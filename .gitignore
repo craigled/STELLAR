@@ -1,0 +1,21 @@
+# Nested repo with no remote — cannot be a submodule yet.
+# Give it a remote, then `git submodule add <url> "Main Code"` to include it.
+/Main Code/
+
+# macOS / OS cruft
+.DS_Store
+**/.DS_Store
+.Spotlight-V100
+.Trashes
+Icon?
+._*
+
+# Large third-party reference material (kept on disk, not tracked)
+# These are scanned books / datasheets / manuals, not project source.
+dr_dobbs_journal_vol_07.pdf
+8051 STC15F2K60S2-en.pdf
+Electronic-Experimenters-Handbook-1978.pdf
+The_AWK_Programming_Language.pdf
+PDP-1802-1.pdf
+PDP-1802-2.pdf
+RCAEngineer-V26N8-1981-SepOct-p29-35-Wright-CLIP3HighLevelControllerLanguage.pdf

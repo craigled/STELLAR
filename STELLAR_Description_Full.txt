@@ -1,0 +1,628 @@
+================================================================================
+STELLAR VIRTUAL MACHINE SYSTEM — FULL TECHNICAL REFERENCE
+Version 0.61 (Beta), January 1, 2026
+================================================================================
+
+Author: Craig Ledbetter
+Target Hardware: Elf2K board (RCA CDP1802/180X microprocessor)
+Implementation: Hand-assembled 1802 machine code — no assembler used
+
+
+--------------------------------------------------------------------------------
+1. OVERVIEW AND BACKGROUND
+--------------------------------------------------------------------------------
+
+STELLAR is a cooperative multitasking virtual CPU and programming layer built
+entirely on top of the RCA CDP1802/180X microprocessor. It runs on the Elf2K
+board and was written entirely in 1802 machine code — every opcode and operand
+byte entered by hand, with all branch targets and addresses calculated manually.
+No assembler of any kind was used during its creation.
+
+The project originated during the 2020 COVID lockdown. In Craig Ledbetter's own
+words:
+
+  "STELLAR was the result of the 2020 COVID lockdown, and was initially designed
+  and created to be a very simple set of general purpose functions that could be
+  called to do complex activities on the Elf2K board. It quickly morphed into
+  having its own virtual Core CPU structure as a learning platform for me to work
+  through all the possible ways I would like an imaginary CPU to function."
+
+The system currently supports up to four simultaneously running virtual machines
+(VMs), each with its own registers, accumulators, flags, stack, label table, and
+4KB of program memory. STELLAR sits at a level of abstraction above 1802 machine
+code but below interpreted BASIC, providing a rich instruction set that handles
+16-bit registers, 24-bit and 32-bit accumulators, decimal arithmetic, stack
+operations, inter-VM communication, and cooperative multitasking — all on an
+8-bit CPU designed in the 1970s.
+
+Current status: Beta, version 0.61. A small number of opcodes remain partially
+implemented or have known issues, but the system is a verified working proof of
+concept for cooperative multitasking on the 1802.
+
+
+--------------------------------------------------------------------------------
+2. PHYSICAL IMPLEMENTATION
+--------------------------------------------------------------------------------
+
+STELLAR is implemented directly in 1802 machine code. Every hex byte was entered
+by hand. There is no source file in any assembly language — the hand-written
+bytes ARE the source. This means all branch displacements, absolute addresses,
+and opcode sequences were calculated manually by the author.
+
+The system uses the CDP1802 SCRT (Standard Call and Return Technique):
+
+  R4 = CALL routine (located at $0340)
+  R5 = RETURN routine (located at $0360)
+  R3 = main 1802 program counter (as per SCRT convention)
+
+Additional 1802 registers dedicated to STELLAR operation:
+
+  R8 = current VM program counter (points into VM program space)
+  R9 = VM stack pointer
+  RC = VM core pointer (RC.hi is always maintained as $30 for the active VM)
+
+R8 advancement is a critical discipline in the codebase: every opcode handler
+must advance R8 past all bytes of the current instruction (opcode byte plus all
+parameter bytes) before returning control to the dispatcher.
+
+The system occupies approximately 12KB of active code in the range $0000-$2EFF,
+plus per-VM data areas described in the memory map below.
+
+A notable hardware constraint: short 1802 branch instructions (opcodes $30-$3F)
+can only branch within the same 256-byte page. This constrains how opcode
+handlers are laid out in memory.
+
+
+--------------------------------------------------------------------------------
+3. MEMORY MAP
+--------------------------------------------------------------------------------
+
+SYSTEM CODE ($0000-$2EFF, approximately 12KB):
+
+  $0000-$009F   Startup, main task loop, VM scheduler
+  $0050         Main scheduler entry point
+  $0100-$014F   Main program loop (opcode fetch and dispatch)
+  $0150-$016F   PARSE_COMMAND (opcode dispatch table lookup)
+  $0340-$035F   SCRT CALL routine
+  $0360-$036F   SCRT RETURN routine
+  $0370-$0379   DELAY routine
+  $0380-$03BF   Display Output routines
+  $03C0-$03FD   Get Input routines
+  $0400-$044F   GETPARAM / SPLIT_NIBBLE (operand decoding)
+  $0450-$04EB   MODIFY_NIBBLE (register-pair parameter decoding)
+  $0510-$0544   REG_DUMP (save 1802 registers to stack)
+  $0565-$058C   REG_RESTORE
+  $05A0-$05BC   PUSH_ROUTINE
+  $05C0-$05DB   POP_ROUTINE
+  $05E0-$05E9   LABEL_ADDR
+  $0600-$069F   Error message table and dispatch
+  $0800-$09FF   Command dispatch table (2 bytes per opcode, 256 entries)
+  $0A00-$2EFF   Opcode handler code
+
+COMMON INTERCHANGE DATA PAGE:
+
+  $2F00-$2FFF   CIDP — Common VM Interchange Data Page (shared by all VMs)
+
+VM CORE AND DATA AREAS:
+
+  $3000-$30FF   VM1 Core (256 bytes — registers, flags, accumulators)
+  $3100-$317F   VM1 Call/Return stack (128 bytes)
+  $3180-$31FF   1802 hardware stack (R2)
+  $3200-$33FF   VM1 Label array (512 bytes, 256 x 2-byte entries)
+  $4000-$4FFF   VM1 Program memory (4KB)
+
+  VMs 2, 3, and 4 follow the same layout:
+  VM2: core $3400, program $5000
+  VM3: core $3800, program $6000
+  VM4: core $3C00, program $7000
+
+  $7000-$7EFF   VM4 program memory (last 4KB of usable RAM in 32KB space)
+
+
+--------------------------------------------------------------------------------
+4. VM CORE LAYOUT
+--------------------------------------------------------------------------------
+
+Each VM has a 256-byte core block at its base address ($3000, $3400, $3800, or
+$3C00). The layout is identical for all four VMs:
+
+REGISTERS AND ACCUMULATORS:
+  +$0000-$001F  16 general-purpose 16-bit registers, R0-RF (2 bytes each)
+  +$0020-$0021  Main Accumulator (16-bit)
+  +$0022-$0024  Math Accumulator (24-bit integer)
+  +$0025-$0026  Math Remainder Register (16-bit)
+  +$0027        Math Accumulator Sign/Decimal Point (00 = positive)
+  +$0028-$002B  Decimal Accumulator (32-bit)
+  +$002C-$002E  Decimal Remainder Register (24-bit)
+  +$002F        Decimal Accumulator Sign
+
+PROGRAM STATE:
+  +$0030        Program Command (current opcode being executed)
+  +$0031-$0032  Program Location (VM PC high byte / low byte)
+  +$0033-$0036  Command Counter (4 bytes — counts executed instructions)
+  +$0037        EF Flag configuration
+  +$0038        Input Port (default $0C)
+  +$0039        Output Port (default $04)
+  +$003A        I/O Byte
+  +$003B        Absolute/Relative memory flag (default $01 = relative)
+  +$003C        Stack Location Register (default $FF)
+  +$003D        Last PUSH byte count
+  +$003E-$003F  Last Location (used for label operations)
+  +$0040        Address Modifier Register
+  +$0041        Memory Address Pointer Direction
+  +$0042-$0043  Random Number Register
+  +$0044        Delay Counter (00-FF)
+  +$004D        Remaining Delay Counter (for multi-VM timeslice delay)
+  +$004E        ExitCode Register
+  +$004F        Error Register
+
+FLAGS:
+  +$0045        Test Flag (00 = false, non-zero = true)
+  +$0046        Debug Flag
+  +$0047        System Status Flag
+  +$0048        Carry Flag
+  +$0049        Overflow Flag
+  +$004A        Hex/Decimal Flag
+  +$004C        Interrupt Flag
+  +$004B        (reserved)
+  +$0056        Q State
+
+VM IDENTITY AND CONFIGURATION:
+  +$0050-$0055  Breakpoint registers
+  +$0057        Hardware ID (01 = Elf2K)
+  +$0058        Call/Return Stack Location (default $7F)
+  +$0059        VM Number
+  +$005A        VM Core Location page
+  +$005B        VM Program Location block
+  +$005C        VM CIDP Location
+  +$005D        VM Data Block Size
+  +$005E        Internal Interrupt Counter
+  +$005F        Internal Interrupt Counter Max (default $03)
+
+WORKSPACE:
+  +$0060-$006F  Scratch Registers A, B, C, D
+  +$0070-$00CF  Temporary Workspace (96 bytes)
+  +$00D0-$00DF  Trace Parameters
+  +$00E0-$00FF  1802 Register Copy (context switch save area)
+
+
+--------------------------------------------------------------------------------
+5. CIDP — COMMON VM INTERCHANGE DATA PAGE ($2F00-$2FFF)
+--------------------------------------------------------------------------------
+
+The CIDP page is shared across all VMs and holds VM configuration records plus
+system-wide state.
+
+Each VM has a 16-byte entry at $2F00 (VM1), $2F10 (VM2), $2F20 (VM3), $2F30 (VM4):
+
+  [00]  VM number
+  [01]  Core page address
+  [02]  Program location block
+  [03]  Maximum program size
+  [04]  Timeslice count (instructions per time quantum)
+  [05]  State
+  [06-09] Command counter (number of instructions executed)
+  [0A]  Mode
+  [0B]  Status
+
+VM State values:
+  00 = Not Available
+  01 = Active
+  03 = Idle / Waiting
+  04 = Paused
+  05 = Killed
+  0F = Unknown
+
+VM Mode:
+  01 = Read Only access
+  02 = Read/Write access
+
+VM Status:
+  00 = Busy
+  01 = Ready
+  02 = Error
+
+System-wide registers at $2F50+:
+  $2F50  System Interrupt State
+           00 = Single (no interrupt)
+           01 = HW Interrupt only
+           02 = Counter Interrupt only
+           03 = Dual (both)
+           0E = Error
+  $2F51  VM Error Register
+  $2F52  Current VM Number (01 to MAX)
+  $2F53  MAX VMs (hardcoded 04)
+  $2F54  Total VMs currently active
+  $2F55  Multitasking Allowed (00 = No, 01 = Yes)
+  $2F56  VM Operation (00 = Sequential, 01 = Simultaneous)
+  $2F57  VM Repeat (00 = Continuous loop, 01 = Repeat at end)
+
+
+--------------------------------------------------------------------------------
+6. COOPERATIVE MULTITASKING
+--------------------------------------------------------------------------------
+
+STELLAR implements cooperative multitasking across up to four VMs using a
+command counter timeslice mechanism.
+
+The main scheduler lives at $0050. Each VM is allocated a configurable number
+of instruction cycles (the timeslice count stored in its CIDP entry). The
+scheduler tracks how many instructions the current VM has executed. When that
+count is exhausted, the scheduler:
+
+  1. Saves the current VM's context (R8, R9, and all core register state into
+     the VM's core area at +$00E0-$00FF)
+  2. Advances to the next active VM
+  3. Restores that VM's context
+  4. Resumes execution from where that VM left off
+
+Each VM has fully independent state:
+  - 16-bit general registers R0-RF
+  - Main, Math, and Decimal accumulators
+  - All flags (Test, Carry, Overflow, Interrupt, etc.)
+  - Call/Return stack (128 bytes)
+  - Label array (256 x 2-byte entries)
+  - 4KB program memory
+
+The DELAY opcode (C0) is multi-VM aware. In a single-VM environment it blocks
+for the specified number of delay units. In a multi-VM environment, each delay
+unit causes the VM to yield its timeslice to the other VMs, allowing concurrent
+activity during wait states. This prevents one VM's delay from stalling the
+entire system.
+
+VMs can share data with each other through the D0-DF inter-VM opcode group,
+but only when sharing has been enabled by the D0 (SHAREVM) opcode. Sharing can
+be configured as read-only or read/write. The inter-VM opcodes allow copying
+accumulators, registers, and individual memory bytes between VMs.
+
+A VM can pause or kill another VM using the CE (PAUSEVM) and CF (KILLVM)
+opcodes, providing basic VM lifecycle management from within a running program.
+
+
+--------------------------------------------------------------------------------
+7. OPCODE SET — 191 OPCODES
+--------------------------------------------------------------------------------
+
+STELLAR has 191 defined opcodes, most of which are multi-byte instructions
+(opcode byte plus one or more parameter bytes). An extended opcode prefix (F8)
+provides access to an additional 256 opcodes.
+
+The Test Flag (at core offset +$0045) is used by all test and conditional branch
+opcodes. Non-zero = TRUE, zero = FALSE.
+
+Note on the 1802 DF flag: after subtraction operations on the host CPU,
+DF = 1 means NO borrow occurred (this is the inverse of intuitive expectation).
+
+--- 7.1 INPUT / OUTPUT ($01-$0F) ---
+
+01 0Z  DEFOUT    Define output port Z (0-7), default port 4
+02 0Z  DEFIN     Define input port Z (9-F), default port C
+03 DZ  DEFEF     Define EF source D (0-4), Z=0 normal / Z=1 inverted
+04 NN  OUTI      Output immediate byte NN on defined port
+05 DZ  OUTA      Output byte Z of accumulator D (0=Acc, 1=MA, 2=DA)
+06 ZX  OUTX      Output register X on defined port
+08 0X  OUTMX     Output byte at memory[RX] on defined port
+09     GETEFA    Scan EF flags into Accumulator
+0A 0Z  SETQ      Set Q line: 0=off, 1=on, 2=pulse once, 3=pulse twice
+0B MMMM SETQM   Play tone/pulse sequence from memory at address MMMM
+0C 0Z  SIPA      Scan input port into Acc byte Z (0=lo, 1=hi)
+0D 0Z  GIPA      Get input port into Acc byte Z
+0E ZX  GIPX      Get input port into register X
+0F 0Z  WIP       Wait for EF flag Z to go high then low
+
+--- 7.2 REGISTER AND ACCUMULATOR ($10-$1F) ---
+
+10 NNNN  LOADAI    Load 2 bytes into Accumulator
+11 ZX NNNN LOADXI  Load 2 bytes into register X (Z: 0=both, 1=lo, 2=hi)
+12 ZD NN… LOADZAI  Load Z bytes into accumulator D (0=Acc, 1=MA, 2=DA)
+13        COPYALH   Copy Acc low byte to high byte
+14 0X     COPYXLH   Copy register X low byte to high byte
+15        SWAPA     Swap Acc high and low bytes
+16 0X     SWAPX     Swap register X high and low bytes
+17 0Z     SHIFTMA   Shift Math Accumulator 1 byte (0=L, 1=RingL, 2=R, 3=RingR)
+18 NN     SETBITI   Set bit NN in Acc low byte
+19 NN     RESETBITI Reset bit NN in Acc low byte
+1A NN     TESTBITI  Test bit NN in Acc low byte
+
+--- 7.3 DATA MOVE ($20-$3F) ---
+
+20 0Z     MEMMODE   Set memory mode (0=absolute, 1=relative)
+21 ZX     COPYAX    Copy accumulator Z to register X (2 bytes)
+22 ZX     COPYXA    Copy register X to accumulator Z (2 bytes)
+23 0Z XY  COPYXY    Copy register X to Y (Z: 0=both, 1=lo, 2=hi)
+24        COPYAMA   Copy Acc to lowest 2 bytes of Math Accumulator
+25        COPYMAA   Copy Math Accumulator to Acc (2 bytes)
+26        COPYAREM  Copy Acc to Math Accumulator Remainder
+27        COPYREMA  Copy Math Remainder to Acc
+28 0Z     COPYCCA   Copy Command Counter to accumulator Z
+29        COPYIOA   Copy IO Register to Acc low byte
+2A        COPYAIO   Copy Acc low byte to IO Register
+30 0Z     DATADIR   Set copy direction (0=same, 1=forward, 2=backward)
+31 0X NN  COPYMXI   Copy byte NN to memory[RX]
+32 0X NNNN COPYMX2I Copy 2 bytes to memory[RX]
+33 ZX     COPYMXA   Copy from memory[RX] to accumulator Z (2/5/7 bytes)
+34 ZX     COPYAMX   Copy accumulator Z to memory[RX]
+35 0D ZX  COPYIMXA  Copy D bytes from memory[RX] to accumulator Z (integer only)
+36 0D ZX  COPYIAMX  Copy D bytes of accumulator Z to memory[RX] (integer only)
+37 DE ZX  COPYDEMXA Copy D bytes starting at byte E of accum Z from memory[RX]
+38 DE ZX  COPYDEAMX Copy D bytes of accum Z starting at byte E to memory[RX]
+39 0D XY  COPYMXY   Copy D bytes from memory[RX] to register Y
+3A 0D XY  COPYXMY   Copy D bytes from register X to memory[RY]
+3B XY NN  COPYMXMY  Copy NN bytes from memory[RX] to memory[RY]
+3C XY 0Z  COPYMXYZ  Copy block from RX to RY until register Z
+3D ZX     COMPAMX   Compare accumulator Z with memory[RX]
+
+--- 7.4 MATH ($40-$6A) ---
+
+40        INCA      Increment Accumulator
+41        DECA      Decrement Accumulator
+42 ZX     INCX      Increment register X (Z: 0=hex, 1=decimal)
+43 ZX     DECX      Decrement register X
+44 XY     ADDXY     Add RX + RY → Math Accumulator
+45 XY     SUBXY     Subtract RY from RX → Math Accumulator
+46 0X     ADDAX     Add Acc + RX → Math Accumulator
+47 0X     SUBAX     Subtract RX from Acc → Math Accumulator
+48 0X     SUBXA     Subtract Acc from RX → Math Accumulator
+49 0X     MULTXA    Multiply RX × Acc → Math Accumulator
+4A XY     MULTXY    Multiply RX × RY → Math Accumulator
+4B 0X     DIVAX     Divide Acc ÷ RX → Math Accumulator + Remainder
+4C 0X     DIVXA     Divide RX ÷ Acc → Math Accumulator + Remainder
+4D XY     DIVXY     Divide RX ÷ RY → Math Accumulator + Remainder
+4E NNNN  ADDAI      Add immediate 2 bytes to Accumulator
+4F NNNN  SUBAI      Subtract immediate 2 bytes from Accumulator
+50 XY 0Z  ADDXYZ    Add RX + RY → register Z
+51 XY 0Z  SUBXYZ    Subtract RY from RX → register Z
+52 0X NNNN ADDXI    Add immediate to register X
+53 0X NNNN SUBXI    Subtract immediate from register X
+54 DZ XY  ADDMXMY   Add D bytes at memory[RX] + memory[RY] → Math Acc
+55 DZ XY  SUBMXMY   Subtract D bytes memory[RY] from memory[RX] → Math Acc
+56 ZX     ADDAMX    Add Z bytes at memory[RX] to Acc → Math Acc
+57 ZX     SUBAMX    Subtract Z bytes at memory[RX] from Acc → Math Acc
+58 0X     MULTAMX   Multiply Acc × 2 bytes at memory[RX] → Math Acc
+59 0X     DIVAMX    Divide Acc ÷ 2 bytes at memory[RX] → Math Acc
+5A DZ XY  MULTMXMY  Multiply D bytes memory[RX] × memory[RY] → Math Acc
+5B DZ XY  DIVMXMY   Divide D bytes memory[RX] ÷ memory[RY] → Math Acc + Remainder
+60 0Z     SHIFTBA   Shift Acc bits (0=L, 1=RingL, 2=R, 3=RingR)
+61 XZ     SHIFTBX   Shift register X bits
+62 0Z     SHIFTBMA  Shift Math Accumulator bits
+63 ZX     OR        OR register X with Acc or immediate → Math Acc
+64 ZX     XOR       XOR register X with Acc or immediate → Math Acc
+65 ZX     AND       AND register X with Acc or immediate → Math Acc
+6A 0Z     CLEARA    Clear accumulator Z (0=Acc, 1=MA, 2=DA, 3=all)
+
+--- 7.5 CONVERT ($6B-$6D) ---
+
+6B ZX     CVT2DEC    Convert Acc/register X to decimal → Decimal Accumulator
+6C        CVT2HEX    Convert Decimal Accumulator to hex → Math Accumulator
+6D 0Z     SETHEXDEC  Set hex/decimal mode flag
+
+--- 7.6 STACK ($70-$7F) ---
+
+70 NN     PUSHI     Push immediate byte NN
+71 NNNN  PUSH2I     Push immediate 2 bytes
+72 0Z     PUSHA     Push complete accumulator Z (2/5/7 bytes depending on type)
+73 0Z     POPA      Pop into accumulator Z
+74 0X     PUSHX     Push register X (2 bytes)
+75 0X     POPX      Pop into register X
+76 ZX     PUSHMX    Push Z bytes from memory[RX] (Z=0 means 16 bytes)
+77 ZX     POPMX     Pop into memory[RX]
+78 0Z     PUSHS     Push special register Z (IO byte, EF flags, flags, etc.)
+79 0Z     POPS      Pop into special register Z
+7A        PUSHQ     Push Q state
+7B        POPQ      Pop and restore Q state
+7E        POPLAST   Skip back over last push (undo stack advance)
+7F        RESETSP   Reset stack pointer to top of stack
+
+--- 7.7 TEST ($80-$9F) ---
+
+All test opcodes set the Test Flag at core offset +$0045.
+
+80 ZX     TESTAX     Acc == register X ?
+81 NNNN  TESTAI      Acc == immediate NN NN ?
+82        TESTAMA    Acc == Math Accumulator (low 2 bytes) ?
+83        TESTIO     IO byte == Acc low byte ?
+84 NN     TESTIOI    IO byte == immediate NN ?
+85        TESTADA    Acc == Decimal Accumulator (low 2 bytes) ?
+86 ZX NNNN TESTXI   Register X == immediate ?
+87 XY     TESTXY     Register X == Register Y ?
+88 0Z XY  TESTGXY    Register X > (or >=) Register Y ?
+89 0Z XY  TESTLXY    Register X < (or <=) Register Y ?
+8A 0X     TESTDAGX   Decimal Acc >= register X ?
+8B 0X     TESTCCGX   Command Counter > register X ?
+8C ZX     TESTXZ     Register X == 0 ?
+8D 0D     TESTAZ     Accumulator D == 0 ?
+8E        TESTREMZ   Math Remainder == 0 ?
+8F        TESTDAREMZ Decimal Remainder == 0 ?
+90 XY     TESTRANGEXY  Acc within range RX to RY ?
+91        TESTSIGN   Math Acc sign positive ?
+92        TESTQ      Q line set ?
+93        TESTCF     Carry flag set ?
+94 0Z     TESTSPEC   Special flag Z non-zero ?
+95 NN     SETEXIT    Set ExitCode register to NN
+96 NN     TESTEXIT   ExitCode == NN ?
+97 NN     TESTIS     Interrupt state == NN ?
+98        TESTERROR  Error register non-zero ?
+99 DZ     TESTEFI    EF flag D == Z ?
+9A 0Z     TESTEVEN   Acc/MA low byte even ?
+9B DZ     TESTABZ    Byte D of accumulator Z == 0 ?
+9C D0 XY  COMPMXMY   Compare D bytes memory[RX] with memory[RY]
+9D ZX NN… TESTMXI   Compare Z bytes at memory[RX] with immediate NN…
+9E NN     TESTSYSTAT System status == NN ?
+9F 0Z NN  TESTINP    Input port Z value == NN ?
+
+--- 7.8 LABELS AND BRANCHES ($A0-$BF) ---
+
+A0 MMMM  IFTRUEI    If Test Flag true, jump to absolute address MM MM
+A1 MMMM  IFFALSEI   If Test Flag false, jump to absolute address MM MM
+A2 LL    IFTRUEL    If Test Flag true, jump to label LL
+A3 LL    IFFALSEL   If Test Flag false, jump to label LL
+A4 0Z MM IFTRUEJI   If Test Flag true, jump ±MM bytes (Z: 0=forward, 1=back)
+A5 0Z MM IFFALSEJI  If Test Flag false, jump ±MM bytes
+A6 ZX    IFTRUEX    If Test Flag true, jump to address in register X
+A7 ZX    IFFALSEX   If Test Flag false, jump to address in register X
+A8 MMMM  LOOPTI     Loop to MM MM until Test Flag becomes true
+A9 MMMM  LOOPFI     Loop to MM MM until Test Flag becomes false
+B0 MMMM  GAL        Unconditional jump to absolute address MM MM
+B1 ZX    GTX        Jump to address in register X (direct or indirect)
+B3 LL    LBL        Define label LL at this location
+B4 LL    GTL        Unconditional jump to label LL
+B5 XY MMMM LOOPI   Loop to MM MM until RX >= RY
+B6 XY LL LOOPL     Loop to label LL until RX >= RY
+B7 0X MMMM LOOPXI  Loop to MM MM until RX == 0
+B8 0X LL LOOPXL    Loop to label LL until RX == 0
+B9 0Z MM JUMPI     Jump ±MM bytes from current location (relative)
+BA LL MMMM DEFSUB  Define subroutine LL at address MM MM
+BB LL    STARTSUB   Mark start of inline subroutine LL
+BC 00    ENDSUB     Mark end of subroutine
+BD MMMM  CALL       Call subroutine at MM MM
+BE 0Z    RETURN     Return from call (Z=0: standard; non-0: return to last location)
+BF       RETURNL    Return from label-based subroutine
+
+--- 7.9 MISCELLANEOUS ($C0-$CF) ---
+
+00        HALT     End VM program execution
+C0 NN     DLYI     Delay NN units (multi-VM aware: yields timeslice per unit)
+C2 NN…   RUNMC    Execute raw 1802 machine code inline; return with SEP R5
+C3        RAND     Generate pseudo-random 2-byte number → Accumulator
+C4        NOP      No operation
+C5        EINT     Enable external interrupt
+C6        DINT     Disable external interrupt (default state: disabled)
+C7 0Z     SETSTATE Set interrupt state Z (0=none, 1=HW, 2=counter, 3=dual)
+C8 NN     SETCIN   Set counter interrupt threshold NN
+C9 MMMM  IADDR    Set interrupt handler address to MM MM
+CE VZ     PAUSEVM  Pause/resume VM V (Z: 0=pause, 1=resume)
+CF V0     KILLVM   Kill VM V
+
+--- 7.10 VIRTUAL MACHINE INTER-VM OPCODES ($D0-$DF) ---
+
+These opcodes operate between VMs. Sharing must be enabled with D0 first.
+
+D0 ZD     SHAREVM    Enable/disable sharing (Z: 0=off, 1=on; D: 1=RO, 2=RW)
+D1 VD     TESTVM     Test if VM V is available for access D (1=read, 2=RW)
+D2 VZ     COPYVA     Load/save accumulator between local VM and VM V
+D3 VZ XY  COPYVXY    Load/save register between local VM and VM V
+D4 V0 XY  COPYVMXY   Copy 2 bytes from VM V memory[RX] to local RY
+D5 V0 XY  COPYXVMY   Copy 2 bytes from local RX to VM V memory[RY]
+D6 VX VY  COPYVMXVMY Copy 1 byte between VM V memory locations
+D7 VX VY  COPYVXVY   Copy register RX to RY within VM V
+D8 V0     INCVA      Increment VM V accumulator
+D9 V0     DECVA      Decrement VM V accumulator
+DA VX     INCVX      Increment VM V register X
+DB VX     DECVX      Decrement VM V register X
+DC VX VY DD COPYBVMXVMY  Copy DD bytes between VM memory regions
+DD V0     TESTVSTAT  Test VM V error status
+DE V0 XY  TESTVXY    Test if VM V register X == local register Y
+DF VZ NN  TESTVSR    Test VM V special register Z against byte NN
+
+--- 7.11 DEBUG ($F0-$FF) ---
+
+F0        BRK      Break and display current register state
+F6 XY     CKSUMXY  Checksum bytes from memory[RX] to memory[RY] → Math Acc
+F8 OO     EXTOP    Extended opcode prefix (256 additional opcodes follow)
+FA 0Z     RESETFLAG  Reset flag Z to 00
+FB XY NN  FILLMEMXY  Fill memory from RX to RY with byte NN
+FC ZD XY  PULSESORTXY  Bubble sort array from RX to RY (ascending/descending)
+FF NN     DEBUG    Set debug mode (0=normal through 8=full trace)
+
+--- 7.12 EXTENDED OPCODES (F8 prefix) ---
+
+F8 01        TRACVAR   Define system variables to trace
+F8 02 MM     COPYSV    Copy system variable at offset MM → Acc low byte
+F8 03 MM     COPYSV*   Copy Acc low byte → system variable at offset MM
+F8 04 MMMM  PEEKI      Copy byte from absolute address MM MM → Acc low byte
+F8 05 MMMM  POKEI      Store Acc low byte to absolute address MM MM
+F8 06        OUTT      Output Acc low byte to terminal as ASCII
+F8 07        PULSESORTXY  Extended sort (D=cell size 0-F)
+F8 08 0X     OUTS      Output null-terminated string at memory[RX] to terminal
+F8 09 LL     RESETL    Clear label LL and make it available for reuse
+
+
+--------------------------------------------------------------------------------
+8. KEY DESIGN NOTES AND CONSTRAINTS
+--------------------------------------------------------------------------------
+
+R8 ADVANCEMENT RULE:
+Every opcode handler must advance R8 past the complete instruction (opcode byte
+plus all parameter bytes) before returning to the main dispatch loop. Failure to
+advance R8 correctly will cause the VM to misinterpret bytes and execute garbage.
+
+GETPARAM ROUTINE ($0400):
+The standard operand decoding routine. Mode 01 reads lo-byte pointers; mode 03
+reads hi-byte pointers. All multi-byte opcode handlers call this routine to
+decode their operand nibbles.
+
+MODIFY_NIBBLE ROUTINE ($0450):
+Decodes register-pair parameters (e.g., "XY" notation in the opcode table, where
+the single byte encodes two 4-bit register numbers).
+
+TEST FLAG CONVENTION:
+The Test Flag at core offset +$0045 is the universal branch condition. All test
+opcodes (80-9F) write their result here. Non-zero = TRUE. Zero = FALSE. Conditional
+branch opcodes (A0-A9) read this flag.
+
+1802 DF FLAG BEHAVIOUR:
+The CDP1802's DF (data flag) behaves counter-intuitively after subtraction:
+DF = 1 means the subtraction required NO borrow (i.e., result was non-negative).
+DF = 0 means a borrow occurred. This is the opposite of many other architectures
+and must be kept in mind when implementing or extending arithmetic handlers.
+
+SHORT BRANCH PAGE CONSTRAINT:
+CDP1802 short branch instructions ($30-$3F) can only branch to addresses within
+the same 256-byte memory page. This places a hard layout constraint on all opcode
+handler code: any handler that uses short branches must fit entirely within, or
+carefully straddle, page boundaries. This is one reason the opcode handler space
+($0A00-$2EFF) is large and carefully structured.
+
+LABEL STORAGE:
+Labels are stored in a 512-byte array at $3200-$33FF (VM1) — 256 two-byte
+entries. Each entry holds the 16-bit address corresponding to the label number.
+The LBL opcode (B3) writes the current VM PC into the label array. GTL (B4) and
+the conditional label branches look up addresses from this array.
+
+MEMORY MODES:
+STELLAR supports both absolute and relative memory addressing within VM program
+space. The mode is set per-VM via the MEMMODE opcode (20) and stored at core
+offset +$003B. In relative mode, memory addresses in data-move opcodes are
+offsets from the start of the VM's program block rather than absolute 1802
+addresses.
+
+RUNMC OPCODE (C2):
+Allows embedding raw 1802 machine code bytes directly within a STELLAR program.
+The inline machine code is executed natively by the 1802. The handler must end
+with SEP R5 (1802 opcode $B5... actually the SCRT return sequence) to hand
+control back to the STELLAR dispatcher.
+
+COMMAND COUNTER:
+Each VM maintains a 4-byte command counter at core offset +$0033 that counts the
+total number of instructions the VM has executed since starting. This can be read
+with the COPYCCA opcode (28) and tested with TESTCCGX (8B).
+
+
+--------------------------------------------------------------------------------
+9. CURRENT STATUS
+--------------------------------------------------------------------------------
+
+Version:  0.61 (Beta)
+Date:     January 1, 2026
+Hardware: Elf2K (RCA CDP1802/180X)
+Code size: approximately 12KB of hand-assembled machine code
+
+The system is a verified working proof of concept. Cooperative multitasking
+across up to four VMs has been demonstrated. The majority of the 191 defined
+opcodes are fully implemented and functional.
+
+A small number of opcodes remain partially implemented or have known issues —
+this is the primary reason the version remains at Beta 0.61.
+
+As the author notes:
+
+  "This is Beta version, with a few of the OpCodes still not fully implemented,
+  or problematic. But overall, STELLAR does work, and is a verified proof of
+  concept that an 1802 can be run as a multitasking system, doing substantial
+  work using a new programming language below the BASIC language, but above the
+  Machine Code/Assembly language of the 1802."
+
+
+--------------------------------------------------------------------------------
+END OF DOCUMENT
+================================================================================

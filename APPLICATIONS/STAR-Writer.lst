@@ -1,0 +1,47 @@
+; STAR-Writer — basic STELLAR text-entry terminal
+; Loads at $4000 (VM1 program block).
+; Text buffer: $0A00..$0FFF relative  ( = $4A00..$4FFF absolute ).
+; MEMMODE left at default 1 (Relative).
+;
+; Keys:  CR       = store CR+LF, echo CR+LF
+;        BS ($08) = backspace - drop last char (drops 2 for CR+LF pair),
+;                   echo BS SP BS
+;        ^D ($04) = silent delete (drops 2 for CR+LF pair)
+;        ^E ($05) = end - scan buffer for $00 sentinel, set R1 there,
+;                   replay the loaded text, ready to continue typing
+;        ^U ($15) = clear - zero the whole buffer, reset pointer, CR+LF
+;        ^V ($16) = view - dump buffer to terminal
+;        ^X ($18) = exit - write $00 sentinel at M(R1), HALT (text stays)
+;
+; Init does NOT clear buffer memory — only loads vCPU register state.
+; ^X writes a $00 byte after the last typed char so that ^E on a later
+; run can find where the text ends.  On a fresh cold boot ^E will
+; typically see $00 at $4A00 and act as empty.
+;
+; vCPU register map:
+;   R1 = current write pointer
+;   R2 = buffer start ($0A00)
+;   R3 = buffer end+1 ($1000) - R1<R3 bounds check
+;   R4 = scratch (view / scan / display iterator)
+;   R5 = buffer last byte ($0FFF) - FILLMEMXY upper end for ^U
+;
+; Label map: 01=main loop  10/11/12=view  20/22=BS  30=delete
+;            40/41=CR  50=clear  60/61/62/63/64=load-to-end  FE=exit
+
+D 4000 CD 11 01 0A 00 11 02 0A 00 11 03 10 00 11 05 0F
+D 4010 FF 10 00 00 B3 01 CB 81 00 18 A2 FE 81 00 16 A2
+D 4020 10 81 00 08 A2 20 81 00 04 A2 30 81 00 0D A2 40
+D 4030 81 00 15 A2 50 81 00 05 A2 60 89 13 A3 01 C9 36
+D 4040 01 01 42 01 B4 01 B3 10 CA 0D CA 0A 23 00 24 B3
+D 4050 11 87 14 A2 12 35 01 04 C9 42 04 B4 11 B3 12 CA
+D 4060 0D CA 0A B4 01 B3 20 88 12 A3 01 43 01 35 01 01
+D 4070 81 00 0A A3 22 88 12 A3 22 43 01 B3 22 CA 08 CA
+D 4080 20 CA 08 B4 01 B3 30 88 12 A3 01 43 01 35 01 01
+D 4090 81 00 0A A3 01 88 12 A3 01 43 01 B4 01 B3 40 89
+D 40A0 13 A3 41 36 01 01 42 01 89 13 A3 41 10 00 0A 36
+D 40B0 01 01 42 01 B3 41 CA 0D CA 0A B4 01 B3 FE 10 00
+D 40C0 00 36 01 01 CA 0D CA 0A 00 B3 50 FB 25 00 23 00
+D 40D0 21 CA 0D CA 0A B4 01 B3 60 23 00 24 B3 61 87 43
+D 40E0 A2 62 35 01 04 81 00 00 A2 62 42 04 B4 61 B3 62
+D 40F0 23 00 41 CA 0D CA 0A 23 00 24 B3 63 87 14 A2 64
+D 4100 35 01 04 C9 42 04 B4 63 B3 64 B4 01

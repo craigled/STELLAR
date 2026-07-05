@@ -1,0 +1,133 @@
+================================================================================
+STELLAR VIRTUAL MACHINE SYSTEM — OVERVIEW
+Version 0.61 (Beta), January 1, 2026
+================================================================================
+
+Author: Craig Ledbetter
+
+
+WHAT IS STELLAR?
+
+STELLAR is a cooperative multitasking virtual CPU and high-level programming
+layer that runs on the RCA CDP1802/180X microprocessor, implemented on the Elf2K
+retrocomputer board. It provides a complete virtual machine environment — with
+its own instruction set, registers, accumulators, stack, label system, and
+inter-VM communication — sitting at a level of abstraction above raw 1802
+machine code but below interpreted languages such as BASIC.
+
+The entire system was written by hand directly in 1802 machine code during the
+2020 COVID lockdown. No assembler was used — every opcode byte, branch target,
+and address was calculated and entered manually. The active codebase is
+approximately 12KB.
+
+The project grew from a simple utility library into a fully featured virtual
+machine architecture, designed as an exploration of how a capable programming
+environment could be built on a minimal 1970s-era 8-bit processor. Up to four
+independent virtual machines can run simultaneously on a single 1802 chip using
+cooperative multitasking.
+
+
+HARDWARE
+
+  Processor:  RCA CDP1802 / 180X (8-bit, late 1970s architecture)
+  Board:      Elf2K
+  RAM:        32KB addressable space (VMs use the upper regions)
+  Identified as Hardware ID 01 within STELLAR
+
+
+COOPERATIVE MULTITASKING
+
+STELLAR's scheduler divides CPU time among up to four VMs using a configurable
+command counter timeslice. Each VM is allocated a set number of instructions per
+time quantum. When a VM's quota is exhausted, the scheduler saves that VM's full
+state and switches to the next active VM, restoring its state and resuming
+execution transparently.
+
+Each VM maintains completely independent state: sixteen 16-bit general-purpose
+registers, a 16-bit main accumulator, a 24-bit math accumulator, a 32-bit
+decimal accumulator, a call/return stack, a 256-entry label table, all flags,
+and 4KB of dedicated program memory. Context switches preserve everything.
+
+The DELAY instruction is multi-VM aware. Rather than blocking the entire CPU
+during a wait, each delay unit causes the active VM to yield its timeslice to
+the other VMs, keeping all virtual machines running during delay periods.
+
+VMs can share data with each other through a dedicated set of inter-VM
+instructions, provided sharing has been explicitly enabled. Sharing can be
+configured as read-only or read/write. One VM can also pause or terminate
+another VM under program control.
+
+A Common VM Interchange Data Page (CIDP) at a fixed memory location holds
+configuration records for all four VMs plus system-wide state, and is accessible
+to all VMs as shared ground.
+
+
+INSTRUCTION SET — HIGH-LEVEL CATEGORIES
+
+STELLAR defines 191 opcodes, most requiring one or more parameter bytes. An
+extended prefix opcode provides access to a further 256 extended instructions.
+The opcode groups are:
+
+  Input / Output       — define I/O ports and EF flags, send and receive data,
+                         control the Q output line, wait on external signals
+
+  Register / Accumulator — load, copy, swap, and shift the general-purpose
+                         registers and the three accumulators (main, math,
+                         decimal)
+
+  Data Move            — copy data between registers, accumulators, and VM
+                         memory in flexible combinations; set memory addressing
+                         mode and copy direction
+
+  Math                 — add, subtract, multiply, and divide using registers,
+                         accumulators, and memory operands; bitwise OR, XOR,
+                         AND; bit shifting; results land in the math accumulator
+                         with remainder capture
+
+  Convert              — convert between hexadecimal and decimal representations
+                         across the math and decimal accumulators
+
+  Stack                — push and pop immediate values, registers, accumulators,
+                         and memory blocks; save and restore special registers
+                         and the Q state
+
+  Test                 — a full set of comparison instructions (equality, range,
+                         sign, zero, flags, counters, EF lines, input ports)
+                         that all write their result to a single Test Flag used
+                         by conditional branches
+
+  Labels and Branches  — unconditional and conditional jumps by absolute address,
+                         label number, register-held address, or relative offset;
+                         loop constructs with register-based termination
+                         conditions; subroutine define, call, and return
+
+  Miscellaneous        — halt, delay, inline native 1802 machine code, random
+                         number generation, NOP, interrupt control, VM pause
+                         and kill
+
+  Inter-VM             — copy accumulators, registers, and memory between
+                         running VMs; increment/decrement VM registers remotely;
+                         test remote VM state and registers
+
+  Debug / Extended     — breakpoint, memory fill, checksum, sort, debug trace
+                         levels, peek/poke to absolute addresses, terminal
+                         ASCII output, system variable access
+
+
+CURRENT STATUS
+
+Version 0.61 Beta, dated January 1, 2026. The system is a verified working
+proof of concept. Cooperative multitasking across multiple VMs has been
+demonstrated on real hardware. The majority of the 191 opcodes are fully
+implemented. A small number remain partially implemented or have known issues,
+which is why the version remains at Beta.
+
+In the author's words: "STELLAR does work, and is a verified proof of concept
+that an 1802 can be run as a multitasking system, doing substantial work using
+a new programming language below the BASIC language, but above the Machine
+Code/Assembly language of the 1802."
+
+
+================================================================================
+END OF DOCUMENT
+================================================================================
