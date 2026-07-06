@@ -68,6 +68,19 @@ There is no assembler, no compiler, no toolchain. Every byte of machine code is 
 | `STELLAR_HANDOFF.md` | Session-by-session development log and bug fix history |
 | `STELLAR_ONBOARDING.md` | Technical reference for the architecture and code format |
 
+## Applications
+
+Programs written in the STELLAR VM instruction set, hand-assembled as D-line hex. All load at `$4000` (VM1) and run over the terminal. Found in [`APPLICATIONS/`](APPLICATIONS/).
+
+| App | Description |
+|-----|-------------|
+| `Simple-Calc.lst` | Terminal four-function calculator with chained operations |
+| `Prime-Gen.lst` | Prime-number generator over a user-supplied range |
+| `Tic-Tac-Toe.lst` | Tic-Tac-Toe against a heuristic computer opponent; board drawn with a 1–9 position legend |
+| `Lite-Writer.lst` | Minimal terminal text-entry editor |
+| `STAR-Writer.lst` | Basic terminal text-entry app |
+| `ELIZA.lst` | ELIZA-style conversational chatbot (keyword matching + pronoun swap) |
+
 ## Code Format
 
 The source uses D-line notation for machine code:
