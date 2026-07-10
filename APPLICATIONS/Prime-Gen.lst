@@ -1,6 +1,7 @@
 ; ============================================================
 ; Prime-Gen  —  STELLAR prime-number generator  (loads at $4000, VM1)
-; VERSION:  v02   (2026-07-04)  — echo CR/LF after each entry line
+; VERSION:  v03   (2026-07-07)  — add missing F0 00 00 pre-pass END marker
+;           v02   (2026-07-04)  — echo CR/LF after each entry line
 ; ============================================================
 ; Asks the user for a LOW and HIGH limit, then prints every prime
 ; in [LOW..HIGH] to the terminal, space separated.
@@ -98,6 +99,11 @@ D 4240 BE 00
 ;   $4727 "High limit: "
 ;   $4734 "Primes:\r\n"
 ;   $473E "\r\nDone.\r\n"
+
+; ---- pre-pass END marker (v03): without it the pre-pass scanned
+;      dirty RAM past PRINT and corrupted the loop labels ----
+D 4242 F0 00 00
+
 D 4700 53 54 45 4C 4C 41 52 20 50 72 69 6D 65 20 47 65
 D 4710 6E 65 72 61 74 6F 72 0D 0A 00 4C 6F 77 20 6C 69
 D 4720 6D 69 74 3A 20 20 00 48 69 67 68 20 6C 69 6D 69

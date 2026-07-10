@@ -45,3 +45,9 @@ D 40D0 21 CA 0D CA 0A B4 01 B3 60 23 00 24 B3 61 87 43
 D 40E0 A2 62 35 01 04 81 00 00 A2 62 42 04 B4 61 B3 62
 D 40F0 23 00 41 CA 0D CA 0A 23 00 24 B3 63 87 14 A2 64
 D 4100 35 01 04 C9 42 04 B4 63 B3 64 B4 01
+
+; ---- pre-pass END MARKER (added 2026-07-07) ----
+;   Code ends at $410B (B4 01). Without F0 00 00 the label pre-pass
+;   scans dirty RAM past here and can corrupt the 16 labels / 30
+;   branches (the Prime-Gen bug class). Marker stops the scan cleanly.
+D 410C F0 00 00
