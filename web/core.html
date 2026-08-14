@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STELLAR VM Core</title>
+<meta name="description" content="A live view of a STELLAR VM core — its registers, accumulators, math units, and flags — updating as a program runs.">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<main class="wrap">
+  <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Interactive</div>
+  <h1 style="margin:.1em 0 .1em">The VM Core</h1>
+  <p class="muted" style="max-width:74ch">Everything a STELLAR VM knows lives in a 256-byte block of RAM (VM&nbsp;1 at <span class="mono">$3000</span>). The firmware reads and writes it as it interprets each opcode — so this panel is a live window onto that memory. Load a program and step it; cells the last opcode changed light up.</p>
+
+  <div class="sim-controls">
+    <select id="sample" title="Sample program"></select>
+    <button id="step" class="primary">Step ▸</button>
+    <button id="run">Run ▶</button>
+    <button id="pause" disabled>Pause ⏸</button>
+    <button id="reset">Reset ↺</button>
+    <span class="speed-row">speed
+      <input type="range" id="speed" min="0" max="3" step="1" value="0">
+      <span id="speedLabel" class="mono">1×</span>
+    </span>
+    <span class="grow"></span>
+    <button id="toggleSide">Disassembly</button>
+  </div>
+  <div class="status-line" id="status">loading…</div>
+
+  <div class="sim-body" id="body">
+    <div class="sim-main">
+      <div id="core"></div>
+      <div class="term-wrap">
+        <h4>Serial terminal</h4>
+        <div class="term" id="term"></div>
+      </div>
+    </div>
+    <div class="sim-side" id="side">
+      <h4>Disassembly — running program</h4>
+      <div class="dis-panel" id="disasm"></div>
+    </div>
+  </div>
+
+  <h2><span class="hx">?</span>What you're looking at</h2>
+  <div class="grid">
+    <div class="card"><div class="k">Registers</div><h3>R0–RF</h3><p>Sixteen general-purpose 16-bit registers. Programs use them for pointers, counters, and operands. (R0 is reserved.)</p></div>
+    <div class="card"><div class="k">Accumulators</div><h3>Acc · MA · DA</h3><p>The 16-bit working <b>Acc</b>; the <b>Math Accumulator</b> that receives multiply/divide results plus a remainder and sign; and the packed-BCD <b>Decimal Accumulator</b>.</p></div>
+    <div class="card"><div class="k">Flags &amp; state</div><h3>Test · Carry · …</h3><p>The <b>Test</b> flag drives every branch. <b>Carry</b> means borrow/overflow. <b>Quantum</b> is the multitasking countdown before this VM yields.</p></div>
+    <div class="card" style="border-color:var(--accent)"><div class="k">Go deeper</div><h3>Reference</h3><p>See the <a href="architecture.html">byte-by-byte core layout</a>, the full <a href="opcodes.html">opcode set</a>, or open the <a href="simulator.html">full simulator</a>.</p></div>
+  </div>
+</main>
+
+<footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
+
+<script src="js/opcodes.js"></script>
+<script src="js/firmware-0061-22.js"></script>
+<script src="js/stellar-vm.js"></script>
+<script src="js/disasm.js"></script>
+<script src="js/core-view.js"></script>
+<script src="js/sim-app.js"></script>
+<script src="js/core-page.js"></script>
+<script src="js/nav.js"></script>
+</body>
+</html>

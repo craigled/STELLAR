@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STELLAR Simulator</title>
+<meta name="description" content="Run STELLAR programs in the browser on the real firmware — step through the disassembly and watch the core update live.">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<main class="wrap">
+  <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Interactive</div>
+  <h1 style="margin:.1em 0 .1em">Simulator</h1>
+  <p class="muted" style="max-width:72ch">Runs the actual V0061.22 firmware on a faithful 1802 emulator — the same bytes the hardware executes. Step one opcode at a time and watch the VM core change; the side panel disassembles the running program and tracks the current instruction.</p>
+
+  <div class="sim-controls">
+    <select id="sample" title="Sample program"></select>
+    <label class="mono small" style="color:var(--ink-soft)">input
+      <input type="text" id="input" value="" size="10" placeholder="e.g. 3&#92;r60&#92;r" title="Serial input; use \r for Enter">
+    </label>
+    <button id="load">Load</button>
+    <span class="grow"></span>
+    <button id="toggleSide" title="Show/hide the disassembly panel">Side panel</button>
+  </div>
+  <p class="sim-blurb" id="blurb"></p>
+
+  <div class="sim-controls">
+    <button id="step" class="primary">Step ▸</button>
+    <button id="run">Run ▶</button>
+    <button id="pause" disabled>Pause ⏸</button>
+    <button id="reset">Reset ↺</button>
+    <span class="speed-row">
+      speed
+      <input type="range" id="speed" min="0" max="3" step="1" value="1">
+      <span id="speedLabel" class="mono">1×</span>
+    </span>
+  </div>
+  <div class="status-line" id="status">loading…</div>
+
+  <div class="sim-body side-open" id="body">
+    <div class="sim-main">
+      <div id="core"></div>
+      <div class="term-wrap">
+        <h4>Serial terminal</h4>
+        <div class="term" id="term"></div>
+      </div>
+    </div>
+    <div class="sim-side" id="side">
+      <h4>Disassembly — running program</h4>
+      <div class="dis-panel" id="disasm"></div>
+    </div>
+  </div>
+
+  <p class="small muted" style="margin-top:18px">The first step runs STELLAR's <code>CD</code> label pre-pass; interactive stepping then begins at the first real instruction. Look up any opcode in the <a href="opcodes.html">reference</a>.</p>
+</main>
+
+<footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
+
+<script src="js/opcodes.js"></script>
+<script src="js/firmware-0061-22.js"></script>
+<script src="js/stellar-vm.js"></script>
+<script src="js/disasm.js"></script>
+<script src="js/core-view.js"></script>
+<script src="js/sim-app.js"></script>
+<script src="js/simulator-page.js"></script>
+<script src="js/nav.js"></script>
+</body>
+</html>

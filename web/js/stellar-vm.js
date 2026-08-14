@@ -10,7 +10,10 @@
 (function (root, factory) {
   var api = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  if (typeof window !== 'undefined') window.StellarVM = api;
+  if (typeof window !== 'undefined') {
+    window.StellarVM = api.StellarVM;   // the constructor
+    window.StellarVMLib = api;          // CPU, UART, parseLst, constants
+  }
 })(this, function () {
   'use strict';
 
@@ -268,6 +271,57 @@
   StellarVM.prototype.coreByte = function (off, vmCore) { return this.cpu.M[(vmCore || CORE) + off]; };
   StellarVM.prototype.coreWord = function (off, vmCore) {
     var base = (vmCore || CORE) + off; return (this.cpu.M[base] << 8) | this.cpu.M[base + 1];
+  };
+
+  // Structured snapshot of a VM core (default VM1) for the visualizers.
+  StellarVM.prototype.snapshot = function (vmCore) {
+    var base = vmCore || CORE, M = this.cpu.M;
+    function b(o) { return M[base + o]; }
+    function w(o) { return (M[base + o] << 8) | M[base + o + 1]; }
+    var regs = [];
+    for (var i = 0; i < 16; i++) regs.push((M[base + i * 2] << 8) | M[base + i * 2 + 1]);
+    return {
+      regs: regs,
+      acc: w(0x20),
+      maBytes: [b(0x22), b(0x23), b(0x24)], maRem: w(0x25), maSign: b(0x27),
+      daBytes: [b(0x28), b(0x29), b(0x2A), b(0x2B)],
+      daRemBytes: [b(0x2C), b(0x2D), b(0x2E)], daSign: b(0x2F),
+      cmd: b(0x30), pl: w(0x31),
+      cmdCounter: b(0x33) * 0x1000000 + (b(0x34) << 16) + (b(0x35) << 8) + b(0x36),
+      flags: { test: b(0x45), carry: b(0x48), overflow: b(0x49), hexdec: b(0x4A) },
+      intCounter: b(0x5E), intMax: b(0x5F), memMode: b(0x3B),
+      steps: this.cpu.steps, halted: this.cpu.halted, pc1802: this.cpu.R[this.cpu.P]
+    };
+  };
+
+  // Command counter (VM1) — increments once per real STELLAR opcode.
+  StellarVM.prototype._cc = function () {
+    var M = this.cpu.M;
+    return M[CORE + 0x33] * 0x1000000 + (M[CORE + 0x34] << 16) + (M[CORE + 0x35] << 8) + M[CORE + 0x36];
+  };
+  // Run past the CD label pre-pass so interactive stepping starts at the first
+  // real instruction. The pre-pass walks PL through the program, then real
+  // execution restarts at the program base — so we stop the 2nd time PL == base.
+  StellarVM.prototype.prime = function (cap) {
+    cap = cap || 3000000;
+    var c = this.cpu, prevAtBase = false, hits = 0, g = 0;
+    while (g++ < cap) {
+      if (!c.step()) return false;
+      var atBase = ((c.M[CORE + 0x31] << 8) | c.M[CORE + 0x32]) === ENTRY;
+      if (atBase && !prevAtBase && ++hits === 2) { this.primed = true; return true; }
+      prevAtBase = atBase;
+    }
+    return false;
+  };
+  // Advance exactly one real STELLAR opcode (until the command counter ticks).
+  StellarVM.prototype.stepOpcode = function (cap) {
+    cap = cap || 2000000;
+    var c = this.cpu, s = this._cc(), g = 0;
+    while (g++ < cap) {
+      if (!c.step()) return { halted: true };
+      if (this._cc() !== s) return { halted: false };
+    }
+    return { halted: false, capped: true };
   };
 
   return {
