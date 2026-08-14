@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Prime-Gen v05",
+    "file": "Prime-Gen-v05.lst",
+    "input": "3\r60\r",
+    "blurb": "Odd-only trial division; prints primes 3 to 59. Exercises SERIN input, decimal parse, DIVXY + remainder test, decimal print.",
+    "maxSteps": 40000000,
+    "halts": true
+  },
+  {
+    "name": "Prime-Gen v04",
+    "file": "Prime-Gen-v04.lst",
+    "input": "3\r30\r",
+    "blurb": "Earlier prime generator using a multiply-back divisibility test; primes 3 to 29.",
+    "maxSteps": 40000000,
+    "halts": true
+  },
+  {
+    "name": "Banner",
+    "file": "Banner.lst",
+    "input": "HI\r",
+    "blurb": "Big-letter ASCII banner from a 5x5 pre-rendered font. Exercises indexed memory reads and nested loops.",
+    "maxSteps": 4000000,
+    "halts": true
+  },
+  {
+    "name": "Simple-Calc",
+    "file": "Simple-Calc.lst",
+    "input": "12+30\r",
+    "blurb": "Interactive calculator (runs a fixed step budget here). Exercises the decimal/fixed-point math path.",
+    "maxSteps": 3000000,
+    "halts": false
+  },
+  {
+    "name": "Mandelbrot",
+    "file": "Mandelbrot.lst",
+    "input": "",
+    "blurb": "ASCII Mandelbrot in Q8.8 fixed point (fixed step budget here). Exercises signed multiply and the MA pipeline.",
+    "maxSteps": 8000000,
+    "halts": false
+  }
+]
