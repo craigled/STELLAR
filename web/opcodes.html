@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STELLAR Opcode Reference</title>
+<meta name="description" content="Every STELLAR opcode by group — hex, mnemonic, operands, and description. Searchable and deep-linkable.">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<main class="wrap">
+  <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Reference</div>
+  <h1 style="margin:.1em 0 .2em">Opcode set</h1>
+  <p class="muted" style="max-width:70ch">Every STELLAR v0.61 opcode. Operand notation:
+    <span class="mono">NN</span> immediate byte · <span class="mono">MM MM</span> address ·
+    <span class="mono">X/Y</span> register · <span class="mono">Z/D</span> nibble selector ·
+    <span class="mono">LL</span> label · <span class="mono">V</span> VM number.
+    Each row links to itself — e.g. <a href="#op-4D">#op-4D</a>.</p>
+
+  <div class="op-controls">
+    <input class="op-search" id="q" type="search" placeholder="Search name, hex, or description…  (try DIV, 4D, remainder)" autocomplete="off">
+    <span class="op-count" id="count"></span>
+  </div>
+  <div class="op-controls" id="chips"></div>
+
+  <div id="list"></div>
+</main>
+
+<footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a> · <a href="architecture.html">architecture</a></footer>
+
+<script src="js/opcodes.js"></script>
+<script src="js/opcodes-page.js"></script>
+<script src="js/nav.js"></script>
+</body>
+</html>

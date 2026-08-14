@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STELLAR Architecture</title>
+<meta name="description" content="STELLAR's memory map, 1802 register roles, SCRT, the VM core layout, and the CIDP multitasking page.">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<main class="wrap">
+  <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Architecture</div>
+  <h1 style="margin:.1em 0 .2em">How STELLAR is built</h1>
+  <p class="muted" style="max-width:70ch">STELLAR is a virtual CPU written in raw 1802 machine code. It uses up to 32&nbsp;KB of RAM: about 12&nbsp;KB for the interpreter, a shared page for coordinating VMs, one small "core" of state per VM, and the rest for program code.</p>
+
+  <h2><span class="hx">$</span>Memory map</h2>
+  <div class="memmap">
+    <div class="memrow"><div class="addr">$0000–$2EFF</div><div class="membar"><b>STELLAR firmware</b> <span>— the interpreter (R3 = 1802 program counter). ~12&nbsp;KB.</span></div></div>
+    <div class="memrow"><div class="addr">$0B00–$0DFF</div><div class="membar"><b>SCRT registers</b> <span>— call/return/link workspace (R4, R5, R6). 512&nbsp;B.</span></div></div>
+    <div class="memrow"><div class="addr">$2B00–$2EFF</div><div class="membar"><b>Expanded opcode tables</b> <span>— dispatch + length tables.</span></div></div>
+    <div class="memrow"><div class="addr">$2F00–$2FFF</div><div class="membar"><b>CIDP</b> <span>— Common VM Interchange Data Page (RA). Scheduler + per-VM state.</span></div></div>
+    <div class="memrow"><div class="addr">$3000–$33FF</div><div class="membar"><b>VM1</b> <span>— core ($3000), stacks ($3100), label array ($3200).</span></div></div>
+    <div class="memrow"><div class="addr">$3400–$37FF</div><div class="membar"><b>VM2</b> <span>— core + stacks + labels.</span></div></div>
+    <div class="memrow"><div class="addr">$3800–$3BFF</div><div class="membar"><b>VM3</b> <span>— core + stacks + labels.</span></div></div>
+    <div class="memrow"><div class="addr">$3C00–$3FFF</div><div class="membar"><b>VM4</b> <span>— core + stacks + labels.</span></div></div>
+    <div class="memrow"><div class="addr">$4000–$4FFF</div><div class="membar"><b>VM1 program block</b> <span>— up to 4&nbsp;KB of bytecode (R8).</span></div></div>
+    <div class="memrow"><div class="addr">$5000–$7EFF</div><div class="membar"><b>VM2–VM4 program blocks</b> <span>— $5000 / $6000 / $7000.</span></div></div>
+  </div>
+
+  <h2><span class="hx">R</span>1802 register roles</h2>
+  <p>STELLAR commits the 1802's sixteen hardware registers to fixed jobs. (These are the <em>host</em> registers — not to be confused with a VM's sixteen <em>virtual</em> registers, which live in RAM.)</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Reg</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="hex">R0</td><td>Reserved (aliases the DMA pointer) — not used</td></tr>
+      <tr><td class="hex">R1</td><td>Interrupt handler PC</td></tr>
+      <tr><td class="hex">R2</td><td>1802 hardware stack ($2FC0–$2FFF)</td></tr>
+      <tr><td class="hex">R3</td><td>Main program counter (the interpreter)</td></tr>
+      <tr><td class="hex">R4 · R5 · R6</td><td>SCRT call · return · link</td></tr>
+      <tr><td class="hex">R7</td><td>Label-array pointer</td></tr>
+      <tr><td class="hex">R8</td><td>VM program-block pointer (the virtual PC)</td></tr>
+      <tr><td class="hex">R9</td><td>VM stack pointer (program + call/return)</td></tr>
+      <tr><td class="hex">RA</td><td>CIDP pointer</td></tr>
+      <tr><td class="hex">RC</td><td>VM core pointer (which core is running)</td></tr>
+      <tr><td class="hex">RB · RD · RE · RF</td><td>Temporary internal registers</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2><span class="hx">→</span>SCRT — calls without a stack</h2>
+  <p>The 1802 has no call instruction. STELLAR uses RCA's <strong>Standard Call and Return
+  Technique</strong>: <span class="mono">R3</span> is the program counter, and switching it with
+  another register (via <span class="mono">SEP</span>) transfers control. <span class="mono">R4</span>
+  points at the CALL routine (<span class="hex">$0340</span>), <span class="mono">R5</span> at RETURN
+  (<span class="hex">$0360</span>), and <span class="mono">R6</span> carries the link address. Every
+  STELLAR <span class="mono">CALL</span>/<span class="mono">RETURN</span> opcode rides on this.</p>
+
+  <h2><span class="hx">■</span>The VM core ($3000 block)</h2>
+  <p>Each VM's entire live state is a 256-byte block. This is exactly what the
+  <a href="core.html">core visualizer</a> renders. VM1's block starts at
+  <span class="hex">$3000</span>; VM2/3/4 at <span class="hex">$3400</span>/<span class="hex">$3800</span>/<span class="hex">$3C00</span>.</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Offset</th><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="hex">+$00–$1F</td><td>Registers R0–RF</td><td>Sixteen 16-bit registers, high byte first</td></tr>
+      <tr><td class="hex">+$20–$21</td><td>Accumulator (Acc)</td><td>The main 16-bit working value</td></tr>
+      <tr><td class="hex">+$22–$24</td><td>Math Accumulator (MA)</td><td>Result of add/sub/mul/div</td></tr>
+      <tr><td class="hex">+$25–$26</td><td>MA Remainder</td><td>Division remainder</td></tr>
+      <tr><td class="hex">+$27</td><td>MA sign / point</td><td>$00 = positive</td></tr>
+      <tr><td class="hex">+$28–$2B</td><td>Decimal Accumulator (DA)</td><td>32-bit packed BCD</td></tr>
+      <tr><td class="hex">+$2C–$2E</td><td>DA Remainder</td><td></td></tr>
+      <tr><td class="hex">+$2F</td><td>DA sign / point</td><td></td></tr>
+      <tr><td class="hex">+$30</td><td>Program Command</td><td>The opcode currently executing</td></tr>
+      <tr><td class="hex">+$31–$32</td><td>Program Location</td><td>The VM's position in its program (virtual PC)</td></tr>
+      <tr><td class="hex">+$33–$36</td><td>Command Counter</td><td>4-byte count of opcodes executed</td></tr>
+      <tr><td class="hex">+$45</td><td>Test Flag</td><td>Set by TEST opcodes; read by branches</td></tr>
+      <tr><td class="hex">+$48</td><td>Carry Flag</td><td>Carry=1 means borrow/overflow occurred</td></tr>
+      <tr><td class="hex">+$49</td><td>Overflow Flag</td><td></td></tr>
+      <tr><td class="hex">+$4A</td><td>Hex/Decimal Flag</td><td>$00 = hex, $01 = decimal</td></tr>
+      <tr><td class="hex">+$5E–$5F</td><td>Interrupt counter / max</td><td>The multitasking quantum countdown</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small muted">(Selected fields — the block also holds I/O port config, stack pointers, delay counters, the random seed, error/exit registers, and more.)</p>
+
+  <h2><span class="hx">⇄</span>CIDP — the multitasking page ($2F00)</h2>
+  <p>The Common VM Interchange Data Page is how the scheduler and the VMs coordinate. The first
+  64 bytes are a per-VM array (16 bytes each); the system registers at
+  <span class="hex">$2F50</span> hold the global scheduler state. This whole page is decoded live
+  on the <a href="scheduler.html">multitasking view</a>.</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Address</th><th>Field</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td class="hex">$2F00+</td><td>Per-VM array</td><td>VM#, core page, program page, max size, count, <b>State</b>, #Cmds, mode, status — 16 bytes × 4 VMs</td></tr>
+      <tr><td class="hex">$2F52</td><td>Current VM#</td><td>Which VM holds the CPU right now</td></tr>
+      <tr><td class="hex">$2F53 / $2F54</td><td>Max / Total VMs</td><td>Ceiling (4) and how many are present</td></tr>
+      <tr><td class="hex">$2F55</td><td>Multitasking Allowed</td><td>$00 = off, $01 = on</td></tr>
+      <tr><td class="hex">$2F56</td><td>VM Operation</td><td>$00 = sequential, $01 = simultaneous</td></tr>
+      <tr><td class="hex">$2F57</td><td>VM Repeat</td><td>$00 = run to end, $01 = repeat</td></tr>
+      <tr><td class="hex">$2F51</td><td>VM Error</td><td>$00 none · $01 no VMs · $02 abort</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>VM State values:</strong>
+    <span class="mono">$00</span> done ·
+    <span class="mono">$01</span> active ·
+    <span class="mono">$02</span> completed this cycle ·
+    <span class="mono">$03</span> idle/waiting ·
+    <span class="mono">$04</span> paused ·
+    <span class="mono">$05</span> killed.</p>
+
+  <h2><span class="hx">↻</span>Cooperative multitasking</h2>
+  <p>VMs are not pre-empted by a timer. Each active VM runs a small number of opcodes — the
+  <em>quantum</em>, default three — then yields, and the scheduler (<span class="mono">Do_Next_Task</span>
+  at <span class="hex">$0080</span>) scans the CIDP for the next VM in state <span class="mono">$01</span>.
+  A VM waiting on serial input (<span class="mono">SERIN</span>) yields cooperatively instead of
+  stalling everyone. Because all VMs share one UART, their terminal output interleaves — which the
+  <a href="scheduler.html">multitasking view</a> makes visible.</p>
+
+  <div class="note" style="margin-top:34px">
+    <div class="lbl">Next</div>
+    <p class="small" style="margin:.3em 0 0">Ready to see it move? Open the
+    <a href="core.html">VM Core Visualizer</a> to watch one core execute, or the
+    <a href="opcodes.html">opcode reference</a> to look up any instruction.</p>
+  </div>
+</main>
+
+<footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
+<script src="js/nav.js"></script>
+</body>
+</html>

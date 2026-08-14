@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STELLAR — a 16-bit virtual CPU on the RCA 1802</title>
+<meta name="description" content="How STELLAR works: architecture, live core visualizer, full opcode reference, and an in-browser simulator.">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="tag">System for Time-shared Execution on Low-Level Architecture Resources</div>
+  <h1>STELLAR</h1>
+  <p class="lede">A 16-bit virtual CPU that runs on top of the 8-bit RCA COSMAC 1802 —
+  with up to four cooperative VMs, its own accumulators and math unit, and 191+ opcodes,
+  all in hand-written machine code.</p>
+</header>
+
+<main class="wrap">
+
+  <section class="grid">
+    <a class="card" href="architecture.html">
+      <div class="k">Start here</div>
+      <h3>Architecture</h3>
+      <p>The memory map, the 1802 register roles, SCRT calls, the CIDP interchange page, and how cooperative multitasking fits in 32&nbsp;KB.</p>
+    </a>
+    <a class="card" href="core.html">
+      <div class="k">Interactive</div>
+      <h3>VM Core Visualizer</h3>
+      <p>Watch a program run: every register, the Accumulator, the Math and Decimal accumulators, and the flags update live as each opcode retires.</p>
+    </a>
+    <a class="card" href="scheduler.html">
+      <div class="k">Interactive</div>
+      <h3>Multitasking</h3>
+      <p>Two to four cores side by side, the decoded <span class="mono">$2F00</span> CIDP page, and the quantum countdown that drives the cooperative hand-off.</p>
+    </a>
+    <a class="card" href="opcodes.html">
+      <div class="k">Reference</div>
+      <h3>Opcode Set</h3>
+      <p>Every opcode by group — encoding, operands, and what it does. Searchable and deep-linkable.</p>
+    </a>
+    <a class="card" href="simulator.html">
+      <div class="k">Interactive</div>
+      <h3>Simulator</h3>
+      <p>Load a program, step or run it, and follow along in the disassembly side panel with the live core beside it.</p>
+    </a>
+  </section>
+
+  <h2><span class="hx">01</span>The idea</h2>
+  <p>The RCA 1802 is an 8-bit processor with sixteen 16-bit registers and no stack,
+  no multiply, and no divide. STELLAR is a layer written entirely in 1802 machine code
+  that turns it into a far friendlier <em>virtual</em> machine: a 16-bit accumulator, a
+  multi-byte Math Accumulator with multiply/divide and remainder, a packed-BCD Decimal
+  Accumulator, sixteen virtual 16-bit registers, real call/return and stacks, labels,
+  and structured test-and-branch — exposed as a compact bytecode.</p>
+
+  <p>Because STELLAR is an interpreter, it can host <strong>several independent programs
+  at once</strong>. Up to four virtual machines share the single 1802, each with its own
+  registers and 4&nbsp;KB program block, taking turns a few opcodes at a time. They talk
+  through a shared page of memory called the CIDP.</p>
+
+  <div class="note">
+    <div class="lbl">The key to the visualizations</div>
+    <p class="small" style="margin:.3em 0 0">A STELLAR VM's registers, accumulators, and flags
+    are not an abstraction layered on top — they are literally fixed <b>bytes in a 256-byte
+    "core" block of RAM</b> (VM&nbsp;1 lives at <span class="mono">$3000</span>). The firmware reads
+    and writes those bytes as it interprets each opcode. So the live core panels on this site
+    are simply a window onto that RAM, updated straight from the real firmware as it runs.</p>
+  </div>
+
+  <h2><span class="hx">02</span>What runs where</h2>
+  <div class="memmap">
+    <div class="memrow"><div class="addr">$0000–$2EFF</div><div class="membar"><b>STELLAR firmware</b> <span>— the interpreter itself (~12&nbsp;KB of 1802 code)</span></div></div>
+    <div class="memrow"><div class="addr">$2F00–$2FFF</div><div class="membar"><b>CIDP</b> <span>— common VM interchange page (scheduler + per-VM state)</span></div></div>
+    <div class="memrow"><div class="addr">$3000–$3FFF</div><div class="membar"><b>VM cores, stacks &amp; labels</b> <span>— one 256-byte core per VM ($3000/$3400/$3800/$3C00)</span></div></div>
+    <div class="memrow"><div class="addr">$4000–$7EFF</div><div class="membar"><b>Program blocks</b> <span>— up to 4&nbsp;KB per VM ($4000/$5000/$6000/$7000)</span></div></div>
+  </div>
+  <p class="small muted">See the <a href="architecture.html">architecture page</a> for the full map and the core layout byte-by-byte.</p>
+
+  <h2><span class="hx">03</span>Faithful, not approximate</h2>
+  <p>The simulator on this site is not a re-implementation of STELLAR's opcodes. It runs the
+  <em>actual flashed firmware</em> on a faithful 1802 emulator, exactly as the hardware does —
+  so what you see stepping through a program is what the real Elf2K would do. The visuals are
+  read directly out of the emulated core RAM.</p>
+
+</main>
+
+<footer class="foot">
+  STELLAR for the RCA COSMAC 1802 · built by Craig Ledbetter ·
+  <a href="opcodes.html">opcode reference</a> · <a href="simulator.html">simulator</a>
+</footer>
+
+<script src="js/nav.js"></script>
+</body>
+</html>
