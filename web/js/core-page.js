@@ -2,8 +2,8 @@
 // input comes from the manifest (no manual input field here).
 (function () {
   var SPEEDS = [
-    { label: '1×', ops: 1, ms: 220 },
-    { label: '4×', ops: 1, ms: 60 },
+    { label: '1×', ops: 1, ms: 500 },
+    { label: '4×', ops: 1, ms: 120 },
     { label: '16×', ops: 4, ms: 30 },
     { label: 'turbo', ops: 200, ms: 0 }
   ];

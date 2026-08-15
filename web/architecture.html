@@ -63,9 +63,7 @@
     <tbody>
       <tr><td class="hex">+$00–$1F</td><td>Registers R0–RF</td><td>Sixteen 16-bit registers, high byte first</td></tr>
       <tr><td class="hex">+$20–$21</td><td>Accumulator (Acc)</td><td>The main 16-bit working value</td></tr>
-      <tr><td class="hex">+$22–$24</td><td>Math Accumulator (MA)</td><td>Result of add/sub/mul/div</td></tr>
-      <tr><td class="hex">+$25–$26</td><td>MA Remainder</td><td>Division remainder</td></tr>
-      <tr><td class="hex">+$27</td><td>MA sign / point</td><td>$00 = positive</td></tr>
+      <tr><td class="hex">+$68–$6E</td><td>Math Accumulator (MA)</td><td>4 integer bytes (+$68–$6B), remainder (+$6C–$6D), sign (+$6E). <b>Relocated + widened</b> from the legacy +$22 block, which is now unused.</td></tr>
       <tr><td class="hex">+$28–$2B</td><td>Decimal Accumulator (DA)</td><td>32-bit packed BCD</td></tr>
       <tr><td class="hex">+$2C–$2E</td><td>DA Remainder</td><td></td></tr>
       <tr><td class="hex">+$2F</td><td>DA sign / point</td><td></td></tr>

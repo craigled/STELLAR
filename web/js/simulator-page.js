@@ -1,8 +1,8 @@
 // Glue for simulator.html: sample picker, controls, and the SimApp wiring.
 (function () {
   var SPEEDS = [
-    { label: '1×', ops: 1, ms: 160 },
-    { label: '4×', ops: 1, ms: 40 },
+    { label: '1×', ops: 1, ms: 500 },
+    { label: '4×', ops: 1, ms: 120 },
     { label: '16×', ops: 4, ms: 30 },
     { label: 'turbo', ops: 200, ms: 0 }
   ];

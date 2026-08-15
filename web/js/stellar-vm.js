@@ -283,14 +283,17 @@
     return {
       regs: regs,
       acc: w(0x20),
-      maBytes: [b(0x22), b(0x23), b(0x24)], maRem: w(0x25), maSign: b(0x27),
+      // MA was relocated + widened (firmware >= reloc): 4 int bytes $3068-$306B,
+      // remainder $306C-$306D, sign $306E. The old $3022 block is dead.
+      maBytes: [b(0x68), b(0x69), b(0x6A), b(0x6B)], maRem: w(0x6C), maSign: b(0x6E),
       daBytes: [b(0x28), b(0x29), b(0x2A), b(0x2B)],
       daRemBytes: [b(0x2C), b(0x2D), b(0x2E)], daSign: b(0x2F),
       cmd: b(0x30), pl: w(0x31),
       cmdCounter: b(0x33) * 0x1000000 + (b(0x34) << 16) + (b(0x35) << 8) + b(0x36),
       flags: { test: b(0x45), carry: b(0x48), overflow: b(0x49), hexdec: b(0x4A) },
       intCounter: b(0x5E), intMax: b(0x5F), memMode: b(0x3B),
-      steps: this.cpu.steps, halted: this.cpu.halted, pc1802: this.cpu.R[this.cpu.P]
+      steps: this.cpu.steps, halted: this.cpu.halted, pc1802: this.cpu.R[this.cpu.P],
+      raw: Array.from(M.subarray(base, base + 256))   // full core block for the detailed view
     };
   };
 
