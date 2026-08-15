@@ -38,6 +38,12 @@ def build_image():
         mem[0x15DB + i] = b
     mem[0x08DC] = 0x01
     mem[0x08DD] = 0x75
+    # VM1 launch symmetry (HW-verified 2026-08-15): boot enters VM1 via the same
+    # free-first-opcode path the scheduler uses for VM2+, so VM1's CD is free too.
+    # $003D: BR $0050 (30 50) -> LBR $0100 (C0 01 00). Fixes multi-VM opening 231.
+    mem[0x003D] = 0xC0
+    mem[0x003E] = 0x01
+    mem[0x003F] = 0x00
     return mem
 
 def runs(mem):

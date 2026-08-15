@@ -32,6 +32,8 @@ def run(lst_path, inp, max_steps):
     for i, b in enumerate(bytes.fromhex('8F3AE4F830ADD40CA018C000508D3AEE8F32F8F801AF8DFC30ADD40CA0D5')):
         mem[0x15DB + i] = b
     mem[0x08DC] = 0x01; mem[0x08DD] = 0x75
+    # VM1 launch symmetry (matches extract_firmware.py) — boot BR $0050 -> LBR $0100
+    mem[0x003D] = 0xC0; mem[0x003E] = 0x01; mem[0x003F] = 0x00
     for ln in open(lst_path):
         import re
         m = re.match(r'D\s+([0-9A-Fa-f]{4})\s+(.+)', ln.strip())
