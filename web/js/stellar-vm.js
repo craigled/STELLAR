@@ -250,6 +250,7 @@
     c.R[12] = 0x3000; c.R[8] = ENTRY; c.R[3] = 0x0100; c.P = 3; c.X = 2;
     this.cpu = c;
     this.serialLen = 0;
+    this.lastOpCost = 0;   // raw 1802 instructions the last STELLAR opcode took
   };
   // Run to completion (halt), returning captured serial output bytes.
   StellarVM.prototype.runToSerial = function (maxSteps) {
@@ -292,7 +293,8 @@
       cmdCounter: b(0x33) * 0x1000000 + (b(0x34) << 16) + (b(0x35) << 8) + b(0x36),
       flags: { test: b(0x45), carry: b(0x48), overflow: b(0x49), hexdec: b(0x4A) },
       intCounter: b(0x5E), intMax: b(0x5F), memMode: b(0x3B),
-      steps: this.cpu.steps, halted: this.cpu.halted, pc1802: this.cpu.R[this.cpu.P],
+      steps: this.cpu.steps, lastOpCost: this.lastOpCost || 0,
+      halted: this.cpu.halted, pc1802: this.cpu.R[this.cpu.P],
       raw: Array.from(M.subarray(base, base + 256))   // full core block for the detailed view
     };
   };
@@ -319,12 +321,13 @@
   // Advance exactly one real STELLAR opcode (until the command counter ticks).
   StellarVM.prototype.stepOpcode = function (cap) {
     cap = cap || 2000000;
-    var c = this.cpu, s = this._cc(), g = 0;
+    var c = this.cpu, s = this._cc(), start = c.steps, g = 0;
     while (g++ < cap) {
-      if (!c.step()) return { halted: true };
-      if (this._cc() !== s) return { halted: false };
+      if (!c.step()) { this.lastOpCost = c.steps - start; return { halted: true, cost: this.lastOpCost }; }
+      if (this._cc() !== s) { this.lastOpCost = c.steps - start; return { halted: false, cost: this.lastOpCost }; }
     }
-    return { halted: false, capped: true };
+    this.lastOpCost = c.steps - start;
+    return { halted: false, capped: true, cost: this.lastOpCost };
   };
 
   return {

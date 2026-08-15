@@ -152,6 +152,7 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
   background:var(--code-bg); color:var(--code-ink); font-size:13px}
 .cv-s-op{color:var(--accent); font-weight:700; font-size:14px}
 .cv-s-pl,.cv-s-cc,.cv-s-steps{color:var(--code-ink); opacity:.85}
+.cv-s-steps b{color:var(--accent); font-weight:700; opacity:1}
 .cv-grid{display:grid; gap:1px; background:var(--line);
   grid-template-columns:1fr; padding:1px}
 @media(min-width:720px){ .cv-grid{grid-template-columns:1.4fr 1fr} .cv-regs{grid-row:span 2} }

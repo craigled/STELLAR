@@ -218,7 +218,9 @@
     this.sOp.textContent = s.halted ? 'HALTED' : '$' + hx(s.cmd, 2) + '  ' + (opName(s.cmd) || '');
     this.sPl.textContent = 'PL $' + hx(s.pl, 4);
     this.sCc.textContent = 'cmd# ' + s.cmdCounter;
-    this.sSteps.textContent = s.steps.toLocaleString() + ' cycles';
+    // raw 1802 instruction counts: this STELLAR opcode, then running total
+    this.sSteps.innerHTML = '1802: <b>' + (s.lastOpCost || 0).toLocaleString() +
+      '</b> this op · <b>' + s.steps.toLocaleString() + '</b> total';
 
     if ((this.showFull || force) && s.raw) {
       var praw = p && p.raw;
