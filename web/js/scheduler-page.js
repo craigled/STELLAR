@@ -112,6 +112,7 @@
         '<div class="mini-body">' +
         '<div class="mini-op">$' + hx(s.cmd, 2) + ' ' + (opName(s.cmd) || '') + '</div>' +
         '<div class="mini-pl">PL $' + hx(s.pl, 4) + ' · cmd# ' + s.cmdCounter + '</div>' +
+        '<div class="mini-pl">1802 ops: <b style="color:var(--accent)">' + s.steps.toLocaleString() + '</b></div>' +
         '<div class="mini-quantum"><span class="qlab">quantum ' + s.intCounter + ' / ' + s.intMax + '</span>' +
         '<span class="qbar"><i style="width:' + q + '%"></i></span></div>' +
         '<div class="mini-regs">' + regsHtml + '</div>' +
