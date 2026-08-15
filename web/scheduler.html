@@ -30,8 +30,18 @@
   <h3 style="margin:20px 0 4px">CIDP — <span class="mono">$2F00</span> interchange page</h3>
   <div class="cidp" id="cidp"></div>
 
-  <h3 style="margin:22px 0 4px">Cores <span class="muted small" style="font-weight:400">(the highlighted one holds the CPU right now)</span></h3>
+  <h3 style="margin:22px 0 4px">Cores <span class="muted small" style="font-weight:400">(the highlighted one holds the CPU right now — click ⤢ to expand any VM)</span></h3>
   <div class="cores-grid" id="cores"></div>
+
+  <div class="vmdetail" id="vmdetail" hidden>
+    <div class="vmdetail-head">
+      <span class="vd-title" id="vd-title"></span>
+      <span class="vd-badge idle" id="vd-badge">waiting</span>
+      <span class="spacer"></span>
+      <button class="theme-btn" id="vd-close" type="button">✕ close</button>
+    </div>
+    <div id="vd-core"></div>
+  </div>
 
   <div class="term-wrap" style="margin-top:18px">
     <h4>Shared serial terminal</h4>
@@ -49,6 +59,7 @@
 <script src="js/opcodes.js"></script>
 <script src="js/firmware-0061-22.js"></script>
 <script src="js/stellar-vm.js"></script>
+<script src="js/core-view.js"></script>
 <script src="js/scheduler-page.js"></script>
 <script src="js/nav.js"></script>
 </body>

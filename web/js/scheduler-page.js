@@ -28,6 +28,7 @@
 
   var mv = null, running = false, timer = null, opsPerTick = 1, tickMs = 320;
   var serialLen = 0, prevRegs = {}, built = 0;
+  var expandedVM = null, coreView = null;
 
   function loadScenario(i) {
     var s = SCENARIOS[i];
@@ -38,7 +39,7 @@
     })).then(function (texts) {
       mv = new window.StellarMultiVM({ firmware: window.STELLAR_FIRMWARE, programs: texts });
       mv.bootUntilReady();      // run CREATE_CIDP + scheduler so VMs are active
-      stop(); serialLen = 0; prevRegs = {}; built = 0;
+      stop(); serialLen = 0; prevRegs = {}; built = 0; expandedVM = null;
       byId('term').textContent = '';
       byId('cores').innerHTML = '';
       render();
@@ -94,6 +95,7 @@
         host.appendChild(el);
       }
       el.classList.toggle('active', active);
+      el.classList.toggle('expanded', expandedVM === v.num);
       var prev = prevRegs[v.num] || [];
       var regsHtml = '';
       for (var r = 0; r < 16; r++) {
@@ -105,6 +107,7 @@
       el.innerHTML =
         '<div class="mini-head"><span class="vmname">VM' + v.num + '</span>' +
         stateBadge(v.state) +
+        '<button class="mini-expand" data-vm="' + v.num + '" title="Expand full core">⤢</button>' +
         '<span class="cpu-badge' + (active ? '' : ' idle') + '">' + (active ? 'RUNNING' : 'waiting') + '</span></div>' +
         '<div class="mini-body">' +
         '<div class="mini-op">$' + hx(s.cmd, 2) + ' ' + (opName(s.cmd) || '') + '</div>' +
@@ -125,11 +128,26 @@
     }
   }
 
+  function updateDetail(cd) {
+    var dp = byId('vmdetail');
+    if (!expandedVM || !mv || expandedVM > cd.totalVMs) { dp.hidden = true; return; }
+    dp.hidden = false;
+    if (!coreView) coreView = new window.CoreView(byId('vd-core'));
+    var active = cd.currentVM === expandedVM;
+    byId('vd-title').textContent = 'VM' + expandedVM + ' — full core ($' +
+      (0x3000 + (expandedVM - 1) * 0x400).toString(16).toUpperCase() + ')';
+    var badge = byId('vd-badge');
+    badge.textContent = active ? 'RUNNING' : 'waiting';
+    badge.classList.toggle('idle', !active);
+    coreView.render(mv.snapshotVM(expandedVM));
+  }
+
   function render() {
     if (!mv) return;
     var cd = mv.cidp();
     renderCIDP(cd);
     renderCores(cd);
+    updateDetail(cd);
     appendSerial();
     var anyActive = cd.vms.some(function (v) { return v.state === 0x01; });
     byId('run').disabled = running || !anyActive;
@@ -164,6 +182,17 @@
     var o = document.createElement('option'); o.value = i; o.textContent = s.name; sel.appendChild(o);
   });
   sel.addEventListener('change', function () { loadScenario(+this.value); });
+  // expand a VM into the full core view (event-delegated; mini panels re-render)
+  byId('cores').addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.mini-expand');
+    if (!btn) return;
+    var vm = +btn.dataset.vm;
+    if (expandedVM === vm) { expandedVM = null; }
+    else { expandedVM = vm; if (coreView) coreView.reset(); }
+    render();
+    if (expandedVM) byId('vmdetail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  byId('vd-close').addEventListener('click', function () { expandedVM = null; render(); });
   byId('step').addEventListener('click', step);
   byId('run').addEventListener('click', run);
   byId('pause').addEventListener('click', function () { stop(); byId('status').textContent = 'paused'; });

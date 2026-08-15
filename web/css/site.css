@@ -270,3 +270,15 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .mini-regs .rc.chg{background:var(--hi); border-color:var(--hi-edge)}
 .mini-regs .rc .l{color:var(--ink-soft)}
 .arrow-note{font-size:12px; color:var(--ink-soft); font-family:var(--mono)}
+.mini-expand{margin-left:6px; border:1px solid var(--line); background:var(--bg-panel); color:var(--ink-soft);
+  border-radius:6px; padding:1px 7px; cursor:pointer; font-size:12px; line-height:1.4}
+.mini-expand:hover{color:var(--accent); border-color:var(--accent)}
+.mini.expanded .mini-expand{background:var(--accent); border-color:var(--accent); color:#1a1206}
+.vmdetail{margin:14px 0 0; border:1px solid var(--accent); border-radius:12px; overflow:hidden}
+.vmdetail-head{display:flex; align-items:center; gap:10px; padding:8px 14px; background:var(--bg-sunk);
+  border-bottom:1px solid var(--line)}
+.vmdetail-head .vd-title{font-family:var(--mono); font-weight:700; color:var(--accent)}
+.vmdetail-head .vd-badge{font-family:var(--mono); font-size:11px; padding:2px 8px; border-radius:20px;
+  background:var(--accent); color:#1a1206; font-weight:700}
+.vmdetail-head .vd-badge.idle{background:transparent; color:var(--ink-soft); border:1px solid var(--line)}
+.vmdetail-head .spacer{flex:1}
