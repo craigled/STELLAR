@@ -360,8 +360,16 @@
     c.io_out[2] = [];
     c.io_in[3] = new UART(this.input, c.io_out);
     c.R[0] = 0x0000; c.P = 0; c.X = 0;   // cold boot from the reset vector
+    // R1 = interrupt/exit handler PC. On the Elf2K the monitor sets this so that
+    // "all VMs done" (SEP R1 at $02E2) returns to the monitor. Point it at an IDL
+    // ($0033 = $00) so the sim halts cleanly instead of looping back to the reset
+    // vector and re-running every program (which double-ran the whole boot).
+    c.R[1] = 0x0033;
     this.cpu = c;
     this.serialLen = 0;
+    // per-VM raw-1802 accounting (index by VM number 1..4)
+    this.vmSteps = [0, 0, 0, 0, 0];    // total 1802 instructions each VM has run
+    this.vmLastOp = [0, 0, 0, 0, 0];   // 1802 instructions the VM's last opcode took
   };
   MultiVM.prototype.coreBase = function (vm) { return 0x3000 + (vm - 1) * 0x400; };
   MultiVM.prototype.currentVM = function () { return this.cpu.M[0x2F52]; };
@@ -372,7 +380,9 @@
   };
   MultiVM.prototype.snapshotVM = function (vm) {
     var s = readCore(this.cpu.M, this.coreBase(vm));
-    s.vm = vm; s.steps = this.cpu.steps;
+    s.vm = vm;
+    s.steps = this.vmSteps[vm] || 0;      // this VM's own 1802 total (not the global)
+    s.lastOpCost = this.vmLastOp[vm] || 0; // this VM's last-opcode 1802 cost
     return s;
   };
   MultiVM.prototype.cidp = function () {
@@ -396,11 +406,17 @@
   MultiVM.prototype.stepSlice = function (cap) {
     cap = cap || 3000000;
     var c = this.cpu, vm0 = this.currentVM(), cc0 = this._cc(vm0), g = 0;
+    var start = (vm0 >= 1 && vm0 <= 4) ? this.vmSteps[vm0] : 0;
     while (g++ < cap) {
+      var cur = this.currentVM();               // attribute this instruction to the running VM
       if (!c.step()) return { halted: true };
+      if (cur >= 1 && cur <= 4) this.vmSteps[cur]++;
       var vm = this.currentVM();
       if (vm !== vm0) return { switched: true, from: vm0, to: vm };
-      if (this._cc(vm) !== cc0) return { opcode: true, vm: vm };
+      if (this._cc(vm) !== cc0) {
+        if (vm >= 1 && vm <= 4) this.vmLastOp[vm] = this.vmSteps[vm] - start;
+        return { opcode: true, vm: vm };
+      }
     }
     return { capped: true };
   };
