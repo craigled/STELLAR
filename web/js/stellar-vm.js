@@ -11,8 +11,9 @@
   var api = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof window !== 'undefined') {
-    window.StellarVM = api.StellarVM;   // the constructor
-    window.StellarVMLib = api;          // CPU, UART, parseLst, constants
+    window.StellarVM = api.StellarVM;     // the single-VM constructor
+    window.StellarMultiVM = api.MultiVM;  // the multi-VM constructor
+    window.StellarVMLib = api;            // CPU, UART, parseLst, constants
   }
 })(this, function () {
   'use strict';
@@ -274,9 +275,8 @@
     var base = (vmCore || CORE) + off; return (this.cpu.M[base] << 8) | this.cpu.M[base + 1];
   };
 
-  // Structured snapshot of a VM core (default VM1) for the visualizers.
-  StellarVM.prototype.snapshot = function (vmCore) {
-    var base = vmCore || CORE, M = this.cpu.M;
+  // Structured snapshot of any VM core block ($3000/$3400/$3800/$3C00).
+  function readCore(M, base) {
     function b(o) { return M[base + o]; }
     function w(o) { return (M[base + o] << 8) | M[base + o + 1]; }
     var regs = [];
@@ -284,8 +284,7 @@
     return {
       regs: regs,
       acc: w(0x20),
-      // MA was relocated + widened (firmware >= reloc): 4 int bytes $3068-$306B,
-      // remainder $306C-$306D, sign $306E. The old $3022 block is dead.
+      // MA was relocated + widened: 4 int bytes +$68-$6B, remainder +$6C-$6D, sign +$6E.
       maBytes: [b(0x68), b(0x69), b(0x6A), b(0x6B)], maRem: w(0x6C), maSign: b(0x6E),
       daBytes: [b(0x28), b(0x29), b(0x2A), b(0x2B)],
       daRemBytes: [b(0x2C), b(0x2D), b(0x2E)], daSign: b(0x2F),
@@ -293,10 +292,16 @@
       cmdCounter: b(0x33) * 0x1000000 + (b(0x34) << 16) + (b(0x35) << 8) + b(0x36),
       flags: { test: b(0x45), carry: b(0x48), overflow: b(0x49), hexdec: b(0x4A) },
       intCounter: b(0x5E), intMax: b(0x5F), memMode: b(0x3B),
-      steps: this.cpu.steps, lastOpCost: this.lastOpCost || 0,
-      halted: this.cpu.halted, pc1802: this.cpu.R[this.cpu.P],
-      raw: Array.from(M.subarray(base, base + 256))   // full core block for the detailed view
+      raw: Array.from(M.subarray(base, base + 256))
     };
+  }
+
+  // Structured snapshot of a VM core (default VM1) for the visualizers.
+  StellarVM.prototype.snapshot = function (vmCore) {
+    var s = readCore(this.cpu.M, vmCore || CORE);
+    s.steps = this.cpu.steps; s.lastOpCost = this.lastOpCost || 0;
+    s.halted = this.cpu.halted; s.pc1802 = this.cpu.R[this.cpu.P];
+    return s;
   };
 
   // Command counter (VM1) — increments once per real STELLAR opcode.
@@ -330,9 +335,98 @@
     return { halted: false, capped: true, cost: this.lastOpCost };
   };
 
+  // ---- multi-VM engine (for the scheduler view) ----
+  // Boots via STELLAR's real cold-boot ($0000): CREATE_CIDP scans the program
+  // blocks and creates one VM per program, then the scheduler round-robins them.
+  // opts: { firmware, programs: [lstText|pokes, ...] (up to 4), input }
+  function MultiVM(opts) {
+    this.firmware = opts.firmware || (typeof window !== 'undefined' && window.STELLAR_FIRMWARE);
+    if (!this.firmware) throw new Error('firmware image not provided');
+    this.programs = (opts.programs || []).map(function (p) {
+      return typeof p === 'string' ? parseLst(p) : p;
+    });
+    this.input = opts.input || '';
+    this.reset();
+  }
+  MultiVM.prototype.reset = function () {
+    var mem = new Uint8Array(0x10000);
+    loadFirmwareImage(mem, this.firmware);
+    // load program i into block $4000 + i*$1000 (relocate from its $4000 base)
+    this.programs.forEach(function (pokes, i) {
+      var off = i * 0x1000;
+      pokes.forEach(function (p) { mem[(p[0] + off) & 0xFFFF] = p[1]; });
+    });
+    var c = new CPU(mem);
+    c.io_out[2] = [];
+    c.io_in[3] = new UART(this.input, c.io_out);
+    c.R[0] = 0x0000; c.P = 0; c.X = 0;   // cold boot from the reset vector
+    this.cpu = c;
+    this.serialLen = 0;
+  };
+  MultiVM.prototype.coreBase = function (vm) { return 0x3000 + (vm - 1) * 0x400; };
+  MultiVM.prototype.currentVM = function () { return this.cpu.M[0x2F52]; };
+  MultiVM.prototype._cc = function (vm) {
+    if (vm < 1 || vm > 4) return -1;
+    var M = this.cpu.M, base = this.coreBase(vm) + 0x33;
+    return M[base] * 0x1000000 + (M[base + 1] << 16) + (M[base + 2] << 8) + M[base + 3];
+  };
+  MultiVM.prototype.snapshotVM = function (vm) {
+    var s = readCore(this.cpu.M, this.coreBase(vm));
+    s.vm = vm; s.steps = this.cpu.steps;
+    return s;
+  };
+  MultiVM.prototype.cidp = function () {
+    var M = this.cpu.M, vms = [];
+    for (var v = 0; v < 4; v++) {
+      var b = 0x2F00 + v * 0x10;
+      vms.push({
+        num: M[b], corePage: M[b + 1], progPage: M[b + 2], maxSize: M[b + 3],
+        count: M[b + 4], state: M[b + 5],
+        cmds: M[b + 6] * 0x1000000 + (M[b + 7] << 16) + (M[b + 8] << 8) + M[b + 9],
+        mode: M[b + 0x0A], status: M[b + 0x0B]
+      });
+    }
+    return {
+      vms: vms, sysIntState: M[0x2F50], vmError: M[0x2F51], currentVM: M[0x2F52],
+      maxVMs: M[0x2F53], totalVMs: M[0x2F54], multitasking: M[0x2F55],
+      operation: M[0x2F56], repeat: M[0x2F57], hwIntFF: M[0x2F5F]
+    };
+  };
+  // Advance until the current VM retires one opcode OR the scheduler switches VMs.
+  MultiVM.prototype.stepSlice = function (cap) {
+    cap = cap || 3000000;
+    var c = this.cpu, vm0 = this.currentVM(), cc0 = this._cc(vm0), g = 0;
+    while (g++ < cap) {
+      if (!c.step()) return { halted: true };
+      var vm = this.currentVM();
+      if (vm !== vm0) return { switched: true, from: vm0, to: vm };
+      if (this._cc(vm) !== cc0) return { opcode: true, vm: vm };
+    }
+    return { capped: true };
+  };
+  // Run the cold boot (CREATE_CIDP + scheduler) until a VM is active, so the
+  // caller can start stepping at "VMs ready" (analogous to the pre-pass prime).
+  MultiVM.prototype.bootUntilReady = function (cap) {
+    cap = cap || 800000;
+    var c = this.cpu, g = 0, want = this.programs.length;
+    while (g++ < cap) {
+      if (!c.step()) return false;
+      if (this.cpu.M[0x2F54] >= want && this.currentVM() >= 1 && this.anyActive()) {
+        this.booted = true; return true;
+      }
+    }
+    return false;
+  };
+  MultiVM.prototype.serialOut = function () { return Uint8Array.from(this.cpu.io_out[3] || []); };
+  MultiVM.prototype.anyActive = function () {
+    var M = this.cpu.M;
+    for (var v = 0; v < 4; v++) if (M[0x2F00 + v * 0x10 + 5] === 0x01) return true;
+    return false;
+  };
+
   return {
-    CPU: CPU, UART: UART, StellarVM: StellarVM,
-    parseLst: parseLst, loadFirmwareImage: loadFirmwareImage,
+    CPU: CPU, UART: UART, StellarVM: StellarVM, MultiVM: MultiVM,
+    parseLst: parseLst, loadFirmwareImage: loadFirmwareImage, readCore: readCore,
     CORE: CORE, ENTRY: ENTRY
   };
 });

@@ -226,3 +226,47 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
   min-height:120px; max-height:240px; overflow:auto}
 .status-line{font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); margin-top:4px}
 .speed-row{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-soft)}
+
+/* ================= scheduler / multi-core ================= */
+.cidp{border:1px solid var(--line); border-radius:12px; background:var(--bg-panel); overflow:hidden; margin:14px 0}
+.cidp-sys{display:flex; flex-wrap:wrap; gap:14px; padding:10px 14px; background:var(--code-bg);
+  color:var(--code-ink); font-family:var(--mono); font-size:12.5px}
+.cidp-sys b{color:var(--accent); font-weight:700}
+.cidp-tblwrap{overflow-x:auto}
+.cidp table{width:100%; border-collapse:collapse; font-size:13px}
+.cidp th,.cidp td{padding:7px 12px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap}
+.cidp thead th{background:var(--bg-sunk); font-family:var(--mono); font-size:11px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--ink-soft)}
+.cidp td.mono,.cidp .mono{font-family:var(--mono)}
+.cidp tr.vm-active{background:var(--hi)}
+.cidp tr.vm-active td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.st{display:inline-block; padding:1px 8px; border-radius:20px; font-size:11px; font-family:var(--mono); font-weight:600}
+.st.s01{background:#1f6f6a22; color:var(--accent-2); border:1px solid var(--accent-2)}   /* active */
+.st.s00{background:var(--bg-sunk); color:var(--ink-soft); border:1px solid var(--line)}   /* done */
+.st.s02,.st.s03,.st.s04{background:#ffb00022; color:var(--accent); border:1px solid var(--accent)}
+.st.s05{background:#b9531b22; color:var(--accent); border:1px solid var(--accent)}
+
+.cores-grid{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.mini{border:1px solid var(--line); border-radius:11px; background:var(--bg-panel); overflow:hidden;
+  transition:border-color .2s, box-shadow .2s}
+.mini.active{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent)}
+.mini-head{display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--bg-sunk);
+  border-bottom:1px solid var(--line)}
+.mini-head .vmname{font-family:var(--mono); font-weight:700}
+.mini-head .cpu-badge{margin-left:auto; font-family:var(--mono); font-size:10.5px; padding:2px 8px;
+  border-radius:20px; background:var(--accent); color:#1a1206; font-weight:700}
+.mini-head .cpu-badge.idle{background:transparent; color:var(--ink-soft); border:1px solid var(--line)}
+.mini-body{padding:10px 12px}
+.mini-op{font-family:var(--mono); font-size:13px; color:var(--accent); font-weight:700}
+.mini-pl{font-family:var(--mono); font-size:12px; color:var(--ink-soft)}
+.mini-quantum{margin:8px 0 6px}
+.mini-quantum .qlab{font-family:var(--mono); font-size:10.5px; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--ink-soft)}
+.qbar{height:7px; background:var(--bg-sunk); border-radius:5px; overflow:hidden; margin-top:3px}
+.qbar > i{display:block; height:100%; background:var(--accent-2); transition:width .2s}
+.mini-regs{display:grid; grid-template-columns:repeat(4,1fr); gap:3px; margin-top:8px}
+.mini-regs .rc{font-family:var(--mono); font-size:10.5px; padding:2px 4px; border-radius:4px;
+  background:var(--bg); border:1px solid var(--line); transition:background .35s}
+.mini-regs .rc.chg{background:var(--hi); border-color:var(--hi-edge)}
+.mini-regs .rc .l{color:var(--ink-soft)}
+.arrow-note{font-size:12px; color:var(--ink-soft); font-family:var(--mono)}

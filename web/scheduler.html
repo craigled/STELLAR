@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STELLAR Multitasking</title>
+<meta name="description" content="Watch STELLAR run 2–4 cooperative VMs at once — the decoded $2F00 CIDP page, the quantum countdown, and the round-robin hand-off, live on the real firmware.">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<main class="wrap">
+  <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Interactive</div>
+  <h1 style="margin:.1em 0 .1em">Multitasking</h1>
+  <p class="muted" style="max-width:74ch">STELLAR runs up to four independent VMs on the single 1802, a few opcodes at a time each. This boots the <em>real</em> firmware from its reset vector — <span class="mono">CREATE_CIDP</span> discovers a VM per loaded program and the scheduler round-robins them. Watch each core, the decoded <span class="mono">$2F00</span> CIDP page, and the quantum countdown that triggers each hand-off.</p>
+
+  <div class="sim-controls">
+    <select id="scenario" title="Scenario"></select>
+    <button id="step" class="primary">Step ▸</button>
+    <button id="run">Run ▶</button>
+    <button id="pause" disabled>Pause ⏸</button>
+    <button id="reset">Reset ↺</button>
+    <span class="speed-row">speed
+      <input type="range" id="speed" min="0" max="3" step="1" value="0">
+      <span id="speedLabel" class="mono">1×</span>
+    </span>
+  </div>
+  <p class="sim-blurb" id="blurb"></p>
+  <div class="status-line" id="status">loading…</div>
+
+  <h3 style="margin:20px 0 4px">CIDP — <span class="mono">$2F00</span> interchange page</h3>
+  <div class="cidp" id="cidp"></div>
+
+  <h3 style="margin:22px 0 4px">Cores <span class="muted small" style="font-weight:400">(the highlighted one holds the CPU right now)</span></h3>
+  <div class="cores-grid" id="cores"></div>
+
+  <div class="term-wrap" style="margin-top:18px">
+    <h4>Shared serial terminal</h4>
+    <div class="term" id="term"></div>
+    <p class="arrow-note">One UART, shared by all VMs — their output interleaves in the order the scheduler runs them.</p>
+  </div>
+
+  <h2><span class="hx">↻</span>How the hand-off works</h2>
+  <p>Each active VM runs a small number of opcodes — the <strong>quantum</strong>, counted down in each core's interrupt counter (<span class="mono">+$5E</span> of its core block) — then yields. The scheduler (<span class="mono">Do_Next_Task</span>, <span class="hx">$0080</span>) scans the CIDP for the next VM whose <b>State</b> is <span class="mono">$01</span> (active) and hands it the CPU, updating <b>Current VM#</b> at <span class="mono">$2F52</span>. A VM waiting on serial input yields cooperatively instead of blocking the others. When a VM's program ends its State becomes <span class="mono">$00</span> (done) and the scheduler skips it.</p>
+  <p class="small muted">See the <a href="architecture.html">architecture page</a> for the full CIDP layout, or the <a href="core.html">VM Core</a> view for one core in depth.</p>
+</main>
+
+<footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
+
+<script src="js/opcodes.js"></script>
+<script src="js/firmware-0061-22.js"></script>
+<script src="js/stellar-vm.js"></script>
+<script src="js/scheduler-page.js"></script>
+<script src="js/nav.js"></script>
+</body>
+</html>
