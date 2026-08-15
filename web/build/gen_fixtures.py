@@ -26,6 +26,12 @@ def run(lst_path, inp, max_steps):
     for a, b in parse_lst('DIVMAX-hw.lst').items():
         mem[a] = b
     mem[0x08B8] = 0x17; mem[0x08B9] = 0xC0; mem[0x2E5C] = 0x02
+    # OUTDEC ($6E) — HW-verified 2026-08-15 (matches web/build/extract_firmware.py)
+    for i, b in enumerate(bytes.fromhex('F830BEF828AEF804ABF800AF0EBFF6F6F6F6ADD415E89FFA0FADD415E81E2B8B3A81C015DB')):
+        mem[0x0175 + i] = b
+    for i, b in enumerate(bytes.fromhex('8F3AE4F830ADD40CA018C000508D3AEE8F32F8F801AF8DFC30ADD40CA0D5')):
+        mem[0x15DB + i] = b
+    mem[0x08DC] = 0x01; mem[0x08DD] = 0x75
     for ln in open(lst_path):
         import re
         m = re.match(r'D\s+([0-9A-Fa-f]{4})\s+(.+)', ln.strip())

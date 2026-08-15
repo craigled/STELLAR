@@ -8,6 +8,14 @@
     "halts": true
   },
   {
+    "name": "Prime-Gen v07",
+    "file": "Prime-Gen-v07.lst",
+    "input": "3\r60\r",
+    "blurb": "Prime generator using the native OUTDEC opcode ($6E) for decimal print \u2014 CVT2DEC + OUTDEC, ~6x faster and smaller than the hand-rolled printer.",
+    "maxSteps": 40000000,
+    "halts": true
+  },
+  {
     "name": "Prime-Gen v04",
     "file": "Prime-Gen-v04.lst",
     "input": "3\r30\r",

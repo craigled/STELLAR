@@ -122,6 +122,7 @@ DESC = {
 0x6B: ('math', 'ZX', 'Convert to decimal into DA (Z: 0=Acc, 1=MA, 2=RX).'),
 0x6C: ('math', '', 'Convert DA to hex into MA.'),
 0x6D: ('math', '0Z', 'Set hex/decimal mode (0=Hex, 1=Auto decimal conversion).'),
+0x6E: ('math', '', 'OUTDEC — output the DA as decimal ASCII to the UART, leading-zero suppressed (custom; pair with CVT2DEC).'),
 
 0x70: ('stack', 'NN', 'Push an immediate byte onto the stack.'),
 0x71: ('stack', 'NN NN', 'Push two immediate bytes onto the stack.'),

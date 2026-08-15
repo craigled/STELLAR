@@ -96,6 +96,7 @@ var OPS = [
   {op:0x6B, name:"CVT2DEC", length:1, group:"math", operands:"ZX", desc:"Convert to decimal into DA (Z: 0=Acc, 1=MA, 2=RX)."},
   {op:0x6C, name:"CVT2HEX", length:0, group:"math", operands:"", desc:"Convert DA to hex into MA."},
   {op:0x6D, name:"SETHEXDEC", length:1, group:"math", operands:"0Z", desc:"Set hex/decimal mode (0=Hex, 1=Auto decimal conversion)."},
+  {op:0x6E, name:"OUTDEC", length:0, group:"math", operands:"", desc:"OUTDEC — output the DA as decimal ASCII to the UART, leading-zero suppressed (custom; pair with CVT2DEC)."},
   {op:0x70, name:"PUSHI", length:1, group:"stack", operands:"NN", desc:"Push an immediate byte onto the stack."},
   {op:0x71, name:"PUSH2I", length:2, group:"stack", operands:"NN NN", desc:"Push two immediate bytes onto the stack."},
   {op:0x72, name:"PUSHA", length:1, group:"stack", operands:"0Z", desc:"Push accumulator Z (0=Acc, 1=MA, 2=DA)."},
