@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB = join(HERE, '..');
 
-const firmware = require(join(WEB, 'js', 'firmware-0061-22.js'));
+const firmware = require(join(WEB, 'js', 'firmware-0061-23.js'));
 const { StellarVM } = require(join(WEB, 'js', 'stellar-vm.js'));
 
 const manifest = JSON.parse(readFileSync(join(WEB, 'samples', 'manifest.json'), 'utf8'));

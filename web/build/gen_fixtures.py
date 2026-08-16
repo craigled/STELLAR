@@ -22,7 +22,7 @@ from calc_interactive import UART               # noqa: E402
 CORE = 0x3000
 
 def run(lst_path, inp, max_steps):
-    mem, _ = load('../STELLAR MAIN V0061.22.docx')
+    mem, _ = load('../STELLAR MAIN V0061.23.docx')
     for a, b in parse_lst('DIVMAX-hw.lst').items():
         mem[a] = b
     mem[0x08B8] = 0x17; mem[0x08B9] = 0xC0; mem[0x2E5C] = 0x02
