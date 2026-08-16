@@ -44,6 +44,15 @@ def build_image():
     mem[0x003D] = 0xC0
     mem[0x003E] = 0x01
     mem[0x003F] = 0x00
+    # Hex/Decimal auto-convert remainder fix (HW-verified 2026-08-16): with the
+    # DECHEX flag ($x04A) set, the MA-result auto-convert (+,-,*,/) now writes the
+    # correct DA integer AND the DA remainder, matching explicit CVT2DEC 6B 10.
+    # Entry A ($07D6) branch retargeted to a new tail in the $07FA free bytes that
+    # runs the explicit-CVT2DEC MA path ($1B9D: int via $2500 + remainder via $2D7F).
+    # $07DA: BR $07F0 (30 F0) -> BR $07FA (30 FA); new tail $07FA = D4 0A 20 C0 1B 9D.
+    mem[0x07DA] = 0xFA
+    for i, b in enumerate(bytes.fromhex('D40A20C01B9D')):
+        mem[0x07FA + i] = b
     return mem
 
 def runs(mem):

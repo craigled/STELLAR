@@ -34,6 +34,10 @@ def run(lst_path, inp, max_steps):
     mem[0x08DC] = 0x01; mem[0x08DD] = 0x75
     # VM1 launch symmetry (matches extract_firmware.py) — boot BR $0050 -> LBR $0100
     mem[0x003D] = 0xC0; mem[0x003E] = 0x01; mem[0x003F] = 0x00
+    # Hex/Decimal auto-convert remainder fix (HW-verified 2026-08-16, matches extract_firmware.py)
+    mem[0x07DA] = 0xFA
+    for i, b in enumerate(bytes.fromhex('D40A20C01B9D')):
+        mem[0x07FA + i] = b
     for ln in open(lst_path):
         import re
         m = re.match(r'D\s+([0-9A-Fa-f]{4})\s+(.+)', ln.strip())
