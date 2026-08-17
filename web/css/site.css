@@ -337,9 +337,8 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .mv-row{display:flex; gap:12px; white-space:pre}
 .mv-addr{color:var(--accent); opacity:.85}
 .mv-hex{display:flex; gap:5px}
-.mv-b{width:2ch; text-align:center; transition:color .25s, background .35s; border-radius:3px}
+.mv-b{width:2ch; text-align:center}
 .mv-b.zero{opacity:.32}
-.mv-b.chg{background:var(--accent); color:#fff; opacity:1}
 .mv-ascii{opacity:.72; letter-spacing:.02em}
 
 /* breakpoints in the disassembly */

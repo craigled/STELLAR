@@ -121,8 +121,6 @@
           var cell = this.cells[i2];
           cell.textContent = hx(v, 2);
           cell.classList.toggle('zero', v === 0);
-          // flag bytes that changed since the last redraw
-          cell.classList.toggle('chg', !force && !!prev && prev[i2] !== v);
         }
         s += (v >= 32 && v < 127) ? String.fromCharCode(v) : '.';
       }

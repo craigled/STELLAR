@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Simulator</title>
 <meta name="description" content="Run STELLAR programs in the browser on the real firmware — step through the disassembly and watch the core update live.">
-<link rel="stylesheet" href="css/site.css?v=9">
+<link rel="stylesheet" href="css/site.css?v=10">
 </head>
 <body>
 <main class="wrap">
@@ -66,7 +66,7 @@
   <div class="mv-wrap" style="margin-top:18px">
     <h4>Memory — $2F00 to $7EFF</h4>
     <div class="mv" id="memview"></div>
-    <p class="arrow-note">CIDP page, the four VM cores and the four program blocks. Bytes that changed since the last redraw are highlighted. Click a line in the disassembly to set a breakpoint.</p>
+    <p class="arrow-note">CIDP page, the four VM cores and the four program blocks. Updates live as the program runs. Click a line in the disassembly to set a breakpoint.</p>
   </div>
 
   <p class="small muted" style="margin-top:18px">The first step runs STELLAR's <code>CD</code> label pre-pass; interactive stepping then begins at the first real instruction. Look up any opcode in the <a href="opcodes.html">reference</a>.</p>
@@ -74,16 +74,16 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=9"></script>
-<script src="js/firmware-0061-23.js?v=9"></script>
-<script src="js/stellar-vm.js?v=9"></script>
-<script src="js/disasm.js?v=9"></script>
-<script src="js/core-view.js?v=9"></script>
-<script src="js/mem-view.js?v=9"></script>
-<script src="js/front-panel.js?v=9"></script>
-<script src="js/term-input.js?v=9"></script>
-<script src="js/sim-app.js?v=9"></script>
-<script src="js/simulator-page.js?v=9"></script>
-<script src="js/nav.js?v=9"></script>
+<script src="js/opcodes.js?v=10"></script>
+<script src="js/firmware-0061-23.js?v=10"></script>
+<script src="js/stellar-vm.js?v=10"></script>
+<script src="js/disasm.js?v=10"></script>
+<script src="js/core-view.js?v=10"></script>
+<script src="js/mem-view.js?v=10"></script>
+<script src="js/front-panel.js?v=10"></script>
+<script src="js/term-input.js?v=10"></script>
+<script src="js/sim-app.js?v=10"></script>
+<script src="js/simulator-page.js?v=10"></script>
+<script src="js/nav.js?v=10"></script>
 </body>
 </html>
