@@ -43,4 +43,24 @@
   inner.appendChild(btn);
   nav.appendChild(inner);
   document.body.insertBefore(nav, document.body.firstChild);
+
+  // Build stamp in the footer. The pages version their css/js with ?v=N to defeat
+  // browser caching; this reads the version off this script's own URL, so what it
+  // shows is the build actually loaded — not what the file on disk says. If a page
+  // ever misbehaves, this is the first thing to check: a stamp older than the
+  // current build means the browser is serving cached assets.
+  var me = document.currentScript || (function () {
+    var s = document.getElementsByTagName('script');
+    return s[s.length - 1];
+  })();
+  var m = me && me.src && me.src.match(/[?&]v=(\d+)/);
+  var foot = document.querySelector('footer.foot');
+  if (foot) {
+    var tag = document.createElement('span');
+    tag.className = 'mono small';
+    tag.style.opacity = '.55';
+    tag.style.marginLeft = '8px';
+    tag.textContent = ' · build ' + (m ? 'v' + m[1] : 'unversioned');
+    foot.appendChild(tag);
+  }
 })();
