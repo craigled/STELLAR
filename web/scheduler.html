@@ -46,8 +46,8 @@
   <div class="io-row" style="margin-top:18px">
     <div class="term-wrap">
       <h4>Shared serial terminal</h4>
-      <div class="term" id="term"></div>
-      <p class="arrow-note">One UART, shared by all VMs — their output interleaves in the order the scheduler runs them.</p>
+      <div class="term" id="term" tabindex="0" role="textbox" aria-label="Shared serial terminal — click to type"></div>
+      <p class="arrow-note">One UART, shared by all VMs — their output interleaves in the order the scheduler runs them. Click it and type to send keys in; whichever VM reads first gets them.</p>
     </div>
     <div class="fp-wrap">
       <h4>Front panel</h4>
@@ -68,6 +68,7 @@
 <script src="js/stellar-vm.js?v=5"></script>
 <script src="js/core-view.js?v=5"></script>
 <script src="js/front-panel.js?v=5"></script>
+<script src="js/term-input.js?v=5"></script>
 <script src="js/scheduler-page.js?v=5"></script>
 <script src="js/nav.js?v=5"></script>
 </body>

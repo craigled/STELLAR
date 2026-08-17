@@ -73,28 +73,9 @@
       .catch(function (e) { btn('status').textContent = 'load failed: ' + e; });
   }
 
-  // ---- live typing into the serial terminal ----
-  // The emulated 16C550 reports "byte waiting" whenever its receive buffer is
-  // non-empty, and SERIN yields when it is empty — so appending to that buffer
-  // as keys are pressed is exactly a person typing at the real terminal. The
-  // buffer is reached through the CPU rather than a StellarVM method so a cached
-  // engine cannot break it. Programs echo their own input, as on hardware.
-  var termEl = document.getElementById('term');
-  termEl.addEventListener('keydown', function (e) {
-    var cpu = app.vm && app.vm.cpu;
-    var uart = cpu && cpu.io_in && cpu.io_in[3];
-    if (!uart || !uart.buf) return;
-    if (e.altKey || e.metaKey || e.key === 'Tab') return;   // leave shortcuts and focus alone
-    var code = null;
-    if (e.key === 'Enter') code = 0x0D;
-    else if (e.key === 'Backspace') code = 0x08;
-    else if (e.key === 'Escape') code = 0x1B;
-    else if (e.ctrlKey && /^[a-zA-Z]$/.test(e.key)) code = (e.key.toUpperCase().charCodeAt(0) - 64); // ^A..^Z
-    else if (!e.ctrlKey && e.key.length === 1) code = e.key.charCodeAt(0) & 0xFF;
-    if (code === null) return;
-    e.preventDefault();
-    uart.buf.push(code);
-  });
+  // Live typing into the serial terminal (shared with the multitasking page).
+  window.attachTerminalInput(document.getElementById('term'),
+    function () { return app.vm && app.vm.cpu; });
 
   // ---- opening a .lst from the user's machine (file picker or drag-and-drop) ----
   // Everything is client-side; the site is static, so nothing is uploaded anywhere.

@@ -1,0 +1,4 @@
+;multi-VM input demo, VM2: SERIN + echo, 4 characters, then halts.
+;SERIN yields to the scheduler while no byte is waiting, so VM1 keeps running.
+D 4000 CD 11 03 00 04 B3 01 CB C9 43 03 8C 03 A3 01 00
+D 4010 F0 00 00

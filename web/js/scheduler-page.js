@@ -10,6 +10,8 @@
       programs: ['sched-tick1.lst', 'sched-tick2.lst', 'sched-tick3.lst', 'sched-tick4.lst'] },
     { name: '3 counters (CVT2DEC + OUTDEC)', blurb: 'Each VM counts by a different step and prints via CVT2DEC + OUTDEC — watch the registers change per core.',
       programs: ['sched-count1.lst', 'sched-count2.lst', 'sched-count3.lst'] },
+    { name: 'Typing — one VM waits, the other runs', blurb: 'Click the shared terminal and type. VM1 prints a dot 48 times; VM2 sits in SERIN waiting for a key and echoes the 4 characters you type. Because SERIN yields to the scheduler instead of blocking, the dots keep coming while VM2 waits — your characters appear inline wherever you typed them.',
+      programs: ['sched-echo-tick.lst', 'sched-echo-read.lst'] },
     { name: 'Front panel — two VMs, one latch', blurb: 'Nothing goes to the terminal here — watch the front panel. VM1 holds Q on and writes $11 to the output latch; VM2 holds Q off and writes $22. There is only one Q line and one latch for the whole machine, so the display flips 11/22 and the Q lamp blinks as the scheduler hands the CPU between them.',
       programs: ['sched-panel1.lst', 'sched-panel2.lst'] }
   ];
@@ -22,6 +24,10 @@
   var STATE = { 0x00: 'done', 0x01: 'active', 0x02: 'cycle', 0x03: 'idle', 0x04: 'paused', 0x05: 'killed', 0x0F: 'unknown' };
   function byId(id) { return document.getElementById(id); }
   var panel = new window.FrontPanel(byId('frontpanel'));
+  // Live typing into the shared terminal. One UART for the whole machine, so a
+  // keystroke goes to whichever VM reads it first — the input side of the same
+  // sharing the output already shows.
+  window.attachTerminalInput(byId('term'), function () { return mv && mv.cpu; });
   function hx(v, n) { return v.toString(16).toUpperCase().padStart(n, '0'); }
   function opName(op) {
     var t = window.STELLAR_OPCODES || [];

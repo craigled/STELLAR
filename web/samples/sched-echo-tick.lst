@@ -1,0 +1,4 @@
+;multi-VM input demo, VM1: prints a dot 48x so you can see it keep running
+;while VM2 sits waiting on the keyboard.
+D 4000 CD 11 01 00 30 B3 01 10 00 2E C9 43 01 8C 01 A2
+D 4010 02 B4 01 B3 02 00 F0 00 00
