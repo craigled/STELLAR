@@ -22,8 +22,36 @@
     this.timer = null;
     this.opsPerTick = 1;
     this.tickMs = 120;
+    this.breaks = {};        // absolute address -> true
+    this._skipBreak = false; // don't re-trigger on the address we just resumed from
     this.onState = opts.onState || function () {};
   }
+
+  // Program Location, as the firmware maintains it at core+$31/$32 — the same
+  // value the disassembly highlights. Read directly rather than via snapshot()
+  // so the run loop can check it after every opcode without the extra work.
+  SimApp.prototype._pl = function () {
+    var M = this.vm.cpu.M, b = 0x3000;
+    return (M[b + 0x31] << 8) | M[b + 0x32];
+  };
+
+  SimApp.prototype.toggleBreak = function (addr) {
+    if (this.breaks[addr]) delete this.breaks[addr]; else this.breaks[addr] = true;
+    var row = this.rows[addr];
+    if (row) row.classList.toggle('dis-bp', !!this.breaks[addr]);
+    return !!this.breaks[addr];
+  };
+
+  SimApp.prototype.clearBreaks = function () {
+    var self = this;
+    Object.keys(this.breaks).forEach(function (a) {
+      var row = self.rows[a];
+      if (row) row.classList.remove('dis-bp');
+    });
+    this.breaks = {};
+  };
+
+  SimApp.prototype.breakCount = function () { return Object.keys(this.breaks).length; };
 
   SimApp.prototype.load = function (programText, input) {
     this.stop();
@@ -57,10 +85,24 @@
         '<span class="dis-bytes">' + ln.bytes.map(function (b) { return hx(b, 2); }).join(' ') + '</span>' +
         '<span class="dis-name">' + ln.name + '</span>' +
         '<span class="dis-ops">' + (ln.operandHex || '') + '</span>';
+      row.dataset.addr = ln.addr;
+      if (this.breaks[ln.addr]) row.classList.add('dis-bp');
       frag.appendChild(row);
       this.rows[ln.addr] = row;
     }, this);
     host.appendChild(frag);
+    // Click a line to toggle a breakpoint on it. Bound once on the container so
+    // it survives the panel being rebuilt for each newly loaded program.
+    if (!host._bpBound) {
+      host._bpBound = true;
+      var self = this;
+      host.addEventListener('click', function (e) {
+        var row = e.target.closest ? e.target.closest('.dis-row') : null;
+        if (!row || row.dataset.addr === undefined) return;
+        self.toggleBreak(+row.dataset.addr);
+        if (self.opts.onBreaksChanged) self.opts.onBreaksChanged(self.breakCount());
+      });
+    }
   };
 
   SimApp.prototype._highlight = function (pl) {
@@ -112,12 +154,26 @@
   SimApp.prototype.run = function () {
     if (this.running || !this.vm) return;
     this.running = true;
+    // Resuming while stopped ON a breakpoint would otherwise hit it again at once.
+    this._skipBreak = !!this.breaks[this._pl()];
     this._setStatus('running…');
     var self = this;
     this.timer = setInterval(function () {
       for (var i = 0; i < self.opsPerTick; i++) {
         var r = self.vm.stepOpcode();
-        if (r.halted) { self._render(); self.stop(); self._setStatus('halted — program ended'); return; }
+        // stop() before _render(): the render fires onState, and the page decides
+        // the Run/Step/Pause button states from this.running — rendering first
+        // would leave them disabled after we have already stopped.
+        if (r.halted) { self.stop(); self._render(); self._setStatus('halted — program ended'); return; }
+        if (self.breakCount()) {
+          var pl = self._pl();
+          if (self._skipBreak) { self._skipBreak = false; }
+          else if (self.breaks[pl]) {
+            self.stop(); self._render();
+            self._setStatus('breakpoint — stopped at $' + hx(pl, 4) + ' (Step ▸ to continue)');
+            return;
+          }
+        }
       }
       self._render();
     }, this.tickMs);

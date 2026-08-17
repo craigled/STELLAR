@@ -226,6 +226,12 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .term{background:var(--code-bg); color:var(--code-ink); border-radius:10px; padding:12px 14px;
   font-family:var(--mono); font-size:13px; white-space:pre-wrap; word-break:break-word;
   min-height:120px; max-height:240px; overflow:auto}
+/* 24-line terminal: height is derived from the line box so it stays exactly 24
+   rows if the font size changes */
+.term{line-height:1.35}
+/* box-sizing is border-box, so the 12px top+bottom padding has to be added in
+   for the content box to be exactly 24 lines */
+.io-row .term{min-height:calc(24 * 1.35em + 24px); max-height:calc(24 * 1.35em + 24px)}
 /* the terminal takes live keystrokes when focused */
 .term[tabindex]{cursor:text; outline:none; box-shadow:inset 0 0 0 1px transparent; transition:box-shadow .15s}
 .term[tabindex]:focus{box-shadow:inset 0 0 0 1px var(--accent), 0 0 0 3px rgba(198,93,42,.18)}
@@ -316,3 +322,29 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
   background:var(--accent); color:#1a1206; font-weight:700}
 .vmdetail-head .vd-badge.idle{background:transparent; color:var(--ink-soft); border:1px solid var(--line)}
 .vmdetail-head .spacer{flex:1}
+
+/* ================= memory page viewer ================= */
+.mv-wrap h4{margin:0 0 6px; font-family:var(--mono); font-size:12px;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft)}
+.mv{background:var(--code-bg); color:var(--code-ink); border-radius:10px; padding:10px 12px}
+.mv-bar{display:flex; gap:8px; align-items:center; margin-bottom:8px}
+.mv-bar button{font-family:var(--mono); padding:2px 9px; border-radius:6px; cursor:pointer;
+  border:1px solid rgba(255,255,255,.2); background:transparent; color:var(--code-ink)}
+.mv-bar button:hover{background:rgba(255,255,255,.08)}
+.mv-page{font-family:var(--mono); font-size:12.5px; padding:3px 6px; border-radius:6px;
+  border:1px solid rgba(255,255,255,.2); background:var(--code-bg); color:var(--code-ink)}
+.mv-grid{font-size:12.5px; line-height:1.5; overflow-x:auto}
+.mv-row{display:flex; gap:12px; white-space:pre}
+.mv-addr{color:var(--accent); opacity:.85}
+.mv-hex{display:flex; gap:5px}
+.mv-b{width:2ch; text-align:center; transition:color .25s, background .35s; border-radius:3px}
+.mv-b.zero{opacity:.32}
+.mv-b.chg{background:var(--accent); color:#fff; opacity:1}
+.mv-ascii{opacity:.72; letter-spacing:.02em}
+
+/* breakpoints in the disassembly */
+.dis-row{cursor:pointer}
+.dis-row:hover{background:rgba(255,255,255,.06)}
+.dis-row.dis-bp{background:rgba(214,64,48,.20)}
+.dis-row.dis-bp .dis-addr{color:#ff5a48; font-weight:700}
+.dis-row.dis-bp .dis-addr::before{content:'●'; margin-right:4px; color:#ff5a48}

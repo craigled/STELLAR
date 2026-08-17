@@ -8,6 +8,12 @@
   ];
 
   var panel = new window.FrontPanel(document.getElementById('frontpanel'));
+  var memView = null;   // built after the app exists, so it can read the live memory
+
+  function showBreaks(n) {
+    var el = document.getElementById('bpCount');
+    if (el) el.textContent = n ? (n + ' breakpoint' + (n === 1 ? '' : 's')) : '';
+  }
 
   // Front-panel inputs are read straight off the live CPU rather than trusted to
   // come back in the snapshot. StellarVM.snapshot does supply q/outPort/outByte,
@@ -30,8 +36,10 @@
     disasmEl: document.getElementById('disasm'),
     terminalEl: document.getElementById('term'),
     statusEl: document.getElementById('status'),
+    onBreaksChanged: function (n) { showBreaks(n); },
     onState: function (s) {
       panel.render(panelState(s));
+      if (memView) memView.render();
       btn('pause').disabled = !app.running;
       btn('run').disabled = app.running || s.halted;
       btn('step').disabled = app.running || s.halted;
@@ -72,6 +80,13 @@
       })
       .catch(function (e) { btn('status').textContent = 'load failed: ' + e; });
   }
+
+  memView = new window.MemView(document.getElementById('memview'),
+    function () { return app.vm && app.vm.cpu && app.vm.cpu.M; });
+
+  document.getElementById('clearBreaks').addEventListener('click', function () {
+    app.clearBreaks(); showBreaks(0);
+  });
 
   // Live typing into the serial terminal (shared with the multitasking page).
   window.attachTerminalInput(document.getElementById('term'),
