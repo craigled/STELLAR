@@ -1,315 +1,33 @@
 ; ============================================================
-; ELIZA for the 1802 — STELLAR   *** MILESTONE 3b: PRONOUN SWAP ***
+; ELIZA for the 1802 — STELLAR   *** v2: EXPANDED SCRIPT ***
 ; ============================================================
-; C7 00 (multitasking off) + F0 00 00 pre-pass end marker -> loads into dirty RAM.
-; Full core engine: keyword match (FINDKEY) + fragment echo + pronoun swap.
-;   "I AM SAD" -> "HOW LONG HAVE YOU BEEN SAD?"
-;   "I FEEL YOU HATE MY DOG" -> "DO YOU OFTEN FEEL I HATE YOUR DOG?"
+; 35 keyword rules (was 10) and 13 pronoun-swap pairs (was 3).
+; Uses PRINTSTR ($C1 0X) for the goodbye and the fallback line — one opcode
+; prints a whole null-terminated string, replacing a 17-byte char loop each.
 ;
-; *** TYPE IN CAPITALS *** (auto-upper is a later step).
+; *** TYPE IN CAPITALS *** (auto-upper is still to do.)
 ;
-; The $01 marker in a reply splices in the fragment (input after the keyword).
-; While copying it, at every space the swap table ($4A00) is checked with a
-; trailing-word-boundary test, swapping whole words only:
-;   YOU<->I   MY<->YOUR   ARE<->AM   (single left-to-right pass, no re-swap)
-;
-; NOTE (fixed): the "emit fragment char" path re-reads M(R3) before OUTCH,
-; because the swap-table scan clobbers Acc — otherwise a non-swapped space came
-; out as a $00 (invisible), giving "BEENSAD" instead of "BEEN SAD".
+; A $01 inside a reply splices in the fragment that followed the keyword, with
+; pronoun swapping applied at word boundaries (YOU<->I, MY<->YOUR, ARE<->AM,
+; ME->YOU, WAS<->WERE, MYSELF<->YOURSELF, I'M->YOU ARE, YOU'RE->I AM).
 ;
 ; Memory:
-;   $4000..4209  code (ends F0 00 00)
-;   $4700..$479A  strings   $4800..4962  keyword table ($01=splice)
-;   $4A00..4A36  swap table [FROM\0][TO\0]... (FROM has leading space)
-;   $5000..$50FF  INPUT buffer
+;   $4000..        code (ends F0 00 00)
+;   $4700 greeting   $4770 fallback   $4790 goodbye
+;   $4800..$4C91  keyword table  [KEYWORD\0][REPLY\0]... , extra \0 ends it
+;   $4D00..$4D95  swap table     [FROM\0][TO\0]... , FROM has a leading space
+;   $5000..       INPUT buffer
 ;
-; Keyword table (priority order):
-;   HELLO     -> HELLO. HOW ARE YOU FEELING TODAY?
-;   COMPUTER  -> DO COMPUTERS WORRY YOU?
-;   I FEEL    -> DO YOU OFTEN FEEL ?
-;   I AM      -> HOW LONG HAVE YOU BEEN ?
-;   I WANT    -> WHY DO YOU WANT ?
-;   WHY       -> WHY DO YOU ASK?
-;   NAME      -> NAMES DON'T INTEREST ME.
-;   DREAM     -> WHAT DOES THAT DREAM SUGGEST TO YOU?
-;   SORRY     -> PLEASE DON'T APOLOGIZE.
-;   YOU       -> WE WERE DISCUSSING YOU, NOT ME.
-;   YES       -> YOU SEEM QUITE CERTAIN.
-;   NO        -> WHY NOT?
-;   (no match) -> "PLEASE GO ON."
+; Rebuild with Firmware-Math/build_eliza.py (work repo) — it regenerates the
+; tables from a Python list, so adding rules does not touch the code.
 ;
-; Validated: decodes cleanly $4000..4209; 38 labels, all 54 targets matched.
+; KNOWN, PRE-EXISTING: the first character prints twice ("EELIZA"). The program
+; is entered a second time from $4000 shortly after start, so whatever has been
+; emitted by then repeats. It is NOT caused by PRINTSTR — but PRINTSTR makes it
+; far more visible, because collapsing the greeting from a many-iteration loop
+; into ONE opcode lets execution reach the prompt and the first SERIN before the
+; re-entry. That is why the greeting deliberately still uses the char loop.
 ; ============================================================
-
-; ---- FULL DISASSEMBLY ----
-4000  CD              START
-4001  C7 00           SETMULTI $00                        ; multitasking off
-4003  10 00 00        LOADAI $0000                        ; clear Acc
-4006  11 02 10 00     LOADXI R2,$1000                     ; R2 buf start
-400A  11 0A 07 00     LOADXI RA,$0700
-;
-400E  B3 80           LBL  L80                            greeting
-4010  35 01 0A        COPYIMXA Acc<-M(RA)
-4013  81 00 00        TESTAI $0000
-4016  A2 01           IFTRUEL  L01
-4018  C9              OUTCH
-4019  42 0A           INCX RA
-401B  B4 80           GTL  L80
-;
-401D  B3 01           LBL  L01                            main+prompt
-401F  CA 0D           OUTL $0D
-4021  CA 0A           OUTL $0A
-4023  CA 3E           OUTL $3E
-4025  CA 20           OUTL $20
-4027  11 01 10 00     LOADXI R1,$1000
-;
-402B  B3 10           LBL  L10                            read
-402D  CB              INCH
-402E  81 00 0D        TESTAI $000D
-4031  A2 20           IFTRUEL  L20
-4033  81 00 08        TESTAI $0008
-4036  A2 30           IFTRUEL  L30
-4038  81 00 7F        TESTAI $007F
-403B  A2 30           IFTRUEL  L30
-403D  C9              OUTCH
-403E  36 01 01        COPYIAMX M(R1)<-Acc
-4041  42 01           INCX R1
-4043  B4 10           GTL  L10
-;
-4045  B3 30           LBL  L30                            backspace
-4047  89 12           TESTLXY R1<=R2
-4049  A2 10           IFTRUEL  L10
-404B  43 01           DECX R1
-404D  CA 08           OUTL $08
-404F  CA 20           OUTL $20
-4051  CA 08           OUTL $08
-4053  B4 10           GTL  L10
-;
-4055  B3 20           LBL  L20                            line done
-4057  10 00 00        LOADAI $0000
-405A  36 01 01        COPYIAMX M(R1)<-Acc                 ; null-term
-405D  CA 0D           OUTL $0D
-405F  CA 0A           OUTL $0A
-4061  11 01 10 00     LOADXI R1,$1000                     ; BYE?
-4065  35 01 01        COPYIMXA Acc<-M(R1)
-4068  81 00 42        TESTAI $0042
-406B  A3 50           IFFALSEL L50
-406D  42 01           INCX R1
-406F  35 01 01        COPYIMXA Acc<-M(R1)
-4072  81 00 59        TESTAI $0059
-4075  A3 50           IFFALSEL L50
-4077  42 01           INCX R1
-4079  35 01 01        COPYIMXA Acc<-M(R1)
-407C  81 00 45        TESTAI $0045
-407F  A3 50           IFFALSEL L50
-4081  42 01           INCX R1
-4083  35 01 01        COPYIMXA Acc<-M(R1)
-4086  81 00 00        TESTAI $0000
-4089  A3 50           IFFALSEL L50
-408B  11 0A 07 90     LOADXI RA,$0790
-;
-408F  B3 70           LBL  L70                            goodbye
-4091  35 01 0A        COPYIMXA Acc<-M(RA)
-4094  81 00 00        TESTAI $0000
-4097  A2 71           IFTRUEL  L71
-4099  C9              OUTCH
-409A  42 0A           INCX RA
-409C  B4 70           GTL  L70
-;
-409E  B3 71           LBL  L71
-40A0  00              HALT
-;
-40A1  B3 50           LBL  L50                            FINDKEY
-40A3  11 06 08 00     LOADXI R6,$0800
-;
-40A7  B3 51           LBL  L51                            next entry
-40A9  35 01 06        COPYIMXA Acc<-M(R6)
-40AC  81 00 00        TESTAI $0000
-40AF  A2 62           IFTRUEL  L62                        ; end->fallback
-40B1  11 07 10 00     LOADXI R7,$1000
-;
-40B5  B3 52           LBL  L52                            scan pos
-40B7  35 01 07        COPYIMXA Acc<-M(R7)
-40BA  81 00 00        TESTAI $0000
-40BD  A2 5C           IFTRUEL  L5C                        ; input end->next
-40BF  23 00 74        COPYXY R7->R4
-40C2  23 00 65        COPYXY R6->R5
-;
-40C5  B3 53           LBL  L53                            match char
-40C7  35 01 05        COPYIMXA Acc<-M(R5)
-40CA  81 00 00        TESTAI $0000
-40CD  A2 55           IFTRUEL  L55                        ; matched!
-40CF  21 0B           COPYAX Acc->RB
-40D1  35 01 04        COPYIMXA Acc<-M(R4)
-40D4  21 09           COPYAX Acc->R9
-40D6  87 B9           TESTXY RB==R9
-40D8  A3 54           IFFALSEL L54
-40DA  42 04           INCX R4
-40DC  42 05           INCX R5
-40DE  B4 53           GTL  L53
-;
-40E0  B3 54           LBL  L54                            fail->next pos
-40E2  42 07           INCX R7
-40E4  B4 52           GTL  L52
-;
-40E6  B3 55           LBL  L55                            matched
-40E8  23 00 43        COPYXY R4->R3                       ; R3 = fragment start
-;
-40EB  B3 56           LBL  L56                            walk R6 to null
-40ED  35 01 06        COPYIMXA Acc<-M(R6)
-40F0  81 00 00        TESTAI $0000
-40F3  A2 57           IFTRUEL  L57
-40F5  42 06           INCX R6
-40F7  B4 56           GTL  L56
-;
-40F9  B3 57           LBL  L57
-40FB  42 06           INCX R6                             ; skip null->response
-;
-40FD  B3 58           LBL  L58                            response print
-40FF  35 01 06        COPYIMXA Acc<-M(R6)
-4102  81 00 01        TESTAI $0001
-4105  A2 5A           IFTRUEL  L5A                        ; $01=append+swap
-4107  81 00 00        TESTAI $0000
-410A  A2 59           IFTRUEL  L59
-410C  C9              OUTCH
-410D  42 06           INCX R6
-410F  B4 58           GTL  L58
-;
-4111  B3 59           LBL  L59                            response done
-4113  CA 0D           OUTL $0D
-4115  CA 0A           OUTL $0A
-4117  B4 01           GTL  L01
-;
-4119  B3 5A           LBL  L5A                            append fragment
-411B  42 06           INCX R6                             ; skip marker
-;
-411D  B3 5B           LBL  L5B                            frag loop (swap-aware)
-411F  35 01 03        COPYIMXA Acc<-M(R3)
-4122  81 00 00        TESTAI $0000
-4125  A2 58           IFTRUEL  L58                        ; frag done->resume
-4127  81 00 20        TESTAI $0020
-412A  A3 66           IFFALSEL L66                        ; not space->emit
-412C  11 05 0A 00     LOADXI R5,$0A00                     ; R5 = swap table
-;
-4130  B3 67           LBL  L67                            swap next entry
-4132  35 01 05        COPYIMXA Acc<-M(R5)
-4135  81 00 00        TESTAI $0000
-4138  A2 66           IFTRUEL  L66                        ; no swap->emit space
-413A  23 00 34        COPYXY R3->R4                       ; R4 frag walk
-413D  23 00 57        COPYXY R5->R7                       ; R7 FROM walk
-;
-4140  B3 68           LBL  L68                            swap match
-4142  35 01 07        COPYIMXA Acc<-M(R7)
-4145  81 00 00        TESTAI $0000
-4148  A2 6A           IFTRUEL  L6A                        ; FROM done->boundary
-414A  21 0B           COPYAX Acc->RB
-414C  35 01 04        COPYIMXA Acc<-M(R4)
-414F  21 09           COPYAX Acc->R9
-4151  87 B9           TESTXY RB==R9
-4153  A3 69           IFFALSEL L69
-4155  42 04           INCX R4
-4157  42 07           INCX R7
-4159  B4 68           GTL  L68
-;
-415B  B3 6A           LBL  L6A                            boundary check
-415D  35 01 04        COPYIMXA Acc<-M(R4)
-4160  81 00 00        TESTAI $0000
-4163  A2 6B           IFTRUEL  L6B
-4165  81 00 20        TESTAI $0020
-4168  A2 6B           IFTRUEL  L6B
-416A  B4 69           GTL  L69                            ; not boundary->fail
-;
-416C  B3 69           LBL  L69                            swap fail: walk FROM null
-416E  35 01 05        COPYIMXA Acc<-M(R5)
-4171  81 00 00        TESTAI $0000
-4174  A2 6C           IFTRUEL  L6C
-4176  42 05           INCX R5
-4178  B4 69           GTL  L69
-;
-417A  B3 6C           LBL  L6C
-417C  42 05           INCX R5                             ; skip null->TO
-;
-417E  B3 6D           LBL  L6D                            walk TO null
-4180  35 01 05        COPYIMXA Acc<-M(R5)
-4183  81 00 00        TESTAI $0000
-4186  A2 6E           IFTRUEL  L6E
-4188  42 05           INCX R5
-418A  B4 6D           GTL  L6D
-;
-418C  B3 6E           LBL  L6E
-418E  42 05           INCX R5                             ; -> next entry
-4190  B4 67           GTL  L67
-;
-4192  B3 6B           LBL  L6B                            do swap: walk FROM null
-4194  35 01 05        COPYIMXA Acc<-M(R5)
-4197  81 00 00        TESTAI $0000
-419A  A2 6F           IFTRUEL  L6F
-419C  42 05           INCX R5
-419E  B4 6B           GTL  L6B
-;
-41A0  B3 6F           LBL  L6F
-41A2  42 05           INCX R5                             ; skip null->TO
-;
-41A4  B3 72           LBL  L72                            emit TO
-41A6  35 01 05        COPYIMXA Acc<-M(R5)
-41A9  81 00 00        TESTAI $0000
-41AC  A2 73           IFTRUEL  L73
-41AE  C9              OUTCH
-41AF  42 05           INCX R5
-41B1  B4 72           GTL  L72
-;
-41B3  B3 73           LBL  L73
-41B5  23 00 43        COPYXY R4->R3                       ; R3 = past FROM word
-41B8  B4 5B           GTL  L5B
-;
-41BA  B3 66           LBL  L66                            emit char
-41BC  35 01 03        COPYIMXA Acc<-M(R3)                 ; re-read frag char (Acc clobbered by swap scan)
-41BF  C9              OUTCH
-41C0  42 03           INCX R3
-41C2  B4 5B           GTL  L5B
-;
-41C4  B3 5C           LBL  L5C                            kw failed: walk kw null
-41C6  35 01 06        COPYIMXA Acc<-M(R6)
-41C9  81 00 00        TESTAI $0000
-41CC  A2 5D           IFTRUEL  L5D
-41CE  42 06           INCX R6
-41D0  B4 5C           GTL  L5C
-;
-41D2  B3 5D           LBL  L5D
-41D4  42 06           INCX R6                             ; skip kw null
-;
-41D6  B3 5E           LBL  L5E                            walk resp null
-41D8  35 01 06        COPYIMXA Acc<-M(R6)
-41DB  81 00 00        TESTAI $0000
-41DE  A2 5F           IFTRUEL  L5F
-41E0  42 06           INCX R6
-41E2  B4 5E           GTL  L5E
-;
-41E4  B3 5F           LBL  L5F
-41E6  42 06           INCX R6                             ; -> next entry
-41E8  B4 51           GTL  L51
-;
-41EA  B3 62           LBL  L62                            no match: fallback
-41EC  11 0A 07 70     LOADXI RA,$0770
-;
-41F0  B3 63           LBL  L63                            fallback print
-41F2  35 01 0A        COPYIMXA Acc<-M(RA)
-41F5  81 00 00        TESTAI $0000
-41F8  A2 64           IFTRUEL  L64
-41FA  C9              OUTCH
-41FB  42 0A           INCX RA
-41FD  B4 63           GTL  L63
-;
-41FF  B3 64           LBL  L64
-4201  CA 0D           OUTL $0D
-4203  CA 0A           OUTL $0A
-4205  B4 01           GTL  L01
-4207  F0 00 00        END                                 ; pre-pass stop
-
-; ============================================================
-; UPLOAD DATA — D-LINES
-; ============================================================
-; ---- CODE  $4000..4209 ----
 D 4000 CD C7 00 10 00 00 11 02 10 00 11 0A 07 00 B3 80
 D 4010 35 01 0A 81 00 00 A2 01 C9 42 0A B4 80 B3 01 CA
 D 4020 0D CA 0A CA 3E CA 20 11 01 10 00 B3 10 CB 81 00
@@ -318,66 +36,115 @@ D 4040 01 42 01 B4 10 B3 30 89 12 A2 10 43 01 CA 08 CA
 D 4050 20 CA 08 B4 10 B3 20 10 00 00 36 01 01 CA 0D CA
 D 4060 0A 11 01 10 00 35 01 01 81 00 42 A3 50 42 01 35
 D 4070 01 01 81 00 59 A3 50 42 01 35 01 01 81 00 45 A3
-D 4080 50 42 01 35 01 01 81 00 00 A3 50 11 0A 07 90 B3
-D 4090 70 35 01 0A 81 00 00 A2 71 C9 42 0A B4 70 B3 71
-D 40A0 00 B3 50 11 06 08 00 B3 51 35 01 06 81 00 00 A2
-D 40B0 62 11 07 10 00 B3 52 35 01 07 81 00 00 A2 5C 23
-D 40C0 00 74 23 00 65 B3 53 35 01 05 81 00 00 A2 55 21
-D 40D0 0B 35 01 04 21 09 87 B9 A3 54 42 04 42 05 B4 53
-D 40E0 B3 54 42 07 B4 52 B3 55 23 00 43 B3 56 35 01 06
-D 40F0 81 00 00 A2 57 42 06 B4 56 B3 57 42 06 B3 58 35
-D 4100 01 06 81 00 01 A2 5A 81 00 00 A2 59 C9 42 06 B4
-D 4110 58 B3 59 CA 0D CA 0A B4 01 B3 5A 42 06 B3 5B 35
-D 4120 01 03 81 00 00 A2 58 81 00 20 A3 66 11 05 0A 00
-D 4130 B3 67 35 01 05 81 00 00 A2 66 23 00 34 23 00 57
-D 4140 B3 68 35 01 07 81 00 00 A2 6A 21 0B 35 01 04 21
-D 4150 09 87 B9 A3 69 42 04 42 07 B4 68 B3 6A 35 01 04
-D 4160 81 00 00 A2 6B 81 00 20 A2 6B B4 69 B3 69 35 01
-D 4170 05 81 00 00 A2 6C 42 05 B4 69 B3 6C 42 05 B3 6D
-D 4180 35 01 05 81 00 00 A2 6E 42 05 B4 6D B3 6E 42 05
-D 4190 B4 67 B3 6B 35 01 05 81 00 00 A2 6F 42 05 B4 6B
-D 41A0 B3 6F 42 05 B3 72 35 01 05 81 00 00 A2 73 C9 42
-D 41B0 05 B4 72 B3 73 23 00 43 B4 5B B3 66 35 01 03 C9
-D 41C0 42 03 B4 5B B3 5C 35 01 06 81 00 00 A2 5D 42 06
-D 41D0 B4 5C B3 5D 42 06 B3 5E 35 01 06 81 00 00 A2 5F
-D 41E0 42 06 B4 5E B3 5F 42 06 B4 51 B3 62 11 0A 07 70
-D 41F0 B3 63 35 01 0A 81 00 00 A2 64 C9 42 0A B4 63 B3
-D 4200 64 CA 0D CA 0A B4 01 F0 00 00
-
-; ---- STRINGS  $4700..$479A ----
+D 4080 50 42 01 35 01 01 81 00 00 A3 50 11 0A 07 90 C1
+D 4090 0A 00 B3 50 11 06 08 00 B3 51 35 01 06 81 00 00
+D 40A0 A2 62 11 07 10 00 B3 52 35 01 07 81 00 00 A2 5C
+D 40B0 23 00 74 23 00 65 B3 53 35 01 05 81 00 00 A2 55
+D 40C0 21 0B 35 01 04 21 09 87 B9 A3 54 42 04 42 05 B4
+D 40D0 53 B3 54 42 07 B4 52 B3 55 23 00 43 B3 56 35 01
+D 40E0 06 81 00 00 A2 57 42 06 B4 56 B3 57 42 06 B3 58
+D 40F0 35 01 06 81 00 01 A2 5A 81 00 00 A2 59 C9 42 06
+D 4100 B4 58 B3 59 CA 0D CA 0A B4 01 B3 5A 42 06 B3 5B
+D 4110 35 01 03 81 00 00 A2 58 81 00 20 A3 66 11 05 0D
+D 4120 00 B3 67 35 01 05 81 00 00 A2 66 23 00 34 23 00
+D 4130 57 B3 68 35 01 07 81 00 00 A2 6A 21 0B 35 01 04
+D 4140 21 09 87 B9 A3 69 42 04 42 07 B4 68 B3 6A 35 01
+D 4150 04 81 00 00 A2 6B 81 00 20 A2 6B B4 69 B3 69 35
+D 4160 01 05 81 00 00 A2 6C 42 05 B4 69 B3 6C 42 05 B3
+D 4170 6D 35 01 05 81 00 00 A2 6E 42 05 B4 6D B3 6E 42
+D 4180 05 B4 67 B3 6B 35 01 05 81 00 00 A2 6F 42 05 B4
+D 4190 6B B3 6F 42 05 B3 72 35 01 05 81 00 00 A2 73 C9
+D 41A0 42 05 B4 72 B3 73 23 00 43 B4 5B B3 66 35 01 03
+D 41B0 C9 42 03 B4 5B B3 5C 35 01 06 81 00 00 A2 5D 42
+D 41C0 06 B4 5C B3 5D 42 06 B3 5E 35 01 06 81 00 00 A2
+D 41D0 5F 42 06 B4 5E B3 5F 42 06 B4 51 B3 62 11 0A 07
+D 41E0 70 C1 0A CA 0D CA 0A B4 01 F0 00 00
 D 4700 45 4C 49 5A 41 2E 20 20 54 41 4C 4B 20 54 4F 20
 D 4710 4D 45 2E 20 20 28 42 59 45 20 54 4F 20 51 55 49
-D 4720 54 29 0D 0A 00 00 00 00 00 00 00 00 00 00 00 00
-D 4770 50 4C 45 41 53 45 20 47 4F 20 4F 4E 2E 00 00 00
-D 4790 47 4F 4F 44 42 59 45 2E 0D 0A 00 00 00 00 00 00
-
-; ---- KEYWORD TABLE  $4800..4962  ($01 = fragment-splice marker) ----
+D 4720 54 29 0D 0A 00
+D 4770 50 4C 45 41 53 45 20 47 4F 20 4F 4E 2E 00
+D 4790 47 4F 4F 44 42 59 45 2E 0D 0A 00
 D 4800 48 45 4C 4C 4F 00 48 45 4C 4C 4F 2E 20 48 4F 57
 D 4810 20 41 52 45 20 59 4F 55 20 46 45 45 4C 49 4E 47
-D 4820 20 54 4F 44 41 59 3F 00 43 4F 4D 50 55 54 45 52
-D 4830 00 44 4F 20 43 4F 4D 50 55 54 45 52 53 20 57 4F
-D 4840 52 52 59 20 59 4F 55 3F 00 49 20 46 45 45 4C 00
-D 4850 44 4F 20 59 4F 55 20 4F 46 54 45 4E 20 46 45 45
-D 4860 4C 01 3F 00 49 20 41 4D 00 48 4F 57 20 4C 4F 4E
-D 4870 47 20 48 41 56 45 20 59 4F 55 20 42 45 45 4E 01
-D 4880 3F 00 49 20 57 41 4E 54 00 57 48 59 20 44 4F 20
-D 4890 59 4F 55 20 57 41 4E 54 01 3F 00 57 48 59 00 57
-D 48A0 48 59 20 44 4F 20 59 4F 55 20 41 53 4B 3F 00 4E
-D 48B0 41 4D 45 00 4E 41 4D 45 53 20 44 4F 4E 27 54 20
-D 48C0 49 4E 54 45 52 45 53 54 20 4D 45 2E 00 44 52 45
-D 48D0 41 4D 00 57 48 41 54 20 44 4F 45 53 20 54 48 41
-D 48E0 54 20 44 52 45 41 4D 20 53 55 47 47 45 53 54 20
-D 48F0 54 4F 20 59 4F 55 3F 00 53 4F 52 52 59 00 50 4C
-D 4900 45 41 53 45 20 44 4F 4E 27 54 20 41 50 4F 4C 4F
-D 4910 47 49 5A 45 2E 00 59 4F 55 00 57 45 20 57 45 52
-D 4920 45 20 44 49 53 43 55 53 53 49 4E 47 20 59 4F 55
-D 4930 2C 20 4E 4F 54 20 4D 45 2E 00 59 45 53 00 59 4F
-D 4940 55 20 53 45 45 4D 20 51 55 49 54 45 20 43 45 52
-D 4950 54 41 49 4E 2E 00 4E 4F 00 57 48 59 20 4E 4F 54
-D 4960 3F 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-
-; ---- SWAP TABLE  $4A00..4A36 ----
-D 4A00 20 59 4F 55 00 20 49 00 20 49 00 20 59 4F 55 00
-D 4A10 20 59 4F 55 52 00 20 4D 59 00 20 4D 59 00 20 59
-D 4A20 4F 55 52 00 20 41 52 45 00 20 41 4D 00 20 41 4D
-D 4A30 00 20 41 52 45 00 00 00 00 00 00 00 00 00 00 00
+D 4820 20 54 4F 44 41 59 3F 00 48 49 00 48 45 4C 4C 4F
+D 4830 2E 20 57 48 41 54 20 49 53 20 4F 4E 20 59 4F 55
+D 4840 52 20 4D 49 4E 44 3F 00 43 4F 4D 50 55 54 45 52
+D 4850 00 44 4F 20 43 4F 4D 50 55 54 45 52 53 20 57 4F
+D 4860 52 52 59 20 59 4F 55 3F 00 4D 41 43 48 49 4E 45
+D 4870 00 57 48 59 20 44 4F 20 59 4F 55 20 4D 45 4E 54
+D 4880 49 4F 4E 20 4D 41 43 48 49 4E 45 53 3F 00 49 20
+D 4890 46 45 45 4C 00 44 4F 20 59 4F 55 20 4F 46 54 45
+D 48A0 4E 20 46 45 45 4C 01 3F 00 49 20 41 4D 00 48 4F
+D 48B0 57 20 4C 4F 4E 47 20 48 41 56 45 20 59 4F 55 20
+D 48C0 42 45 45 4E 01 3F 00 49 27 4D 00 48 4F 57 20 4C
+D 48D0 4F 4E 47 20 48 41 56 45 20 59 4F 55 20 42 45 45
+D 48E0 4E 01 3F 00 49 20 57 41 4E 54 00 57 48 59 20 44
+D 48F0 4F 20 59 4F 55 20 57 41 4E 54 01 3F 00 49 20 4E
+D 4900 45 45 44 00 57 48 41 54 20 57 4F 55 4C 44 20 49
+D 4910 54 20 4D 45 41 4E 20 54 4F 20 59 4F 55 20 49 46
+D 4920 20 59 4F 55 20 47 4F 54 01 3F 00 49 20 54 48 49
+D 4930 4E 4B 00 44 4F 20 59 4F 55 20 52 45 41 4C 4C 59
+D 4940 20 54 48 49 4E 4B 01 3F 00 49 20 43 41 4E 27 54
+D 4950 00 57 48 41 54 20 4D 41 4B 45 53 20 59 4F 55 20
+D 4960 54 48 49 4E 4B 20 59 4F 55 20 43 41 4E 4E 4F 54
+D 4970 01 3F 00 49 20 44 4F 4E 27 54 00 57 48 59 20 44
+D 4980 4F 4E 27 54 20 59 4F 55 01 3F 00 49 20 4B 4E 4F
+D 4990 57 00 48 4F 57 20 44 4F 20 59 4F 55 20 4B 4E 4F
+D 49A0 57 01 3F 00 49 20 52 45 4D 45 4D 42 45 52 00 57
+D 49B0 48 41 54 20 45 4C 53 45 20 44 4F 20 59 4F 55 20
+D 49C0 52 45 4D 45 4D 42 45 52 3F 00 42 45 43 41 55 53
+D 49D0 45 00 49 53 20 54 48 41 54 20 54 48 45 20 52 45
+D 49E0 41 4C 20 52 45 41 53 4F 4E 3F 00 41 4C 57 41 59
+D 49F0 53 00 43 41 4E 20 59 4F 55 20 54 48 49 4E 4B 20
+D 4A00 4F 46 20 41 20 53 50 45 43 49 46 49 43 20 45 58
+D 4A10 41 4D 50 4C 45 3F 00 4E 45 56 45 52 00 4E 45 56
+D 4A20 45 52 3F 20 54 48 41 54 20 49 53 20 41 20 53 54
+D 4A30 52 4F 4E 47 20 57 4F 52 44 2E 00 45 56 45 52 59
+D 4A40 4F 4E 45 00 53 55 52 45 4C 59 20 4E 4F 54 20 45
+D 4A50 56 45 52 59 4F 4E 45 2E 00 4D 4F 54 48 45 52 00
+D 4A60 54 45 4C 4C 20 4D 45 20 4D 4F 52 45 20 41 42 4F
+D 4A70 55 54 20 59 4F 55 52 20 46 41 4D 49 4C 59 2E 00
+D 4A80 46 41 54 48 45 52 00 54 45 4C 4C 20 4D 45 20 4D
+D 4A90 4F 52 45 20 41 42 4F 55 54 20 59 4F 55 52 20 46
+D 4AA0 41 4D 49 4C 59 2E 00 46 41 4D 49 4C 59 00 57 48
+D 4AB0 4F 20 45 4C 53 45 20 49 4E 20 59 4F 55 52 20 46
+D 4AC0 41 4D 49 4C 59 20 43 4F 4D 45 53 20 54 4F 20 4D
+D 4AD0 49 4E 44 3F 00 46 52 49 45 4E 44 00 57 48 59 20
+D 4AE0 44 4F 20 59 4F 55 20 42 52 49 4E 47 20 55 50 20
+D 4AF0 46 52 49 45 4E 44 53 3F 00 44 52 45 41 4D 00 57
+D 4B00 48 41 54 20 44 4F 45 53 20 54 48 41 54 20 44 52
+D 4B10 45 41 4D 20 53 55 47 47 45 53 54 20 54 4F 20 59
+D 4B20 4F 55 3F 00 53 4F 52 52 59 00 50 4C 45 41 53 45
+D 4B30 20 44 4F 4E 27 54 20 41 50 4F 4C 4F 47 49 5A 45
+D 4B40 2E 00 4E 41 4D 45 00 4E 41 4D 45 53 20 44 4F 4E
+D 4B50 27 54 20 49 4E 54 45 52 45 53 54 20 4D 45 2E 00
+D 4B60 57 48 59 00 57 48 59 20 44 4F 20 59 4F 55 20 41
+D 4B70 53 4B 3F 00 48 4F 57 00 57 48 41 54 20 41 4E 53
+D 4B80 57 45 52 20 57 4F 55 4C 44 20 50 4C 45 41 53 45
+D 4B90 20 59 4F 55 20 4D 4F 53 54 3F 00 57 48 41 54 00
+D 4BA0 57 48 59 20 44 4F 20 59 4F 55 20 41 53 4B 3F 00
+D 4BB0 41 52 45 20 59 4F 55 00 57 48 59 20 44 4F 45 53
+D 4BC0 20 49 54 20 4D 41 54 54 45 52 20 57 48 45 54 48
+D 4BD0 45 52 20 49 20 41 4D 3F 00 59 4F 55 20 41 52 45
+D 4BE0 00 57 48 41 54 20 4D 41 4B 45 53 20 59 4F 55 20
+D 4BF0 54 48 49 4E 4B 20 49 20 41 4D 01 3F 00 59 4F 55
+D 4C00 00 57 45 20 57 45 52 45 20 44 49 53 43 55 53 53
+D 4C10 49 4E 47 20 59 4F 55 2C 20 4E 4F 54 20 4D 45 2E
+D 4C20 00 4D 41 59 42 45 00 59 4F 55 20 44 4F 4E 27 54
+D 4C30 20 53 45 45 4D 20 56 45 52 59 20 43 45 52 54 41
+D 4C40 49 4E 2E 00 50 45 52 48 41 50 53 00 59 4F 55 20
+D 4C50 44 4F 4E 27 54 20 53 45 45 4D 20 56 45 52 59 20
+D 4C60 43 45 52 54 41 49 4E 2E 00 59 45 53 00 59 4F 55
+D 4C70 20 53 45 45 4D 20 51 55 49 54 45 20 43 45 52 54
+D 4C80 41 49 4E 2E 00 4E 4F 00 57 48 59 20 4E 4F 54 3F
+D 4C90 00 00
+D 4D00 20 59 4F 55 00 20 49 00 20 49 00 20 59 4F 55 00
+D 4D10 20 59 4F 55 52 00 20 4D 59 00 20 4D 59 00 20 59
+D 4D20 4F 55 52 00 20 41 52 45 00 20 41 4D 00 20 41 4D
+D 4D30 00 20 41 52 45 00 20 4D 45 00 20 59 4F 55 00 20
+D 4D40 57 41 53 00 20 57 45 52 45 00 20 57 45 52 45 00
+D 4D50 20 57 41 53 00 20 4D 59 53 45 4C 46 00 20 59 4F
+D 4D60 55 52 53 45 4C 46 00 20 59 4F 55 52 53 45 4C 46
+D 4D70 00 20 4D 59 53 45 4C 46 00 20 49 27 4D 00 20 59
+D 4D80 4F 55 20 41 52 45 00 20 59 4F 55 27 52 45 00 20
+D 4D90 49 20 41 4D 00 00
