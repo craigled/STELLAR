@@ -298,9 +298,19 @@
 
   // Structured snapshot of a VM core (default VM1) for the visualizers.
   StellarVM.prototype.snapshot = function (vmCore) {
-    var s = readCore(this.cpu.M, vmCore || CORE);
+    var base = vmCore || CORE;
+    var s = readCore(this.cpu.M, base);
     s.steps = this.cpu.steps; s.lastOpCost = this.lastOpCost || 0;
     s.halted = this.cpu.halted; s.pc1802 = this.cpu.R[this.cpu.P];
+    // ---- Elf2K front panel: Q lamp + the latched output byte ----
+    // The output port is whatever DEFOUT ($01 0Z) last set at core $x039; the
+    // Elf2K default is port 4. io_out[port] is the write log, so the last entry
+    // is what the hardware latch would be showing.
+    s.q = this.cpu.Q ? 1 : 0;
+    var port = this.cpu.M[base + 0x39] || 4;
+    var log = this.cpu.io_out[port];
+    s.outPort = port;
+    s.outByte = (log && log.length) ? log[log.length - 1] : null;
     return s;
   };
 

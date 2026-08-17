@@ -7,12 +7,15 @@
     { label: 'turbo', ops: 200, ms: 0 }
   ];
 
+  var panel = new window.FrontPanel(document.getElementById('frontpanel'));
+
   var app = new window.SimApp({
     coreEl: document.getElementById('core'),
     disasmEl: document.getElementById('disasm'),
     terminalEl: document.getElementById('term'),
     statusEl: document.getElementById('status'),
     onState: function (s) {
+      panel.render(s);
       btn('pause').disabled = !app.running;
       btn('run').disabled = app.running || s.halted;
       btn('step').disabled = app.running || s.halted;
@@ -53,6 +56,64 @@
       })
       .catch(function (e) { btn('status').textContent = 'load failed: ' + e; });
   }
+
+  // ---- opening a .lst from the user's machine (file picker or drag-and-drop) ----
+  // Everything is client-side; the site is static, so nothing is uploaded anywhere.
+  function loadUserProgram(name, text) {
+    var pokes;
+    try {
+      pokes = window.StellarVMLib.parseLst(text);
+    } catch (e) {
+      btn('status').textContent = name + ': could not parse — ' + e;
+      return;
+    }
+    if (!pokes.length) {
+      btn('status').textContent = name + ': no "D <addr> <bytes>" lines found — is this a STELLAR .lst?';
+      return;
+    }
+    var entry = pokes[0][0], first = pokes[0][1];
+    var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
+    app.load(text, input);
+    btn('blurb').textContent = 'Loaded ' + name + ' — ' + pokes.length +
+      ' bytes from $' + entry.toString(16).toUpperCase() + '.';
+    if (first !== 0xCD) {
+      // Every STELLAR program starts with CD START; anything else is most
+      // likely native 1802 code (or a data-only file) and will not run here.
+      btn('status').textContent = name + ': loaded, but the first byte is $' +
+        first.toString(16).toUpperCase() + ', not $CD START — this may not be a STELLAR program.';
+    }
+  }
+
+  function readFile(file) {
+    if (!file) return;
+    var fr = new FileReader();
+    fr.onload = function () { loadUserProgram(file.name, String(fr.result)); };
+    fr.onerror = function () { btn('status').textContent = 'could not read ' + file.name; };
+    fr.readAsText(file);
+  }
+
+  btn('openFile').addEventListener('click', function () { btn('fileInput').click(); });
+  btn('fileInput').addEventListener('change', function () {
+    readFile(this.files && this.files[0]);
+    this.value = '';               // let the same file be re-picked later
+  });
+
+  var bodyEl = document.getElementById('body');
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    bodyEl.addEventListener(ev, function (e) {
+      e.preventDefault(); bodyEl.classList.add('dropping');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    bodyEl.addEventListener(ev, function (e) {
+      e.preventDefault();
+      if (ev === 'dragleave' && bodyEl.contains(e.relatedTarget)) return;
+      bodyEl.classList.remove('dropping');
+    });
+  });
+  bodyEl.addEventListener('drop', function (e) {
+    readFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  });
 
   btn('sample').addEventListener('change', function () { selectSample(+this.value); });
   btn('load').addEventListener('click', function () {

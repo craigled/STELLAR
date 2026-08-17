@@ -40,5 +40,12 @@
   "halted": false,
   "steps": 7999999,
   "bytes": 190
+ },
+ "Front-Panel.lst": {
+  "input": "",
+  "outHex": "",
+  "halted": true,
+  "steps": 27877,
+  "bytes": 0
  }
 }

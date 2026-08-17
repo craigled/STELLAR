@@ -19,6 +19,8 @@
       <input type="text" id="input" value="" size="10" placeholder="e.g. 3&#92;r60&#92;r" title="Serial input; use \r for Enter">
     </label>
     <button id="load">Load</button>
+    <button id="openFile" title="Open a .lst program from your computer">Open .lst…</button>
+    <input type="file" id="fileInput" accept=".lst,.txt" hidden>
     <span class="grow"></span>
     <button id="toggleSide" title="Show/hide the disassembly panel">Side panel</button>
   </div>
@@ -41,9 +43,15 @@
   <div class="sim-body side-open" id="body">
     <div class="sim-main">
       <div id="core"></div>
-      <div class="term-wrap">
-        <h4>Serial terminal</h4>
-        <div class="term" id="term"></div>
+      <div class="io-row">
+        <div class="term-wrap">
+          <h4>Serial terminal</h4>
+          <div class="term" id="term"></div>
+        </div>
+        <div class="fp-wrap">
+          <h4>Front panel</h4>
+          <div class="fp" id="frontpanel"></div>
+        </div>
       </div>
     </div>
     <div class="sim-side" id="side">
@@ -62,6 +70,7 @@
 <script src="js/stellar-vm.js"></script>
 <script src="js/disasm.js"></script>
 <script src="js/core-view.js"></script>
+<script src="js/front-panel.js"></script>
 <script src="js/sim-app.js"></script>
 <script src="js/simulator-page.js"></script>
 <script src="js/nav.js"></script>

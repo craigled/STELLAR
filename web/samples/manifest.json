@@ -46,5 +46,13 @@
     "blurb": "ASCII Mandelbrot in Q8.8 fixed point (fixed step budget here). Exercises signed multiply and the MA pipeline.",
     "maxSteps": 8000000,
     "halts": false
+  },
+  {
+    "name": "Front panel (Q + hex display)",
+    "file": "Front-Panel.lst",
+    "input": "",
+    "blurb": "Drives the Elf2K front panel instead of the terminal: lights the Q lamp and counts $00-$1F on the two-digit output display, then clears Q and halts. Serial output stays empty \u2014 watch the panel.",
+    "maxSteps": 3000000,
+    "halts": true
   }
 ]
