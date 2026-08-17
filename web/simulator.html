@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Simulator</title>
 <meta name="description" content="Run STELLAR programs in the browser on the real firmware — step through the disassembly and watch the core update live.">
-<link rel="stylesheet" href="css/site.css?v=4">
+<link rel="stylesheet" href="css/site.css?v=5">
 </head>
 <body>
 <main class="wrap">
@@ -46,7 +46,8 @@
       <div class="io-row">
         <div class="term-wrap">
           <h4>Serial terminal</h4>
-          <div class="term" id="term"></div>
+          <div class="term" id="term" tabindex="0" role="textbox" aria-label="Serial terminal — click to type"></div>
+          <p class="arrow-note" id="termHint">Click the terminal and type to send keys to the running program — Enter, Backspace and Ctrl-key combinations all go through. The <b>input</b> box above just pre-loads keystrokes before you start.</p>
         </div>
         <div class="fp-wrap">
           <h4>Front panel</h4>
@@ -65,14 +66,14 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=4"></script>
-<script src="js/firmware-0061-23.js?v=4"></script>
-<script src="js/stellar-vm.js?v=4"></script>
-<script src="js/disasm.js?v=4"></script>
-<script src="js/core-view.js?v=4"></script>
-<script src="js/front-panel.js?v=4"></script>
-<script src="js/sim-app.js?v=4"></script>
-<script src="js/simulator-page.js?v=4"></script>
-<script src="js/nav.js?v=4"></script>
+<script src="js/opcodes.js?v=5"></script>
+<script src="js/firmware-0061-23.js?v=5"></script>
+<script src="js/stellar-vm.js?v=5"></script>
+<script src="js/disasm.js?v=5"></script>
+<script src="js/core-view.js?v=5"></script>
+<script src="js/front-panel.js?v=5"></script>
+<script src="js/sim-app.js?v=5"></script>
+<script src="js/simulator-page.js?v=5"></script>
+<script src="js/nav.js?v=5"></script>
 </body>
 </html>
