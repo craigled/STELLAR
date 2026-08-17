@@ -245,8 +245,10 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .fp-display{display:flex; gap:10px; padding:10px 14px; border-radius:8px;
   background:#0b0d10; box-shadow:inset 0 2px 6px rgba(0,0,0,.7)}
 .fp-digit{width:38px; height:68px; display:block}
-.fp-seg{fill:#ff4436; opacity:.07; transition:opacity .1s, filter .1s}
-.fp-seg.on{opacity:1; filter:drop-shadow(0 0 3px rgba(255,68,54,.65))}
+/* brightness comes from the fill-opacity attribute the renderer sets, so the
+   digits still read correctly if this stylesheet is stale; CSS adds the glow */
+.fp-seg{fill:#ff4436; transition:fill-opacity .1s, filter .1s}
+.fp-seg.on{filter:drop-shadow(0 0 3px rgba(255,68,54,.65))}
 .fp-cap{font-size:11px; color:var(--code-ink); opacity:.7; letter-spacing:.04em}
 
 /* drag-and-drop target for opening a .lst */

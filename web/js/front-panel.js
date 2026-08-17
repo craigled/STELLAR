@@ -37,15 +37,26 @@
     g: '20,90  28,80  72,80  80,90  72,100 28,100'
   };
 
+  var LIT = '#ff4436';        // LED red
+  var DIM = 0.07;             // unlit segments stay faintly visible, as on real hardware
+
   function digit(doc) {
     var svg = doc.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', '0 0 100 180');
     svg.setAttribute('class', 'fp-digit');
+    // Size and colour are also set as attributes, not left to CSS alone: an SVG
+    // with no CSS width falls back to the browser default of 300x150 and unstyled
+    // polygons fill black, so a stale stylesheet would render huge black digits
+    // on white. These attributes keep it sane; the CSS still overrides them.
+    svg.setAttribute('width', '38');
+    svg.setAttribute('height', '68');
     var segs = {};
     Object.keys(SEG).forEach(function (k) {
       var p = doc.createElementNS(NS, 'polygon');
       p.setAttribute('points', SEG[k]);
       p.setAttribute('class', 'fp-seg');
+      p.setAttribute('fill', LIT);
+      p.setAttribute('fill-opacity', DIM);
       svg.appendChild(p);
       segs[k] = p;
     });
@@ -90,7 +101,9 @@
   FrontPanel.prototype._setDigit = function (d, nib) {
     var on = nib === null ? '' : GLYPH[nib & 0xF];
     Object.keys(d.segs).forEach(function (k) {
-      d.segs[k].classList.toggle('on', on.indexOf(k) >= 0);
+      var lit = on.indexOf(k) >= 0;
+      d.segs[k].classList.toggle('on', lit);          // CSS adds the glow
+      d.segs[k].setAttribute('fill-opacity', lit ? 1 : DIM);  // works without CSS too
     });
   };
 
