@@ -60,31 +60,61 @@
     return '<span class="st s' + hx(st, 2) + '">' + (STATE[st] || ('$' + hx(st, 2))) + '</span>';
   }
 
+  // Decoders for the CIDP system bytes, per STELLAR COMMANDS v0061.23.
+  var SYSINT = { 0x00: 'Single', 0x01: 'Hardware Int', 0x02: 'Counter Int', 0x03: 'Dual', 0x0E: 'Error' };
+  var VMERR = { 0x00: 'None', 0x01: 'No VMs', 0x02: 'Abort', 0x0F: 'Unknown' };
+  var STATUS = { 0x00: 'busy', 0x01: 'ready', 0x02: 'error' };
+  function statusBadge(st) {
+    return '<span class="st st-' + (STATUS[st] || 'unk') + '">' + (STATUS[st] || ('$' + hx(st, 2))) + '</span>';
+  }
+  function dec(map, v) { return map[v] !== undefined ? map[v] : '?'; }
+
+  // The nine machine-wide bytes at $2F50-$2F5F, shown with their addresses so the
+  // panel doubles as a map of the interchange page.
+  function renderSys(cd) {
+    var items = [
+      ['System Interrupt State', 0x2F50, cd.sysIntState, dec(SYSINT, cd.sysIntState)],
+      ['VM Error Register',      0x2F51, cd.vmError,     dec(VMERR, cd.vmError)],
+      ['Current VM Number',      0x2F52, cd.currentVM,   cd.currentVM ? 'VM' + cd.currentVM : 'none'],
+      ['MAX VMs',                0x2F53, cd.maxVMs,      String(cd.maxVMs)],
+      ['Total VMs Present',      0x2F54, cd.totalVMs,    String(cd.totalVMs)],
+      ['Multitasking Allowed',   0x2F55, cd.multitasking, cd.multitasking ? 'Yes' : 'No'],
+      // spec: 00 = Simultaneous, 01 = Sequential
+      ['VM Operation',           0x2F56, cd.operation,   cd.operation ? 'Sequential' : 'Simultaneous'],
+      ['VM Repeat',              0x2F57, cd.repeat,      cd.repeat ? 'Repeat at End' : 'Continuous to End'],
+      ['Hardware Interrupt FF',  0x2F5F, cd.hwIntFF,     cd.hwIntFF ? 'set' : 'clear']
+    ];
+    byId('sysreg').innerHTML = items.map(function (it) {
+      return '<div class="sr-cell">' +
+        '<span class="sr-lab">' + it[0] + '</span>' +
+        '<span class="sr-addr mono">$' + hx(it[1], 4) + '</span>' +
+        '<span class="sr-val mono">$' + hx(it[2], 2) + '</span>' +
+        '<span class="sr-dec">' + it[3] + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
   function renderCIDP(cd) {
-    var sys = '<div class="cidp-sys">' +
-      'Current VM <b>' + (cd.currentVM || '—') + '</b>' +
-      '<span>Total <b>' + cd.totalVMs + '</b>/' + cd.maxVMs + '</span>' +
-      '<span>Multitasking <b>' + (cd.multitasking ? 'ON' : 'off') + '</b></span>' +
-      '<span>Mode <b>' + (cd.operation ? 'simultaneous' : 'sequential') + '</b></span>' +
-      '<span>Repeat <b>' + (cd.repeat ? 'yes' : 'no') + '</b></span>' +
-      (cd.vmError ? '<span>VM error <b>$' + hx(cd.vmError, 2) + '</b></span>' : '') +
-      '</div>';
     var rows = '';
     cd.vms.forEach(function (v, i) {
       if (v.num === 0 || v.num > cd.totalVMs) return;
       var active = cd.currentVM === v.num;
+      var base = 0x2F00 + (v.num - 1) * 0x10;
       rows += '<tr class="' + (active ? 'vm-active' : '') + '">' +
         '<td class="mono">VM' + v.num + (active ? ' ◀ CPU' : '') + '</td>' +
-        '<td>' + stateBadge(v.state) + '</td>' +
+        '<td>' + stateBadge(v.state) +
+          '<span class="cidp-raw mono">$' + hx(v.state, 2) + ' @$' + hx(base + 0x05, 4) + '</span></td>' +
+        '<td>' + statusBadge(v.status) +
+          '<span class="cidp-raw mono">$' + hx(v.status, 2) + ' @$' + hx(base + 0x0B, 4) + '</span></td>' +
         '<td class="mono">$' + hx(v.corePage, 2) + '00</td>' +
         '<td class="mono">$' + hx(v.progPage, 2) + '00</td>' +
         '<td class="mono">' + v.cmds.toLocaleString() + '</td>' +
         '<td class="mono">' + (v.mode === 2 ? 'RW' : v.mode === 1 ? 'RO' : '—') + '</td>' +
         '</tr>';
     });
-    byId('cidp').innerHTML = sys +
+    byId('cidp').innerHTML =
       '<div class="cidp-tblwrap"><table><thead><tr>' +
-      '<th>VM</th><th>State</th><th>Core</th><th>Prog</th><th>#Cmds</th><th>Access</th>' +
+      '<th>VM</th><th>State</th><th>Status</th><th>Core</th><th>Prog</th><th>#Cmds</th><th>Access</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
 
@@ -172,6 +202,7 @@
     if (!mv) return;
     var cd = mv.cidp();
     renderCIDP(cd);
+    renderSys(cd);
     renderCores(cd);
     updateDetail(cd);
     appendSerial();

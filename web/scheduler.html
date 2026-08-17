@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Multitasking</title>
 <meta name="description" content="Watch STELLAR run 2–4 cooperative VMs at once — the decoded $2F00 CIDP page, the quantum countdown, and the round-robin hand-off, live on the real firmware.">
-<link rel="stylesheet" href="css/site.css?v=10">
+<link rel="stylesheet" href="css/site.css?v=11">
 </head>
 <body>
 <main class="wrap">
@@ -29,6 +29,9 @@
 
   <h3 style="margin:20px 0 4px">CIDP — <span class="mono">$2F00</span> interchange page</h3>
   <div class="cidp" id="cidp"></div>
+
+  <h3 style="margin:22px 0 4px">System registers <span class="muted small" style="font-weight:400">(the machine-wide bytes at <span class="mono">$2F50</span>–<span class="mono">$2F5F</span>)</span></h3>
+  <div class="sysreg" id="sysreg"></div>
 
   <h3 style="margin:22px 0 4px">Cores <span class="muted small" style="font-weight:400">(the highlighted one holds the CPU right now — click ⤢ to expand any VM)</span></h3>
   <div class="cores-grid" id="cores"></div>
@@ -63,13 +66,13 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=10"></script>
-<script src="js/firmware-0061-23.js?v=10"></script>
-<script src="js/stellar-vm.js?v=10"></script>
-<script src="js/core-view.js?v=10"></script>
-<script src="js/front-panel.js?v=10"></script>
-<script src="js/term-input.js?v=10"></script>
-<script src="js/scheduler-page.js?v=10"></script>
-<script src="js/nav.js?v=10"></script>
+<script src="js/opcodes.js?v=11"></script>
+<script src="js/firmware-0061-23.js?v=11"></script>
+<script src="js/stellar-vm.js?v=11"></script>
+<script src="js/core-view.js?v=11"></script>
+<script src="js/front-panel.js?v=11"></script>
+<script src="js/term-input.js?v=11"></script>
+<script src="js/scheduler-page.js?v=11"></script>
+<script src="js/nav.js?v=11"></script>
 </body>
 </html>
