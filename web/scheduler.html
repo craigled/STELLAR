@@ -43,10 +43,17 @@
     <div id="vd-core"></div>
   </div>
 
-  <div class="term-wrap" style="margin-top:18px">
-    <h4>Shared serial terminal</h4>
-    <div class="term" id="term"></div>
-    <p class="arrow-note">One UART, shared by all VMs — their output interleaves in the order the scheduler runs them.</p>
+  <div class="io-row" style="margin-top:18px">
+    <div class="term-wrap">
+      <h4>Shared serial terminal</h4>
+      <div class="term" id="term"></div>
+      <p class="arrow-note">One UART, shared by all VMs — their output interleaves in the order the scheduler runs them.</p>
+    </div>
+    <div class="fp-wrap">
+      <h4>Front panel</h4>
+      <div class="fp" id="frontpanel"></div>
+      <p class="arrow-note">Also shared: one Q line and one output latch for the whole machine, whichever VM last drove them.</p>
+    </div>
   </div>
 
   <h2><span class="hx">↻</span>How the hand-off works</h2>
@@ -60,6 +67,7 @@
 <script src="js/firmware-0061-23.js?v=4"></script>
 <script src="js/stellar-vm.js?v=4"></script>
 <script src="js/core-view.js?v=4"></script>
+<script src="js/front-panel.js?v=4"></script>
 <script src="js/scheduler-page.js?v=4"></script>
 <script src="js/nav.js?v=4"></script>
 </body>

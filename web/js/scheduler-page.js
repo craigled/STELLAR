@@ -9,7 +9,9 @@
     { name: '4 tickers — all cores', blurb: 'All four VMs active — the CPU cycles 1→2→3→4.',
       programs: ['sched-tick1.lst', 'sched-tick2.lst', 'sched-tick3.lst', 'sched-tick4.lst'] },
     { name: '3 counters (CVT2DEC + OUTDEC)', blurb: 'Each VM counts by a different step and prints via CVT2DEC + OUTDEC — watch the registers change per core.',
-      programs: ['sched-count1.lst', 'sched-count2.lst', 'sched-count3.lst'] }
+      programs: ['sched-count1.lst', 'sched-count2.lst', 'sched-count3.lst'] },
+    { name: 'Front panel — two VMs, one latch', blurb: 'Nothing goes to the terminal here — watch the front panel. VM1 holds Q on and writes $11 to the output latch; VM2 holds Q off and writes $22. There is only one Q line and one latch for the whole machine, so the display flips 11/22 and the Q lamp blinks as the scheduler hands the CPU between them.',
+      programs: ['sched-panel1.lst', 'sched-panel2.lst'] }
   ];
   var SPEEDS = [
     { label: '1×', slices: 1, ms: 320 },
@@ -19,6 +21,7 @@
   ];
   var STATE = { 0x00: 'done', 0x01: 'active', 0x02: 'cycle', 0x03: 'idle', 0x04: 'paused', 0x05: 'killed', 0x0F: 'unknown' };
   function byId(id) { return document.getElementById(id); }
+  var panel = new window.FrontPanel(byId('frontpanel'));
   function hx(v, n) { return v.toString(16).toUpperCase().padStart(n, '0'); }
   function opName(op) {
     var t = window.STELLAR_OPCODES || [];
@@ -143,6 +146,22 @@
     coreView.render(mv.snapshotVM(expandedVM));
   }
 
+  // The front panel is machine-wide, not per-VM: one 1802 means one Q line and
+  // one output latch, so whichever VM drove them last is what shows — the same
+  // sharing the serial terminal has. The port number is per-VM though (each core
+  // has its own DEFOUT byte at +$39), so it is read from the VM holding the CPU.
+  function panelState() {
+    var cpu = mv.cpu, vm = mv.currentVM();
+    var base = mv.coreBase(vm >= 1 && vm <= 4 ? vm : 1);
+    var port = cpu.M[base + 0x39] || 4;
+    var log = cpu.io_out[port];
+    return {
+      q: cpu.Q ? 1 : 0,
+      outPort: port,
+      outByte: (log && log.length) ? log[log.length - 1] : null
+    };
+  }
+
   function render() {
     if (!mv) return;
     var cd = mv.cidp();
@@ -150,6 +169,7 @@
     renderCores(cd);
     updateDetail(cd);
     appendSerial();
+    panel.render(panelState());
     var anyActive = cd.vms.some(function (v) { return v.state === 0x01; });
     byId('run').disabled = running || !anyActive;
     byId('step').disabled = running || !anyActive;

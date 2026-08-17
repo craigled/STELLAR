@@ -1,0 +1,3 @@
+;multi-VM front-panel demo, VM2: holds Q off and writes $22 to the output latch, 24x
+D 4000 CD 11 03 00 18 B3 01 0A 00 04 22 43 03 8C 03 A3
+D 4010 01 00 F0 00 00
