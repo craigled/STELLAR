@@ -9,13 +9,29 @@
 
   var panel = new window.FrontPanel(document.getElementById('frontpanel'));
 
+  // Front-panel inputs are read straight off the live CPU rather than trusted to
+  // come back in the snapshot. StellarVM.snapshot does supply q/outPort/outByte,
+  // but only in builds from 2026-08-17 on — deriving them here as well means a
+  // cached copy of stellar-vm.js leaves the panel working instead of blank.
+  function panelState(s) {
+    var cpu = app.vm && app.vm.cpu;
+    if (!cpu) return s;
+    var CORE = (window.StellarVMLib && window.StellarVMLib.CORE) || 0x3000;
+    var port = cpu.M[CORE + 0x39] || 4;          // DEFOUT target; Elf2K default 4
+    var log = cpu.io_out[port];
+    s.q = cpu.Q ? 1 : 0;
+    s.outPort = port;
+    s.outByte = (log && log.length) ? log[log.length - 1] : null;
+    return s;
+  }
+
   var app = new window.SimApp({
     coreEl: document.getElementById('core'),
     disasmEl: document.getElementById('disasm'),
     terminalEl: document.getElementById('term'),
     statusEl: document.getElementById('status'),
     onState: function (s) {
-      panel.render(s);
+      panel.render(panelState(s));
       btn('pause').disabled = !app.running;
       btn('run').disabled = app.running || s.halted;
       btn('step').disabled = app.running || s.halted;
