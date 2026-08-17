@@ -148,8 +148,10 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 
 /* ================= core visualizer ================= */
 .coreview{border:1px solid var(--line); border-radius:12px; background:var(--bg-panel); overflow:hidden}
-.cv-status{display:flex; flex-wrap:wrap; gap:16px; align-items:center; padding:10px 14px;
+.cv-status{display:flex; flex-direction:column; gap:3px; padding:10px 14px;
   background:var(--code-bg); color:var(--code-ink); font-size:13px}
+.cv-s-row{display:flex; flex-wrap:wrap; gap:16px; align-items:center}
+.cv-s-counters{opacity:.9}
 .cv-s-op{color:var(--accent); font-weight:700; font-size:14px}
 .cv-s-pl,.cv-s-cc,.cv-s-steps{color:var(--code-ink); opacity:.85}
 .cv-s-steps b{color:var(--accent); font-weight:700; opacity:1}

@@ -116,12 +116,14 @@
     r.classList.add('coreview');
     r.innerHTML = '';
 
+    // Two rows: the instruction being executed on top, and the counters that
+    // describe it (command number, and the 1802 instructions it cost) beneath —
+    // so the opcode reads on its own line instead of trailing off into numbers.
     var status = el('div', 'cv-status');
-    status.appendChild(el('span', 'cv-s-op mono', '—'));
-    status.appendChild(el('span', 'cv-s-pl mono', ''));
-    status.appendChild(el('span', 'cv-s-cc mono', ''));
-    status.appendChild(el('span', 'cv-s-steps mono', ''));
-    var spacer = el('span', 'cv-s-spacer'); status.appendChild(spacer);
+    var top = el('div', 'cv-s-row');
+    top.appendChild(el('span', 'cv-s-op mono', '—'));
+    top.appendChild(el('span', 'cv-s-pl mono', ''));
+    var spacer = el('span', 'cv-s-spacer'); top.appendChild(spacer);
     var toggle = el('button', 'cv-toggle', '⊕ all fields');
     toggle.type = 'button';
     toggle.addEventListener('click', function () {
@@ -130,7 +132,14 @@
       toggle.textContent = self.showFull ? '⊖ compact' : '⊕ all fields';
       if (self.prev) self.render(self.prev, true);
     });
-    status.appendChild(toggle);
+    top.appendChild(toggle);
+
+    var counters = el('div', 'cv-s-row cv-s-counters');
+    counters.appendChild(el('span', 'cv-s-cc mono', ''));
+    counters.appendChild(el('span', 'cv-s-steps mono', ''));
+
+    status.appendChild(top);
+    status.appendChild(counters);
     r.appendChild(status);
     this.sOp = status.querySelector('.cv-s-op');
     this.sPl = status.querySelector('.cv-s-pl');
