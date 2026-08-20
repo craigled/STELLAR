@@ -36,7 +36,6 @@ DESC = {
 0x08: ('io', '0X', 'Output the byte in memory pointed to by register X.'),
 0x09: ('io', '', 'Scan the EF flags into the Accumulator.'),
 0x0A: ('io', '0Z', 'Set Q (0=Off, 1=On, 2=On-then-Off, 3=On,On then Off,Off).'),
-0x0B: ('io', 'MM MM', 'Play a pulse/tone sequence from memory until a $00 byte.'),
 0x0C: ('io', '0Z', 'Scan input-port value into Acc byte Z (0=low, 1=high).'),
 0x0D: ('io', '0Z', 'Get input-port value into Acc byte Z (0=low, 1=high).'),
 0x0E: ('io', 'ZX', 'Get input-port value into register X (Z=0: low, else high).'),

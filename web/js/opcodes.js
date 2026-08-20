@@ -13,7 +13,6 @@ var OPS = [
   {op:0x08, name:"OUTMX", length:1, group:"io", operands:"0X", desc:"Output the byte in memory pointed to by register X."},
   {op:0x09, name:"GETEFA", length:0, group:"io", operands:"", desc:"Scan the EF flags into the Accumulator."},
   {op:0x0A, name:"SETQ", length:1, group:"io", operands:"0Z", desc:"Set Q (0=Off, 1=On, 2=On-then-Off, 3=On,On then Off,Off)."},
-  {op:0x0B, name:"SETQM", length:2, group:"io", operands:"MM MM", desc:"Play a pulse/tone sequence from memory until a $00 byte."},
   {op:0x0C, name:"SIPA", length:1, group:"io", operands:"0Z", desc:"Scan input-port value into Acc byte Z (0=low, 1=high)."},
   {op:0x0D, name:"GIPA", length:1, group:"io", operands:"0Z", desc:"Get input-port value into Acc byte Z (0=low, 1=high)."},
   {op:0x0E, name:"GIPX", length:1, group:"io", operands:"ZX", desc:"Get input-port value into register X (Z=0: low, else high)."},
