@@ -26,20 +26,23 @@
   function fmtOperands(pattern, bytes) {
     var toks = (pattern || '').trim().split(/\s+/).filter(Boolean);
     if (!toks.length || toks.length !== bytes.length) return bytes.map(hx2).join(' ');
-    var out = [];
+    var out = [], run = '';
     for (var i = 0; i < bytes.length; i++) {
       var tk = toks[i], b = bytes[i];
-      if (!/[XY]/.test(tk)) { out.push(hx2(b)); continue; }
+      if (!/[XY]/.test(tk)) { run += hx2(b); continue; }   // plain bytes group together
+      if (run) { out.push(run); run = ''; }
       var parts = [], nib = [(b >> 4) & 0xF, b & 0xF];
       for (var k = 0; k < 2; k++) {
         var c = tk.charAt(k), d = nib[k].toString(16).toUpperCase();
         if (c === 'X' || c === 'Y') parts.push('R' + d);
-        else if (c === '0') continue;          // padding nibble, nothing to show
+        else if (c === '0') continue;          // padding nibble in the pattern
+        else if (nib[k] === 0) continue;       // zero selector alongside a register: noise
         else parts.push(d);
       }
       out.push(parts.join(' '));
     }
-    return out.join(' ');
+    if (run) out.push(run);
+    return out.filter(Boolean).join(' ');
   }
 
   // variable-length opcodes (return operand-byte count)
