@@ -54,7 +54,7 @@
   (<span class="hex">$0360</span>), and <span class="mono">R6</span> carries the link address. Every
   STELLAR <span class="mono">CALL</span>/<span class="mono">RETURN</span> opcode rides on this.</p>
 
-  <h2><span class="hx">■</span>The VM core ($3000 block)</h2>
+  <h2><span class="hx">■</span>The VM core ($3000, $3400, $3800, and $3C00 blocks)</h2>
   <p>Each VM's entire live state is a 256-byte block. This is exactly what the
   <a href="core.html">core visualizer</a> renders. VM1's block starts at
   <span class="hex">$3000</span>; VM2/3/4 at <span class="hex">$3400</span>/<span class="hex">$3800</span>/<span class="hex">$3C00</span>.</p>
