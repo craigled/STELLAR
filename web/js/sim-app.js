@@ -84,7 +84,7 @@
         '<span class="dis-addr">' + hx(ln.addr, 4) + '</span>' +
         '<span class="dis-bytes">' + ln.bytes.map(function (b) { return hx(b, 2); }).join(' ') + '</span>' +
         '<span class="dis-name">' + ln.name + '</span>' +
-        '<span class="dis-ops">' + (ln.operandHex || '') + '</span>';
+        '<span class="dis-ops">' + (ln.operandText || ln.operandHex || '') + '</span>';
       row.dataset.addr = ln.addr;
       if (this.breaks[ln.addr]) row.classList.add('dis-bp');
       frag.appendChild(row);

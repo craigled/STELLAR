@@ -123,19 +123,16 @@ DESC = {
 0x6D: ('math', '0Z', 'Set hex/decimal mode (0=Hex, 1=Auto decimal conversion).'),
 0x6E: ('math', '', 'OUTDEC — output the DA as decimal ASCII to the UART, leading-zero suppressed (custom; pair with CVT2DEC).'),
 
-0x70: ('stack', 'NN', 'Push an immediate byte onto the stack.'),
-0x71: ('stack', 'NN NN', 'Push two immediate bytes onto the stack.'),
-0x72: ('stack', '0Z', 'Push accumulator Z (0=Acc, 1=MA, 2=DA).'),
-0x73: ('stack', '0Z', 'Pop into accumulator Z.'),
-0x74: ('stack', '0X', 'Push register X (two bytes).'),
-0x75: ('stack', '0X', 'Pop into register X (two bytes).'),
-0x76: ('stack', 'ZX', 'Push Z bytes from memory at RX (Z=0: 16 bytes).'),
-0x77: ('stack', 'ZX', 'Pop Z bytes into memory at RX (Z=0: 16 bytes).'),
-0x78: ('stack', '0Z', 'Push special value (IO/EF/RelAbs/DataDir/Hex/Macro/Error/MARem/ExitCode).'),
-0x79: ('stack', '0Z', 'Pop special value (same Z selectors as PUSHS).'),
-0x7A: ('stack', '', 'Push the Q state.'),
-0x7B: ('stack', '', 'Pop and restore the Q state.'),
-0x7E: ('stack', '', 'Skip back over the last PUSH on the stack.'),
+0x70: ('stack', '0Z', 'Push the complete contents of accumulator Z (0=Acc, 1=MA, 2=DA).'),
+0x71: ('stack', '0Z', 'Pop the complete contents of accumulator Z (0=Acc, 1=MA, 2=DA).'),
+0x72: ('stack', '0X', 'Push register X onto the stack (two bytes).'),
+0x73: ('stack', '0X', 'Pop the stack into register X (two bytes).'),
+0x74: ('stack', 'ZX', 'Push the memory pointed to by RX onto the stack (Z=0: 16 bytes).'),
+0x75: ('stack', 'ZX', 'Pop the stack into the memory pointed to by RX (Z=0: 16 bytes).'),
+0x76: ('stack', '0Z', 'Push one special byte: Z = 0 IO, 1 EF, 2 MEMMODE, 3 DATADIR, 4 HEXFLAG, 6 ERROR, 8 ExitCode. Z = 5 and 7 are unassigned and do nothing.'),
+0x77: ('stack', '0Z', 'Pop one special byte back off the stack, Z as for PUSHS.'),
+0x78: ('stack', '', 'Push the Q output state onto the stack.'),
+0x79: ('stack', '', 'Pop the Q state back off the stack and set Q accordingly.'),
 
 0x80: ('test', 'ZX', 'Test Acc = RX (Z=0: all, 1: low, 2: high).'),
 0x81: ('test', 'NN NN', 'Test Acc = immediate.'),
@@ -201,8 +198,9 @@ DESC = {
 
 0xC0: ('misc', 'NN', 'Delay NN before the next operation.'),
 0xC1: ('misc', '0X', 'PRINTSTR — output the whole null-terminated string at M(RX) in one op (custom).'),
-0xF1: ('misc', 'OO... D5', 'RUNMC — run raw 1802 machine code (return with D5; no VM '
-        'timing). Moved here from $C2 in V0061.24.'),
+0xF1: ('misc', 'MM MM', 'RUNMC — jump to native 1802 machine code at $MMMM. The code is NOT '
+        'inline: only the 2-byte address follows the opcode. It must return with SEP R5 (D5). '
+        'No VM time-sharing happens while it runs. Moved here from $C2 in V0061.24.'),
 0xC2: ('io', 'XY', 'GETSTR — read a line from the UART into the buffer at RX, echoing as it '
         'goes. X = cursor register (advances), Y = buffer-start register (the floor backspace '
         'cannot pass). CR ends the line and stores $00; $08/$7F backspace. Handles one '
@@ -252,7 +250,7 @@ GROUPS = [
     ('reg',    'Register & Accumulator','$10-$1A'),
     ('move',   'Data Move',             '$20-$3F'),
     ('math',   'Math',                  '$40-$6D'),
-    ('stack',  'Stack',                 '$70-$7E'),
+    ('stack',  'Stack',                 '$70-$79'),
     ('test',   'Test',                  '$80-$9F'),
     ('branch', 'Labels & Branches',     '$A0-$BF'),
     ('misc',   'Misc / Control',        '$C0-$CF'),

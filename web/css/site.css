@@ -100,6 +100,14 @@ pre,.codeblock{background:var(--code-bg); color:var(--code-ink); border-radius:1
 /* ---- tables ---- */
 .tblwrap{overflow-x:auto; border:1px solid var(--line); border-radius:10px; margin:16px 0}
 table{border-collapse:collapse; width:100%; font-size:14px}
+/* Core-map table: a wide Offset column reads better against the hex, and Notes
+   does not need the lion's share of the row. */
+.coremap{table-layout:fixed}
+.coremap th:nth-child(1),.coremap td:nth-child(1){width:22%}
+.coremap th:nth-child(2),.coremap td:nth-child(2){width:26%}
+.coremap th:nth-child(3),.coremap td:nth-child(3){width:52%}
+.coremap td:nth-child(3){white-space:normal}
+@media(max-width:640px){ .coremap{table-layout:auto} }
 th,td{text-align:left; padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top}
 thead th{background:var(--bg-sunk); font-family:var(--mono); font-size:12px;
   letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); position:sticky; top:0}

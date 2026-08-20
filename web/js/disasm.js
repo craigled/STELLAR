@@ -15,9 +15,31 @@
     throw new Error('opcode table unavailable (load opcodes.js first)');
   }
   function tables(ops) {
-    var LEN = {}, NAME = {};
-    ops.forEach(function (o) { LEN[o.op] = o.length; NAME[o.op] = o.name; });
-    return { LEN: LEN, NAME: NAME };
+    var LEN = {}, NAME = {}, PAT = {};
+    ops.forEach(function (o) { LEN[o.op] = o.length; NAME[o.op] = o.name; PAT[o.op] = o.operands || ''; });
+    return { LEN: LEN, NAME: NAME, PAT: PAT };
+  }
+
+  // Render operand bytes against the opcode's pattern ("XY", "ZX", "0X", "NN NN"...)
+  // so register nibbles read as R1/RA rather than a bare hex digit. Bytes whose
+  // pattern holds no register nibble stay as plain hex.
+  function fmtOperands(pattern, bytes) {
+    var toks = (pattern || '').trim().split(/\s+/).filter(Boolean);
+    if (!toks.length || toks.length !== bytes.length) return bytes.map(hx2).join(' ');
+    var out = [];
+    for (var i = 0; i < bytes.length; i++) {
+      var tk = toks[i], b = bytes[i];
+      if (!/[XY]/.test(tk)) { out.push(hx2(b)); continue; }
+      var parts = [], nib = [(b >> 4) & 0xF, b & 0xF];
+      for (var k = 0; k < 2; k++) {
+        var c = tk.charAt(k), d = nib[k].toString(16).toUpperCase();
+        if (c === 'X' || c === 'Y') parts.push('R' + d);
+        else if (c === '0') continue;          // padding nibble, nothing to show
+        else parts.push(d);
+      }
+      out.push(parts.join(' '));
+    }
+    return out.join(' ');
   }
 
   // variable-length opcodes (return operand-byte count)
@@ -26,7 +48,6 @@
     if (op === 0x12) return 1 + ((nxt >> 4) || 2);
     if (op === 0x63 || op === 0x64 || op === 0x65) return (nxt >> 4) === 1 ? 3 : 1;
     if (op === 0x9D) return 1 + (nxt >> 4);
-    if (op === 0xC2) { var n = 1; while (mem[a + n] !== 0xD5 && mem[a + n] !== undefined) n++; return n; }
     return 0;
   }
 
@@ -34,9 +55,9 @@
   function hx4(w) { return w.toString(16).toUpperCase().padStart(4, '0'); }
 
   // Disassemble a memory image over [lo,hi]; stop code at F0 00 00 end marker.
-  // Returns { lines:[{addr,len,bytes,op,name,ops,operandHex,isEnd}], byAddr:{addr:index} }.
+  // Returns { lines:[{addr,len,bytes,op,name,operandHex,operandText,isEnd}], byAddr:{addr:index} }.
   function disassemble(mem, lo, hi, opcodesArr) {
-    var t = tables(getOpcodes(opcodesArr)), LEN = t.LEN, NAME = t.NAME;
+    var t = tables(getOpcodes(opcodesArr)), LEN = t.LEN, NAME = t.NAME, PAT = t.PAT;
     var lines = [], byAddr = {};
     var a = lo;
     while (a <= hi) {
@@ -55,6 +76,7 @@
         addr: a, len: nops + 1, bytes: bytes, op: op,
         name: end ? 'BRK' : (NAME[op] || ('op' + hx2(op))),
         operandHex: bytes.slice(1).map(hx2).join(' '),
+        operandText: end ? '' : fmtOperands(PAT[op], bytes.slice(1)),
         isEnd: end, unknown: L === undefined
       });
       a += nops + 1;
@@ -70,5 +92,5 @@
     return disassemble(mem, base, base + 0x0FFF);
   }
 
-  return { disassemble: disassemble, disassembleProgram: disassembleProgram, vlen: vlen, hx2: hx2, hx4: hx4 };
+  return { disassemble: disassemble, disassembleProgram: disassembleProgram, vlen: vlen, fmtOperands: fmtOperands, hx2: hx2, hx4: hx4 };
 });

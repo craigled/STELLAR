@@ -30,7 +30,7 @@
     [0x38, 1, 'Input port', 'hex1'],
     [0x39, 1, 'Output port', 'hex1'],
     [0x3A, 1, 'I/O byte', 'hex1'],
-    [0x3B, 1, 'Abs/Rel mode', 'relabs'],
+    [0x3B, 1, 'MEMMODE (addressing)', 'memmode'],
     [0x3C, 1, 'Prog stack loc', 'hex1'],
     [0x40, 1, 'Address modifier', 'hex1'],
     [0x41, 1, 'Mem direction', 'hex1'],
@@ -75,7 +75,7 @@
       case 'u32': return (raw[off] * 0x1000000 + (raw[off + 1] << 16) + (raw[off + 2] << 8) + raw[off + 3]).toLocaleString();
       case 'flag': return b0 ? '● 1' : '○ 0';
       case 'hex1': return '$' + hx(b0, 2);
-      case 'relabs': return b0 ? 'REL' : 'ABS';
+      case 'memmode': return b0 ? 'RELATIVE' : 'ABSOLUTE';
       case 'hexdec': return b0 ? 'DEC' : 'HEX';
       case 'bytes': {
         var s = [];

@@ -58,7 +58,7 @@
   <p>Each VM's entire live state is a 256-byte block. This is exactly what the
   <a href="core.html">core visualizer</a> renders. VM1's block starts at
   <span class="hex">$3000</span>; VM2/3/4 at <span class="hex">$3400</span>/<span class="hex">$3800</span>/<span class="hex">$3C00</span>.</p>
-  <div class="tblwrap"><table>
+  <div class="tblwrap"><table class="coremap">
     <thead><tr><th>Offset</th><th>Field</th><th>Notes</th></tr></thead>
     <tbody>
       <tr><td class="hex">+$00–$1F</td><td>Registers R0–RF</td><td>Sixteen 16-bit registers, high byte first</td></tr>

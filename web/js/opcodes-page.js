@@ -55,10 +55,9 @@
       html += '<div class="op-group"><h3>' + esc(g[1]) +
         '<span class="rng">' + esc(g[2]) + '</span></h3>';
       rows.forEach(function (o) {
-        var len = o.length < 0 ? 'var' : o.length + 'b';
         html += '<div class="op-row" id="op-' + o.op.toString(16).toUpperCase().padStart(2, '0') + '">' +
           '<div class="oc">' + hx(o.op) + '</div>' +
-          '<div class="nm">' + esc(o.name) + ' <span class="muted small" style="font-weight:400">' + len + '</span></div>' +
+          '<div class="nm">' + esc(o.name) + '</div>' +
           '<div class="ops">' + (esc(o.operands) || '—') + '</div>' +
           '<div class="ds">' + esc(o.desc) + '</div>' +
           '</div>';
