@@ -1,0 +1,46 @@
+; ============================================================
+; GETSTR-Test  —  demo/verify the $C2 GETSTR line-input opcode
+; ============================================================
+; Needs Firmware-Math/GETSTR-2frag.dlines.txt flashed.
+;
+;   11 01 09 00   R1 = $0900   cursor      (-> $4900)
+;   11 02 09 00   R2 = $0900   buffer start / backspace floor
+;   C2 12         GETSTR: read a line into the buffer at R1, floor R2
+;   C1 02         PRINTSTR the buffer back from R2
+;
+; Prompts "Type a line: ", reads what you type, then echoes "You typed: <line>".
+;
+; What to try:
+;   plain text + Enter      -> the same text comes back
+;   type, BACKSPACE, retype -> the erased characters are gone from the buffer
+;                              and the screen shows BS SPACE BS (a real erase)
+;   DEL instead of BACKSPACE-> behaves identically ($7F is an alias for $08)
+;   BACKSPACE at the very start -> ignored; it will not eat the prompt
+;   Enter on an empty line   -> "You typed: " with nothing after it
+;
+; GETSTR handles ONE character per execution and yields between them, so other
+; VMs keep running while this one waits for you. It is not a blocking loop.
+;
+; NOTE: the strings live PAST the F0 00 00 end marker, so the label pre-pass
+; never scans them - otherwise a stray $B3 byte in text reads as a label.
+; ============================================================
+
+; ---- CODE ($4000..$402B) ----
+D 4000 CD
+D 4001 11 03 09 40
+D 4005 C1 03
+D 4007 11 01 09 00
+D 400B 11 02 09 00
+D 400F C2 12
+D 4011 10 00 0D C9
+D 4015 10 00 0A C9
+D 4019 11 03 09 20
+D 401D C1 03
+D 401F C1 02
+D 4021 10 00 0D C9
+D 4025 10 00 0A C9
+D 4029 F0 00 00
+
+; ---- strings, past the end marker ----
+D 4920 59 6F 75 20 74 79 70 65 64 3A 20 00
+D 4940 54 79 70 65 20 61 20 6C 69 6E 65 3A 20 00

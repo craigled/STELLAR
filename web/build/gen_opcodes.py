@@ -202,7 +202,12 @@ DESC = {
 
 0xC0: ('misc', 'NN', 'Delay NN before the next operation.'),
 0xC1: ('misc', '0X', 'PRINTSTR — output the whole null-terminated string at M(RX) in one op (custom).'),
-0xC2: ('misc', 'OO... D5', 'Run raw 1802 machine code (return with D5; no VM timing).'),
+0xF1: ('misc', 'OO... D5', 'RUNMC — run raw 1802 machine code (return with D5; no VM '
+        'timing). Moved here from $C2 in V0061.24.'),
+0xC2: ('io', 'XY', 'GETSTR — read a line from the UART into the buffer at RX, echoing as it '
+        'goes. X = cursor register (advances), Y = buffer-start register (the floor backspace '
+        'cannot pass). CR ends the line and stores $00; $08/$7F backspace. Handles one '
+        'character per execution and yields between them, so other VMs keep running (custom).'),
 0xC3: ('misc', '', 'Generate a pseudo-random two-byte number into Acc.'),
 0xC4: ('misc', '', 'No operation.'),
 0xC5: ('misc', '', 'Enable external interrupt.'),

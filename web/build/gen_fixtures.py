@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 Generate web/build/fixtures.json — golden serial output for each sample program,
-produced by the REAL firmware simulator in Firmware-Math. The Node parity test
-(test_parity.mjs) asserts the JS engine reproduces these byte-for-byte.
+produced by the REAL firmware simulator in Firmware-Math, over the SAME image the
+browser gets (extract_firmware.build_image = V0061.24 as flashed). The Node parity
+test (test_parity.mjs) asserts the JS engine reproduces these byte-for-byte.
 
     python3 web/build/gen_fixtures.py
 """
@@ -14,30 +15,15 @@ FMATH = os.path.expanduser('~/Projects/stellar-1802/Firmware-Math')
 sys.path.insert(0, FMATH)
 os.chdir(FMATH)
 
-from load_firmware import load                  # noqa: E402
-from divmax_hw_verify import parse_lst          # noqa: E402
+sys.path.insert(0, HERE)                        # extract_firmware lives beside this file
+from extract_firmware import build_image        # noqa: E402  (single source of truth)
 from cpu1802 import CPU                          # noqa: E402
 from calc_interactive import UART               # noqa: E402
 
 CORE = 0x3000
 
 def run(lst_path, inp, max_steps):
-    mem, _ = load('../STELLAR MAIN V0061.23.docx')
-    for a, b in parse_lst('DIVMAX-hw.lst').items():
-        mem[a] = b
-    mem[0x08B8] = 0x17; mem[0x08B9] = 0xC0; mem[0x2E5C] = 0x02
-    # OUTDEC ($6E) — HW-verified 2026-08-15 (matches web/build/extract_firmware.py)
-    for i, b in enumerate(bytes.fromhex('F830BEF828AEF804ABF800AF0EBFF6F6F6F6ADD415E89FFA0FADD415E81E2B8B3A81C015DB')):
-        mem[0x0175 + i] = b
-    for i, b in enumerate(bytes.fromhex('8F3AE4F830ADD40CA018C000508D3AEE8F32F8F801AF8DFC30ADD40CA0D5')):
-        mem[0x15DB + i] = b
-    mem[0x08DC] = 0x01; mem[0x08DD] = 0x75
-    # VM1 launch symmetry (matches extract_firmware.py) — boot BR $0050 -> LBR $0100
-    mem[0x003D] = 0xC0; mem[0x003E] = 0x01; mem[0x003F] = 0x00
-    # Hex/Decimal auto-convert remainder fix (HW-verified 2026-08-16, matches extract_firmware.py)
-    mem[0x07DA] = 0xFA
-    for i, b in enumerate(bytes.fromhex('D40A20C01B9D')):
-        mem[0x07FA + i] = b
+    mem = bytearray(build_image())      # V0061.24 exactly as flashed
     for ln in open(lst_path):
         import re
         m = re.match(r'D\s+([0-9A-Fa-f]{4})\s+(.+)', ln.strip())

@@ -1,5 +1,21 @@
 [
   {
+    "name": "GETSTR",
+    "file": "GETSTR.lst",
+    "input": "HELLO\r",
+    "blurb": "The $C2 GETSTR line-input opcode: prompts, reads a whole line with echo and backspace handling, then prints it back with PRINTSTR. GETSTR handles one character per execution and yields between them, so other VMs keep running while this one waits.",
+    "maxSteps": 8000000,
+    "halts": false
+  },
+  {
+    "name": "String Store",
+    "file": "String-Store.lst",
+    "input": "ALPHA\rBETA\rGAMMA\r",
+    "blurb": "Storing strings for later: GETSTR reads three lines, $3B COPYMXMY block-copies each into a numbered 32-byte slot, and PRINTSTR reads them back out of order. Shows the slot pattern for keeping text around.",
+    "maxSteps": 12000000,
+    "halts": false
+  },
+  {
     "name": "Prime-Gen v05",
     "file": "Prime-Gen-v05.lst",
     "input": "3\r60\r",
