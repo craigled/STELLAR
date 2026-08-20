@@ -101,13 +101,11 @@ pre,.codeblock{background:var(--code-bg); color:var(--code-ink); border-radius:1
 .tblwrap{overflow-x:auto; border:1px solid var(--line); border-radius:10px; margin:16px 0}
 table{border-collapse:collapse; width:100%; font-size:14px}
 /* Core-map table: a wide Offset column reads better against the hex, and Notes
-   does not need the lion's share of the row. */
-.coremap{table-layout:fixed}
-.coremap th:nth-child(1),.coremap td:nth-child(1){width:17%}   /* Offset - about 2x its natural width */
-.coremap th:nth-child(2),.coremap td:nth-child(2){width:17%}   /* Field  - roughly unchanged */
-.coremap th:nth-child(3),.coremap td:nth-child(3){width:66%}   /* Notes  - gives up the difference */
-.coremap td:nth-child(3){white-space:normal}
-@media(max-width:640px){ .coremap{table-layout:auto} }
+   does not need the lion's share of the row. Offset is sized in `ch` and set
+   nowrap, so it scales with the font and can never break "+$00-$1F" across two
+   lines the way a percentage width does when the text is zoomed. */
+.coremap th:nth-child(1),.coremap td:nth-child(1){width:22ch; white-space:nowrap}
+.coremap th:nth-child(3),.coremap td:nth-child(3){width:66%}
 th,td{text-align:left; padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top}
 thead th{background:var(--bg-sunk); font-family:var(--mono); font-size:12px;
   letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); position:sticky; top:0}
