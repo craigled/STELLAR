@@ -80,6 +80,12 @@ Programs written in the STELLAR VM instruction set, hand-assembled as D-line hex
 | `Lite-Writer.lst` | Minimal terminal text-entry editor |
 | `STAR-Writer.lst` | Basic terminal text-entry app |
 | `ELIZA.lst` | ELIZA-style conversational chatbot (keyword matching + pronoun swap) |
+| `Banner.lst` | Big-letter ASCII banner printer, 5x5 pre-rendered font |
+| `Mandelbrot.lst` | ASCII Mandelbrot set, Q8.8 sign-magnitude fixed point |
+| `Game-of-Life.lst` | Conway's Game of Life, animated on a 40x20 grid |
+| `Starship.lst` | The COSMAC ELF logo as a static picture; any key quits |
+| `Bouncing-Ball.lst` | Two 3x3 reverse-video balls bouncing off the walls and each other |
+| `Invaders.lst` | Space Invaders: two rows of six, arrow-key gun, aliens drop bombs |
 
 ## Code Format
 

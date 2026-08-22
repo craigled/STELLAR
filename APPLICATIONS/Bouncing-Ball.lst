@@ -1,0 +1,653 @@
+; ==========================================================================
+; Bouncing-Ball-v04  -  two 3x3 balls that bounce off each other
+; ==========================================================================
+; v03 with the two balls able to strike each other. Everything else is unchanged:
+; two 3x3 reverse-video balls, any key launches, ESC stops and tidies up.
+;
+; DETECTING A STRIKE. Both balls are 3x3, so they overlap exactly when the gap is
+; under 3 on BOTH axes. SUBXY leaves the MAGNITUDE of a difference in the Math
+; Accumulator - the sign goes in a separate byte - so the order of the two
+; registers does not matter, and dividing that magnitude by three gives a quotient
+; of zero only for a gap of 0, 1 or 2. Two subtracts, two divides, no comparisons.
+;
+; THE BOUNCE. Two equal masses in an elastic collision simply exchange velocities,
+; so the balls swap their direction flags. That is six register copies and no
+; arithmetic, and it is the physically right answer rather than an approximation.
+;
+; WHY THERE IS A LATCH. Two 3x3 balls stay overlapped for a frame or two after
+; they bounce, and swapping again on the next frame would undo the first swap and
+; send them back together - they judder on the spot instead of parting. Measured
+; before the latch: one pair stayed locked together for 35 consecutive frames. So
+; the swap fires only on the frame they FIRST touch. All sixteen VM registers are
+; already in use, so the latch lives in memory at $4950 and R11 is borrowed as a
+; pointer for the two accesses.
+;
+; REGISTERS. R0 frame counter, R15 the constant ten, R11 old x, R12 old y (shared
+; scratch, live only inside one ball's turn), R13 line and R14 column for POSXY,
+; ball A in R1-R5 and ball B in R6-R10 as x, y, x-direction, y-direction, divisor.
+;
+; The rest is as v03: the vertical step is gated by dividing the shared frame
+; counter by each ball's own divisor; both balls move and erase before either is
+; drawn, so neither can blank cells the other has just been drawn into; only the
+; stale edge is erased so nothing flickers; and which edge is stale is decided by
+; comparing new against old with TESTGXY rather than by the direction flag, which
+; has already flipped on a bounce frame.
+;
+; HW-VERIFIED 2026-08-22 on the Elf2K - Craig flashed and ran it.
+; Sim-verified across three different launch seeds: 1026 frames, both balls always
+; inside lines 1-21 and columns 1-78, every lit cell part of an intact 3x3, and no
+; overlap lasting more than a single frame.
+;
+; About 150 bytes of output per frame, so roughly 6 frames a second at 9600 baud.
+; DLYI 04 near the end of the loop is the speed knob.
+;
+; 297 STELLAR commands, $4000-$42E0 (737 bytes of code).
+; Data at $4900, 54 bytes, past the end marker.
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+; D 4000 CD             START                  Start of program, and run the label pre-pass
+; D 4001 11 0F 09 00    LOADXI R15 0900        Point R15 at the banner text
+; D 4005 C1 0F          PRINTSTR R15           Print it
+; D 4007 C3             RAND                   Advance the generator - the count depends on the operator
+; D 4008 CC             SERST                  Has a key arrived?
+; D 4009 A1 00 07       IFFALSEI SEED          Not yet - go round again
+; D 400C CB             SERIN                  Take the key and throw it away
+; D 400D 11 0F 00 0A    LOADXI R15 000A        Ten, for splitting a number into digits
+; D 4011 11 00 00 00    LOADXI R0 0000         Frame counter
+; D 4015 11 0B 09 50    LOADXI R11 0950        The touching latch starts clear
+; D 4019 32 0B 00 00    COPYMX2I R11 0000
+; D 401D 11 01 00 22    LOADXI R1 0022         Ball A starts at column 34
+; D 4021 11 02 00 0F    LOADXI R2 000F         line 15
+; D 4025 11 06 00 2C    LOADXI R6 002C         Ball B starts at column 44
+; D 4029 11 07 00 05    LOADXI R7 0005         and line 5, well clear of ball A - two balls launched from the
+; same line tend to mirror each other
+; D 402D C3             RAND                   One random value drives both launches
+; D 402E 21 0B          COPYAX 0B              Park it in R11
+; D 4030 11 0C 00 02    LOADXI R12 0002        Two
+; D 4034 21 0B          COPYAX 0B              Take the running random value
+; D 4036 4D BC          DIVXY R11 R12          Divide it
+; D 4038 27             COPYREMA               The remainder
+; D 4039 21 03          COPYAX 03              Ball A horizontal direction
+; D 403B 25             COPYMAA                Keep the quotient for the next one
+; D 403C 21 0B          COPYAX 0B
+; D 403E 21 0B          COPYAX 0B              Take the running random value
+; D 4040 4D BC          DIVXY R11 R12          Divide it
+; D 4042 27             COPYREMA               The remainder
+; D 4043 21 04          COPYAX 04              Ball A vertical direction
+; D 4045 25             COPYMAA                Keep the quotient for the next one
+; D 4046 21 0B          COPYAX 0B
+; D 4048 21 0B          COPYAX 0B              Take the running random value
+; D 404A 4D BC          DIVXY R11 R12          Divide it
+; D 404C 27             COPYREMA               The remainder
+; D 404D 21 08          COPYAX 08              Ball B horizontal direction
+; D 404F 25             COPYMAA                Keep the quotient for the next one
+; D 4050 21 0B          COPYAX 0B
+; D 4052 21 0B          COPYAX 0B              Take the running random value
+; D 4054 4D BC          DIVXY R11 R12          Divide it
+; D 4056 27             COPYREMA               The remainder
+; D 4057 21 09          COPYAX 09              Ball B vertical direction
+; D 4059 25             COPYMAA                Keep the quotient for the next one
+; D 405A 21 0B          COPYAX 0B
+; D 405C 11 0C 00 03    LOADXI R12 0003        Three
+; D 4060 21 0B          COPYAX 0B              Take the running random value
+; D 4062 4D BC          DIVXY R11 R12          Divide it
+; D 4064 27             COPYREMA               The remainder
+; D 4065 4E 00 01       ADDAI 0001             Make it 1, 2 or 3 - NOT 0, which would divide by zero
+; D 4068 21 05          COPYAX 05              Ball A angle divisor, 1 to 3
+; D 406A 25             COPYMAA                Keep the quotient for the next one
+; D 406B 21 0B          COPYAX 0B
+; D 406D 21 0B          COPYAX 0B              Take the running random value
+; D 406F 4D BC          DIVXY R11 R12          Divide it
+; D 4071 27             COPYREMA               The remainder
+; D 4072 4E 00 01       ADDAI 0001             Make it 1, 2 or 3 - NOT 0, which would divide by zero
+; D 4075 21 0A          COPYAX 0A              Ball B angle divisor, 1 to 3
+; D 4077 25             COPYMAA                Keep the quotient for the next one
+; D 4078 21 0B          COPYAX 0B
+; D 407A CA 1B          SEROUTI 1B             ESC
+; D 407C CA 5B          SEROUTI 5B             [
+; D 407E CA 32          SEROUTI 32             2
+; D 4080 CA 4A          SEROUTI 4A             J - clear the screen
+; D 4082 CA 1B          SEROUTI 1B             ESC
+; D 4084 CA 5B          SEROUTI 5B             [
+; D 4086 CA 3F          SEROUTI 3F             ?
+; D 4088 CA 32          SEROUTI 32             2
+; D 408A CA 35          SEROUTI 35             5
+; D 408C CA 6C          SEROUTI 6C             l - hide the cursor
+; D 408E 23 00 1E       COPYXY R1 R14
+; D 4091 23 00 2D       COPYXY R2 R13
+; D 4094 BD 02 71       CALL DRAW              Put ball A on the screen
+; D 4097 23 00 6E       COPYXY R6 R14
+; D 409A 23 00 7D       COPYXY R7 R13
+; D 409D BD 02 71       CALL DRAW              and ball B
+; D 40A0 42 00          INCX R0                Count the frame
+; D 40A2 45 16          SUBXY R1 R6            How far apart horizontally?
+; D 40A4 25             COPYMAA                The magnitude
+; D 40A5 21 0B          COPYAX 0B              Park it in R11
+; D 40A7 11 0C 00 03    LOADXI R12 0003        Three - the ball's width
+; D 40AB 4D BC          DIVXY R11 R12          Gap divided by three
+; D 40AD 25             COPYMAA                The quotient
+; D 40AE 81 00 00       TESTAI 0000            Zero means the columns overlap
+; D 40B1 A1 00 EB       IFFALSEI NOHIT         They are clear of each other horizontally
+; D 40B4 45 27          SUBXY R2 R7            How far apart vertically?
+; D 40B6 25             COPYMAA                The magnitude
+; D 40B7 21 0B          COPYAX 0B              Park it in R11
+; D 40B9 4D BC          DIVXY R11 R12          Gap divided by three
+; D 40BB 25             COPYMAA                The quotient
+; D 40BC 81 00 00       TESTAI 0000            Zero means the lines overlap too
+; D 40BF A1 00 EB       IFFALSEI NOHIT         They are clear vertically, so no collision
+; D 40C2 11 0B 09 50    LOADXI R11 0950        Point at the touching latch
+; D 40C6 33 0B          COPYMXA 0B             Read it
+; D 40C8 81 00 00       TESTAI 0000            Were they apart last frame?
+; D 40CB A1 00 E0       IFFALSEI LATCH         No - already bounced, leave them alone
+; D 40CE 23 00 3B       COPYXY R3 R11          Save ball A's horizontal direction
+; D 40D1 23 00 83       COPYXY R8 R3           Ball A takes ball B's
+; D 40D4 23 00 B8       COPYXY R11 R8          and ball B takes ball A's
+; D 40D7 23 00 4B       COPYXY R4 R11          The same for the vertical directions
+; D 40DA 23 00 94       COPYXY R9 R4
+; D 40DD 23 00 B9       COPYXY R11 R9
+; D 40E0 11 0B 09 50    LOADXI R11 0950        Remember that they are touching
+; D 40E4 32 0B 00 01    COPYMX2I R11 0001
+; D 40E8 B0 00 F3       GAL HITDONE
+; D 40EB 11 0B 09 50    LOADXI R11 0950        They are apart - clear the latch
+; D 40EF 32 0B 00 00    COPYMX2I R11 0000
+; D 40F3 23 00 1B       COPYXY R1 R11          Remember where this ball is
+; D 40F6 23 00 2C       COPYXY R2 R12
+; D 40F9 86 03 00 00    TESTXI R3 0000         Heading right?
+; D 40FD A1 01 14       IFFALSEI XLA           No - heading left
+; D 4100 42 01          INCX R1                x = x + 1
+; D 4102 86 01 00 4F    TESTXI R1 004F         Would the right edge pass column 80?
+; D 4106 A1 01 23       IFFALSEI XDA           No - carry on
+; D 4109 11 01 00 4D    LOADXI R1 004D         Reflect to 77
+; D 410D 11 03 00 01    LOADXI R3 0001         and bounce - now heading left
+; D 4111 B0 01 23       GAL XDA
+; D 4114 43 01          DECX R1                x = x - 1
+; D 4116 8C 01          TESTXZ R1              Reached column 0?
+; D 4118 A1 01 23       IFFALSEI XDA           No - carry on
+; D 411B 11 01 00 02    LOADXI R1 0002         Reflect to 2
+; D 411F 11 03 00 00    LOADXI R3 0000         and bounce - now heading right
+; D 4123 4D 05          DIVXY R0 R5            Frame counter divided by this ball's divisor
+; D 4125 27             COPYREMA               The remainder
+; D 4126 81 00 00       TESTAI 0000            Is this ball's frame?
+; D 4129 A1 01 56       IFFALSEI SYA           No - leave y alone this time
+; D 412C 86 04 00 00    TESTXI R4 0000         Heading down?
+; D 4130 A1 01 47       IFFALSEI YUA           No - heading up
+; D 4133 42 02          INCX R2                y = y + 1
+; D 4135 86 02 00 16    TESTXI R2 0016         Would the bottom edge pass line 23?
+; D 4139 A1 01 56       IFFALSEI SYA           No - carry on
+; D 413C 11 02 00 14    LOADXI R2 0014         Reflect to 20
+; D 4140 11 04 00 01    LOADXI R4 0001         and bounce - now heading up
+; D 4144 B0 01 56       GAL SYA
+; D 4147 43 02          DECX R2                y = y - 1
+; D 4149 8C 02          TESTXZ R2              Reached line 0?
+; D 414B A1 01 56       IFFALSEI SYA           No - carry on
+; D 414E 11 02 00 02    LOADXI R2 0002         Reflect to 2
+; D 4152 11 04 00 00    LOADXI R4 0000         and bounce - now heading down
+; D 4156 88 1B          TESTGXY R1 R11         Did x increase?
+; D 4158 A1 01 61       IFFALSEI ELA           No - the stale column is on the right
+; D 415B 23 00 BE       COPYXY R11 R14         Moving right: the old left edge is stale
+; D 415E B0 01 68       GAL ECA
+; D 4161 23 00 BE       COPYXY R11 R14         Moving left: the old right edge is stale
+; D 4164 42 0E          INCX R14
+; D 4166 42 0E          INCX R14
+; D 4168 23 00 CD       COPYXY R12 R13         Starting at the old top line
+; D 416B BD 02 A2       CALL POSXY
+; D 416E CA 20          SEROUTI 20             A space
+; D 4170 42 0D          INCX R13
+; D 4172 BD 02 A2       CALL POSXY
+; D 4175 CA 20          SEROUTI 20             A space
+; D 4177 42 0D          INCX R13
+; D 4179 BD 02 A2       CALL POSXY
+; D 417C CA 20          SEROUTI 20             A space
+; D 417E 87 2C          TESTXY R2 R12          Did y stay put this frame?
+; D 4180 A0 01 A1       IFTRUEI NRA            Yes - nothing to erase
+; D 4183 88 2C          TESTGXY R2 R12         Did y increase?
+; D 4185 A1 01 8E       IFFALSEI EUA           No - the stale row is the old bottom
+; D 4188 23 00 CD       COPYXY R12 R13         Moving down: the old top row is stale
+; D 418B B0 01 95       GAL ERA
+; D 418E 23 00 CD       COPYXY R12 R13         Moving up: the old bottom row is stale
+; D 4191 42 0D          INCX R13
+; D 4193 42 0D          INCX R13
+; D 4195 23 00 BE       COPYXY R11 R14         Starting at the old left edge
+; D 4198 BD 02 A2       CALL POSXY
+; D 419B CA 20          SEROUTI 20             Three spaces clear the row
+; D 419D CA 20          SEROUTI 20
+; D 419F CA 20          SEROUTI 20
+; D 41A1 23 00 6B       COPYXY R6 R11          Remember where this ball is
+; D 41A4 23 00 7C       COPYXY R7 R12
+; D 41A7 86 08 00 00    TESTXI R8 0000         Heading right?
+; D 41AB A1 01 C2       IFFALSEI XLB           No - heading left
+; D 41AE 42 06          INCX R6                x = x + 1
+; D 41B0 86 06 00 4F    TESTXI R6 004F         Would the right edge pass column 80?
+; D 41B4 A1 01 D1       IFFALSEI XDB           No - carry on
+; D 41B7 11 06 00 4D    LOADXI R6 004D         Reflect to 77
+; D 41BB 11 08 00 01    LOADXI R8 0001         and bounce - now heading left
+; D 41BF B0 01 D1       GAL XDB
+; D 41C2 43 06          DECX R6                x = x - 1
+; D 41C4 8C 06          TESTXZ R6              Reached column 0?
+; D 41C6 A1 01 D1       IFFALSEI XDB           No - carry on
+; D 41C9 11 06 00 02    LOADXI R6 0002         Reflect to 2
+; D 41CD 11 08 00 00    LOADXI R8 0000         and bounce - now heading right
+; D 41D1 4D 0A          DIVXY R0 R10           Frame counter divided by this ball's divisor
+; D 41D3 27             COPYREMA               The remainder
+; D 41D4 81 00 00       TESTAI 0000            Is this ball's frame?
+; D 41D7 A1 02 04       IFFALSEI SYB           No - leave y alone this time
+; D 41DA 86 09 00 00    TESTXI R9 0000         Heading down?
+; D 41DE A1 01 F5       IFFALSEI YUB           No - heading up
+; D 41E1 42 07          INCX R7                y = y + 1
+; D 41E3 86 07 00 16    TESTXI R7 0016         Would the bottom edge pass line 23?
+; D 41E7 A1 02 04       IFFALSEI SYB           No - carry on
+; D 41EA 11 07 00 14    LOADXI R7 0014         Reflect to 20
+; D 41EE 11 09 00 01    LOADXI R9 0001         and bounce - now heading up
+; D 41F2 B0 02 04       GAL SYB
+; D 41F5 43 07          DECX R7                y = y - 1
+; D 41F7 8C 07          TESTXZ R7              Reached line 0?
+; D 41F9 A1 02 04       IFFALSEI SYB           No - carry on
+; D 41FC 11 07 00 02    LOADXI R7 0002         Reflect to 2
+; D 4200 11 09 00 00    LOADXI R9 0000         and bounce - now heading down
+; D 4204 88 6B          TESTGXY R6 R11         Did x increase?
+; D 4206 A1 02 0F       IFFALSEI ELB           No - the stale column is on the right
+; D 4209 23 00 BE       COPYXY R11 R14         Moving right: the old left edge is stale
+; D 420C B0 02 16       GAL ECB
+; D 420F 23 00 BE       COPYXY R11 R14         Moving left: the old right edge is stale
+; D 4212 42 0E          INCX R14
+; D 4214 42 0E          INCX R14
+; D 4216 23 00 CD       COPYXY R12 R13         Starting at the old top line
+; D 4219 BD 02 A2       CALL POSXY
+; D 421C CA 20          SEROUTI 20             A space
+; D 421E 42 0D          INCX R13
+; D 4220 BD 02 A2       CALL POSXY
+; D 4223 CA 20          SEROUTI 20             A space
+; D 4225 42 0D          INCX R13
+; D 4227 BD 02 A2       CALL POSXY
+; D 422A CA 20          SEROUTI 20             A space
+; D 422C 87 7C          TESTXY R7 R12          Did y stay put this frame?
+; D 422E A0 02 4F       IFTRUEI NRB            Yes - nothing to erase
+; D 4231 88 7C          TESTGXY R7 R12         Did y increase?
+; D 4233 A1 02 3C       IFFALSEI EUB           No - the stale row is the old bottom
+; D 4236 23 00 CD       COPYXY R12 R13         Moving down: the old top row is stale
+; D 4239 B0 02 43       GAL ERB
+; D 423C 23 00 CD       COPYXY R12 R13         Moving up: the old bottom row is stale
+; D 423F 42 0D          INCX R13
+; D 4241 42 0D          INCX R13
+; D 4243 23 00 BE       COPYXY R11 R14         Starting at the old left edge
+; D 4246 BD 02 A2       CALL POSXY
+; D 4249 CA 20          SEROUTI 20             Three spaces clear the row
+; D 424B CA 20          SEROUTI 20
+; D 424D CA 20          SEROUTI 20
+; D 424F 23 00 1E       COPYXY R1 R14          Left edge
+; D 4252 23 00 2D       COPYXY R2 R13          Top line
+; D 4255 BD 02 71       CALL DRAW
+; D 4258 23 00 6E       COPYXY R6 R14          Left edge
+; D 425B 23 00 7D       COPYXY R7 R13          Top line
+; D 425E BD 02 71       CALL DRAW
+; D 4261 CC             SERST                  A key waiting?
+; D 4262 A1 02 6C       IFFALSEI NOKEY         No
+; D 4265 CB             SERIN                  Read it
+; D 4266 81 00 1B       TESTAI 001B            Was it ESC?
+; D 4269 A0 02 C4       IFTRUEI QUIT           Yes - stop
+; D 426C C0 04          DLYI 04                Pace the animation
+; D 426E B0 00 A0       GAL LOOP               Round again
+; D 4271 CA 1B          SEROUTI 1B             ESC
+; D 4273 CA 5B          SEROUTI 5B             [
+; D 4275 CA 37          SEROUTI 37             7
+; D 4277 CA 6D          SEROUTI 6D             m - reverse video
+; D 4279 BD 02 A2       CALL POSXY
+; D 427C CA 20          SEROUTI 20
+; D 427E CA 20          SEROUTI 20
+; D 4280 CA 20          SEROUTI 20
+; D 4282 42 0D          INCX R13
+; D 4284 BD 02 A2       CALL POSXY
+; D 4287 CA 20          SEROUTI 20
+; D 4289 CA 20          SEROUTI 20
+; D 428B CA 20          SEROUTI 20
+; D 428D 42 0D          INCX R13
+; D 428F BD 02 A2       CALL POSXY
+; D 4292 CA 20          SEROUTI 20
+; D 4294 CA 20          SEROUTI 20
+; D 4296 CA 20          SEROUTI 20
+; D 4298 CA 1B          SEROUTI 1B             ESC
+; D 429A CA 5B          SEROUTI 5B             [
+; D 429C CA 30          SEROUTI 30             0
+; D 429E CA 6D          SEROUTI 6D             m - back to normal video
+; D 42A0 BE 00          RETURN
+; D 42A2 CA 1B          SEROUTI 1B             ESC
+; D 42A4 CA 5B          SEROUTI 5B             [
+; D 42A6 4D DF          DIVXY R13 R15          Split the line number
+; D 42A8 25             COPYMAA
+; D 42A9 4E 00 30       ADDAI 0030
+; D 42AC C9             SEROUT                 Tens
+; D 42AD 27             COPYREMA
+; D 42AE 4E 00 30       ADDAI 0030
+; D 42B1 C9             SEROUT                 Units
+; D 42B2 CA 3B          SEROUTI 3B             ;
+; D 42B4 4D EF          DIVXY R14 R15          Split the column number
+; D 42B6 25             COPYMAA
+; D 42B7 4E 00 30       ADDAI 0030
+; D 42BA C9             SEROUT                 Tens
+; D 42BB 27             COPYREMA
+; D 42BC 4E 00 30       ADDAI 0030
+; D 42BF C9             SEROUT                 Units
+; D 42C0 CA 48          SEROUTI 48             H
+; D 42C2 BE 00          RETURN
+; D 42C4 CA 1B          SEROUTI 1B             ESC
+; D 42C6 CA 5B          SEROUTI 5B             [
+; D 42C8 CA 3F          SEROUTI 3F             ?
+; D 42CA CA 32          SEROUTI 32             2
+; D 42CC CA 35          SEROUTI 35             5
+; D 42CE CA 68          SEROUTI 68             h - show the cursor again
+; D 42D0 CA 1B          SEROUTI 1B             ESC
+; D 42D2 CA 5B          SEROUTI 5B             [
+; D 42D4 CA 32          SEROUTI 32             2
+; D 42D6 CA 4A          SEROUTI 4A             J
+; D 42D8 CA 1B          SEROUTI 1B             ESC
+; D 42DA CA 5B          SEROUTI 5B             [
+; D 42DC CA 48          SEROUTI 48             H - cursor home
+; D 42DE F0 00 00       BREAK                  End of program
+; --------------------------------------------------------------------------
+; CODE  -  download this block
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 11 0F 09 00
+D 4005 C1 0F
+D 4007 C3
+D 4008 CC
+D 4009 A1 00 07
+D 400C CB
+D 400D 11 0F 00 0A
+D 4011 11 00 00 00
+D 4015 11 0B 09 50
+D 4019 32 0B 00 00
+D 401D 11 01 00 22
+D 4021 11 02 00 0F
+D 4025 11 06 00 2C
+D 4029 11 07 00 05
+D 402D C3
+D 402E 21 0B
+D 4030 11 0C 00 02
+D 4034 21 0B
+D 4036 4D BC
+D 4038 27
+D 4039 21 03
+D 403B 25
+D 403C 21 0B
+D 403E 21 0B
+D 4040 4D BC
+D 4042 27
+D 4043 21 04
+D 4045 25
+D 4046 21 0B
+D 4048 21 0B
+D 404A 4D BC
+D 404C 27
+D 404D 21 08
+D 404F 25
+D 4050 21 0B
+D 4052 21 0B
+D 4054 4D BC
+D 4056 27
+D 4057 21 09
+D 4059 25
+D 405A 21 0B
+D 405C 11 0C 00 03
+D 4060 21 0B
+D 4062 4D BC
+D 4064 27
+D 4065 4E 00 01
+D 4068 21 05
+D 406A 25
+D 406B 21 0B
+D 406D 21 0B
+D 406F 4D BC
+D 4071 27
+D 4072 4E 00 01
+D 4075 21 0A
+D 4077 25
+D 4078 21 0B
+D 407A CA 1B
+D 407C CA 5B
+D 407E CA 32
+D 4080 CA 4A
+D 4082 CA 1B
+D 4084 CA 5B
+D 4086 CA 3F
+D 4088 CA 32
+D 408A CA 35
+D 408C CA 6C
+D 408E 23 00 1E
+D 4091 23 00 2D
+D 4094 BD 02 71
+D 4097 23 00 6E
+D 409A 23 00 7D
+D 409D BD 02 71
+D 40A0 42 00
+D 40A2 45 16
+D 40A4 25
+D 40A5 21 0B
+D 40A7 11 0C 00 03
+D 40AB 4D BC
+D 40AD 25
+D 40AE 81 00 00
+D 40B1 A1 00 EB
+D 40B4 45 27
+D 40B6 25
+D 40B7 21 0B
+D 40B9 4D BC
+D 40BB 25
+D 40BC 81 00 00
+D 40BF A1 00 EB
+D 40C2 11 0B 09 50
+D 40C6 33 0B
+D 40C8 81 00 00
+D 40CB A1 00 E0
+D 40CE 23 00 3B
+D 40D1 23 00 83
+D 40D4 23 00 B8
+D 40D7 23 00 4B
+D 40DA 23 00 94
+D 40DD 23 00 B9
+D 40E0 11 0B 09 50
+D 40E4 32 0B 00 01
+D 40E8 B0 00 F3
+D 40EB 11 0B 09 50
+D 40EF 32 0B 00 00
+D 40F3 23 00 1B
+D 40F6 23 00 2C
+D 40F9 86 03 00 00
+D 40FD A1 01 14
+D 4100 42 01
+D 4102 86 01 00 4F
+D 4106 A1 01 23
+D 4109 11 01 00 4D
+D 410D 11 03 00 01
+D 4111 B0 01 23
+D 4114 43 01
+D 4116 8C 01
+D 4118 A1 01 23
+D 411B 11 01 00 02
+D 411F 11 03 00 00
+D 4123 4D 05
+D 4125 27
+D 4126 81 00 00
+D 4129 A1 01 56
+D 412C 86 04 00 00
+D 4130 A1 01 47
+D 4133 42 02
+D 4135 86 02 00 16
+D 4139 A1 01 56
+D 413C 11 02 00 14
+D 4140 11 04 00 01
+D 4144 B0 01 56
+D 4147 43 02
+D 4149 8C 02
+D 414B A1 01 56
+D 414E 11 02 00 02
+D 4152 11 04 00 00
+D 4156 88 1B
+D 4158 A1 01 61
+D 415B 23 00 BE
+D 415E B0 01 68
+D 4161 23 00 BE
+D 4164 42 0E
+D 4166 42 0E
+D 4168 23 00 CD
+D 416B BD 02 A2
+D 416E CA 20
+D 4170 42 0D
+D 4172 BD 02 A2
+D 4175 CA 20
+D 4177 42 0D
+D 4179 BD 02 A2
+D 417C CA 20
+D 417E 87 2C
+D 4180 A0 01 A1
+D 4183 88 2C
+D 4185 A1 01 8E
+D 4188 23 00 CD
+D 418B B0 01 95
+D 418E 23 00 CD
+D 4191 42 0D
+D 4193 42 0D
+D 4195 23 00 BE
+D 4198 BD 02 A2
+D 419B CA 20
+D 419D CA 20
+D 419F CA 20
+D 41A1 23 00 6B
+D 41A4 23 00 7C
+D 41A7 86 08 00 00
+D 41AB A1 01 C2
+D 41AE 42 06
+D 41B0 86 06 00 4F
+D 41B4 A1 01 D1
+D 41B7 11 06 00 4D
+D 41BB 11 08 00 01
+D 41BF B0 01 D1
+D 41C2 43 06
+D 41C4 8C 06
+D 41C6 A1 01 D1
+D 41C9 11 06 00 02
+D 41CD 11 08 00 00
+D 41D1 4D 0A
+D 41D3 27
+D 41D4 81 00 00
+D 41D7 A1 02 04
+D 41DA 86 09 00 00
+D 41DE A1 01 F5
+D 41E1 42 07
+D 41E3 86 07 00 16
+D 41E7 A1 02 04
+D 41EA 11 07 00 14
+D 41EE 11 09 00 01
+D 41F2 B0 02 04
+D 41F5 43 07
+D 41F7 8C 07
+D 41F9 A1 02 04
+D 41FC 11 07 00 02
+D 4200 11 09 00 00
+D 4204 88 6B
+D 4206 A1 02 0F
+D 4209 23 00 BE
+D 420C B0 02 16
+D 420F 23 00 BE
+D 4212 42 0E
+D 4214 42 0E
+D 4216 23 00 CD
+D 4219 BD 02 A2
+D 421C CA 20
+D 421E 42 0D
+D 4220 BD 02 A2
+D 4223 CA 20
+D 4225 42 0D
+D 4227 BD 02 A2
+D 422A CA 20
+D 422C 87 7C
+D 422E A0 02 4F
+D 4231 88 7C
+D 4233 A1 02 3C
+D 4236 23 00 CD
+D 4239 B0 02 43
+D 423C 23 00 CD
+D 423F 42 0D
+D 4241 42 0D
+D 4243 23 00 BE
+D 4246 BD 02 A2
+D 4249 CA 20
+D 424B CA 20
+D 424D CA 20
+D 424F 23 00 1E
+D 4252 23 00 2D
+D 4255 BD 02 71
+D 4258 23 00 6E
+D 425B 23 00 7D
+D 425E BD 02 71
+D 4261 CC
+D 4262 A1 02 6C
+D 4265 CB
+D 4266 81 00 1B
+D 4269 A0 02 C4
+D 426C C0 04
+D 426E B0 00 A0
+D 4271 CA 1B
+D 4273 CA 5B
+D 4275 CA 37
+D 4277 CA 6D
+D 4279 BD 02 A2
+D 427C CA 20
+D 427E CA 20
+D 4280 CA 20
+D 4282 42 0D
+D 4284 BD 02 A2
+D 4287 CA 20
+D 4289 CA 20
+D 428B CA 20
+D 428D 42 0D
+D 428F BD 02 A2
+D 4292 CA 20
+D 4294 CA 20
+D 4296 CA 20
+D 4298 CA 1B
+D 429A CA 5B
+D 429C CA 30
+D 429E CA 6D
+D 42A0 BE 00
+D 42A2 CA 1B
+D 42A4 CA 5B
+D 42A6 4D DF
+D 42A8 25
+D 42A9 4E 00 30
+D 42AC C9
+D 42AD 27
+D 42AE 4E 00 30
+D 42B1 C9
+D 42B2 CA 3B
+D 42B4 4D EF
+D 42B6 25
+D 42B7 4E 00 30
+D 42BA C9
+D 42BB 27
+D 42BC 4E 00 30
+D 42BF C9
+D 42C0 CA 48
+D 42C2 BE 00
+D 42C4 CA 1B
+D 42C6 CA 5B
+D 42C8 CA 3F
+D 42CA CA 32
+D 42CC CA 35
+D 42CE CA 68
+D 42D0 CA 1B
+D 42D2 CA 5B
+D 42D4 CA 32
+D 42D6 CA 4A
+D 42D8 CA 1B
+D 42DA CA 5B
+D 42DC CA 48
+D 42DE F0 00 00
+
+D 4900 54 77 6F 20 62 6F 75 6E 63 69 6E 67 20 62 61 6C
+D 4910 6C 73 20 2D 2D 20 61 6E 79 20 6B 65 79 20 74 6F
+D 4920 20 73 74 61 72 74 2C 20 45 53 43 20 74 6F 20 71
+D 4930 75 69 74 0D 0A 00
