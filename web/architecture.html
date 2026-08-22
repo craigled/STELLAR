@@ -16,8 +16,6 @@
   <h2><span class="hx">$</span>Memory map</h2>
   <div class="memmap">
     <div class="memrow"><div class="addr">$0000–$2EFF</div><div class="membar"><b>STELLAR firmware</b> <span>— the interpreter (R3 = 1802 program counter). ~12&nbsp;KB.</span></div></div>
-    <div class="memrow"><div class="addr">$0B00–$0DFF</div><div class="membar"><b>SCRT registers</b> <span>— call/return/link workspace (R4, R5, R6). 512&nbsp;B.</span></div></div>
-    <div class="memrow"><div class="addr">$2B00–$2EFF</div><div class="membar"><b>Expanded opcode tables</b> <span>— dispatch + length tables.</span></div></div>
     <div class="memrow"><div class="addr">$2F00–$2FFF</div><div class="membar"><b>CIDP</b> <span>— Common VM Interchange Data Page (RA). Scheduler + per-VM state.</span></div></div>
     <div class="memrow"><div class="addr">$3000–$33FF</div><div class="membar"><b>VM1</b> <span>— core ($3000), stacks ($3100), label array ($3200).</span></div></div>
     <div class="memrow"><div class="addr">$3400–$37FF</div><div class="membar"><b>VM2</b> <span>— core + stacks + labels.</span></div></div>
@@ -33,7 +31,7 @@
     <thead><tr><th>Reg</th><th>Purpose</th></tr></thead>
     <tbody>
       <tr><td class="hex">R0</td><td>Reserved (aliases the DMA pointer) — not used</td></tr>
-      <tr><td class="hex">R1</td><td>Interrupt handler PC</td></tr>
+      <tr><td class="hex">R1</td><td>Return to the monitor — the exit vector, supplied by the host monitor rather than by STELLAR</td></tr>
       <tr><td class="hex">R2</td><td>1802 hardware stack ($2FC0–$2FFF)</td></tr>
       <tr><td class="hex">R3</td><td>Main program counter (the interpreter)</td></tr>
       <tr><td class="hex">R4 · R5 · R6</td><td>SCRT call · return · link</td></tr>
@@ -45,6 +43,14 @@
       <tr><td class="hex">RB · RD · RE · RF</td><td>Temporary internal registers</td></tr>
     </tbody>
   </table></div>
+  <p class="small muted"><strong>R1 is not free.</strong> The 1802 vectors interrupts through
+  <span class="mono">R1</span>, but STELLAR has already spent it: the firmware ends a program with
+  <span class="hex">$02E0</span> <span class="mono">SEX R2 / MARK / SEP R1</span>, handing control back to
+  whatever address the monitor left there. Nothing in the firmware ever loads <span class="mono">R1</span>,
+  precisely because its value has to be the monitor's. That is also why enabling interrupts with
+  <span class="mono">EINT</span> does not get you an interrupt handler — any interrupt that arrives goes to
+  the monitor's exit vector. Servicing interrupts would mean moving the exit vector to another register
+  first.</p>
 
   <h2><span class="hx">→</span>SCRT — calls without a stack</h2>
   <p>The 1802 has no call instruction. STELLAR uses RCA's <strong>Standard Call and Return
@@ -61,23 +67,62 @@
   <div class="tblwrap"><table class="coremap">
     <thead><tr><th>Offset</th><th>Field</th><th>Notes</th></tr></thead>
     <tbody>
-      <tr><td class="hex">+$00–$1F</td><td>Registers R0–RF</td><td>Sixteen 16-bit registers, high byte first</td></tr>
+      <tr><td class="hex">+$00–$1F</td><td>Registers R0–RF</td><td>Sixteen 16-bit general purpose registers, high byte first</td></tr>
       <tr><td class="hex">+$20–$21</td><td>Accumulator (Acc)</td><td>The main 16-bit working value</td></tr>
-      <tr><td class="hex">+$68–$6E</td><td>Math Accumulator (MA)</td><td>4 integer bytes (+$68–$6B), remainder (+$6C–$6D), sign (+$6E). <b>Relocated + widened</b> from the legacy +$22 block, which is now unused.</td></tr>
       <tr><td class="hex">+$28–$2B</td><td>Decimal Accumulator (DA)</td><td>32-bit packed BCD</td></tr>
-      <tr><td class="hex">+$2C–$2E</td><td>DA Remainder</td><td></td></tr>
-      <tr><td class="hex">+$2F</td><td>DA sign / point</td><td></td></tr>
-      <tr><td class="hex">+$30</td><td>Program Command</td><td>The opcode currently executing</td></tr>
-      <tr><td class="hex">+$31–$32</td><td>Program Location</td><td>The VM's position in its program (virtual PC)</td></tr>
+      <tr><td class="hex">+$2C–$2E</td><td>DA Remainder</td><td>3 bytes, left by a decimal divide</td></tr>
+      <tr><td class="hex">+$2F</td><td>DA sign / decimal point</td><td>$00 = positive</td></tr>
+      <tr><td class="hex">+$30</td><td>Program Command Register</td><td>The opcode currently executing</td></tr>
+      <tr><td class="hex">+$31–$32</td><td>Program Location Register</td><td>The VM's position in its program (virtual PC)</td></tr>
       <tr><td class="hex">+$33–$36</td><td>Command Counter</td><td>4-byte count of opcodes executed</td></tr>
-      <tr><td class="hex">+$45</td><td>Test Flag</td><td>Set by TEST opcodes; read by branches</td></tr>
-      <tr><td class="hex">+$48</td><td>Carry Flag</td><td>Carry=1 means borrow/overflow occurred</td></tr>
-      <tr><td class="hex">+$49</td><td>Overflow Flag</td><td></td></tr>
+      <tr><td class="hex">+$37</td><td>EF Flag</td><td><span class="mono">ZD</span> — Z: $00 normal, $01 invert; D: which EF line, 1–4</td></tr>
+      <tr><td class="hex">+$38</td><td>Input Port</td><td>$09–$0F</td></tr>
+      <tr><td class="hex">+$39</td><td>Output Port</td><td>$01–$08</td></tr>
+      <tr><td class="hex">+$3A</td><td>Input / Output Byte</td><td>The last byte read or written</td></tr>
+      <tr><td class="hex">+$3B</td><td>Memory mode</td><td>$00 absolute, $01 relative — relative is the reset default, and what almost every program wants</td></tr>
+      <tr><td class="hex">+$3C</td><td>Program Stack Location</td><td>Stack pointer, counts down from $FF</td></tr>
+      <tr><td class="hex">+$3D</td><td>Last PUSH size</td><td>How many bytes the last push placed on the stack</td></tr>
+      <tr><td class="hex">+$3E–$3F</td><td>Last Location</td><td>Used with labels</td></tr>
+      <tr><td class="hex">+$40</td><td>Address Modifier</td><td>$01–$FF</td></tr>
+      <tr><td class="hex">+$41</td><td>Memory Address Pointer Direction</td><td>$00, $01 or $02</td></tr>
+      <tr><td class="hex">+$42–$43</td><td>Random Number Register</td><td>The seed RAND advances</td></tr>
+      <tr><td class="hex">+$44</td><td>Delay Counter</td><td>$00–$FF</td></tr>
+      <tr><td class="hex">+$45</td><td>Test Flag</td><td>Set by the TEST opcodes; read by the branches</td></tr>
+      <tr><td class="hex">+$46</td><td>Debug Flag</td><td>$00–$FF; selects the DEBUG display mode</td></tr>
+      <tr><td class="hex">+$47</td><td>System Status Flag</td><td>$00 while a program runs, $0B once it ends</td></tr>
+      <tr><td class="hex">+$48</td><td>Carry Flag</td><td>$01 means a carry or borrow occurred</td></tr>
+      <tr><td class="hex">+$49</td><td>Overflow Flag</td><td>$01 when a result did not fit</td></tr>
       <tr><td class="hex">+$4A</td><td>Hex/Decimal Flag</td><td>$00 = hex, $01 = decimal</td></tr>
-      <tr><td class="hex">+$5E–$5F</td><td>Interrupt counter / max</td><td>The multitasking quantum countdown</td></tr>
-    </tbody>
+      <tr><td class="hex">+$4B</td><td><span class="muted">unused</span></td><td>Reads as $00; nothing in the firmware uses it</td></tr>
+      <tr><td class="hex">+$4C</td><td>Interrupt Flag</td><td>$00 disabled, $01 enabled — set by DINT and EINT, read by TESTIS</td></tr>
+      <tr><td class="hex">+$4D</td><td>Remaining Delay</td><td>What is left of a delay in progress</td></tr>
+      <tr><td class="hex">+$4E</td><td>ExitCode Register</td><td>The result the last opcode reported</td></tr>
+      <tr><td class="hex">+$4F</td><td>Error Register</td><td>$00 none; $07 divide by zero, $01 undefined label, $0F unimplemented opcode</td></tr>
+      <tr><td class="hex">+$50</td><td>Breakpoint Register</td><td>Whether a breakpoint is armed</td></tr>
+      <tr><td class="hex">+$51</td><td>Breakpoint Command</td><td>Stop when this opcode is about to run</td></tr>
+      <tr><td class="hex">+$52–$53</td><td>Breakpoint Location</td><td>Stop when the program pointer reaches this address; the run loop compares it every opcode</td></tr>
+      <tr><td class="hex">+$54–$55</td><td>Breakpoint Bytes</td><td></td></tr>
+      <tr><td class="hex">+$56</td><td>Q State</td><td>$00 off, $01 on — the 1802's single output bit</td></tr>
+      <tr><td class="hex">+$57</td><td>Hardware Identification</td><td>$01 on an Elf2K</td></tr>
+      <tr><td class="hex">+$58</td><td>Call/Return Stack Location</td><td>Stack pointer for CALL/RETURN, counts down from $7F</td></tr>
+      <tr><td class="hex">+$59</td><td>VM number</td><td>$00–$04</td></tr>
+      <tr><td class="hex">+$5A</td><td>VM Core Location</td><td>High byte of this VM's core page, $30–$3F</td></tr>
+      <tr><td class="hex">+$5B</td><td>VM Program Block</td><td>High byte of this VM's program block, $40–$7F — the base every relative address is resolved against</td></tr>
+      <tr><td class="hex">+$5C</td><td>VM CIDP Location</td><td>High byte of the CIDP, $2F</td></tr>
+      <tr><td class="hex">+$5D</td><td>VM Data Block Size</td><td></td></tr>
+      <tr><td class="hex">+$5E</td><td>Interrupt Counter</td><td>The multitasking quantum countdown</td></tr>
+      <tr><td class="hex">+$5F</td><td>Interrupt Counter Max</td><td>How long each VM's turn lasts; $03 by default</td></tr>
+      <tr><td class="hex">+$60–$62</td><td>Scratch Register A</td><td>Firmware workspace</td></tr>
+      <tr><td class="hex">+$63–$65</td><td>Scratch Register B</td><td>Firmware workspace</td></tr>
+      <tr><td class="hex">+$66–$67</td><td>Scratch Register C</td><td>Firmware workspace</td></tr>
+      <tr><td class="hex">+$68–$6B</td><td>Math Accumulator (MA)</td><td>32-bit, most significant byte first</td></tr>
+      <tr><td class="hex">+$6C–$6D</td><td>MA Remainder</td><td>Left by a divide; read it with COPYREMA</td></tr>
+      <tr><td class="hex">+$6E</td><td>MA sign / decimal point</td><td>$00 = positive. Negative results are stored as a magnitude plus this byte, not two's complement</td></tr>
+      <tr><td class="hex">+$70–$CF</td><td>Temporary workspace</td><td>Firmware scratch</td></tr>
+      <tr><td class="hex">+$D0–$DF</td><td>Trace parameters</td><td></td></tr>
+      <tr><td class="hex">+$E0–$FF</td><td>1802 register copy</td><td>Where the real CPU's registers are parked across a VM switch</td></tr>
   </table></div>
-  <p class="small muted">(Selected fields — the block also holds I/O port config, stack pointers, delay counters, the random seed, error/exit registers, and more.)</p>
+  <p class="small muted">Every field of the block, in address order. Offsets are from the start of the VM's core: add <span class="hex">$3000</span> for VM1, <span class="hex">$3400</span> for VM2, and so on.</p>
 
   <h2><span class="hx">⇄</span>CIDP — the multitasking page ($2F00)</h2>
   <p>The Common VM Interchange Data Page is how the scheduler and the VMs coordinate. The first
@@ -88,12 +133,12 @@
     <thead><tr><th>Address</th><th>Field</th><th>Meaning</th></tr></thead>
     <tbody>
       <tr><td class="hex">$2F00+</td><td>Per-VM array</td><td>VM#, core page, program page, max size, count, <b>State</b>, #Cmds, mode, status — 16 bytes × 4 VMs</td></tr>
+      <tr><td class="hex">$2F51</td><td>VM Error</td><td>$00 none · $01 no VMs · $02 abort</td></tr>
       <tr><td class="hex">$2F52</td><td>Current VM#</td><td>Which VM holds the CPU right now</td></tr>
       <tr><td class="hex">$2F53 / $2F54</td><td>Max / Total VMs</td><td>Ceiling (4) and how many are present</td></tr>
       <tr><td class="hex">$2F55</td><td>Multitasking Allowed</td><td>$00 = off, $01 = on</td></tr>
       <tr><td class="hex">$2F56</td><td>VM Operation</td><td>$00 = sequential, $01 = simultaneous</td></tr>
       <tr><td class="hex">$2F57</td><td>VM Repeat</td><td>$00 = run to end, $01 = repeat</td></tr>
-      <tr><td class="hex">$2F51</td><td>VM Error</td><td>$00 none · $01 no VMs · $02 abort</td></tr>
     </tbody>
   </table></div>
   <p><strong>VM State values:</strong>
