@@ -1,5 +1,9 @@
 // Glue for core.html — a focused single-core view. Reuses SimApp; the sample's
 // input comes from the manifest (no manual input field here).
+// Sample fetches carry the same ?v= cache-buster the <script> tags do. Without it a
+// browser that has visited before serves the OLD manifest from cache and newly added
+// samples never appear in the dropdown - which is exactly what happened when the five
+// VT100 programs were added.
 (function () {
   var SPEEDS = [
     { label: '1×', ops: 1, ms: 500 },
@@ -23,7 +27,7 @@
   });
 
   var samples = [];
-  fetch('samples/manifest.json').then(function (r) { return r.json(); }).then(function (list) {
+  fetch('samples/manifest.json?v=12').then(function (r) { return r.json(); }).then(function (list) {
     samples = list;
     var sel = byId('sample');
     list.forEach(function (s, i) {
@@ -36,7 +40,7 @@
   function load(i) {
     var s = samples[i];
     byId('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file).then(function (r) { return r.text(); }).then(function (text) {
+    fetch('samples/' + s.file + '?v=12').then(function (r) { return r.text(); }).then(function (text) {
       var input = (s.input || '').replace(/\\r/g, '\r').replace(/\\n/g, '\n');
       app.load(text, input);
     });
