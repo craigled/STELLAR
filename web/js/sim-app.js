@@ -58,14 +58,16 @@
     this.programText = programText;
     this.input = input || '';
     this.vm = new window.StellarVM({
-      firmware: window.STELLAR_FIRMWARE, program: programText, input: this.input
+      firmware: window.STELLAR_FIRMWARE, program: programText, input: this.input,
+      coldBoot: !!this.opts.coldBoot
     });
     // run the label pre-pass so stepping starts at the first real instruction
     this.vm.prime();
     this._buildDisasm();
     if (this.coreView) this.coreView.reset();
     this.serialLen = 0;
-    if (this.opts.terminalEl) this.opts.terminalEl.textContent = '';
+    if (this._vtObj) this._vtObj.reset();
+    else if (this.opts.terminalEl) this.opts.terminalEl.textContent = '';
     this._render();
     this._setStatus('ready — label pre-pass complete');
   };
@@ -117,20 +119,36 @@
     }
   };
 
+  // The terminal is a VT100, so the full-screen programs (Starfield, Invaders,
+  // Bouncing-Ball, Starship, Game of Life) draw properly instead of spraying
+  // escape sequences as text. Teletype programs are unchanged: CR/LF scrolls, and
+  // lines pushed off the top are kept in the scrollback.
+  SimApp.prototype._vt = function () {
+    var term = this.opts.terminalEl;
+    if (!term) return null;
+    if (!this._vtObj && window.VT100) this._vtObj = window.VT100(term);
+    return this._vtObj || null;
+  };
+
   SimApp.prototype._appendSerial = function () {
     var term = this.opts.terminalEl;
     if (!term) return;
     var out = this.vm.cpu.io_out[3] || [];
-    if (out.length > this.serialLen) {
+    if (out.length <= this.serialLen) return;
+    var vt = this._vt();
+    if (vt) {
+      vt.write(out.slice(this.serialLen));
+      vt.render();
+    } else {                                   // vt100.js missing - old behaviour
       var s = '';
       for (var i = this.serialLen; i < out.length; i++) {
         var b = out[i];
-        s += (b === 13) ? '' : String.fromCharCode(b);   // swallow lone CR, keep LF
+        s += (b === 13) ? '' : String.fromCharCode(b);
       }
       term.textContent += s;
-      this.serialLen = out.length;
       term.scrollTop = term.scrollHeight;
     }
+    this.serialLen = out.length;
   };
 
   SimApp.prototype._render = function () {
@@ -191,7 +209,8 @@
     this.vm.prime();
     if (this.coreView) this.coreView.reset();
     this.serialLen = 0;
-    if (this.opts.terminalEl) this.opts.terminalEl.textContent = '';
+    if (this._vtObj) this._vtObj.reset();
+    else if (this.opts.terminalEl) this.opts.terminalEl.textContent = '';
     this._render();
     this._setStatus('reset — label pre-pass complete');
   };

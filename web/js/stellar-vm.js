@@ -234,6 +234,12 @@
     this.programPokes = typeof opts.program === 'string' ? parseLst(opts.program)
       : (opts.program || []);
     this.input = opts.input || '';
+    // Cold boot through CIDP instead of the hand-built register state. Programs
+    // that WAIT (Starfield at its prompt, Invaders for a key) reach the firmware's
+    // "all VMs done" path, and the hand-built state has no VM registered there, so
+    // they restarted from the top for ever. Off by default so the golden fixtures,
+    // which were all taken on the hand-built path, keep their meaning.
+    this.coldBoot = !!opts.coldBoot;
     this.reset();
   }
   StellarVM.prototype.reset = function () {
@@ -247,11 +253,31 @@
     var c = new CPU(mem);
     c.io_out[2] = [];
     c.io_in[3] = new UART(this.input, c.io_out);
+    if (this.coldBoot) {
+      c.R[0] = 0x0000; c.P = 0; c.X = 0;
+      c.R[1] = 0x0033;                 // return-to-monitor vector; $0033 is an IDL
+      this.cpu = c;
+      this.serialLen = 0; this.lastOpCost = 0;
+      this._bootUntilReady();
+      return;
+    }
     c.R[4] = 0x0340; c.R[5] = 0x0360; c.R[2] = 0x2FF0; c.R[6] = 0;
     c.R[12] = 0x3000; c.R[8] = ENTRY; c.R[3] = 0x0100; c.P = 3; c.X = 2;
     this.cpu = c;
     this.serialLen = 0;
     this.lastOpCost = 0;   // raw 1802 instructions the last STELLAR opcode took
+  };
+  // Step the firmware's own start-up until VM1 exists and is active.
+  StellarVM.prototype._bootUntilReady = function (cap) {
+    cap = cap || 800000;
+    var c = this.cpu, M = c.M, g = 0;
+    while (g++ < cap) {
+      if (!c.step()) return false;
+      if (M[0x2F54] >= 1) {
+        for (var v = 0; v < 4; v++) if (M[0x2F00 + v * 0x10 + 5] === 0x01) return true;
+      }
+    }
+    return false;
   };
   // Run to completion (halt), returning captured serial output bytes.
   StellarVM.prototype.runToSerial = function (maxSteps) {
@@ -323,6 +349,9 @@
   // real instruction. The pre-pass walks PL through the program, then real
   // execution restarts at the program base — so we stop the 2nd time PL == base.
   StellarVM.prototype.prime = function (cap) {
+    // A cold boot has already run the firmware's start-up, which includes the
+    // label pre-pass, so there is nothing to prime.
+    if (this.coldBoot) { this.primed = true; return true; }
     cap = cap || 3000000;
     var c = this.cpu, prevAtBase = false, hits = 0, g = 0;
     while (g++ < cap) {

@@ -36,7 +36,7 @@
   }
 
   var mv = null, running = false, timer = null, opsPerTick = 1, tickMs = 320;
-  var serialLen = 0, prevRegs = {}, built = 0;
+  var serialLen = 0, prevRegs = {}, built = 0, vt = null;
   var expandedVM = null, coreView = null;
 
   function loadScenario(i) {
@@ -49,7 +49,7 @@
       mv = new window.StellarMultiVM({ firmware: window.STELLAR_FIRMWARE, programs: texts });
       mv.bootUntilReady();      // run CREATE_CIDP + scheduler so VMs are active
       stop(); serialLen = 0; prevRegs = {}; built = 0; expandedVM = null;
-      byId('term').textContent = '';
+      if (vt) vt.reset(); else byId('term').textContent = '';
       byId('cores').innerHTML = '';
       render();
       byId('status').textContent = 'ready — ' + mv.cidp().totalVMs + ' VMs booted';
@@ -162,9 +162,15 @@
   function appendSerial() {
     var out = mv.cpu.io_out[3] || [];
     if (out.length > serialLen) {
-      var t = byId('term'), s = '';
-      for (var i = serialLen; i < out.length; i++) { var b = out[i]; s += (b === 13) ? '' : String.fromCharCode(b); }
-      t.textContent += s; serialLen = out.length; t.scrollTop = t.scrollHeight;
+      var t = byId('term');
+      if (!vt && window.VT100) vt = window.VT100(t);
+      if (vt) { vt.write(out.slice(serialLen)); vt.render(); }
+      else {
+        var s = '';
+        for (var i = serialLen; i < out.length; i++) { var b = out[i]; s += (b === 13) ? '' : String.fromCharCode(b); }
+        t.textContent += s; t.scrollTop = t.scrollHeight;
+      }
+      serialLen = out.length;
     }
   }
 
@@ -254,7 +260,7 @@
   byId('step').addEventListener('click', step);
   byId('run').addEventListener('click', run);
   byId('pause').addEventListener('click', function () { stop(); byId('status').textContent = 'paused'; });
-  byId('reset').addEventListener('click', function () { if (mv) { mv.reset(); mv.bootUntilReady(); serialLen = 0; prevRegs = {}; built = 0; byId('term').textContent = ''; byId('cores').innerHTML = ''; render(); byId('status').textContent = 'reset'; } });
+  byId('reset').addEventListener('click', function () { if (mv) { mv.reset(); mv.bootUntilReady(); serialLen = 0; prevRegs = {}; built = 0; if (vt) vt.reset(); else byId('term').textContent = ''; byId('cores').innerHTML = ''; render(); byId('status').textContent = 'reset'; } });
   var speed = byId('speed');
   function applySpeed() { var s = SPEEDS[+speed.value]; byId('speedLabel').textContent = s.label; opsPerTick = s.slices; tickMs = s.ms; if (running) { stop(); run(); } }
   speed.addEventListener('input', applySpeed);

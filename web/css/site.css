@@ -229,9 +229,15 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .sim-side .dis-panel{height:520px}
 .sim-side h4,.term-wrap h4,.fp-wrap h4{margin:0 0 6px; font-family:var(--mono); font-size:12px;
   letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft)}
+/* The terminal is a VT100 (js/vt100.js), so it holds an 80-column screen and must
+   NOT wrap or break words - a wrapped line would push the rest of the screen down
+   and the picture full-screen programs draw would come apart. */
 .term{background:var(--code-bg); color:var(--code-ink); border-radius:10px; padding:12px 14px;
-  font-family:var(--mono); font-size:13px; white-space:pre-wrap; word-break:break-word;
+  font-family:var(--mono); font-size:13px; white-space:pre; word-break:normal;
   min-height:120px; max-height:240px; overflow:auto}
+/* reverse video: ESC[7m. STELLAR's full-screen programs paint solid blocks with it
+   (a space in reverse video), which is how the ball and the invaders are drawn. */
+.term .rev{background:var(--code-ink); color:var(--code-bg)}
 /* 24-line terminal: height is derived from the line box so it stays exactly 24
    rows if the font size changes */
 .term{line-height:1.35}

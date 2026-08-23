@@ -35,6 +35,7 @@
     coreEl: document.getElementById('core'),
     disasmEl: document.getElementById('disasm'),
     terminalEl: document.getElementById('term'),
+    coldBoot: true,
     statusEl: document.getElementById('status'),
     onBreaksChanged: function (n) { showBreaks(n); },
     onState: function (s) {

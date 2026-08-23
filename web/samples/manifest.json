@@ -70,5 +70,45 @@
     "blurb": "Drives the Elf2K front panel instead of the terminal: lights the Q lamp and counts $00-$1F on the two-digit output display, then clears Q and halts. Serial output stays empty \u2014 watch the panel.",
     "maxSteps": 3000000,
     "halts": true
+  },
+  {
+    "name": "Starfield (VT100)",
+    "file": "Starfield.lst",
+    "input": " 12\r",
+    "blurb": "Stars streaming outward from the centre, the way they look from the front window of something moving fast. Each star just does ox += ox/4 every frame - no division, no multiplication, no signed arithmetic - and because both axes grow by the same factor every star travels a straight ray. Needs the VT100 terminal: it positions the cursor for every star. Type a count at the prompt, ESC stops it.",
+    "maxSteps": 14000000,
+    "halts": false
+  },
+  {
+    "name": "Bouncing Ball (VT100)",
+    "file": "Bouncing-Ball.lst",
+    "input": " ",
+    "blurb": "Two 3x3 reverse-video balls bouncing off the walls and off each other. Equal masses in an elastic collision exchange velocities, so the balls simply swap direction flags. Only the stale edge of each ball is erased, which is what keeps it flicker-free. Press a key to launch, ESC stops it.",
+    "maxSteps": 14000000,
+    "halts": false
+  },
+  {
+    "name": "Invaders (VT100, arrow keys)",
+    "file": "Invaders.lst",
+    "input": "",
+    "blurb": "Two rows of six invaders, an arrow-key gun and a rocket. Click the terminal and steer with the left and right arrows, space to fire; the aliens drop bombs back. Needs both the VT100 screen and the arrow keys, which the terminal now sends as the three-byte escape a real VT100 sends.",
+    "maxSteps": 14000000,
+    "halts": false
+  },
+  {
+    "name": "Starship (VT100)",
+    "file": "Starship.lst",
+    "input": "",
+    "blurb": "The COSMAC ELF logo, traced from a photograph and stored as a run table - line, first column, length - rather than a bitmap. 107 runs paint the whole picture. Any key clears it.",
+    "maxSteps": 9000000,
+    "halts": false
+  },
+  {
+    "name": "Game of Life (VT100)",
+    "file": "Game-of-Life.lst",
+    "input": "",
+    "blurb": "Conway's Game of Life on a 40x20 grid, seeded with a blinker and a glider.",
+    "maxSteps": 14000000,
+    "halts": false
   }
 ]

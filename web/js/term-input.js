@@ -28,6 +28,11 @@
     return null;
   }
 
+  // Arrow keys arrive as a three-byte escape sequence, the same as a real VT100
+  // sends. Invaders steers its gun with them, so without this the game cannot be
+  // played in the browser at all.
+  var ARROWS = { ArrowUp: 0x41, ArrowDown: 0x42, ArrowRight: 0x43, ArrowLeft: 0x44 };
+
   return function attachTerminalInput(termEl, getCpu) {
     if (!termEl) return;
     if (!termEl.hasAttribute('tabindex')) termEl.setAttribute('tabindex', '0');
@@ -37,6 +42,11 @@
       if (!uart || !uart.buf) return;
       // leave browser shortcuts and focus movement alone
       if (e.altKey || e.metaKey || e.key === 'Tab') return;
+      if (ARROWS[e.key] !== undefined) {
+        e.preventDefault();
+        uart.buf.push(0x1B); uart.buf.push(0x5B); uart.buf.push(ARROWS[e.key]);
+        return;
+      }
       var code = keyToByte(e);
       if (code === null) return;
       e.preventDefault();

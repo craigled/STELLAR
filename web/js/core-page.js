@@ -13,6 +13,7 @@
     coreEl: byId('core'),
     disasmEl: byId('disasm'),
     terminalEl: byId('term'),
+    coldBoot: true,
     statusEl: byId('status'),
     onState: function (s) {
       byId('pause').disabled = !app.running;
