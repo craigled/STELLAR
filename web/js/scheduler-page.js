@@ -44,7 +44,7 @@
     byId('blurb').textContent = s.blurb;
     byId('status').textContent = 'loading ' + s.name + '…';
     Promise.all(s.programs.map(function (f) {
-      return fetch('samples/' + f + '?v=12').then(function (r) { return r.text(); });
+      return fetch('samples/' + f + '?v=13').then(function (r) { return r.text(); });
     })).then(function (texts) {
       mv = new window.StellarMultiVM({ firmware: window.STELLAR_FIRMWARE, programs: texts });
       mv.bootUntilReady();      // run CREATE_CIDP + scheduler so VMs are active
