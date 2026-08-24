@@ -1,16 +1,21 @@
 # Running the STELLAR web pages
 
-The pages fetch their sample programs, so **they must be served over http** — opening
-`simulator.html` from Finder (a `file://` URL) makes the browser block those fetches,
-the sample dropdown stays empty and nothing runs.
-
-From the repository root:
+**Serve it from the repository root, and check which directory your shell is in
+first.** `--directory web` is relative to wherever you are, so running the command from
+somewhere else quietly serves the wrong tree — you get a directory listing, a 404, or
+an old copy of the site, all of which look like "the web project is broken".
 
 ```
+cd ~/Projects/STELLAR
 python3 -m http.server 8787 --directory web
 ```
 
-then open <http://localhost:8787/simulator.html>.
+then open <http://localhost:8787/simulator.html>. If the page does not appear at all,
+`pwd` before blaming the code.
+
+The pages also **must be served over http rather than opened from Finder**: they fetch
+their sample programs, and a browser blocks those fetches on a `file://` URL, leaving
+the dropdown empty and nothing able to run.
 
 ## After pulling a change
 
