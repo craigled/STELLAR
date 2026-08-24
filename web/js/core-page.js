@@ -27,7 +27,7 @@
   });
 
   var samples = [];
-  fetch('samples/manifest.json?v=14').then(function (r) { return r.json(); }).then(function (list) {
+  fetch('samples/manifest.json?v=15').then(function (r) { return r.json(); }).then(function (list) {
     samples = list;
     var sel = byId('sample');
     list.forEach(function (s, i) {
@@ -35,12 +35,21 @@
       o.value = i; o.textContent = s.name; sel.appendChild(o);
     });
     load(0);
-  }).catch(function (e) { byId('status').textContent = 'could not load samples: ' + e; });
+  }).catch(function (e) {
+    // Opened as a file:// URL the sample fetches are blocked as cross-origin, so the
+    // dropdown stays empty and nothing can be loaded - which looks like the page is
+    // simply broken. Say what to do instead of reporting a bare TypeError.
+    byId('status').textContent = (location.protocol === 'file:')
+      ? 'This page has to be SERVED over http, not opened as a file. '
+        + 'Run:  python3 -m http.server 8787 --directory web   from the repo root, '
+        + 'then open http://localhost:8787/' + location.pathname.split('/').pop()
+      : 'could not load samples: ' + e;
+  });
 
   function load(i) {
     var s = samples[i];
     byId('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=14').then(function (r) { return r.text(); }).then(function (text) {
+    fetch('samples/' + s.file + '?v=15').then(function (r) { return r.text(); }).then(function (text) {
       var input = (s.input || '').replace(/\\r/g, '\r').replace(/\\n/g, '\n');
       app.load(text, input);
     });
