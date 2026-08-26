@@ -17,6 +17,8 @@ import os, sys, importlib.util
 HERE = os.path.dirname(os.path.abspath(__file__))
 # tools/stellar_disasm.py lives in the sibling work repo
 DISASM = os.path.expanduser('~/Projects/stellar-1802/tools/stellar_disasm.py')
+FMATH  = os.path.expanduser('~/Projects/stellar-1802/Firmware-Math')
+DOCX   = 'STELLAR MAIN V0061.24.docx'
 
 def load_disasm():
     spec = importlib.util.spec_from_file_location('stellar_disasm', DISASM)
@@ -59,7 +61,6 @@ DESC = {
 0x23: ('move', '0Z XY', 'Copy register X to register Y (Z=0: all, 1: low, 2: high).'),
 0x24: ('move', '', 'Copy Acc to the lowest two bytes of MA.'),
 0x25: ('move', '', 'Copy the lowest two bytes of MA to Acc.'),
-0x26: ('move', '', 'Copy Acc to the MA Remainder.'),
 0x27: ('move', '', 'Copy the MA Remainder to Acc.'),
 0x28: ('move', '0Z', 'Copy the Command Counter to accumulator Z (0=Acc, 1=MA).'),
 0x29: ('move', '', 'Copy the I/O register to the Acc low byte.'),
@@ -67,7 +68,6 @@ DESC = {
 0x2B: ('move', '0X', 'COPYMAH — copy the widened (full-32) MA high bytes (build-specific).'),
 0x2E: ('move', '0X MM MM', 'READIDX — Acc = M(MMMM + RX), zero-extended; RX preserved. Relative mode.'),
 0x2F: ('move', '0X MM MM', 'WRITEIDX — M(MMMM + RX) = Acc.low. One-op array store. Relative mode.'),
-0x30: ('move', '0Z', 'Set copy direction (0=Stay, 1=Forward, 2=Backward; default Forward).'),
 0x31: ('move', '0X NN', 'Copy immediate byte NN to memory at register X.'),
 0x32: ('move', '0X NN NN', 'Copy two immediate bytes to memory at register X.'),
 0x33: ('move', 'ZX', 'Copy memory at RX to accumulator Z (0=Acc:2B, 1=MA:5B, 2=DA:7B).'),
@@ -155,7 +155,6 @@ DESC = {
 0x92: ('test', '', 'Test whether Q is set.'),
 0x93: ('test', '', 'Test whether the Carry flag is set (Carry=1 means borrow/overflow).'),
 0x94: ('test', '0Z', 'Test a special flag nonzero (0=Overflow,1=Interrupt,2=Decimal,3=Macro).'),
-0x95: ('test', 'NN', 'Set the ExitCode register to NN.'),
 0x96: ('test', 'NN', 'Test ExitCode = NN.'),
 0x97: ('test', 'NN', 'Test Interrupt State = NN.'),
 0x98: ('test', '', 'Test whether the Error register is nonzero.'),
@@ -175,10 +174,6 @@ DESC = {
 0xA5: ('branch', '0Z MM', 'If Test=False, jump MM bytes (Z=0: forward, 1: back).'),
 0xA6: ('branch', 'ZX', 'If Test=True, go to RX (Z=0: direct, Z=1: indirect).'),
 0xA7: ('branch', 'ZX', 'If Test=False, go to RX (Z=0: direct, Z=1: indirect).'),
-0xA8: ('branch', 'MM MM', 'Loop to an address until Test=True.'),
-0xA9: ('branch', 'MM MM', 'Loop to an address until Test=False.'),
-0xAA: ('branch', 'LL', 'Loop to a label until Test=True.'),
-0xAB: ('branch', 'LL', 'Loop to a label until Test=False.'),
 0xB0: ('branch', 'MM MM', 'Go to an absolute address.'),
 0xB1: ('branch', 'ZX', 'Go to the address in RX (Z=0: direct, Z=1: indirect).'),
 0xB2: ('branch', 'LL', 'Call a labelled location (return with RETURNL).'),
@@ -258,10 +253,43 @@ GROUPS = [
     ('debug',  'Debug',                 '$F0-$FF'),
 ]
 
+def live_opcodes():
+    """Opcodes that actually dispatch somewhere in the flashed firmware.
+
+    The reference page once published seven opcodes that dispatch straight to the
+    illegal-opcode vector ($26, $30, $95, $A8-$AB), because nothing here ever
+    checked the firmware. Derive liveness from the dispatch table at $0800 so that
+    cannot silently come back.
+    """
+    sys.path.insert(0, FMATH)
+    cwd = os.getcwd()
+    os.chdir(FMATH)                      # load_firmware uses relative paths
+    try:
+        from load_firmware import load
+        mem, _ = load(os.path.join('..', DOCX))
+    finally:
+        os.chdir(cwd)
+    UNIMPLEMENTED = 0x0170
+    return {op for op in range(256)
+            if ((mem[0x0800 + 2*op] << 8) | mem[0x0801 + 2*op]) != UNIMPLEMENTED}
+
+
 def main():
     d = load_disasm()
+    live = live_opcodes()
+    named = set(d.NAMES)
+
+    phantom = sorted(named - live)
+    if phantom:
+        print('  SKIPPED - named but dead in the firmware: '
+              + ' '.join('$%02X' % o for o in phantom))
+    undocumented = sorted(live - named)
+    if undocumented:
+        print('  WARNING - live in the firmware but unnamed, so NOT published: '
+              + ' '.join('$%02X' % o for o in undocumented))
+
     entries = []
-    for op in sorted(d.NAMES):
+    for op in sorted(named & live):
         name = d.NAMES[op]
         length = d.OPLEN.get(op, 1)
         group, operands, desc = DESC.get(op, ('misc', '', ''))
