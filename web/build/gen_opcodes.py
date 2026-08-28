@@ -137,10 +137,11 @@ DESC = {
 
 0x80: ('test', 'ZX', 'Test Acc = RX (Z=0: all, 1: low, 2: high).'),
 0x81: ('test', 'NN NN', 'Test Acc = immediate.'),
-0x82: ('test', '', 'Test Acc = MA (lowest two bytes).'),
+0x82: ('test', '0Z', 'Test whether the Acc equals two bytes of the MA: Z=0 the low two, Z=1 the high two. '
+        'The MA remainder is tested with $27 COPYREMA.'),
 0x83: ('test', '', 'Test I/O byte = Acc low.'),
 0x84: ('test', 'NN', 'Test I/O byte = immediate.'),
-0x85: ('test', '', 'Test Acc = DA (lowest two bytes).'),
+0x85: ('test', '0Z', 'Test whether the Acc equals two bytes of the DA: Z=0 the low two, Z=1 the high two.'),
 0x86: ('test', 'ZX NN NN', 'Test RX = immediate (Z=0: both, 1: low, 2: high).'),
 0x87: ('test', 'XY', 'Test RX = RY.'),
 0x88: ('test', 'XY', 'Test RX >= RY. Swap the nibbles (88 YX) to test RX <= RY.'),
