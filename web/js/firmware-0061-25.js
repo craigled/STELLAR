@@ -222,7 +222,7 @@
     [0x12B0, "+EWs+A=="],
     [0x12B5, "XNQEUAWOr/sBMs2O+wI61fgHr/gorDDb+Aav+GisMNv4Aq/4IKzsTfU66xwvjzrc+EWs+AFcGMA="],
     [0x12EE, "UJy++Giu+CCsTlwcDlwYwA=="],
-    [0x12FF, "UBjUBFAFKChIvwj29vb2r0j6D1LijjIj+wEyKY77AjIvwAYw+CD0rDAz+Gn0rDAz+Cj0rJ/7NzpBTVwcL486ODBITF0dL486QRjA"],
+    [0x12FF, "UBjUBFAFKChIvwj29vb2r0j6D1LijjIj+wEyKY77AjIvwAYw+CD0rDAz+Gj0rDAz+Cj0rJ/7NzpBTVwcL486ODBITF0dL486QRjA"],
     [0x134B, "UA=="],
     [0x1350, "GNQEUAYoCPoPrxiP+wEyaI/7AjJpwAYwHE1cHC+POmkYwA=="],
     [0x1373, "UA=="],
