@@ -198,12 +198,6 @@ DESC = {
 0xF1: ('misc', 'MM MM', 'RUNMC — jump to native 1802 machine code at $MMMM. The code is NOT '
         'inline: only the 2-byte address follows the opcode. It must return with SEP R5 (D5). '
         'No VM time-sharing happens while it runs. Moved here from $C2 in V0061.24.'),
-0xF2: ('misc', '0Z', 'SETSIZE — raise this VM\'s Max Size to Z whole 4KB blocks '
-        '(Z = 1, 2 or 3, giving $10, $20 or $30 pages). The Z-1 VM entries ABOVE this one '
-        'are consumed: their CIDP prog page is zeroed so VM_SCANNER skips them entirely. '
-        'The new size is written to the CIDP entry and to core+$5D, so the sandbox bound '
-        'follows it. REFUSED with error $22, changing nothing, if Z is out of range, if '
-        'there is no VM above to take, or if one of them is still running (custom).'),
 0xC2: ('io', 'XY', 'GETSTR — read a line from the UART into the buffer at RX, echoing as it '
         'goes. X = cursor register (advances), Y = buffer-start register (the floor backspace '
         'cannot pass). CR ends the line and stores $00; $08/$7F backspace. Handles one '
