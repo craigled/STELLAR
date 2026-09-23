@@ -1,96 +1,195 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark" data-fixed-theme>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>STELLAR — a 16-bit virtual CPU on the RCA 1802</title>
-<meta name="description" content="How STELLAR works: architecture, live core visualizer, full opcode reference, and an in-browser simulator.">
-<link rel="stylesheet" href="css/site.css?v=15">
+<title>STELLAR — four programs, one chip from 1976</title>
+<meta name="description" content="STELLAR is a multitasking virtual machine hand-assembled for the RCA COSMAC 1802. This page runs its real firmware, live, on an emulated 1802: four programs at once, and every layer underneath them.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/site.css?v=19">
+<link rel="stylesheet" href="css/home.css?v=19">
 </head>
-<body>
+<body class="home">
 
-<header class="hero">
-  <div class="tag">System for Time-shared Execution on Low-Level Architecture Resources</div>
-  <h1>STELLAR</h1>
-  <p class="lede">A 16-bit virtual CPU that runs on top of the 8-bit RCA COSMAC 1802 —
-  with up to four cooperative VMs, its own accumulators and math unit, and 191+ opcodes,
-  all in hand-written machine code.</p>
+<!-- ============================================================ HERO -->
+<header class="h-hero">
+  <div class="h-eyebrow">
+    <span>RCA COSMAC CDP1802</span><span>1976</span><span>8-bit</span><span>3&nbsp;MHz</span><span>no stack · no multiply · no divide</span>
+  </div>
+  <h1 class="h-title">Four programs.<br>One chip from 1976.<br><em>Every byte written by hand.</em></h1>
+  <p class="h-lede">STELLAR is a multitasking virtual machine for the RCA 1802, written straight
+  in hex with no assembler. The four screens below are running on STELLAR's real firmware,
+  on an emulated 1802, right now in your browser. It isn't a video and it isn't a
+  re-implementation. The picture beside them is the chip's memory, lit up as it works.</p>
 </header>
 
-<main class="wrap">
-
-  <section class="grid">
-    <a class="card" href="architecture.html">
-      <div class="k">Start here</div>
-      <h3>Architecture</h3>
-      <p>The memory map, the 1802 register roles, SCRT calls, the CIDP interchange page, and how cooperative multitasking fits in 32&nbsp;KB.</p>
-    </a>
-    <a class="card" href="core.html">
-      <div class="k">Interactive</div>
-      <h3>VM Core Visualizer</h3>
-      <p>Watch a program run: every register, the Accumulator, the Math and Decimal accumulators, and the flags update live as each opcode retires.</p>
-    </a>
-    <a class="card" href="scheduler.html">
-      <div class="k">Interactive</div>
-      <h3>Multitasking</h3>
-      <p>Two to four cores side by side, the decoded <span class="mono">$2F00</span> CIDP page, and the quantum countdown that drives the cooperative hand-off.</p>
-    </a>
-    <a class="card" href="opcodes.html">
-      <div class="k">Reference</div>
-      <h3>Opcode Set</h3>
-      <p>Every opcode by group — encoding, operands, and what it does. Searchable and deep-linkable.</p>
-    </a>
-    <a class="card" href="simulator.html">
-      <div class="k">Interactive</div>
-      <h3>Simulator</h3>
-      <p>Load a program, step or run it, and follow along in the disassembly side panel with the live core beside it.</p>
-    </a>
-  </section>
-
-  <h2><span class="hx">01</span>The idea</h2>
-  <p>The RCA 1802 is an 8-bit processor with sixteen 16-bit registers and no stack,
-  no multiply, and no divide. STELLAR is a layer written entirely in 1802 machine code
-  that turns it into a far friendlier <em>virtual</em> machine: a 16-bit accumulator, a
-  multi-byte Math Accumulator with multiply/divide and remainder, a packed-BCD Decimal
-  Accumulator, sixteen virtual 16-bit registers, real call/return and stacks, labels,
-  and structured test-and-branch — exposed as a compact bytecode.</p>
-
-  <p>Because STELLAR is an interpreter, it can host <strong>several independent programs
-  at once</strong>. Up to four virtual machines share the single 1802, each with its own
-  registers and 4&nbsp;KB program block, taking turns a few opcodes at a time. They talk
-  through a shared page of memory called the CIDP.</p>
-
-  <div class="note">
-    <div class="lbl">The key to the visualizations</div>
-    <p class="small" style="margin:.3em 0 0">A STELLAR VM's registers, accumulators, and flags
-    are not an abstraction layered on top — they are literally fixed <b>bytes in a 256-byte
-    "core" block of RAM</b> (VM&nbsp;1 lives at <span class="mono">$3000</span>). The firmware reads
-    and writes those bytes as it interprets each opcode. So the live core panels on this site
-    are simply a window onto that RAM, updated straight from the real firmware as it runs.</p>
+<!-- ============================================================ CONSOLE -->
+<section class="console" id="console" aria-label="The running machine">
+  <div class="console-top">
+    <div class="speed" role="radiogroup" aria-label="Clock speed">
+      <span class="speed-lbl">clock</span>
+      <button data-speed="1" role="radio">Elf2K&nbsp;1×</button>
+      <button data-speed="10" role="radio">10×</button>
+      <button data-speed="40" role="radio">40×</button>
+      <button data-speed="0" role="radio">flat out</button>
+    </div>
+    <div class="console-btns">
+      <button id="pauseBtn" type="button">❚❚ pause</button>
+      <button id="resetBtn" type="button">↺ reboot</button>
+    </div>
   </div>
 
-  <h2><span class="hx">02</span>What runs where</h2>
-  <div class="memmap">
-    <div class="memrow"><div class="addr">$0000–$2EFF</div><div class="membar"><b>STELLAR firmware</b> <span>— the interpreter itself (~12&nbsp;KB of 1802 code)</span></div></div>
-    <div class="memrow"><div class="addr">$2F00–$2FFF</div><div class="membar"><b>CIDP</b> <span>— common VM interchange page (scheduler + per-VM state)</span></div></div>
-    <div class="memrow"><div class="addr">$3000–$3FFF</div><div class="membar"><b>VM cores, stacks &amp; labels</b> <span>— one 256-byte core per VM ($3000/$3400/$3800/$3C00)</span></div></div>
-    <div class="memrow"><div class="addr">$4000–$7EFF</div><div class="membar"><b>Program blocks</b> <span>— up to 4&nbsp;KB per VM ($4000/$5000/$6000/$7000)</span></div></div>
-  </div>
-  <p class="small muted">See the <a href="architecture.html">architecture page</a> for the full map and the core layout byte-by-byte.</p>
+  <div class="console-body">
+    <div class="quad" id="quad"><!-- four VM screens, built by home.js --></div>
 
-  <h2><span class="hx">03</span>Faithful, not approximate</h2>
-  <p>The simulator on this site is not a re-implementation of STELLAR's opcodes. It runs the
-  <em>actual flashed firmware</em> on a faithful 1802 emulator, exactly as the hardware does —
-  so what you see stepping through a program is what the real Elf2K would do. The visuals are
-  read directly out of the emulated core RAM.</p>
+    <figure class="die-wrap">
+      <figcaption class="die-cap">
+        <b>The die</b>
+        <span>32&nbsp;KB of RAM · one pixel per byte</span>
+      </figcaption>
+      <div class="die-frame">
+        <canvas id="die" aria-label="Live memory map of the emulated machine"></canvas>
+        <div class="die-labels" id="dieLabels"></div>
+      </div>
+      <div class="die-read mono" id="dieRead">hover the die</div>
+    </figure>
+  </div>
+
+  <div class="telemetry">
+    <div class="tl-row">
+      <div class="tm"><div class="tm-k">time on a real Elf2K</div><div class="tm-v" id="tmTime">0:00</div></div>
+      <div class="tm"><div class="tm-k">1802 instructions</div><div class="tm-v" id="tmInstr">0</div></div>
+      <div class="tm"><div class="tm-k">STELLAR opcodes</div><div class="tm-v" id="tmOps">0</div></div>
+      <div class="tm"><div class="tm-k">1802 instructions per opcode</div><div class="tm-v" id="tmRatio">—</div></div>
+      <div class="tm"><div class="tm-k">running now</div><div class="tm-v" id="tmSpeed">—</div></div>
+    </div>
+    <div class="timeline-wrap">
+      <div class="timeline-head">
+        <span class="mono">who has the CPU</span>
+        <span class="muted-d">the scheduler's hand-offs · newest on the right · width = time</span>
+      </div>
+      <canvas id="timeline" height="44"></canvas>
+      <div class="share" id="share"></div>
+    </div>
+  </div>
+
+  <p class="console-note">
+    <b>One detail the browser changes.</b> A real Elf2K has one serial port, so these four programs
+    would share one terminal and draw over each other. Here each byte is sorted by the VM that sent
+    it, and each key you type goes only to the screen you clicked. Everything else,
+    including the scheduling, the timing and every instruction, is the real firmware.
+    <span class="nowrap">Click <b>Invaders</b> and press a key to play.</span>
+  </p>
+</section>
+
+<main class="h-main">
+
+<!-- ============================================================ FAIRNESS -->
+<section class="story" id="fair">
+  <div class="story-num">01</div>
+  <div class="story-body">
+    <h2>Fair by opcode, not by time</h2>
+    <p>Watch the timeline while Invaders waits at <i>press any key</i>. STELLAR's scheduler
+    gives every VM the same turn, three opcodes, and then moves on. That's fair
+    <em>by count</em>. But opcodes aren't equal. While it waits, Invaders keeps calling
+    <code>$C3&nbsp;RAND</code> to stir its random seed, and a single RAND costs thousands
+    of 1802 instructions. So its three opcodes take far longer than anyone else's, and
+    the pink VM ends up with most of the chip.</p>
+    <p class="dim">Press a key in Invaders and watch its share fall. The program's own
+    listing says it plainly:</p>
+    <pre class="lst"><span class="c">; D 400B C3             RAND                   Stir the generator while we wait</span>
+<span class="c">; D 400C CC             SERST                  A key yet?</span>
+<span class="c">; D 400D A1 00 0B       IFFALSEI SEED</span>
+<span class="c">; D 4010 CB             SERIN                  Take it and discard it</span></pre>
+  </div>
+</section>
+
+<!-- ============================================================ DESCENT -->
+<section class="story wide" id="descent">
+  <div class="story-num">02</div>
+  <div class="story-body">
+    <h2>One opcode, all the way down</h2>
+    <p>Choose a VM and follow its most recent instruction through every layer: from the
+    STELLAR bytecode it was written in, to the 1802 machine code the firmware runs to carry
+    it out, to the bytes of RAM that change as a result. <b>Freeze</b> the machine to read
+    one, and <b>Step</b> to move on by exactly one opcode.</p>
+
+    <div class="d-controls">
+      <div class="vm-tabs" id="vmTabs" role="tablist" aria-label="VM to trace"></div>
+      <span class="grow"></span>
+      <button id="freezeBtn" type="button">❄ freeze</button>
+      <button id="stepBtn" type="button">step one opcode ▸</button>
+    </div>
+
+    <div class="layers">
+      <div class="layer" id="L1">
+        <div class="layer-h"><span class="ln">A</span> STELLAR bytecode <span class="lsub">what the programmer wrote</span></div>
+        <div class="bytecode mono" id="bytecode"></div>
+      </div>
+      <div class="layer" id="L2">
+        <div class="layer-h"><span class="ln">B</span> The opcode <span class="lsub">one instruction of the virtual machine</span></div>
+        <div class="opcard" id="opcard"></div>
+      </div>
+      <div class="layer tall" id="L3">
+        <div class="layer-h"><span class="ln">C</span> 1802 machine code <span class="lsub">what the chip actually ran for it</span></div>
+        <div class="phase-bar" id="phaseBar"></div>
+        <div class="m1802 mono" id="m1802"></div>
+      </div>
+      <div class="layer" id="L4">
+        <div class="layer-h"><span class="ln">D</span> Bytes in RAM <span class="lsub" id="coreSub">this VM's 256-byte core</span></div>
+        <div class="coregrid mono" id="coregrid"></div>
+        <div class="core-legend" id="coreLegend"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ BY HAND -->
+<section class="story" id="byhand">
+  <div class="story-num">03</div>
+  <div class="story-body">
+    <h2>There is no assembler</h2>
+    <p>STELLAR's firmware lives in a Word document with two columns: notes on the left and
+    hex on the right. Every instruction of the 1802 code you just watched was worked out by
+    hand, typed as bytes and tested on a real Elf2K. The firmware image this page runs is
+    extracted straight from that document.</p>
+    <div class="facts" id="facts"></div>
+    <p class="dim">Programs are delivered the same way, as <code>D</code>-lines that the Elf2K's
+    monitor loads byte by byte. The tools on this site (the disassembler, this emulator, the
+    opcode table) came later, and were written to check the hand work, not to replace it.</p>
+  </div>
+</section>
+
+<!-- ============================================================ WORKBENCH -->
+<section class="bench" id="bench">
+  <h2 class="bench-h">The workbench</h2>
+  <p class="bench-sub">The rest of the site covers the same machine one piece at a time.</p>
+  <div class="bench-grid">
+    <a class="bcard" href="simulator.html"><span class="bk">run</span><h3>Simulator</h3><p>Load any program, or your own <code>.lst</code>. Step it, set breakpoints, and watch the core and the Elf2K front panel.</p></a>
+    <a class="bcard" href="scheduler.html"><span class="bk">multitask</span><h3>Scheduler</h3><p>Two to four VMs opcode by opcode, with the decoded CIDP page and the quantum counter that drives each hand-off.</p></a>
+    <a class="bcard" href="core.html"><span class="bk">inspect</span><h3>VM core</h3><p>Every register, accumulator and flag of one VM, labelled and live.</p></a>
+    <a class="bcard" href="opcodes.html"><span class="bk">reference</span><h3>Opcodes</h3><p>All of the instruction set by group: encoding, operands and what each one does.</p></a>
+    <a class="bcard" href="architecture.html"><span class="bk">read</span><h3>Architecture</h3><p>The memory map, the 1802's register roles, SCRT calls and the CIDP.</p></a>
+  </div>
+</section>
 
 </main>
 
-<footer class="foot">
+<footer class="foot h-foot">
   STELLAR for the RCA COSMAC 1802 · built by Craig Ledbetter ·
-  <a href="opcodes.html">opcode reference</a> · <a href="simulator.html">simulator</a>
+  firmware <span class="mono">V0061.25</span> · <a href="https://github.com/craigled/STELLAR">source</a>
 </footer>
 
-<script src="js/nav.js?v=15"></script>
+<script src="js/opcodes.js?v=19"></script>
+<script src="js/firmware-0061-25.js?v=19"></script>
+<script src="js/stellar-vm.js?v=19"></script>
+<script src="js/cosmac.js?v=19"></script>
+<script src="js/machine.js?v=19"></script>
+<script src="js/die.js?v=19"></script>
+<script src="js/vt100.js?v=19"></script>
+<script src="js/home.js?v=19"></script>
+<script src="js/nav.js?v=19"></script>
 </body>
 </html>

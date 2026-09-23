@@ -1,7 +1,7 @@
 // Shared top nav + theme toggle. Include on every page with <script src="js/nav.js"></script>.
 (function () {
   var TABS = [
-    ['index.html',        'Overview'],
+    ['index.html',        'The machine'],
     ['architecture.html', 'Architecture'],
     ['core.html',         'VM Core'],
     ['scheduler.html',    'Multitasking'],
@@ -11,8 +11,11 @@
   var here = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
 
   // theme: persist choice; default = system
-  var saved = localStorage.getItem('stellar-theme');
-  if (saved === 'light' || saved === 'dark') document.documentElement.setAttribute('data-theme', saved);
+  // A page can pin its theme (the home page is a console of screens: always dark).
+  var fixedTheme = document.documentElement.hasAttribute('data-fixed-theme');
+  var saved = null;
+  try { saved = localStorage.getItem('stellar-theme'); } catch (e) {}
+  if (!fixedTheme && (saved === 'light' || saved === 'dark')) document.documentElement.setAttribute('data-theme', saved);
 
   var nav = document.createElement('nav');
   nav.className = 'nav';
@@ -40,7 +43,7 @@
     label();
   });
   label();
-  inner.appendChild(btn);
+  if (!fixedTheme) inner.appendChild(btn);
   nav.appendChild(inner);
   document.body.insertBefore(nav, document.body.firstChild);
 

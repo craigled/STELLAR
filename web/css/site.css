@@ -1,5 +1,8 @@
 /* STELLAR site — shared design system.
-   Retro-technical: phosphor accents, monospace hex, clean prose. Theme-aware. */
+   Retro-technical: phosphor accents, monospace hex, clean prose. Theme-aware.
+   Type is shared with the home page (css/home.css): Instrument Serif for display,
+   IBM Plex Sans / Plex Mono for everything else. */
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
 
 :root{
   --bg:        #f4f1ea;
@@ -15,20 +18,21 @@
   --hi-edge:   #e0a92a;
   --code-bg:   #1d1b17;
   --code-ink:  #f3e9d2;
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --wrap: 1120px;
+  --serif: "Instrument Serif", "Iowan Old Style", Georgia, serif;
 }
 :root:not([data-theme="light"]){
   @media (prefers-color-scheme: dark){
-    --bg:#0e0d0b; --bg-panel:#17150f; --bg-sunk:#100f0c; --ink:#ede6d6; --ink-soft:#9a9280;
-    --line:#2b271e; --accent:#ffb000; --accent-2:#4fd6c9; --link:#5fd6c9;
+    --bg:#07080b; --bg-panel:#0d0f14; --bg-sunk:#11141b; --ink:#e9e4d8; --ink-soft:#9097a6;
+    --line:#1c212c; --accent:#ffb000; --accent-2:#4fd6c9; --link:#5fd6c9;
     --hi:#5a4a18; --hi-edge:#ffb000; --code-bg:#0a0906; --code-ink:#ffd07a;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0e0d0b; --bg-panel:#17150f; --bg-sunk:#100f0c; --ink:#ede6d6; --ink-soft:#9a9280;
-  --line:#2b271e; --accent:#ffb000; --accent-2:#4fd6c9; --link:#5fd6c9;
+  --bg:#07080b; --bg-panel:#0d0f14; --bg-sunk:#11141b; --ink:#e9e4d8; --ink-soft:#9097a6;
+  --line:#1c212c; --accent:#ffb000; --accent-2:#4fd6c9; --link:#5fd6c9;
   --hi:#5a4a18; --hi-edge:#ffb000; --code-bg:#0a0906; --code-ink:#ffd07a;
 }
 
@@ -65,12 +69,14 @@ code,kbd,.mono{font-family:var(--mono)}
 .wrap{max-width:var(--wrap); margin:0 auto; padding:32px 18px 80px}
 .hero{padding:56px 18px 30px; text-align:center; border-bottom:1px solid var(--line);
   background:linear-gradient(180deg,var(--bg-panel),transparent)}
-.hero h1{font-size:clamp(30px,5vw,46px); margin:.1em 0 .1em; letter-spacing:-.01em}
+.hero h1{font-family:var(--serif); font-weight:400; font-size:clamp(36px,5.4vw,58px); margin:.1em 0 .1em; letter-spacing:-.01em}
 .hero .tag{font-family:var(--mono); color:var(--accent); letter-spacing:.18em;
   font-size:13px; text-transform:uppercase}
 .hero p.lede{max-width:660px; margin:14px auto 0; color:var(--ink-soft); font-size:18px}
 
-h2{font-size:26px; margin:44px 0 10px; letter-spacing:-.01em}
+h1,h2{font-family:var(--serif); font-weight:400}
+h1{font-size:clamp(36px,4.6vw,52px); letter-spacing:-.01em}
+h2{font-size:32px; margin:44px 0 10px; letter-spacing:-.005em}
 h2 .hx{font-family:var(--mono); color:var(--accent); font-size:.7em; margin-right:.4em}
 h3{font-size:19px; margin:26px 0 8px}
 p{margin:10px 0}

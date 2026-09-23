@@ -1,0 +1,221 @@
+// StellarMachine: the always-running machine behind the home page.
+//
+// It is the same emulator as everywhere else on the site (StellarVMLib.CPU running
+// the real firmware image, cold-booted through CIDP by MultiVM), with the
+// instrumentation a visualisation needs and a debugger does not:
+//
+//   * a CLOCK. Every 1802 instruction is charged its machine cycles (8 clocks
+//     each), so the page can run at exactly the speed of Craig's 3 MHz Elf2K, or
+//     any multiple of it, and say how long the same work takes on the hardware.
+//   * HEAT. The address of every instruction fetched is marked in a 32 KB heat
+//     map, tagged with the VM being served; memory WRITES are found by diffing
+//     against a shadow copy once per frame. That is what lights the die picture.
+//   * PER-VM SERIAL. There is one UART. Each byte written to it is tagged with
+//     the VM that was running when it went out, so four programs can have four
+//     screens. Keystrokes are queued per VM and only handed to that VM's SERIN.
+//     On the real Elf2K all four would share one terminal - the page says so.
+//   * SLICES. Every change of running VM is logged, for the scheduler timeline.
+//   * TRACE. For one chosen VM, the address of every 1802 instruction executed
+//     on its behalf, cut into segments at each STELLAR opcode boundary (the core
+//     command counter at core+$33..$36 ticks once per opcode).
+(function (root, factory) {
+  var api = factory();
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (typeof window !== 'undefined') window.StellarMachine = api;
+})(this, function () {
+  'use strict';
+
+  var LIB = (typeof window !== 'undefined' && window.StellarVMLib) || require('./stellar-vm.js');
+  var COS = (typeof window !== 'undefined' && window.Cosmac) || require('./cosmac.js');
+
+  var CLOCK_HZ = 3000000;               // Craig's Elf2K
+  var CYCLES_PER_SEC = CLOCK_HZ / 8;    // 1802 machine cycle = 8 clocks
+  var RAM = 0x8000;                      // the die shows the low 32 KB
+  var RING = 1 << 16;                    // trace ring (traced VM only)
+  var SLICES = 1024;
+
+  // cycles per opcode byte for the base ISA; $68 is resolved per instruction
+  var CYC = new Uint8Array(256);
+  for (var i = 0; i < 256; i++) CYC[i] = ((i & 0xF0) === 0xC0) ? 3 : 2;
+
+  function coreBase(vm) { return 0x3000 + (vm - 1) * 0x400; }
+
+  // programs: [{ text: lstText, input: 'keys to pre-queue' }, ...] (1-4)
+  function Machine(opts) {
+    this.firmware = opts.firmware || (typeof window !== 'undefined' && window.STELLAR_FIRMWARE);
+    this.programs = opts.programs;
+    this.traceVM = opts.traceVM || 1;
+    this.reset();
+  }
+
+  Machine.prototype.reset = function () {
+    var self = this;
+    this.mvm = new LIB.MultiVM({
+      firmware: this.firmware,
+      programs: this.programs.map(function (p) { return p.text; })
+    });
+    var c = this.cpu = this.mvm.cpu, M = this.M = c.M;
+    // per-VM keyboard: SERIN in VM n only ever sees VM n's keys
+    this.keys = [[], [], [], [], []];
+    this.programs.forEach(function (p, i) {
+      var s = p.input || '';
+      for (var k = 0; k < s.length; k++) self.keys[i + 1].push(s.charCodeAt(k) & 0xFF);
+    });
+    var keys = this.keys;
+    c.io_in[3] = { pop: function () {
+      var sel2 = c.io_out[2], sel = sel2 && sel2.length ? sel2[sel2.length - 1] : null;
+      var q = keys[M[0x2F52]] || [];
+      if (sel === 0x15) return 0x20 | (q.length ? 1 : 0);
+      if (sel === 0x10) return q.length ? q.shift() : 0;
+      return 0;
+    } };
+    this.out = [[], [], [], [], []];        // undrained serial bytes per VM
+    this.heat = new Uint8Array(RAM);         // exec heat 0-255
+    this.heatVM = new Uint8Array(RAM);       // which VM the fetch was for
+    this.wheat = new Uint8Array(RAM);        // write heat
+    this.shadow = new Uint8Array(RAM);
+    this.cycles = 0; this.instr = 0;
+    this.vmCycles = new Float64Array(5);
+    this.sliceVM = new Uint8Array(SLICES);
+    this.sliceCyc = new Uint32Array(SLICES);
+    this.sliceHead = 0; this.sliceCount = 0;
+    this.curSliceVM = 0; this.curSliceCyc = 0;
+    this.ring = new Uint16Array(RING); this.ringN = 0;   // monotonically increasing index
+    this.ops = [];                                       // completed opcode records (traced VM)
+    this.opCount = 0;
+    this.mvm.bootUntilReady();
+    this.shadow.set(M.subarray(0, RAM));
+    this._ccAddr = coreBase(this.traceVM) + 0x36;
+    this._cc = M[this._ccAddr];
+    this._opStart = this.ringN;
+    this._opPL = this._pl(this.traceVM);
+  };
+
+  Machine.prototype._pl = function (vm) {
+    var b = coreBase(vm);
+    return (this.M[b + 0x31] << 8) | this.M[b + 0x32];
+  };
+
+  Machine.prototype.setTraceVM = function (vm) {
+    this.traceVM = vm;
+    this._ccAddr = coreBase(vm) + 0x36;
+    this._cc = this.M[this._ccAddr];
+    this._opStart = this.ringN;
+    this._opPL = this._pl(vm);
+    this.ops = [];
+  };
+
+  // Run until `budget` machine cycles are used, the wall clock passes
+  // `deadline` (performance.now() ms), or the machine halts.
+  Machine.prototype.run = function (budget, deadline) {
+    var c = this.cpu, M = this.M, R = c.R;
+    var heat = this.heat, heatVM = this.heatVM, ring = this.ring, out = this.out;
+    var tvm = this.traceVM, ccAddr = this._ccAddr;
+    var used = 0, n = 0, ringN = this.ringN;
+    var sliceVM = this.curSliceVM, sliceCyc = this.curSliceCyc;
+    var o3 = c.io_out[3] || (c.io_out[3] = []);
+    var now = (typeof performance !== 'undefined') ? function () { return performance.now(); } : Date.now;
+    while (used < budget) {
+      var cur = M[0x2F52], pc = R[c.P], op = M[pc];
+      var cyc = op === 0x68 ? COS.cycles(M, pc) : CYC[op];
+      if (pc < RAM) { heat[pc] = 255; heatVM[pc] = cur; }
+      if (cur === tvm) { ring[ringN & (RING - 1)] = pc; ringN++; }
+      if (!c.step()) { this.halted = true; break; }
+      used += cyc; n++;
+      this.vmCycles[cur] += cyc;
+      if (cur !== sliceVM) {
+        this._pushSlice(sliceVM, sliceCyc);
+        sliceVM = cur; sliceCyc = 0;
+      }
+      sliceCyc += cyc;
+      if (o3.length) {
+        var q = out[cur] || out[0];
+        for (var k = 0; k < o3.length; k++) q.push(o3[k]);
+        o3.length = 0;
+      }
+      if (cur === tvm && M[ccAddr] !== this._cc) {
+        this._cc = M[ccAddr];
+        this._closeOp(ringN);
+      }
+      if ((n & 4095) === 0 && deadline && now() > deadline) break;
+    }
+    this.ringN = ringN;
+    this.curSliceVM = sliceVM; this.curSliceCyc = sliceCyc;
+    this.cycles += used; this.instr += n;
+    var o2 = c.io_out[2]; if (o2 && o2.length > 64) o2.splice(0, o2.length - 8);
+    for (var p in c.io_out) {
+      if (p !== '2' && p !== '3' && c.io_out[p].length > 256) c.io_out[p].splice(0, c.io_out[p].length - 16);
+    }
+    return used;
+  };
+
+  Machine.prototype._pushSlice = function (vm, cyc) {
+    if (!cyc) return;
+    this.sliceVM[this.sliceHead] = vm;
+    this.sliceCyc[this.sliceHead] = cyc;
+    this.sliceHead = (this.sliceHead + 1) % SLICES;
+    if (this.sliceCount < SLICES) this.sliceCount++;
+  };
+
+  // Last `n` slices, oldest first, including the one in progress.
+  Machine.prototype.recentSlices = function (n) {
+    var out = [], cnt = Math.min(n - 1, this.sliceCount);
+    for (var i = cnt; i >= 1; i--) {
+      var j = (this.sliceHead - i + SLICES) % SLICES;
+      out.push([this.sliceVM[j], this.sliceCyc[j]]);
+    }
+    out.push([this.curSliceVM, this.curSliceCyc]);
+    return out;
+  };
+
+  Machine.prototype._closeOp = function (ringN) {
+    var pl = this._opPL, M = this.M;
+    this.ops.push({ pl: pl, op: M[pl], start: this._opStart, end: ringN, n: this.opCount++ });
+    if (this.ops.length > 64) this.ops.shift();
+    this._opStart = ringN;
+    this._opPL = this._pl(this.traceVM);
+  };
+
+  // The 1802 program counter values of one opcode record, or null if the ring
+  // has already overwritten them.
+  Machine.prototype.opTrace = function (rec) {
+    if (this.ringN - rec.start > RING) return null;
+    var a = [];
+    for (var i = rec.start; i < rec.end; i++) a.push(this.ring[i & (RING - 1)]);
+    return a;
+  };
+
+  // Find memory written since the last call and mark it hot.
+  Machine.prototype.sampleWrites = function () {
+    var M = this.M, sh = this.shadow, w = this.wheat;
+    for (var a = 0; a < RAM; a++) {
+      var v = M[a];
+      if (v !== sh[a]) { sh[a] = v; w[a] = 255; }
+    }
+  };
+
+  Machine.prototype.drain = function (vm) {
+    var q = this.out[vm];
+    if (!q.length) return null;
+    var b = q.slice(); q.length = 0;
+    return b;
+  };
+
+  Machine.prototype.sendKeys = function (vm, bytes) {
+    for (var i = 0; i < bytes.length; i++) this.keys[vm].push(bytes[i]);
+  };
+
+  // Commands executed so far by VM n (its core's own counter).
+  Machine.prototype.vmOps = function (vm) {
+    var M = this.M, b = coreBase(vm) + 0x33;
+    return M[b] * 0x1000000 + (M[b + 1] << 16) + (M[b + 2] << 8) + M[b + 3];
+  };
+  Machine.prototype.vmState = function (vm) { return this.M[0x2F00 + (vm - 1) * 0x10 + 5]; };
+  Machine.prototype.currentVM = function () { return this.M[0x2F52]; };
+
+  Machine.CLOCK_HZ = CLOCK_HZ;
+  Machine.CYCLES_PER_SEC = CYCLES_PER_SEC;
+  Machine.RAM = RAM;
+  Machine.coreBase = coreBase;
+  return Machine;
+});
