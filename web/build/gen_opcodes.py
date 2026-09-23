@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # tools/stellar_disasm.py lives in the sibling work repo
 DISASM = os.path.expanduser('~/Projects/stellar-1802/tools/stellar_disasm.py')
 FMATH  = os.path.expanduser('~/Projects/stellar-1802/Firmware-Math')
-DOCX   = 'STELLAR MAIN V0061.25.docx'
+DOCX   = 'STELLAR MAIN V0061.27.docx'
 
 def load_disasm():
     spec = importlib.util.spec_from_file_location('stellar_disasm', DISASM)

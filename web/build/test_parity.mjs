@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB = join(HERE, '..');
 
-const firmware = require(join(WEB, 'js', 'firmware-0061-25.js'));
+const firmware = require(join(WEB, 'js', 'firmware-0061-27.js'));
 const { StellarVM } = require(join(WEB, 'js', 'stellar-vm.js'));
 
 const manifest = JSON.parse(readFileSync(join(WEB, 'samples', 'manifest.json'), 'utf8'));
@@ -27,7 +27,7 @@ for (const s of manifest) {
   const fx = fixtures[s.file];
   if (!fx) { console.log(`SKIP ${s.file} (no fixture — run gen_fixtures.py)`); continue; }
   const lst = readFileSync(join(WEB, 'samples', s.file), 'utf8');
-  const vm = new StellarVM({ firmware, program: lst, input: s.input });
+  const vm = new StellarVM({ firmware, program: lst, input: s.input, coldBoot: true });
   vm.runToSerial(s.maxSteps);
   const got = toHex(vm.serialOut());
   if (got === fx.outHex) {

@@ -3,7 +3,7 @@
 // A faithful port of Firmware-Math/cpu1802.py (CDP1802/1805 base ISA + the
 // 68-prefix extended ops STELLAR uses) plus the VM boot recipe from
 // calc_interactive.run_calc. It runs the REAL flashed firmware image
-// (firmware-0061-25.js), so behavior matches the hardware — the visualizers
+// (firmware-0061-27.js), so behavior matches the hardware — the visualizers
 // just read the emulated $3000 core RAM the firmware maintains.
 //
 // Works in the browser (window.StellarVM) and in Node (module.exports).
@@ -19,6 +19,13 @@
   'use strict';
 
   var CORE = 0x3000;            // VM1 core page
+  // R1 is the monitor's exit vector: when every VM has finished, the firmware
+  // does SEP R1. On the Elf2K the monitor sets it; here it must point at an IDL
+  // so the machine halts cleanly. This used to be $0033, which is not an
+  // instruction at all - it is the low byte of `CALL $0C00` at $0031 and merely
+  // happened to be $00. V0061.27 moved CREATE_CIDP, that byte became $98, and a
+  // finished program ran on into the boot code. $FFF0 is never written.
+  var EXIT_IDL = 0xFFF0;
   var ENTRY = 0x4000;          // VM1 program block
 
   // ---- base-1802 CPU (port of cpu1802.py) ----
@@ -62,6 +69,11 @@
     return !this.halted;
   };
   CPU.prototype._branch = function (op) {
+    // A taken short branch replaces the low byte of R(P) while R(P) is still ON
+    // the operand, so the target is in the OPERAND byte's page - not the page
+    // after it, which is what reading the PC after the fetch gives when the
+    // operand is the last byte of a page. (Same fix as cpu1802.py, 9db7059.)
+    var page = this.R[this.P] & 0xFF00;
     var a = this._fetch(), t;
     switch (op) {
       case 0x30: t = true; break;
@@ -81,7 +93,7 @@
       case 0x3E: t = this.EF[2] === 0; break;
       case 0x3F: t = this.EF[3] === 0; break;
     }
-    if (t) this.R[this.P] = (this.R[this.P] & 0xFF00) | a;
+    if (t) this.R[this.P] = page | a;
   };
   CPU.prototype._longbranch = function (op) {
     var self = this;
@@ -237,9 +249,12 @@
     // Cold boot through CIDP instead of the hand-built register state. Programs
     // that WAIT (Starfield at its prompt, Invaders for a key) reach the firmware's
     // "all VMs done" path, and the hand-built state has no VM registered there, so
-    // they restarted from the top for ever. Off by default so the golden fixtures,
-    // which were all taken on the hand-built path, keep their meaning.
-    this.coldBoot = !!opts.coldBoot;
+    // they restarted from the top for ever. ON by default since V0061.27: the
+    // hand-built path only ever worked because the firmware then did SEP R1 with
+    // R1=0 and cold-booted anyway, and its exit relied on $0033 happening to be $00.
+    // The golden fixtures are taken on the cold boot too. Pass coldBoot:false for
+    // the old hand-built state.
+    this.coldBoot = opts.coldBoot !== false;
     this.reset();
   }
   StellarVM.prototype.reset = function () {
@@ -255,7 +270,7 @@
     c.io_in[3] = new UART(this.input, c.io_out);
     if (this.coldBoot) {
       c.R[0] = 0x0000; c.P = 0; c.X = 0;
-      c.R[1] = 0x0033;                 // return-to-monitor vector; $0033 is an IDL
+      c.R[1] = EXIT_IDL;               // return-to-monitor vector: an address that is always $00 (IDL)
       this.cpu = c;
       this.serialLen = 0; this.lastOpCost = 0;
       this._bootUntilReady();
@@ -401,9 +416,9 @@
     c.R[0] = 0x0000; c.P = 0; c.X = 0;   // cold boot from the reset vector
     // R1 = interrupt/exit handler PC. On the Elf2K the monitor sets this so that
     // "all VMs done" (SEP R1 at $02E2) returns to the monitor. Point it at an IDL
-    // ($0033 = $00) so the sim halts cleanly instead of looping back to the reset
+    // (EXIT_IDL, always $00) so the sim halts cleanly instead of looping back to the reset
     // vector and re-running every program (which double-ran the whole boot).
-    c.R[1] = 0x0033;
+    c.R[1] = EXIT_IDL;
     this.cpu = c;
     this.serialLen = 0;
     // per-VM raw-1802 accounting (index by VM number 1..4)

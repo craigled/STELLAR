@@ -2,7 +2,7 @@
 """
 Generate web/build/fixtures.json — golden serial output for each sample program,
 produced by the REAL firmware simulator in Firmware-Math, over the SAME image the
-browser gets (extract_firmware.build_image = V0061.25 as flashed). The Node parity
+browser gets (extract_firmware.build_image = V0061.27 as flashed). The Node parity
 test (test_parity.mjs) asserts the JS engine reproduces these byte-for-byte.
 
     python3 web/build/gen_fixtures.py
@@ -23,7 +23,7 @@ from calc_interactive import UART               # noqa: E402
 CORE = 0x3000
 
 def run(lst_path, inp, max_steps):
-    mem = bytearray(build_image())      # V0061.25 exactly as flashed
+    mem = bytearray(build_image())      # V0061.27 exactly as flashed
     for ln in open(lst_path):
         import re
         m = re.match(r'D\s+([0-9A-Fa-f]{4})\s+(.+)', ln.strip())
@@ -38,8 +38,22 @@ def run(lst_path, inp, max_steps):
     c = CPU(mem)
     mem[CORE + 0x3B] = 1; mem[CORE + 0x5B] = 0x40; mem[CORE + 0x5C] = 0
     c.io_out[2] = []; c.io_in[3] = UART(inp, c.io_out)
-    c.R[4] = 0x0340; c.R[5] = 0x0360; c.R[2] = 0x2FF0; c.R[6] = 0
-    c.R[12] = 0x3000; c.R[8] = 0x4000; c.R[3] = 0x0100; c.P = 3; c.X = 2
+    # COLD BOOT from the reset vector, exactly as the pages run it (StellarVM
+    # coldBoot) and as the Elf2K does. The fixtures used to be taken on a
+    # hand-built register state (R3=$0100 ...), which only ever worked because the
+    # firmware then did SEP R1 with R1=0 and cold-booted anyway - with R1 as the
+    # program counter - and its exit landed on $0033, the low byte of CALL $0C00,
+    # which happened to be $00. V0061.27 moved CREATE_CIDP and that exit printed a
+    # stray byte. R1 = $FFF0 is an address that is always $00 (IDL).
+    c.R[0] = 0x0000; c.P = 0; c.X = 0; c.R[1] = 0xFFF0
+    # Run the firmware's start-up until a VM is active, then count the step
+    # budget - exactly what StellarVM's cold boot does (_bootUntilReady in the
+    # constructor, then runToSerial(maxSteps)), so capped samples stop at the
+    # same instruction in both engines.
+    for _ in range(800000):
+        if not c.step(): break
+        if mem[0x2F54] >= 1 and any(mem[0x2F00 + v * 0x10 + 5] == 1 for v in range(4)):
+            break
     halted = False
     n = 0
     for n in range(max_steps):
