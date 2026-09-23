@@ -3,7 +3,7 @@
 // A faithful port of Firmware-Math/cpu1802.py (CDP1802/1805 base ISA + the
 // 68-prefix extended ops STELLAR uses) plus the VM boot recipe from
 // calc_interactive.run_calc. It runs the REAL flashed firmware image
-// (firmware-0061-27.js), so behavior matches the hardware — the visualizers
+// (firmware-0061-28.js), so behavior matches the hardware — the visualizers
 // just read the emulated $3000 core RAM the firmware maintains.
 //
 // Works in the browser (window.StellarVM) and in Node (module.exports).
