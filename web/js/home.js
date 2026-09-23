@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=19';
+  var V = '?v=22';
   var LINEUP = [
     { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
     { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },
@@ -100,6 +100,75 @@
       read.innerHTML = '<b>$' + h4(a) + '</b> = ' + h2(m.M[a]) + ' · ' + Die.region(a);
     });
     cv.addEventListener('mouseleave', function () { read.textContent = 'hover the die'; });
+  }
+
+  // ---------------------------------------------------------------- CIDP
+  // The Common Interchange Data Page, $2F00: how the scheduler and the VMs keep
+  // track of each other. Only the rows the firmware uses are shown: one 16-byte
+  // entry per VM, the scheduler's own state at $2F50, and the top of the page,
+  // where the 1802's hardware stack (R2) lives.
+  var CIDP_ROWS = [0x00, 0x10, 0x20, 0x30, 'gap', 0x50, 'gap', 0xF0];
+  var VM_FIELDS = ['VM number', 'core page', 'program page', 'max size (pages)', 'count', 'state',
+    '#commands', '#commands', '#commands', '#commands', 'mode', 'status'];
+  var SYS_FIELDS = { 0x50: 'system interrupt state', 0x51: 'VM error', 0x52: 'current VM — who has the CPU',
+    0x53: 'max VMs', 0x54: 'total VMs', 0x55: 'multitasking allowed (C7 SETMULTI)', 0x56: 'VM operation',
+    0x57: 'VM repeat', 0x5F: 'hardware interrupt flip-flop' };
+  var STATES = ['done', 'active', 'completed this cycle', 'idle / waiting', 'paused', 'killed'];
+  var cidpCells = [];
+
+  function cidpField(o) {
+    if (o < 0x40) {
+      var f = o & 0xF, vm = (o >> 4) + 1;
+      return 'VM' + vm + ' ' + (VM_FIELDS[f] || 'unused');
+    }
+    if (o >= 0x50 && o < 0x60) return SYS_FIELDS[o] || 'scheduler (unused)';
+    if (o >= 0xF0) return '1802 hardware stack (R2 grows down from here)';
+    return 'unused';
+  }
+
+  function buildCidp() {
+    var g = $('cidpGrid'), html = '';
+    CIDP_ROWS.forEach(function (r) {
+      if (r === 'gap') { html += '<div class="gap">⋮</div>'; return; }
+      html += '<span class="ra">$2F' + h2(r) + '</span>';
+      for (var i = 0; i < 16; i++) {
+        var o = r + i, cls = 'cb', style = '';
+        if (o < 0x40) { cls += ' vmrow'; style = ' style="--vm:' + VMC[(o >> 4) + 1] + '"'; if ((o & 0xF) === 5) cls += ' state'; }
+        else if (o < 0x60) cls += ' sys';
+        html += '<span class="' + cls + '"' + style + ' data-o="' + o + '"></span>';
+      }
+    });
+    g.innerHTML = html;
+    cidpCells = Array.prototype.slice.call(g.querySelectorAll('.cb'));
+    var read = $('dieRead');
+    g.addEventListener('mouseover', function (e) {
+      var c = e.target.closest ? e.target.closest('.cb') : null;
+      if (!c || !m) return;
+      var o = +c.dataset.o, v = m.M[0x2F00 + o], extra = '';
+      if (o < 0x40 && (o & 0xF) === 5) extra = ' (' + (STATES[v] || '?') + ')';
+      if (o === 0x55) extra = v ? ' (on)' : ' (off)';
+      read.innerHTML = '<b>$' + h4(0x2F00 + o) + '</b> = ' + h2(v) + extra + ' · CIDP · ' + cidpField(o);
+    });
+    g.addEventListener('mouseleave', function () { read.textContent = 'hover the die'; });
+  }
+
+  function renderCidp() {
+    if (!cidpCells.length) return;
+    var M = m.M, wh = m.wheat, cur = M[0x2F52];
+    for (var i = 0; i < cidpCells.length; i++) {
+      var el = cidpCells[i], o = +el.dataset.o, a = 0x2F00 + o, v = M[a], t = h2(v);
+      if (el.textContent !== t) el.textContent = t;
+      var nz = v !== 0, hot = wh[a] > 40, isCur = o < 0x40 && (o >> 4) + 1 === cur;
+      if (el._nz !== nz) { el._nz = nz; el.classList.toggle('nz', nz); }
+      if (el._hot !== hot) { el._hot = hot; el.classList.toggle('hot', hot); }
+      if (el._cur !== isCur) { el._cur = isCur; el.classList.toggle('cur', isCur); }
+    }
+    var st = [];
+    st.push(cur >= 1 && cur <= 4 ? 'VM' + cur + ' running' : 'scheduler');
+    st.push(M[0x2F54] + ' VMs');
+    st.push('multitasking ' + (M[0x2F55] ? 'on' : 'off'));
+    var sum = st.join(' · ');
+    if ($('cidpSum').textContent !== sum) $('cidpSum').textContent = sum;
   }
 
   // ---------------------------------------------------------------- timeline
@@ -314,6 +383,7 @@
     while (m.opCount < want && guard++ < 400 && !m.halted) m.run(4000);
     m.sampleWrites();
     renderDescent(true);
+    renderCidp();
     paintScreens();
     die.render();
     drawTimeline();
@@ -332,16 +402,20 @@
   function tick(t) {
     requestAnimationFrame(tick);
     if (!m) return;
-    var dt = lastT ? Math.min(t - lastT, 100) : 16;
+    // allow long frames (a busy or backgrounded tab) so the chosen speed holds; cap stops a runaway after sleep
+    var dt = lastT ? Math.min(t - lastT, 500) : 16;
     lastT = t;
     if (!paused && !frozen && !m.halted) {
       var budget = speed ? dt / 1000 * Machine.CYCLES_PER_SEC * speed : Infinity;
-      m.run(budget, performance.now() + 11);
+      // ~11 ms of work per frame at 60 fps; a throttled tab gets few, long frames, so it may
+      // spend proportionally more per frame (up to 60 ms) to keep the chosen speed
+      m.run(budget, performance.now() + Math.min(Math.max(11, dt * 0.6), 60));
     }
     frame++;
     m.sampleWrites();
     // frozen: nothing is moving, so keep the last step's heat on screen instead of fading it
     if (consoleVisible && !frozen) {
+      renderCidp();
       die.render();
       paintScreens();
       drawTimeline();
@@ -420,6 +494,7 @@
   function start() {
     buildQuad();
     buildDieLabels();
+    buildCidp();
     buildCoreGrid();
     buildFacts();
     Promise.all(LINEUP.map(function (p) {

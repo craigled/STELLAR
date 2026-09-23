@@ -89,9 +89,9 @@ body.home button{font-family:var(--pmono)}
 .die-cap{display:flex; justify-content:space-between; align-items:baseline; font-size:12px; color:var(--k-dim)}
 .die-cap b{font-family:var(--serif); font-weight:400; font-size:22px; color:var(--k-ink); font-style:italic}
 .die-frame{position:relative; display:grid; grid-template-columns:auto 1fr; gap:8px; flex:1; min-height:0}
-#die{width:256px; height:512px; image-rendering:pixelated; border:1px solid var(--k-line2); border-radius:3px;
+#die{width:224px; height:448px; image-rendering:pixelated; border:1px solid var(--k-line2); border-radius:3px;
   display:block; box-shadow:0 0 0 4px #0a0c10, 0 0 0 5px var(--k-line)}
-.die-labels{position:relative; height:512px}
+.die-labels{position:relative; height:448px}
 .dl{position:absolute; left:0; right:0; border-top:1px solid var(--k-line2); font-size:11px; padding-top:1px;
   display:flex; justify-content:space-between; gap:6px; color:var(--k-soft); overflow:hidden}
 .dl i{font-style:normal; color:var(--k-dim); font-size:10px}
@@ -241,6 +241,7 @@ pre.lst .c{color:#b9b4a8}
   .h-hero{padding:32px 16px 20px}
   #die{width:128px; height:256px}
   .die-labels{height:256px}
+  .cidp-grid{font-size:9.5px}
   .console, .h-main{padding-left:16px; padding-right:16px}
   .quad{grid-template-columns:1fr}
   .tl-row{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -262,3 +263,20 @@ body.home .nav-inner{max-width:1320px; padding-left:24px; padding-right:24px}
   .h-eyebrow span+span::before{content:none}
   .speed button{padding:5px 8px}
 }
+
+/* the CIDP page, byte by byte, under the die */
+.cidp{border-top:1px solid var(--k-line); padding-top:8px}
+.cidp-h{display:flex; align-items:baseline; gap:8px; font-size:11px; color:var(--k-dim); margin-bottom:5px}
+.cidp-h b{font-family:var(--serif); font-style:italic; font-weight:400; font-size:18px; color:var(--k-ink)}
+.cidp-sum{margin-left:auto; color:var(--k-soft); font-size:10.5px}
+.cidp-grid{display:grid; grid-template-columns:34px repeat(16,minmax(0,1fr)); gap:1px 2px; font-size:10px; line-height:1.5}
+.cidp-grid .ra{color:var(--k-dim); font-size:9.5px}
+.cidp-grid .cb{text-align:center; color:#4a5160; border-radius:2px; cursor:default; transition:background .25s, color .25s}
+.cidp-grid .cb.nz{color:var(--k-soft)}
+.cidp-grid .vmrow{color:color-mix(in srgb, var(--vm) 75%, #fff)}
+.cidp-grid .cb.vmrow.nz{color:var(--vm)}
+.cidp-grid .cb.state{box-shadow:inset 0 -1px 0 var(--vm)}
+.cidp-grid .cb.cur{background:color-mix(in srgb, var(--vm) 22%, transparent)}
+.cidp-grid .cb.sys.nz{color:var(--k-ink)}
+.cidp-grid .cb.hot{background:#f4eadb; color:#111; transition:none}
+.cidp-grid .gap{grid-column:1/-1; color:#303644; font-size:9px; line-height:1.1; padding-left:2px}

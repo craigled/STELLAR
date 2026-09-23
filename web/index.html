@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/site.css?v=19">
-<link rel="stylesheet" href="css/home.css?v=19">
+<link rel="stylesheet" href="css/site.css?v=22">
+<link rel="stylesheet" href="css/home.css?v=22">
 </head>
 <body class="home">
 
@@ -31,7 +31,11 @@
     <div class="speed" role="radiogroup" aria-label="Clock speed">
       <span class="speed-lbl">clock</span>
       <button data-speed="1" role="radio">Elf2K&nbsp;1×</button>
+      <button data-speed="2" role="radio">2×</button>
+      <button data-speed="5" role="radio">5×</button>
       <button data-speed="10" role="radio">10×</button>
+      <button data-speed="20" role="radio">20×</button>
+      <button data-speed="30" role="radio">30×</button>
       <button data-speed="40" role="radio">40×</button>
       <button data-speed="0" role="radio">flat out</button>
     </div>
@@ -54,6 +58,11 @@
         <div class="die-labels" id="dieLabels"></div>
       </div>
       <div class="die-read mono" id="dieRead">hover the die</div>
+      <div class="cidp">
+        <div class="cidp-h"><b>CIDP</b><span class="mono">$2F00</span>
+          <span class="cidp-sum mono" id="cidpSum"></span></div>
+        <div class="cidp-grid mono" id="cidpGrid"></div>
+      </div>
     </figure>
   </div>
 
@@ -182,14 +191,14 @@
   firmware <span class="mono">V0061.25</span> · <a href="https://github.com/craigled/STELLAR">source</a>
 </footer>
 
-<script src="js/opcodes.js?v=19"></script>
-<script src="js/firmware-0061-25.js?v=19"></script>
-<script src="js/stellar-vm.js?v=19"></script>
-<script src="js/cosmac.js?v=19"></script>
-<script src="js/machine.js?v=19"></script>
-<script src="js/die.js?v=19"></script>
-<script src="js/vt100.js?v=19"></script>
-<script src="js/home.js?v=19"></script>
-<script src="js/nav.js?v=19"></script>
+<script src="js/opcodes.js?v=22"></script>
+<script src="js/firmware-0061-25.js?v=22"></script>
+<script src="js/stellar-vm.js?v=22"></script>
+<script src="js/cosmac.js?v=22"></script>
+<script src="js/machine.js?v=22"></script>
+<script src="js/die.js?v=22"></script>
+<script src="js/vt100.js?v=22"></script>
+<script src="js/home.js?v=22"></script>
+<script src="js/nav.js?v=22"></script>
 </body>
 </html>
