@@ -146,5 +146,14 @@
     "blurb": "Conway's Game of Life on a 40x20 grid, seeded with a blinker and a glider.",
     "maxSteps": 14000000,
     "halts": false
+  },
+  {
+    "name": "Sort visualiser (VT100)",
+    "file": "Sort-Visualiser.lst",
+    "input": "",
+    "blurb": "Watch STELLAR's $FC PULSESORTXY opcode sort twenty numbers. Each pass is ONE opcode - one bubble-sort pass - and only the bars that moved are redrawn; it stops when a pass finds nothing to swap. Click the terminal and press any key to start; when sorted, A sorts up, D sorts down, N gives new numbers, Q quits. Runs at the Elf2K's own speed.",
+    "maxSteps": 14000000,
+    "halts": false,
+    "speed": "Elf2K"
   }
 ]

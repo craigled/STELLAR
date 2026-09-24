@@ -48,7 +48,7 @@
   function btn(id) { return document.getElementById(id); }
   var samples = [];
 
-  fetch('samples/manifest.json?v=38')
+  fetch('samples/manifest.json?v=39')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       samples = list;
@@ -84,7 +84,7 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=38')
+    fetch('samples/' + s.file + '?v=39')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
