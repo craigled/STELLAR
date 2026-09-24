@@ -291,6 +291,16 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .sim-body.dropping{outline:2px dashed var(--accent); outline-offset:6px; border-radius:12px}
 .status-line{font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); margin-top:4px}
 .speed-row{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-soft)}
+/* simulator clock: one button per speed, like the home page's clock row */
+.clock-row{display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:-4px 0 12px}
+.clock-lbl{font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-soft); margin-right:4px}
+#clockBtns{display:flex; flex-wrap:wrap; gap:4px}
+#clockBtns button{border:1px solid var(--line); background:var(--bg-panel); color:var(--ink);
+  font-family:var(--mono); font-size:12px; padding:4px 9px; border-radius:6px; cursor:pointer}
+#clockBtns button:hover{border-color:var(--accent); color:var(--accent)}
+#clockBtns button[aria-checked="true"]{background:var(--accent); border-color:var(--accent); color:#1a1206; font-weight:600}
+.clock-now{font-size:12px; color:var(--ink-soft); margin-left:6px}
 
 /* ================= scheduler / multi-core ================= */
 .cidp{border:1px solid var(--line); border-radius:12px; background:var(--bg-panel); overflow:hidden; margin:14px 0}

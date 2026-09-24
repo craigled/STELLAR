@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Simulator</title>
 <meta name="description" content="Run STELLAR programs in the browser on the real firmware — step through the disassembly and watch the core update live.">
-<link rel="stylesheet" href="css/site.css?v=36">
+<link rel="stylesheet" href="css/site.css?v=37">
 </head>
 <body>
 <main class="wrap">
@@ -33,11 +33,11 @@
     <button id="reset">Reset ↺</button>
     <button id="clearBreaks" title="Remove all breakpoints">Clear breaks</button>
     <span class="mono small" id="bpCount" style="color:var(--ink-soft)"></span>
-    <span class="speed-row">
-      speed
-      <input type="range" id="speed" min="0" max="4" step="1" value="1">
-      <span id="speedLabel" class="mono">1×</span>
-    </span>
+  </div>
+  <div class="clock-row" role="radiogroup" aria-label="Clock speed">
+    <span class="clock-lbl">clock</span>
+    <span id="clockBtns"></span>
+    <span id="speedLabel" class="mono clock-now"></span>
   </div>
   <div class="status-line" id="status">loading…</div>
   <p class="small muted" style="margin:2px 0 8px">The core status bar counts the raw 1802 instructions behind each STELLAR opcode — <b>this op</b> and the running <b>total</b>. (The first instruction after <span class="mono">START</span> also carries the one-time label pre-pass.)</p>
@@ -74,17 +74,17 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=36"></script>
-<script src="js/firmware-0061-33.js?v=36"></script>
-<script src="js/stellar-vm.js?v=36"></script>
-<script src="js/disasm.js?v=36"></script>
-<script src="js/core-view.js?v=36"></script>
-<script src="js/mem-view.js?v=36"></script>
-<script src="js/front-panel.js?v=36"></script>
-<script src="js/vt100.js?v=36"></script>
-<script src="js/term-input.js?v=36"></script>
-<script src="js/sim-app.js?v=36"></script>
-<script src="js/simulator-page.js?v=36"></script>
-<script src="js/nav.js?v=36"></script>
+<script src="js/opcodes.js?v=37"></script>
+<script src="js/firmware-0061-33.js?v=37"></script>
+<script src="js/stellar-vm.js?v=37"></script>
+<script src="js/disasm.js?v=37"></script>
+<script src="js/core-view.js?v=37"></script>
+<script src="js/mem-view.js?v=37"></script>
+<script src="js/front-panel.js?v=37"></script>
+<script src="js/vt100.js?v=37"></script>
+<script src="js/term-input.js?v=37"></script>
+<script src="js/sim-app.js?v=37"></script>
+<script src="js/simulator-page.js?v=37"></script>
+<script src="js/nav.js?v=37"></script>
 </body>
 </html>
