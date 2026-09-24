@@ -74,6 +74,15 @@
     "speed": "turbo"
   },
   {
+    "name": "Tic-Tac-Toe",
+    "file": "Tic-Tac-Toe.lst",
+    "input": "",
+    "blurb": "You are X, the computer is O. Click the terminal and type a square number 1-9 then Enter; empty squares show their numbers, so the board is its own legend. The computer wins if it can, blocks you if it must, and otherwise takes the centre, then a corner, then a side. One game per run - Reset to play again. Verified on the Elf2K.",
+    "maxSteps": 8000000,
+    "halts": false,
+    "speed": "turbo"
+  },
+  {
     "name": "Mandelbrot",
     "file": "Mandelbrot.lst",
     "input": "",
