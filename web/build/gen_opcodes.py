@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # tools/stellar_disasm.py lives in the sibling work repo
 DISASM = os.path.expanduser('~/Projects/stellar-1802/tools/stellar_disasm.py')
 FMATH  = os.path.expanduser('~/Projects/stellar-1802/Firmware-Math')
-DOCX   = 'STELLAR MAIN V0061.30.docx'
+DOCX   = 'STELLAR MAIN V0061.33.docx'
 
 def load_disasm():
     spec = importlib.util.spec_from_file_location('stellar_disasm', DISASM)
@@ -72,8 +72,8 @@ DESC = {
 0x32: ('move', '0X NN NN', 'Copy two immediate bytes to memory at register X.'),
 0x33: ('move', 'ZX', 'Copy memory at RX to accumulator Z (0=Acc:2B, 1=MA:5B, 2=DA:7B).'),
 0x34: ('move', 'ZX', 'Copy accumulator Z to memory at register X.'),
-0x35: ('move', '0D ZX', 'Copy D bytes (1-4) from M(RX) to accumulator Z; zero-extends the rest.'),
-0x36: ('move', '0D ZX', 'Copy D bytes (1-4) of accumulator Z to M(RX).'),
+0x35: ('move', '0D ZX', 'Copy D bytes (1-4) from M(RX) to accumulator Z; zero-extends the rest. For the MA (Z=1) since V0061.31 - before that it used the old $22-$24 MA location and D=4 was refused.'),
+0x36: ('move', '0D ZX', 'Copy D bytes (1-4) of accumulator Z to M(RX). For the MA (Z=1) since V0061.31.'),
 0x37: ('move', 'DE ZX', 'Copy D bytes starting at byte E of accumulator Z from M(RX).'),
 0x38: ('move', 'DE ZX', 'Copy D bytes of accumulator Z starting at byte E to M(RX).'),
 0x39: ('move', '0D XY', 'Copy D bytes (1,2) from M(RX) to register Y.'),
@@ -98,12 +98,12 @@ DESC = {
 0x4D: ('math', 'XY', 'Divide RX / RY into MA + Remainder.'),
 0x4E: ('math', 'NN NN', 'Add an immediate value to the Accumulator.'),
 0x4F: ('math', 'NN NN', 'Subtract an immediate value from the Accumulator.'),
-0x50: ('math', 'XY 0Z', 'Add RX + RY into register Z.'),
+0x50: ('math', 'XY 0Z', 'Add RX + RY into register Z; Carry set when the sum passes $FFFF (since V0061.31 - before that a wrap also added 1 to the register before RZ).'),
 0x51: ('math', 'XY 0Z', 'Subtract RX - RY into register Z.'),
 0x52: ('math', '0X NN NN', 'Add an immediate value to register X.'),
 0x53: ('math', '0X NN NN', 'Subtract an immediate value from register X.'),
-0x54: ('math', 'DZ XY', 'Add D bytes at M(RX)+M(RY) into MA (Z: 0=destructive, 1=accumulative).'),
-0x55: ('math', 'DZ XY', 'Subtract D bytes M(RX)-M(RY) into MA (Z: 0=destructive, 1=accumulative).'),
+0x54: ('math', 'DZ XY', 'Add D bytes (1-4) at M(RX)+M(RY) into MA (Z: 0=destructive, 1=accumulative). D=4 keeps the top byte since V0061.31.'),
+0x55: ('math', 'DZ XY', 'Subtract D bytes (1-4) M(RX)-M(RY) into MA (Z: 0=destructive, 1=accumulative). D=4 keeps the top byte since V0061.31.'),
 0x56: ('math', 'ZX', 'Add Acc + Z bytes (Z = 1 or 2) at M(RX) into MA. Any other Z does nothing.'),
 0x57: ('math', 'ZX', 'Subtract Acc - Z bytes (Z = 1 or 2) at M(RX) into MA. Any other Z does nothing.'),
 0x58: ('math', '0X', 'Multiply Acc * two bytes at M(RX) into MA.'),
@@ -160,7 +160,7 @@ DESC = {
 0x96: ('test', 'NN', 'Test ExitCode = NN.'),
 0x97: ('test', 'NN', 'Test Interrupt State = NN.'),
 0x98: ('test', '', 'Test whether the Error register is nonzero.'),
-0x99: ('test', 'DZ', 'Test EF D (1-4) = Z (0 or 1).'),
+0x99: ('test', 'DZ', 'Test EF D (1-4) = Z (0 or 1). Works since V0061.33 - before that it could never report true and overwrote part of R0.'),
 0x9A: ('test', '0Z', 'Test whether accumulator Z low byte is even (0=Acc, 1=MA).'),
 0x9B: ('test', 'DZ', 'Test whether byte D (from LSB) of accumulator Z is zero (low-byte-safe null test).'),
 0x9C: ('test', 'DD XY', 'Compare D bytes at M(RX) with M(RY) into the Test Flag.'),
