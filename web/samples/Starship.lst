@@ -1,360 +1,156 @@
 ; ==========================================================================
-; STELLAR STARSHIP v02  -  the COSMAC ELF logo, steered with the arrow keys
+; STELLAR STARSHIP  -  the COSMAC ELF logo, any key to quit   (VT100)
 ; ==========================================================================
-; The picture is painted once, then slides left or right round the screen,
-; wrapping at the edges:
+; The COSMAC ELF starship, drawn once and left on the screen. Any key clears it and
+; returns to the monitor.
 ;
-;   RIGHT ARROW   one step faster to the right (slower, if it is going left)
-;   LEFT ARROW    one step faster to the left  (slower, if it is going right)
-;   SPACE         stop
-;   Q             quit - restores the cursor and clears the screen
+; THE PATTERN IS CRAIG'S. It lives in APPLICATIONS/Starship 2.txt, which he drew by
+; editing the earlier traced version, and this program is generated from that file - so
+; the file is the thing to edit, not this listing. Each line there is |<interior>| and
+; interior column N is screen column N, which puts the drawing in columns 3-80 of lines
+; 1-23. (The tracer that produced the earlier artwork is in git history, at
+; starship_art.py in 6bb4217, if the geometry ever needs re-deriving from the photo.)
 ;
-; d and a do the same as the arrows, for terminals that send none.  The more
-; presses, the faster it goes: speed is columns per frame, 0 to 9, shown on
-; line 1 as a row of > or < marks.  Press the other arrow to slow it down,
-; through a stop, and away the other way.
+; TWO KINDS OF CONTENT. A '#' is a lit cell, painted as a SPACE IN REVERSE VIDEO
+; (ESC[7m), which gives a solid block on anything back to a real VT100. Anything else is
+; literal text: Craig's 'STELLAR EDITION' caption on line 22. Reverse video is turned OFF
+; before the caption is printed, or it would come out as a solid bar.
 ;
-; NEEDS A VT102-CLASS TERMINAL.  The picture is not redrawn to move it - that is
-; about 1300 bytes, over a second at 9600 baud.  Each of its 21 lines is shifted
-; IN THE TERMINAL with the VT102 character insert / delete controls, ESC[n@ and
-; ESC[nP (TeraTerm, PuTTY, minicom, xterm and anything calling itself VT102 or
-; later have them; a strict VT100 does not), and only the n cells that wrap round
-; the edge are painted.  About 190 bytes of output a frame at speed 1.
+; THE PICTURE IS A RUN TABLE, not a bitmap. A bitmap of 80x23 would be 230 bytes that
+; still needs unpacking bit by bit; instead every unbroken horizontal stretch of lit
+; cells is three bytes - line, first column, length - and a line byte of $00 ends the
+; table. 108 stretches, 325 bytes, 426 lit cells, and the renderer is a dozen commands:
+; read three bytes with READIDX, position the cursor, emit that many spaces, repeat.
 ;
-; Each line's control - CR LF, then ESC [ S @, or ESC [ S P ESC [ 7 u C which also
-; moves the cursor to column 81-S - is ONE string, rebuilt once a frame at $4D80
-; and sent with a single PRINTSTR.  The frame starts on the line above the
-; picture, so each CR LF steps down one line; no cursor addressing per line.
+; A run costs the same three bytes however long it is, so the long hull and nacelle
+; lines are nearly free. Painting the whole picture is about 1305 bytes of output.
 ;
-; THE PICTURE GRID at $4300 keeps every picture row followed by its own first 9
-; columns again, so the S cells read from any start column never need a wrap
-; test.  Each grid byte is the LOW BYTE of a string in the page at $4D00: a
-; blank, ESC[7m-space-ESC[0m for a lit cell, or a caption letter.  Painting a
-; cell is four commands - READIDX, ADDAI, COPYAX, PRINTSTR - and leaves the
-; terminal in normal video.  The first paint still uses the run table at $4B00
-; (line, first column, length), as v01 did.
+; ADDRESSES. The READIDX base in the code is PROGRAM-RELATIVE - $0900 means $4900 at
+; run time - but the data D-lines below carry the ABSOLUTE address. Writing the table at
+; the relative address would drop it on the firmware. The caption sits at $4A80, clear
+; of the run table, which now reaches $4A44; the builder asserts they cannot overlap.
 ;
-; REGISTERS.  R0 = 0 (the WRITEIDX index), R1 the picture offset (0-79), R2 the
-; speed, R3 the direction (1 right, 0 left), R4 lines left to shift, R5 the grid
-; row, R7 cells left to paint, R8 the constant 80, R9 the first wrapped column,
-; RA the grid index, RB key-state / string pointer, RC the key, RD/RE line and
-; column for POSXY, RF the constant ten.  R0 is loaded through the accumulator:
-; $11 LOADXI cannot write it.
+; Any key quits: SERIN waits cooperatively, yielding to the scheduler rather than
+; spinning, so other VMs keep running while the picture is up.
 ;
-; SIM-VERIFIED on V0061.30 (Firmware-Math/starship_verify.py): the serial stream
-; is replayed into an 80x23 VT102 screen and at the start of EVERY frame the
-; picture lines equal Craig's pattern rotated by the offset the stream implies,
-; cell for cell including reverse video - 157 frames through a session that
-; speeds up right, reverses through zero, stops, goes flat out both ways and
-; quits.  Frame cost: speed 1 about 54,000 1802 instructions, speed 4 about
-; 125,000, speed 9 about 222,000.  NOT YET HARDWARE-VERIFIED.
+; Sim-verified: the escape stream replayed into a 23x80 screen reproduces Craig's
+; pattern CELL FOR CELL, all 1840 of them, caption included; and the keypress restores
+; normal video, shows the cursor, clears the screen and homes.
 ;
-; The pattern is Craig's, from APPLICATIONS/Starship Graphic.txt (edit that file
-; and rerun Firmware-Math/gen_starship.py, not this listing):
+; The picture as it appears:
 ;
-;   |                                                                                |
-;   |   ##### ##### ##### #   # ##### #####                                          |
-;   |   #   # #   # #     ## ## #   # #   #                                          |
-;   |   #     #   # ##### # # # ##### #                                              |
-;   |   #   # #   #     # #   # #   # #   #                                          |
-;   |   ##### ##### ##### #   # #   # #####                                          |
-;   |                                                                  ########      |
-;   |                                        ########################################|
-;   |                 ###                   ##                                     ##|
-;   |            #############              ##                                    ## |
-;   |  ############         ############     ########  ############################# |
-;   |  #             #####             ##           #  ##                            |
-;   |  ############         ############            #  ##                            |
-;   |             ##########  ##     ##             #  ##                            |
-;   |                #####     ##     ##            #  ##         ##### #     #####  |
-;   |                           ##     ##           #  ##         #     #     #      |
-;   |                         #######################  #####      ####  #     ####   |
-;   |                       ####                          ###     #     #     #      |
-;   |                      ####  ###########               ##     ##### ##### #      |
-;   |                       ###                 #############                        |
-;   |                        ####       #########                                    |
-;   |                           #########                         STELLAR EDITION    |
-;   |                                                                                |
+; |                                                                                  |
+; |    ##### ##### ##### #   # ##### #####                                           |
+; |    #   # #   # #     ## ## #   # #   #                                           |
+; |    #     #   # ##### # # # ##### #                                               |
+; |    #   # #   #     # #   # #   # #   #                                           |
+; |    ##### ##### ##### #   # #   # #####                                           |
+; |                                                                   ########       |
+; |                                         ######################################## |
+; |                  ###                   ##                                     ## |
+; |             #############              ##                                    ##  |
+; |   ############         ############     ########  #############################  |
+; |   #             #####             ##           #  ##                             |
+; |   ############         ############            #  ##                             |
+; |              ##########  ##     ##             #  ##                             |
+; |                 #####     ##     ##            #  ##         ##### #     #####   |
+; |                            ##     ##           #  ##         #     #     #       |
+; |                          #######################  #####      ####  #     ####    |
+; |                        ####                          ###     #     #     #       |
+; |                       ####  ###########               ##     ##### ##### #       |
+; |                        ###                 #############                         |
+; |                         ####       #########                                     |
+; |                            #########                         STELLAR EDITION     |
+; |                                                                                  |
 ;
-; 235 STELLAR commands, $4000-$428A (651 bytes of code).
-; Data at $4300, 2047 bytes, past the end marker.
-; Data at $4B00, 325 bytes, past the end marker.
-; Data at $4C60, 16 bytes, past the end marker.
-; Data at $4C80, 61 bytes, past the end marker.
-; Data at $4D00, 32 bytes, past the end marker.
-; Data at $4D80, 13 bytes, past the end marker.
-; Data at $4DC0, 2 bytes, past the end marker.
+; 81 STELLAR commands, $4000-$40B2 (179 bytes of code).
+; Data at $4900, 325 bytes, past the end marker.
+; Data at $4A80, 16 bytes, past the end marker.
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
 ; --------------------------------------------------------------------------
 ; D 4000 CD             START                  Start of program, and run the label pre-pass
 ; D 4001 11 0F 00 0A    LOADXI R15 000A        Ten, for splitting numbers into digits
-; D 4005 CA 1B          SEROUTI 1B             Clear the screen
-; D 4007 CA 5B          SEROUTI 5B
-; D 4009 CA 32          SEROUTI 32
-; D 400B CA 4A          SEROUTI 4A
-; D 400D CA 1B          SEROUTI 1B             Hide the cursor
-; D 400F CA 5B          SEROUTI 5B
-; D 4011 CA 3F          SEROUTI 3F
-; D 4013 CA 32          SEROUTI 32
-; D 4015 CA 35          SEROUTI 35
-; D 4017 CA 6C          SEROUTI 6C
-; D 4019 CA 1B          SEROUTI 1B             Reverse video: a space is now a lit block
-; D 401B CA 5B          SEROUTI 5B
-; D 401D CA 37          SEROUTI 37
-; D 401F CA 6D          SEROUTI 6D
+; D 4005 CA 1B          SEROUTI 1B             ESC
+; D 4007 CA 5B          SEROUTI 5B             [
+; D 4009 CA 32          SEROUTI 32             2
+; D 400B CA 4A          SEROUTI 4A             J - clear the screen
+; D 400D CA 1B          SEROUTI 1B             ESC
+; D 400F CA 5B          SEROUTI 5B             [
+; D 4011 CA 3F          SEROUTI 3F             ?
+; D 4013 CA 32          SEROUTI 32             2
+; D 4015 CA 35          SEROUTI 35             5
+; D 4017 CA 6C          SEROUTI 6C             l - hide the cursor
+; D 4019 CA 1B          SEROUTI 1B             ESC
+; D 401B CA 5B          SEROUTI 5B             [
+; D 401D CA 37          SEROUTI 37             7
+; D 401F CA 6D          SEROUTI 6D             m - reverse video: a space is now a lit block
 ; D 4021 11 09 00 00    LOADXI R9 0000         Index into the run table
-; NEXT:
-; D 4025 2E 09 0B 00    READIDX R9 0B00        The line this run sits on
+; D 4025 2E 09 09 00    READIDX R9 0900        The line this run sits on
 ; D 4029 81 00 00       TESTAI 0000            Zero ends the table
 ; D 402C A0 00 52       IFTRUEI SHOWN
 ; D 402F 21 0D          COPYAX 0D              into R13 for POSXY
 ; D 4031 42 09          INCX R9
-; D 4033 2E 09 0B 00    READIDX R9 0B00        The column it starts at
+; D 4033 2E 09 09 00    READIDX R9 0900        The column it starts at
 ; D 4037 21 0E          COPYAX 0E              into R14
 ; D 4039 42 09          INCX R9
-; D 403B 2E 09 0B 00    READIDX R9 0B00        and how many cells long it is
+; D 403B 2E 09 09 00    READIDX R9 0900        and how many cells long it is
 ; D 403F 21 0A          COPYAX 0A              into R10
 ; D 4041 42 09          INCX R9
-; D 4043 BD 02 69       CALL POSXY
-; RUN:
+; D 4043 BD 00 91       CALL POSXY
 ; D 4046 CA 20          SEROUTI 20             A space in reverse video is a lit block
 ; D 4048 43 0A          DECX R10
 ; D 404A 8C 0A          TESTXZ R10
-; D 404C A1 00 46       IFFALSEI RUN
+; D 404C A1 00 46       IFFALSEI CELL
 ; D 404F B0 00 25       GAL NEXT
-; SHOWN:
-; D 4052 CA 1B          SEROUTI 1B             Normal video for the caption and the help line
-; D 4054 CA 5B          SEROUTI 5B
-; D 4056 CA 30          SEROUTI 30
-; D 4058 CA 6D          SEROUTI 6D
+; D 4052 CA 1B          SEROUTI 1B             ESC
+; D 4054 CA 5B          SEROUTI 5B             [
+; D 4056 CA 30          SEROUTI 30             0
+; D 4058 CA 6D          SEROUTI 6D             m - normal video for the caption
 ; D 405A 11 0D 00 16    LOADXI R13 0016        Caption line
 ; D 405E 11 0E 00 3E    LOADXI R14 003E        and column
-; D 4062 BD 02 69       CALL POSXY
-; D 4065 11 0B 0C 60    LOADXI R11 0C60        -> 'STELLAR EDITION'
+; D 4062 BD 00 91       CALL POSXY
+; D 4065 11 0B 0A 80    LOADXI R11 0A80        -> 'STELLAR EDITION'
 ; D 4069 C1 0B          PRINTSTR R11
-; D 406B 11 0D 00 17    LOADXI R13 0017        The help line
-; D 406F 11 0E 00 03    LOADXI R14 0003
-; D 4073 BD 02 69       CALL POSXY
-; D 4076 11 0B 0C 80    LOADXI R11 0C80
-; D 407A C1 0B          PRINTSTR R11
-; D 407C 10 00 00       LOADAI 0000            R0 = 0, the WRITEIDX index (LOADXI cannot write R0)
-; D 407F 21 00          COPYAX 00
-; D 4081 11 08 00 50    LOADXI R8 0050         R8 = 80, the width of the picture
-; D 4085 11 01 00 00    LOADXI R1 0000         Offset 0 - the picture as drawn
-; D 4089 11 02 00 00    LOADXI R2 0000         Speed 0 - standing still
-; D 408D 11 03 00 01    LOADXI R3 0001         Direction: right
-; D 4091 11 0B 0D C0    LOADXI R11 0DC0        The arrow-key state starts clear -
-; D 4095 32 0B 00 00    COPYMX2I R11 0000      the pre-pass does not clear RAM
-; KEYS:
-; D 4099 11 0B 0D C0    LOADXI R11 0DC0        RB back on the key state - shifting borrows it
-; KLOOP:
-; D 409D CC             SERST                  Anything typed?
-; D 409E A1 01 5B       IFFALSEI FRAME         No - on with the frame
-; D 40A1 CB             SERIN
-; D 40A2 21 0C          COPYAX 0C              RC = the key
-; D 40A4 33 0B          COPYMXA 0B             The arrow-key state machine: an arrow is three
-; D 40A6 81 00 01       TESTAI 0001            bytes, ESC [ C (right) or ESC [ D (left)
-; D 40A9 A0 00 E8       IFTRUEI KST1
-; D 40AC 33 0B          COPYMXA 0B
-; D 40AE 81 00 02       TESTAI 0002
-; D 40B1 A0 00 FA       IFTRUEI KST2
-; D 40B4 86 0C 00 1B    TESTXI R12 001B        ESC starts one
-; D 40B8 A1 00 C2       IFFALSEI KPLAIN
-; D 40BB 32 0B 00 01    COPYMX2I R11 0001
-; D 40BF B0 00 9D       GAL KLOOP
-; KPLAIN:
-; D 40C2 86 0C 00 20    TESTXI R12 0020        SPACE stops
-; D 40C6 A0 01 51       IFTRUEI STOP
-; D 40C9 86 0C 00 64    TESTXI R12 0064        d is right, for terminals that send no arrows
-; D 40CD A0 01 0F       IFTRUEI GORIGHT
-; D 40D0 86 0C 00 61    TESTXI R12 0061        a is left
-; D 40D4 A0 01 2B       IFTRUEI GOLEFT
-; D 40D7 86 0C 00 71    TESTXI R12 0071        q quits
-; D 40DB A0 02 18       IFTRUEI QUIT
-; D 40DE 86 0C 00 51    TESTXI R12 0051        and so does Q
-; D 40E2 A0 02 18       IFTRUEI QUIT
-; D 40E5 B0 00 9D       GAL KLOOP
-; KST1:
-; D 40E8 32 0B 00 00    COPYMX2I R11 0000      Whatever it was, the sequence restarts
-; D 40EC 86 0C 00 5B    TESTXI R12 005B        Was it '[' ?
-; D 40F0 A1 00 9D       IFFALSEI KLOOP
-; D 40F3 32 0B 00 02    COPYMX2I R11 0002      Now expect the letter
-; D 40F7 B0 00 9D       GAL KLOOP
-; KST2:
-; D 40FA 32 0B 00 00    COPYMX2I R11 0000      Sequence finished
-; D 40FE 86 0C 00 43    TESTXI R12 0043        'C' is the right arrow
-; D 4102 A0 01 0F       IFTRUEI GORIGHT
-; D 4105 86 0C 00 44    TESTXI R12 0044        'D' is the left arrow
-; D 4109 A0 01 2B       IFTRUEI GOLEFT
-; D 410C B0 00 9D       GAL KLOOP
-; GORIGHT:
-; D 410F 8C 02          TESTXZ R2              Standing still?
-; D 4111 A0 01 20       IFTRUEI SETR
-; D 4114 86 03 00 01    TESTXI R3 0001         Already going right?
-; D 4118 A0 01 45       IFTRUEI FASTER
-; D 411B 43 02          DECX R2                No - going left, so slow down
-; D 411D B0 01 55       GAL SHOWK
-; SETR:
-; D 4120 11 03 00 01    LOADXI R3 0001         Start moving right
-; D 4124 11 02 00 01    LOADXI R2 0001         at speed 1
-; D 4128 B0 01 55       GAL SHOWK
-; GOLEFT:
-; D 412B 8C 02          TESTXZ R2              Standing still?
-; D 412D A0 01 3A       IFTRUEI SETL
-; D 4130 8C 03          TESTXZ R3              Already going left?
-; D 4132 A0 01 45       IFTRUEI FASTER
-; D 4135 43 02          DECX R2                No - going right, so slow down
-; D 4137 B0 01 55       GAL SHOWK
-; SETL:
-; D 413A 11 03 00 00    LOADXI R3 0000         Start moving left
-; D 413E 11 02 00 01    LOADXI R2 0001         at speed 1
-; D 4142 B0 01 55       GAL SHOWK
-; FASTER:
-; D 4145 86 02 00 09    TESTXI R2 0009         Already flat out?
-; D 4149 A0 01 55       IFTRUEI SHOWK
-; D 414C 42 02          INCX R2                One step faster
-; D 414E B0 01 55       GAL SHOWK
-; STOP:
-; D 4151 11 02 00 00    LOADXI R2 0000         Speed 0
-; SHOWK:
-; D 4155 BD 02 3D       CALL SPEED             Show the new speed on line 1
-; D 4158 B0 00 99       GAL KEYS               and see if there is more typing
-; FRAME:
-; D 415B 8C 02          TESTXZ R2              Standing still?
-; D 415D A1 01 65       IFFALSEI MOVE
-; D 4160 C0 04          DLYI 04                Yes - idle a moment and look at the keys again
-; D 4162 B0 00 99       GAL KEYS
-; MOVE:
-; D 4165 8C 03          TESTXZ R3              Which way?
-; D 4167 A0 01 97       IFTRUEI LEFT
-; D 416A 50 12 01       ADDXYZ R1 R2 -> R1     Right: the offset grows by S
-; D 416D 88 18          TESTGXY R1 R8          past 80?
-; D 416F A1 01 76       IFFALSEI RWRAP
-; D 4172 53 01 00 50    SUBXI R1 0050          wrap it
-; RWRAP:
-; D 4176 11 09 00 50    LOADXI R9 0050
-; D 417A 51 91 09       SUBXYZ R9 R1 -> R9     R9 = 80 - X,
-; D 417D 88 98          TESTGXY R9 R8
-; D 417F A1 01 86       IFFALSEI RCOL
-; D 4182 53 09 00 50    SUBXI R9 0050          mod 80: the picture column now at screen column 1
-; RCOL:
-; D 4186 10 00 40       LOADAI 0040            The line control: ESC [ S @ - insert S blanks
-; D 4189 2F 00 0D 85    WRITEIDX R0 0D85
-; D 418D 10 00 00       LOADAI 0000            and it ends there - the cells go in at column 1
-; D 4190 2F 00 0D 86    WRITEIDX R0 0D86
-; D 4194 B0 01 CE       GAL SHIFT
-; LEFT:
-; D 4197 89 12          TESTLXY R1 R2          Left: would the offset go below 0?
-; D 4199 A1 01 A0       IFFALSEI LWRAP
-; D 419C 52 01 00 50    ADDXI R1 0050          then wrap it first
-; LWRAP:
-; D 41A0 51 12 01       SUBXYZ R1 R2 -> R1     the offset shrinks by S
-; D 41A3 11 09 00 A0    LOADXI R9 00A0
-; D 41A7 51 92 09       SUBXYZ R9 R2 -> R9
-; D 41AA 51 91 09       SUBXYZ R9 R1 -> R9     R9 = 160 - S - X,
-; D 41AD 88 98          TESTGXY R9 R8
-; D 41AF A1 01 B6       IFFALSEI LCOL
-; D 41B2 53 09 00 50    SUBXI R9 0050          mod 80: the picture column now at screen column 81-S
-; LCOL:
-; D 41B6 10 00 50       LOADAI 0050            The line control: ESC [ S P - delete S cells,
-; D 41B9 2F 00 0D 85    WRITEIDX R0 0D85
-; D 41BD 10 00 1B       LOADAI 001B            then ESC [ 7 u C - forward 80-S, to column 81-S
-; D 41C0 2F 00 0D 86    WRITEIDX R0 0D86
-; D 41C4 10 00 3A       LOADAI 003A            u = '0' + 10 - S
-; D 41C7 47 02          SUBAX R2
-; D 41C9 25             COPYMAA
-; D 41CA 2F 00 0D 89    WRITEIDX R0 0D89
-; SHIFT:
-; D 41CE 22 02          COPYXA 02              S as its digit, into the line control
-; D 41D0 4E 00 30       ADDAI 0030
-; D 41D3 2F 00 0D 84    WRITEIDX R0 0D84
-; D 41D7 11 0D 00 01    LOADXI R13 0001        Cursor to the line ABOVE the picture: every line
-; D 41DB 11 0E 00 01    LOADXI R14 0001        control starts with CR LF, which steps down one
-; D 41DF BD 02 69       CALL POSXY
-; D 41E2 11 04 00 15    LOADXI R4 0015         Picture lines to shift
-; D 41E6 11 05 00 59    LOADXI R5 0059         Grid row of the first one
-; LINE:
-; D 41EA 11 0B 0D 80    LOADXI R11 0D80
-; D 41EE C1 0B          PRINTSTR R11           CR LF, then the line moves in the terminal
-; D 41F0 50 59 0A       ADDXYZ R5 R9 -> R10    Grid index of the first wrapped cell
-; D 41F3 23 00 27       COPYXY R2 -> R7        S cells to paint
-; CELL:
-; D 41F6 2E 0A 03 00    READIDX R10 0300       The grid holds the low byte of the cell's string
-; D 41FA 4E 0D 00       ADDAI 0D00             in page $0D
-; D 41FD 21 0B          COPYAX 0B
-; D 41FF C1 0B          PRINTSTR R11           blank, lit, or a caption letter
-; D 4201 42 0A          INCX R10               Next cell - never past the row's copied tail
-; D 4203 43 07          DECX R7
-; D 4205 8C 07          TESTXZ R7
-; D 4207 A1 01 F6       IFFALSEI CELL
-; D 420A 52 05 00 59    ADDXI R5 0059          Next line: the grid row moves on 89
-; D 420E 43 04          DECX R4
-; D 4210 8C 04          TESTXZ R4
-; D 4212 A1 01 EA       IFFALSEI LINE
-; D 4215 B0 00 99       GAL KEYS               Frame done - look at the keys
-; QUIT:
-; D 4218 CA 1B          SEROUTI 1B             Back to normal video
-; D 421A CA 5B          SEROUTI 5B
-; D 421C CA 30          SEROUTI 30
-; D 421E CA 6D          SEROUTI 6D
-; D 4220 CA 1B          SEROUTI 1B             Show the cursor again
-; D 4222 CA 5B          SEROUTI 5B
-; D 4224 CA 3F          SEROUTI 3F
-; D 4226 CA 32          SEROUTI 32
-; D 4228 CA 35          SEROUTI 35
-; D 422A CA 68          SEROUTI 68
-; D 422C CA 1B          SEROUTI 1B             Clear the screen
-; D 422E CA 5B          SEROUTI 5B
-; D 4230 CA 32          SEROUTI 32
-; D 4232 CA 4A          SEROUTI 4A
-; D 4234 CA 1B          SEROUTI 1B             Cursor home
-; D 4236 CA 5B          SEROUTI 5B
-; D 4238 CA 48          SEROUTI 48
-; D 423A F0 00 00       BREAK                  End of program
-; SPEED:
-; D 423D 11 0D 00 01    LOADXI R13 0001
-; D 4241 11 0E 00 01    LOADXI R14 0001
-; D 4245 BD 02 69       CALL POSXY
-; D 4248 CA 1B          SEROUTI 1B             Clear the old marks
-; D 424A CA 5B          SEROUTI 5B
-; D 424C CA 4B          SEROUTI 4B
-; D 424E 23 00 27       COPYXY R2 -> R7
-; SPD:
-; D 4251 8C 07          TESTXZ R7
-; D 4253 A0 02 67       IFTRUEI SRET
-; D 4256 10 00 3C       LOADAI 003C            '<'
-; D 4259 8C 03          TESTXZ R3
-; D 425B A0 02 61       IFTRUEI SOUT
-; D 425E 10 00 3E       LOADAI 003E            '>'
-; SOUT:
-; D 4261 C9             SEROUT
-; D 4262 43 07          DECX R7
-; D 4264 B0 02 51       GAL SPD
-; SRET:
-; D 4267 BE 00          RETURN
-; POSXY:
-; D 4269 CA 1B          SEROUTI 1B             ESC
-; D 426B CA 5B          SEROUTI 5B             [
-; D 426D 4D DF          DIVXY R13 R15
-; D 426F 25             COPYMAA
-; D 4270 4E 00 30       ADDAI 0030
-; D 4273 C9             SEROUT                 Tens
-; D 4274 27             COPYREMA
-; D 4275 4E 00 30       ADDAI 0030
-; D 4278 C9             SEROUT                 Units
-; D 4279 CA 3B          SEROUTI 3B             ;
-; D 427B 4D EF          DIVXY R14 R15
-; D 427D 25             COPYMAA
-; D 427E 4E 00 30       ADDAI 0030
-; D 4281 C9             SEROUT                 Tens
-; D 4282 27             COPYREMA
-; D 4283 4E 00 30       ADDAI 0030
-; D 4286 C9             SEROUT                 Units
-; D 4287 CA 48          SEROUTI 48             H
-; D 4289 BE 00          RETURN
-
+; D 406B CB             SERIN                  Wait for any key - SERIN yields, so other VMs keep running
+; D 406C CA 1B          SEROUTI 1B             ESC
+; D 406E CA 5B          SEROUTI 5B             [
+; D 4070 CA 30          SEROUTI 30             0
+; D 4072 CA 6D          SEROUTI 6D             m - back to normal video
+; D 4074 CA 1B          SEROUTI 1B             ESC
+; D 4076 CA 5B          SEROUTI 5B             [
+; D 4078 CA 3F          SEROUTI 3F             ?
+; D 407A CA 32          SEROUTI 32             2
+; D 407C CA 35          SEROUTI 35             5
+; D 407E CA 68          SEROUTI 68             h - show the cursor again
+; D 4080 CA 1B          SEROUTI 1B             ESC
+; D 4082 CA 5B          SEROUTI 5B             [
+; D 4084 CA 32          SEROUTI 32             2
+; D 4086 CA 4A          SEROUTI 4A             J - clear the screen
+; D 4088 CA 1B          SEROUTI 1B             ESC
+; D 408A CA 5B          SEROUTI 5B             [
+; D 408C CA 48          SEROUTI 48             H - cursor home
+; D 408E F0 00 00       BREAK                  End of program
+; D 4091 CA 1B          SEROUTI 1B             ESC
+; D 4093 CA 5B          SEROUTI 5B             [
+; D 4095 4D DF          DIVXY R13 R15
+; D 4097 25             COPYMAA
+; D 4098 4E 00 30       ADDAI 0030
+; D 409B C9             SEROUT                 Tens
+; D 409C 27             COPYREMA
+; D 409D 4E 00 30       ADDAI 0030
+; D 40A0 C9             SEROUT                 Units
+; D 40A1 CA 3B          SEROUTI 3B             ;
+; D 40A3 4D EF          DIVXY R14 R15
+; D 40A5 25             COPYMAA
+; D 40A6 4E 00 30       ADDAI 0030
+; D 40A9 C9             SEROUT                 Tens
+; D 40AA 27             COPYREMA
+; D 40AB 4E 00 30       ADDAI 0030
+; D 40AE C9             SEROUT                 Units
+; D 40AF CA 48          SEROUTI 48             H
+; D 40B1 BE 00          RETURN
 ; --------------------------------------------------------------------------
 ; CODE  -  download this block
 ; --------------------------------------------------------------------------
@@ -376,18 +172,18 @@ D 401B CA 5B
 D 401D CA 37
 D 401F CA 6D
 D 4021 11 09 00 00
-D 4025 2E 09 0B 00
+D 4025 2E 09 09 00
 D 4029 81 00 00
 D 402C A0 00 52
 D 402F 21 0D
 D 4031 42 09
-D 4033 2E 09 0B 00
+D 4033 2E 09 09 00
 D 4037 21 0E
 D 4039 42 09
-D 403B 2E 09 0B 00
+D 403B 2E 09 09 00
 D 403F 21 0A
 D 4041 42 09
-D 4043 BD 02 69
+D 4043 BD 00 91
 D 4046 CA 20
 D 4048 43 0A
 D 404A 8C 0A
@@ -399,357 +195,68 @@ D 4056 CA 30
 D 4058 CA 6D
 D 405A 11 0D 00 16
 D 405E 11 0E 00 3E
-D 4062 BD 02 69
-D 4065 11 0B 0C 60
+D 4062 BD 00 91
+D 4065 11 0B 0A 80
 D 4069 C1 0B
-D 406B 11 0D 00 17
-D 406F 11 0E 00 03
-D 4073 BD 02 69
-D 4076 11 0B 0C 80
-D 407A C1 0B
-D 407C 10 00 00
-D 407F 21 00
-D 4081 11 08 00 50
-D 4085 11 01 00 00
-D 4089 11 02 00 00
-D 408D 11 03 00 01
-D 4091 11 0B 0D C0
-D 4095 32 0B 00 00
-D 4099 11 0B 0D C0
-D 409D CC
-D 409E A1 01 5B
-D 40A1 CB
-D 40A2 21 0C
-D 40A4 33 0B
-D 40A6 81 00 01
-D 40A9 A0 00 E8
-D 40AC 33 0B
-D 40AE 81 00 02
-D 40B1 A0 00 FA
-D 40B4 86 0C 00 1B
-D 40B8 A1 00 C2
-D 40BB 32 0B 00 01
-D 40BF B0 00 9D
-D 40C2 86 0C 00 20
-D 40C6 A0 01 51
-D 40C9 86 0C 00 64
-D 40CD A0 01 0F
-D 40D0 86 0C 00 61
-D 40D4 A0 01 2B
-D 40D7 86 0C 00 71
-D 40DB A0 02 18
-D 40DE 86 0C 00 51
-D 40E2 A0 02 18
-D 40E5 B0 00 9D
-D 40E8 32 0B 00 00
-D 40EC 86 0C 00 5B
-D 40F0 A1 00 9D
-D 40F3 32 0B 00 02
-D 40F7 B0 00 9D
-D 40FA 32 0B 00 00
-D 40FE 86 0C 00 43
-D 4102 A0 01 0F
-D 4105 86 0C 00 44
-D 4109 A0 01 2B
-D 410C B0 00 9D
-D 410F 8C 02
-D 4111 A0 01 20
-D 4114 86 03 00 01
-D 4118 A0 01 45
-D 411B 43 02
-D 411D B0 01 55
-D 4120 11 03 00 01
-D 4124 11 02 00 01
-D 4128 B0 01 55
-D 412B 8C 02
-D 412D A0 01 3A
-D 4130 8C 03
-D 4132 A0 01 45
-D 4135 43 02
-D 4137 B0 01 55
-D 413A 11 03 00 00
-D 413E 11 02 00 01
-D 4142 B0 01 55
-D 4145 86 02 00 09
-D 4149 A0 01 55
-D 414C 42 02
-D 414E B0 01 55
-D 4151 11 02 00 00
-D 4155 BD 02 3D
-D 4158 B0 00 99
-D 415B 8C 02
-D 415D A1 01 65
-D 4160 C0 04
-D 4162 B0 00 99
-D 4165 8C 03
-D 4167 A0 01 97
-D 416A 50 12 01
-D 416D 88 18
-D 416F A1 01 76
-D 4172 53 01 00 50
-D 4176 11 09 00 50
-D 417A 51 91 09
-D 417D 88 98
-D 417F A1 01 86
-D 4182 53 09 00 50
-D 4186 10 00 40
-D 4189 2F 00 0D 85
-D 418D 10 00 00
-D 4190 2F 00 0D 86
-D 4194 B0 01 CE
-D 4197 89 12
-D 4199 A1 01 A0
-D 419C 52 01 00 50
-D 41A0 51 12 01
-D 41A3 11 09 00 A0
-D 41A7 51 92 09
-D 41AA 51 91 09
-D 41AD 88 98
-D 41AF A1 01 B6
-D 41B2 53 09 00 50
-D 41B6 10 00 50
-D 41B9 2F 00 0D 85
-D 41BD 10 00 1B
-D 41C0 2F 00 0D 86
-D 41C4 10 00 3A
-D 41C7 47 02
-D 41C9 25
-D 41CA 2F 00 0D 89
-D 41CE 22 02
-D 41D0 4E 00 30
-D 41D3 2F 00 0D 84
-D 41D7 11 0D 00 01
-D 41DB 11 0E 00 01
-D 41DF BD 02 69
-D 41E2 11 04 00 15
-D 41E6 11 05 00 59
-D 41EA 11 0B 0D 80
-D 41EE C1 0B
-D 41F0 50 59 0A
-D 41F3 23 00 27
-D 41F6 2E 0A 03 00
-D 41FA 4E 0D 00
-D 41FD 21 0B
-D 41FF C1 0B
-D 4201 42 0A
-D 4203 43 07
-D 4205 8C 07
-D 4207 A1 01 F6
-D 420A 52 05 00 59
-D 420E 43 04
-D 4210 8C 04
-D 4212 A1 01 EA
-D 4215 B0 00 99
-D 4218 CA 1B
-D 421A CA 5B
-D 421C CA 30
-D 421E CA 6D
-D 4220 CA 1B
-D 4222 CA 5B
-D 4224 CA 3F
-D 4226 CA 32
-D 4228 CA 35
-D 422A CA 68
-D 422C CA 1B
-D 422E CA 5B
-D 4230 CA 32
-D 4232 CA 4A
-D 4234 CA 1B
-D 4236 CA 5B
-D 4238 CA 48
-D 423A F0 00 00
-D 423D 11 0D 00 01
-D 4241 11 0E 00 01
-D 4245 BD 02 69
-D 4248 CA 1B
-D 424A CA 5B
-D 424C CA 4B
-D 424E 23 00 27
-D 4251 8C 07
-D 4253 A0 02 67
-D 4256 10 00 3C
-D 4259 8C 03
-D 425B A0 02 61
-D 425E 10 00 3E
-D 4261 C9
-D 4262 43 07
-D 4264 B0 02 51
-D 4267 BE 00
-D 4269 CA 1B
-D 426B CA 5B
-D 426D 4D DF
-D 426F 25
-D 4270 4E 00 30
-D 4273 C9
-D 4274 27
-D 4275 4E 00 30
-D 4278 C9
-D 4279 CA 3B
-D 427B 4D EF
-D 427D 25
-D 427E 4E 00 30
-D 4281 C9
-D 4282 27
-D 4283 4E 00 30
-D 4286 C9
-D 4287 CA 48
-D 4289 BE 00
+D 406B CB
+D 406C CA 1B
+D 406E CA 5B
+D 4070 CA 30
+D 4072 CA 6D
+D 4074 CA 1B
+D 4076 CA 5B
+D 4078 CA 3F
+D 407A CA 32
+D 407C CA 35
+D 407E CA 68
+D 4080 CA 1B
+D 4082 CA 5B
+D 4084 CA 32
+D 4086 CA 4A
+D 4088 CA 1B
+D 408A CA 5B
+D 408C CA 48
+D 408E F0 00 00
+D 4091 CA 1B
+D 4093 CA 5B
+D 4095 4D DF
+D 4097 25
+D 4098 4E 00 30
+D 409B C9
+D 409C 27
+D 409D 4E 00 30
+D 40A0 C9
+D 40A1 CA 3B
+D 40A3 4D EF
+D 40A5 25
+D 40A6 4E 00 30
+D 40A9 C9
+D 40AA 27
+D 40AB 4E 00 30
+D 40AE C9
+D 40AF CA 48
+D 40B1 BE 00
 
-D 4300 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4310 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4320 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4330 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4340 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4350 00 00 00 00 00 00 00 00 00 00 00 00 02 02 02 02
-D 4360 02 00 02 02 02 02 02 00 02 02 02 02 02 00 02 00
-D 4370 00 00 02 00 02 02 02 02 02 00 02 02 02 02 02 00
-D 4380 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4390 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 43A0 00 00 00 00 00 00 00 00 00 00 00 00 02 02 02 02
-D 43B0 02 00 00 00 00 02 00 00 00 02 00 02 00 00 00 02
-D 43C0 00 02 00 00 00 00 00 02 02 00 02 02 00 02 00 00
-D 43D0 00 02 00 02 00 00 00 02 00 00 00 00 00 00 00 00
-D 43E0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 43F0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4400 00 00 00 00 00 02 00 00 00 02 00 00 00 00 02 00
-D 4410 00 00 00 00 02 00 00 00 02 00 02 02 02 02 02 00
-D 4420 02 00 02 00 02 00 02 02 02 02 02 00 02 00 00 00
-D 4430 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4440 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4450 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 00
-D 4460 00 00 00 00 00 00 00 02 00 00 00 02 00 02 00 00
-D 4470 00 02 00 00 00 00 00 02 00 02 00 00 00 02 00 02
-D 4480 00 00 00 02 00 02 00 00 00 02 00 00 00 00 00 00
-D 4490 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 44A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 44B0 00 00 00 00 00 00 00 02 00 00 00 02 00 00 00 00
-D 44C0 02 02 02 02 02 00 02 02 02 02 02 00 02 02 02 02
-D 44D0 02 00 02 00 00 00 02 00 02 00 00 00 02 00 02 02
-D 44E0 02 02 02 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 44F0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4500 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4510 02 02 02 02 02 00 00 00 00 00 00 00 00 00 00 00
-D 4520 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4530 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4540 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4550 00 00 00 00 00 00 00 00 02 02 02 02 02 02 02 02
-D 4560 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4570 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4580 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4590 00 00 00 00 00 00 00 02 02 02 02 02 02 02 02 02
-D 45A0 02 02 02 02 02 02 02 02 02 02 02 02 02 02 02 02
-D 45B0 02 02 02 02 02 02 02 02 02 02 02 02 02 02 02 00
-D 45C0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 45D0 00 00 00 00 00 00 00 00 00 02 02 02 00 00 00 00
-D 45E0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02
-D 45F0 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4600 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4610 00 00 00 00 00 00 02 02 00 00 00 00 00 00 00 00
-D 4620 00 00 00 00 00 00 00 00 00 00 00 00 00 02 02 02
-D 4630 02 02 02 02 02 02 02 02 02 02 00 00 00 00 00 00
-D 4640 00 00 00 00 00 00 00 00 02 02 00 00 00 00 00 00
-D 4650 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4660 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 02
-D 4670 00 00 00 00 00 00 00 00 00 00 00 00 02 02 02 02
-D 4680 02 02 02 02 02 02 02 02 00 00 00 00 00 00 00 00
-D 4690 00 02 02 02 02 02 02 02 02 02 02 02 02 00 00 00
-D 46A0 00 00 02 02 02 02 02 02 02 02 00 00 02 02 02 02
-D 46B0 02 02 02 02 02 02 02 02 02 02 02 02 02 02 02 02
-D 46C0 02 02 02 02 02 02 02 02 02 00 00 00 02 02 02 02
-D 46D0 02 02 02 00 00 02 00 00 00 00 00 00 00 00 00 00
-D 46E0 00 00 00 02 02 02 02 02 00 00 00 00 00 00 00 00
-D 46F0 00 00 00 00 00 02 02 00 00 00 00 00 00 00 00 00
-D 4700 00 00 02 00 00 02 02 00 00 00 00 00 00 00 00 00
-D 4710 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4720 00 00 00 00 00 02 00 00 00 00 00 00 00 00 02 02
-D 4730 02 02 02 02 02 02 02 02 02 02 00 00 00 00 00 00
-D 4740 00 00 00 02 02 02 02 02 02 02 02 02 02 02 02 00
-D 4750 00 00 00 00 00 00 00 00 00 00 00 02 00 00 02 02
-D 4760 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4770 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 02
-D 4780 02 02 02 02 02 00 00 00 00 00 00 00 00 00 00 00
-D 4790 00 00 02 02 02 02 02 02 02 02 02 02 00 00 02 02
-D 47A0 00 00 00 00 00 02 02 00 00 00 00 00 00 00 00 00
-D 47B0 00 00 00 00 02 00 00 02 02 00 00 00 00 00 00 00
-D 47C0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 47D0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 47E0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 02
-D 47F0 02 02 02 00 00 00 00 00 02 02 00 00 00 00 00 02
-D 4800 02 00 00 00 00 00 00 00 00 00 00 00 00 02 00 00
-D 4810 02 02 00 00 00 00 00 00 00 00 00 02 02 02 02 02
-D 4820 00 02 00 00 00 00 00 02 02 02 02 02 00 00 00 00
-D 4830 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4840 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4850 00 00 02 02 00 00 00 00 00 02 02 00 00 00 00 00
-D 4860 00 00 00 00 00 00 02 00 00 02 02 00 00 00 00 00
-D 4870 00 00 00 00 02 00 00 00 00 00 02 00 00 00 00 00
-D 4880 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4890 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 48A0 00 00 00 00 00 00 00 00 00 02 02 02 02 02 02 02
-D 48B0 02 02 02 02 02 02 02 02 02 02 02 02 02 02 02 02
-D 48C0 00 00 02 02 02 02 02 00 00 00 00 00 00 02 02 02
-D 48D0 02 00 00 02 00 00 00 00 00 02 02 02 02 00 00 00
-D 48E0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 48F0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4900 02 02 02 02 00 00 00 00 00 00 00 00 00 00 00 00
-D 4910 00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 02
-D 4920 02 00 00 00 00 00 02 00 00 00 00 00 02 00 00 00
-D 4930 00 00 02 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4940 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4950 00 00 00 00 00 00 00 00 02 02 02 02 00 00 02 02
-D 4960 02 02 02 02 02 02 02 02 02 00 00 00 00 00 00 00
-D 4970 00 00 00 00 00 00 00 00 02 02 00 00 00 00 00 02
-D 4980 02 02 02 02 00 02 02 02 02 02 00 02 00 00 00 00
-D 4990 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 49A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 49B0 00 00 02 02 02 00 00 00 00 00 00 00 00 00 00 00
-D 49C0 00 00 00 00 00 00 02 02 02 02 02 02 02 02 02 02
-D 49D0 02 02 02 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 49E0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 49F0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4A00 00 00 00 00 00 00 00 00 00 00 00 00 02 02 02 02
-D 4A10 00 00 00 00 00 00 00 02 02 02 02 02 02 02 02 02
-D 4A20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4A30 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4A40 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4A50 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4A60 00 00 00 00 00 00 00 00 02 02 02 02 02 02 02 02
-D 4A70 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4A80 00 00 00 00 00 00 00 00 00 00 1C 1E 10 14 14 0C
-D 4A90 1A 00 10 0E 12 1E 12 18 16 00 00 00 00 00 00 00
-D 4AA0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4AB0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4AC0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4AD0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4AE0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4AF0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-D 4B00 02 04 05 02 0A 05 02 10 05 02 16 01 02 1A 01 02
-D 4B10 1C 05 02 22 05 03 04 01 03 08 01 03 0A 01 03 0E
-D 4B20 01 03 10 01 03 16 02 03 19 02 03 1C 01 03 20 01
-D 4B30 03 22 01 03 26 01 04 04 01 04 0A 01 04 0E 01 04
-D 4B40 10 05 04 16 01 04 18 01 04 1A 01 04 1C 05 04 22
-D 4B50 01 05 04 01 05 08 01 05 0A 01 05 0E 01 05 14 01
-D 4B60 05 16 01 05 1A 01 05 1C 01 05 20 01 05 22 01 05
-D 4B70 26 01 06 04 05 06 0A 05 06 10 05 06 16 01 06 1A
-D 4B80 01 06 1C 01 06 20 01 06 22 05 07 43 08 08 29 28
-D 4B90 09 12 03 09 28 02 09 4F 02 0A 0D 0D 0A 28 02 0A
-D 4BA0 4E 02 0B 03 0C 0B 18 0C 0B 29 08 0B 33 1D 0C 03
-D 4BB0 01 0C 11 05 0C 23 02 0C 30 01 0C 33 02 0D 03 0C
-D 4BC0 0D 18 0C 0D 30 01 0D 33 02 0E 0E 0A 0E 1A 02 0E
-D 4BD0 21 02 0E 30 01 0E 33 02 0F 11 05 0F 1B 02 0F 22
-D 4BE0 02 0F 30 01 0F 33 02 0F 3E 05 0F 44 01 0F 4A 05
-D 4BF0 10 1C 02 10 23 02 10 30 01 10 33 02 10 3E 01 10
-D 4C00 44 01 10 4A 01 11 1A 17 11 33 05 11 3E 04 11 44
-D 4C10 01 11 4A 04 12 18 04 12 36 03 12 3E 01 12 44 01
-D 4C20 12 4A 01 13 17 04 13 1D 0B 13 37 02 13 3E 05 13
-D 4C30 44 05 13 4A 01 14 18 03 14 2C 0D 15 19 04 15 24
-D 4C40 09 16 1C 09 00
-D 4C60 53 54 45 4C 4C 41 52 20 45 44 49 54 49 4F 4E 00
-D 4C80 3C 2D 20 2D 3E 20 73 74 65 65 72 20 28 6D 6F 72
-D 4C90 65 20 70 72 65 73 73 65 73 2C 20 6D 6F 72 65 20
-D 4CA0 73 70 65 65 64 29 20 20 20 53 50 41 43 45 20 73
-D 4CB0 74 6F 70 20 20 20 51 20 71 75 69 74 00
-D 4D00 20 00 1B 5B 37 6D 20 1B 5B 30 6D 00 41 00 44 00
-D 4D10 45 00 49 00 4C 00 4E 00 4F 00 52 00 53 00 54 00
-D 4D80 0D 0A 1B 5B 31 40 00 5B 37 30 43 00 00
-D 4DC0 00 00
+D 4900 02 04 05 02 0A 05 02 10 05 02 16 01 02 1A 01 02
+D 4910 1C 05 02 22 05 03 04 01 03 08 01 03 0A 01 03 0E
+D 4920 01 03 10 01 03 16 02 03 19 02 03 1C 01 03 20 01
+D 4930 03 22 01 03 26 01 04 04 01 04 0A 01 04 0E 01 04
+D 4940 10 05 04 16 01 04 18 01 04 1A 01 04 1C 05 04 22
+D 4950 01 05 04 01 05 08 01 05 0A 01 05 0E 01 05 14 01
+D 4960 05 16 01 05 1A 01 05 1C 01 05 20 01 05 22 01 05
+D 4970 26 01 06 04 05 06 0A 05 06 10 05 06 16 01 06 1A
+D 4980 01 06 1C 01 06 20 01 06 22 05 07 43 08 08 29 28
+D 4990 09 12 03 09 28 02 09 4F 02 0A 0D 0D 0A 28 02 0A
+D 49A0 4E 02 0B 03 0C 0B 18 0C 0B 29 08 0B 33 1D 0C 03
+D 49B0 01 0C 11 05 0C 23 02 0C 30 01 0C 33 02 0D 03 0C
+D 49C0 0D 18 0C 0D 30 01 0D 33 02 0E 0E 0A 0E 1A 02 0E
+D 49D0 21 02 0E 30 01 0E 33 02 0F 11 05 0F 1B 02 0F 22
+D 49E0 02 0F 30 01 0F 33 02 0F 3E 05 0F 44 01 0F 4A 05
+D 49F0 10 1C 02 10 23 02 10 30 01 10 33 02 10 3E 01 10
+D 4A00 44 01 10 4A 01 11 1A 17 11 33 05 11 3E 04 11 44
+D 4A10 01 11 4A 04 12 18 04 12 36 03 12 3E 01 12 44 01
+D 4A20 12 4A 01 13 17 04 13 1D 0B 13 37 02 13 3E 05 13
+D 4A30 44 05 13 4A 01 14 18 03 14 2C 0D 15 19 04 15 24
+D 4A40 09 16 1C 09 00
+
+D 4A80 53 54 45 4C 4C 41 52 20 45 44 49 54 49 4F 4E 00

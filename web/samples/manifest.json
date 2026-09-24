@@ -96,10 +96,10 @@
     "halts": false
   },
   {
-    "name": "Starship (VT102)",
+    "name": "Starship (VT100)",
     "file": "Starship.lst",
     "input": "",
-    "blurb": "The COSMAC ELF logo, steered with the arrow keys: each press is one step faster that way, SPACE stops, Q quits. The picture is shifted in the terminal with VT102 insert/delete-character controls, so each frame paints only the cells that wrap round the edge.",
+    "blurb": "The COSMAC ELF logo with its STELLAR EDITION caption, stored as a run table - line, first column, length - rather than a bitmap. 108 runs paint the whole picture. Any key clears it.",
     "maxSteps": 9000000,
     "halts": false
   },

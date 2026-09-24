@@ -3,12 +3,12 @@
 (function () {
   'use strict';
 
-  var V = '?v=29';
+  var V = '?v=31';
   var LINEUP = [
     { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
     { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },
     { file: 'Invaders.lst',   name: 'Invaders',   input: '',       what: 'a game: click, press a key' },
-    { file: 'Starship.lst',   name: 'Starship',   input: '',       what: 'click, then ← → to steer it' }
+    { file: 'Starship.lst',   name: 'Starship',   input: '',       what: 'a picture, run-length drawn' }
   ];
   var VMC = ['#9aa3b8', '#ffb547', '#5fe3d0', '#ff7a90', '#b8f36a'];
 
