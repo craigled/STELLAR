@@ -13,7 +13,9 @@
     { name: 'Typing — one VM waits, the other runs', blurb: 'Click the shared terminal and type. VM1 prints a dot 48 times; VM2 sits in SERIN waiting for a key and echoes the 4 characters you type. Because SERIN yields to the scheduler instead of blocking, the dots keep coming while VM2 waits — your characters appear inline wherever you typed them.',
       programs: ['sched-echo-tick.lst', 'sched-echo-read.lst'] },
     { name: 'Front panel — two VMs, one latch', blurb: 'Nothing goes to the terminal here — watch the front panel. VM1 holds Q on and writes $11 to the output latch; VM2 holds Q off and writes $22. There is only one Q line and one latch for the whole machine, so the display flips 11/22 and the Q lamp blinks as the scheduler hands the CPU between them.',
-      programs: ['sched-panel1.lst', 'sched-panel2.lst'] }
+      programs: ['sched-panel1.lst', 'sched-panel2.lst'] },
+    { name: 'Race condition — lost updates, then a lock', blurb: 'VM1 and VM2 each add 1 to one shared counter 500 times: READ it, ADD one, WRITE it back. The counter lives in VM1; VM2 reaches it through SHAREVM and the cross-VM copies. In round 1 the scheduler sometimes switches between one VM\'s read and its write, and the other VM\'s updates in that gap are overwritten — 196 of the 1000 are lost. Round 2 wraps the three opcodes in SETMULTI 00 / 01 (multitasking off, the "disable interrupts" critical section) and gets exactly 1000. The marks 1 and 2 show the VMs taking turns.',
+      programs: ['sched-race1.lst', 'sched-race2.lst'] }
   ];
   var STATE = { 0x00: 'done', 0x01: 'active', 0x02: 'cycle', 0x03: 'idle', 0x04: 'paused', 0x05: 'killed', 0x06: 'error', 0x0F: 'unknown' };
   function byId(id) { return document.getElementById(id); }
@@ -38,7 +40,7 @@
     byId('blurb').textContent = s.blurb;
     byId('status').textContent = 'loading ' + s.name + '…';
     Promise.all(s.programs.map(function (f) {
-      return fetch('samples/' + f + '?v=39').then(function (r) { return r.text(); });
+      return fetch('samples/' + f + '?v=40').then(function (r) { return r.text(); });
     })).then(function (texts) {
       mv = new window.StellarMultiVM({ firmware: window.STELLAR_FIRMWARE, programs: texts });
       mv.bootUntilReady();      // run CREATE_CIDP + scheduler so VMs are active
