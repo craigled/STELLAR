@@ -27,7 +27,7 @@
     "name": "Prime-Gen v07",
     "file": "Prime-Gen-v07.lst",
     "input": "3\r60\r",
-    "blurb": "Prime generator using the native OUTDEC opcode ($6E) for decimal print \u2014 CVT2DEC + OUTDEC, ~6x faster and smaller than the hand-rolled printer.",
+    "blurb": "Prime generator using the native OUTDEC opcode ($6E) for decimal print — CVT2DEC + OUTDEC, ~6x faster and smaller than the hand-rolled printer.",
     "maxSteps": 40000000,
     "halts": true
   },
@@ -56,6 +56,15 @@
     "halts": false
   },
   {
+    "name": "ELIZA (chatbot)",
+    "file": "ELIZA.lst",
+    "input": "",
+    "blurb": "The 1966 therapist chatbot. Runs at turbo. Wait for WHAT'S YOUR NAME?, click the terminal, type your name, then talk to it in plain English - lower case is fine; BYE ends it. The text work (keyword search, pronoun swapping) is native 1802 code called through RUNMC, so replies start in a fraction of a second; it rotates its replies, remembers what you said after \"my\" and brings it back, and notices when you repeat yourself. Uses SETSIZE to take 12KB.",
+    "maxSteps": 8000000,
+    "halts": false,
+    "speed": 3
+  },
+  {
     "name": "Mandelbrot",
     "file": "Mandelbrot.lst",
     "input": "",
@@ -67,7 +76,7 @@
     "name": "Front panel (Q + hex display)",
     "file": "Front-Panel.lst",
     "input": "",
-    "blurb": "Drives the Elf2K front panel instead of the terminal: lights the Q lamp and counts $00-$1F on the two-digit output display, then clears Q and halts. Serial output stays empty \u2014 watch the panel.",
+    "blurb": "Drives the Elf2K front panel instead of the terminal: lights the Q lamp and counts $00-$1F on the two-digit output display, then clears Q and halts. Serial output stays empty — watch the panel.",
     "maxSteps": 3000000,
     "halts": true
   },

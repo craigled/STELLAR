@@ -54,7 +54,7 @@
   function btn(id) { return document.getElementById(id); }
   var samples = [];
 
-  fetch('samples/manifest.json?v=31')
+  fetch('samples/manifest.json?v=33')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       samples = list;
@@ -81,12 +81,18 @@
     var s = samples[i];
     btn('input').value = (s.input || '').replace(/\r/g, '\\r');
     btn('blurb').textContent = s.blurb || '';
+    // A sample can ask for a speed (an index into SPEEDS). ELIZA does: at 4x its
+    // start-up outlasts a visitor's first keystrokes, and a conversation wants turbo.
+    if (typeof s.speed === 'number' && s.speed >= 0 && s.speed < SPEEDS.length) {
+      btn('speed').value = s.speed;
+      applySpeed();
+    }
     loadSample(s);
   }
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=31')
+    fetch('samples/' + s.file + '?v=33')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');

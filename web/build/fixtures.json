@@ -48,6 +48,13 @@
   "steps": 2999999,
   "bytes": 34
  },
+ "ELIZA.lst": {
+  "input": "",
+  "outHex": "0d0a454c495a410d0a48492c2049274d20454c495a412e2057484154275320594f5552204e414d453f0d0a0d0a3e20",
+  "halted": false,
+  "steps": 7999999,
+  "bytes": 47
+ },
  "Mandelbrot.lst": {
   "input": "",
   "outHex": "5354454c4c4152204d414e44454c42524f540d0a2e2e2e2e2e2e2e2e2e2e2e3a3a3a3a3a2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d3a3a3a3a3a3a3a3a3a0d0a2e2e2e2e2e2e2e2e2e2e3a3a3a3a2d2d2d2d2d2d2d2d2d2d3d3d2b782b3d3d2d2d2d3a3a3a3a3a3a0d0a2e2e2e2e2e2e2e2e2e3a3a3a2d2d2d2d2d2d2d2d2d2d3d3d3d2b632a2a2a3d3d3d2d2d3a3a3a3a3a0d0a2e2e2e2e2e2e2e2e2e3a3a2d2d2d2d2d2d2d2d2d3d3d3d3d",
