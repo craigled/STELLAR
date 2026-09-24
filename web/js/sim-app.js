@@ -176,9 +176,17 @@
     this._skipBreak = !!this.breaks[this._pl()];
     this._setStatus('running…');
     var self = this;
+    var last = Date.now();
     this.timer = setInterval(function () {
-      for (var i = 0; i < self.opsPerTick; i++) {
+      var now = Date.now(), budget = Infinity, spent = 0;
+      if (self.instrPerSec) {
+        // a long gap (a backgrounded tab) is capped so the machine does not race to catch up
+        budget = Math.min(now - last, 60) / 1000 * self.instrPerSec;
+      }
+      last = now;
+      for (var i = 0; self.instrPerSec ? spent < budget : i < self.opsPerTick; i++) {
         var r = self.vm.stepOpcode();
+        spent += r.cost || 0;
         // stop() before _render(): the render fires onState, and the page decides
         // the Run/Step/Pause button states from this.running — rendering first
         // would leave them disabled after we have already stopped.
@@ -215,8 +223,11 @@
     this._setStatus('reset — label pre-pass complete');
   };
 
-  SimApp.prototype.setSpeed = function (opsPerTick, tickMs) {
-    this.opsPerTick = opsPerTick; this.tickMs = tickMs;
+  // instrPerSec, when given, paces the machine by REAL TIME instead of by opcodes:
+  // each tick spends the 1802 instructions that much wall-clock time buys, so
+  // games and delay loops run as they do on the hardware.
+  SimApp.prototype.setSpeed = function (opsPerTick, tickMs, instrPerSec) {
+    this.opsPerTick = opsPerTick; this.tickMs = tickMs; this.instrPerSec = instrPerSec || 0;
     if (this.running) { this.stop(); this.run(); }
   };
 

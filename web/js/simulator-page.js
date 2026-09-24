@@ -8,6 +8,9 @@
     { label: '1×', ops: 1, ms: 500 },
     { label: '4×', ops: 1, ms: 120 },
     { label: '16×', ops: 4, ms: 30 },
+    // real time on Craig's 3 MHz Elf2K: 375,000 machine cycles a second at about
+    // 2.2 cycles per 1802 instruction. Games (Pong) play at the hardware's pace here.
+    { label: 'Elf2K', ops: 0, ms: 16, ips: 170000 },
     { label: 'turbo', ops: 200, ms: 0 }
   ];
 
@@ -54,7 +57,7 @@
   function btn(id) { return document.getElementById(id); }
   var samples = [];
 
-  fetch('samples/manifest.json?v=33')
+  fetch('samples/manifest.json?v=35')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       samples = list;
@@ -81,10 +84,12 @@
     var s = samples[i];
     btn('input').value = (s.input || '').replace(/\r/g, '\\r');
     btn('blurb').textContent = s.blurb || '';
-    // A sample can ask for a speed (an index into SPEEDS). ELIZA does: at 4x its
-    // start-up outlasts a visitor's first keystrokes, and a conversation wants turbo.
-    if (typeof s.speed === 'number' && s.speed >= 0 && s.speed < SPEEDS.length) {
-      btn('speed').value = s.speed;
+    // A sample can ask for a speed by its label ("turbo", "Elf2K", ...). ELIZA wants
+    // turbo (at 4x its start-up outlasts a visitor's first keystrokes); Pong wants
+    // Elf2K, the hardware's real pace - at turbo a whole game is over in seconds.
+    var want = SPEEDS.map(function (x) { return x.label; }).indexOf(s.speed);
+    if (want >= 0) {
+      btn('speed').value = want;
       applySpeed();
     }
     loadSample(s);
@@ -92,7 +97,7 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=33')
+    fetch('samples/' + s.file + '?v=35')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
@@ -187,7 +192,7 @@
   function applySpeed() {
     var s = SPEEDS[+speed.value];
     btn('speedLabel').textContent = s.label;
-    app.setSpeed(s.ops, s.ms);
+    app.setSpeed(s.ops, s.ms, s.ips);
   }
   speed.addEventListener('input', applySpeed);
   applySpeed();
