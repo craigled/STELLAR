@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=24';
+  var V = '?v=25';
   var LINEUP = [
     { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
     { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },
@@ -113,7 +113,7 @@
   var SYS_FIELDS = { 0x50: 'system interrupt state', 0x51: 'VM error', 0x52: 'current VM — who has the CPU',
     0x53: 'max VMs', 0x54: 'total VMs', 0x55: 'multitasking allowed (C7 SETMULTI)', 0x56: 'VM operation',
     0x57: 'VM repeat', 0x5F: 'hardware interrupt flip-flop' };
-  var STATES = ['done', 'active', 'completed this cycle', 'idle / waiting', 'paused', 'killed'];
+  var STATES = ['done', 'active', 'completed this cycle', 'idle / waiting', 'paused', 'killed', 'stopped on error'];
   var cidpCells = [];
 
   function cidpField(o) {

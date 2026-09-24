@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Architecture</title>
 <meta name="description" content="STELLAR's memory map, 1802 register roles, SCRT, the VM core layout, and the CIDP multitasking page.">
-<link rel="stylesheet" href="css/site.css?v=24">
+<link rel="stylesheet" href="css/site.css?v=25">
 </head>
 <body>
 <main class="wrap">
@@ -147,7 +147,8 @@
     <span class="mono">$02</span> completed this cycle ·
     <span class="mono">$03</span> idle/waiting ·
     <span class="mono">$04</span> paused ·
-    <span class="mono">$05</span> killed.</p>
+    <span class="mono">$05</span> killed ·
+    <span class="mono">$06</span> stopped on error.</p>
 
   <h2><span class="hx">↻</span>Cooperative multitasking</h2>
   <p>VMs are not pre-empted by a timer. Each active VM runs a small number of opcodes — the
@@ -166,6 +167,6 @@
 </main>
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
-<script src="js/nav.js?v=24"></script>
+<script src="js/nav.js?v=25"></script>
 </body>
 </html>

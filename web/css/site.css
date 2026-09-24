@@ -309,7 +309,7 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .st.s01{background:#1f6f6a22; color:var(--accent-2); border:1px solid var(--accent-2)}   /* active */
 .st.s00{background:var(--bg-sunk); color:var(--ink-soft); border:1px solid var(--line)}   /* done */
 .st.s02,.st.s03,.st.s04{background:#ffb00022; color:var(--accent); border:1px solid var(--accent)}
-.st.s05{background:#b9531b22; color:var(--accent); border:1px solid var(--accent)}
+.st.s05,.st.s06{background:#b9531b22; color:var(--accent); border:1px solid var(--accent)}
 
 .cores-grid{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
 .mini{border:1px solid var(--line); border-radius:11px; background:var(--bg-panel); overflow:hidden;

@@ -21,7 +21,7 @@
     { label: '16×', slices: 4, ms: 40 },
     { label: 'turbo', slices: 120, ms: 0 }
   ];
-  var STATE = { 0x00: 'done', 0x01: 'active', 0x02: 'cycle', 0x03: 'idle', 0x04: 'paused', 0x05: 'killed', 0x0F: 'unknown' };
+  var STATE = { 0x00: 'done', 0x01: 'active', 0x02: 'cycle', 0x03: 'idle', 0x04: 'paused', 0x05: 'killed', 0x06: 'error', 0x0F: 'unknown' };
   function byId(id) { return document.getElementById(id); }
   var panel = new window.FrontPanel(byId('frontpanel'));
   // Live typing into the shared terminal. One UART for the whole machine, so a
@@ -44,7 +44,7 @@
     byId('blurb').textContent = s.blurb;
     byId('status').textContent = 'loading ' + s.name + '…';
     Promise.all(s.programs.map(function (f) {
-      return fetch('samples/' + f + '?v=24').then(function (r) { return r.text(); });
+      return fetch('samples/' + f + '?v=25').then(function (r) { return r.text(); });
     })).then(function (texts) {
       mv = new window.StellarMultiVM({ firmware: window.STELLAR_FIRMWARE, programs: texts });
       mv.bootUntilReady();      // run CREATE_CIDP + scheduler so VMs are active

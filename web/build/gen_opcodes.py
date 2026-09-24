@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # tools/stellar_disasm.py lives in the sibling work repo
 DISASM = os.path.expanduser('~/Projects/stellar-1802/tools/stellar_disasm.py')
 FMATH  = os.path.expanduser('~/Projects/stellar-1802/Firmware-Math')
-DOCX   = 'STELLAR MAIN V0061.28.docx'
+DOCX   = 'STELLAR MAIN V0061.30.docx'
 
 def load_disasm():
     spec = importlib.util.spec_from_file_location('stellar_disasm', DISASM)
@@ -30,7 +30,7 @@ def load_disasm():
 DESC = {
 0x00: ('io', '', 'End the program. Inside a VM, terminates that VM.'),
 0x01: ('io', '0Z', 'Define the OUTPUT port (Z=0-7, default 4).'),
-0x02: ('io', '0Z', 'Define the INPUT port (Z=9-F, default C).'),
+0x02: ('io', '0Z', 'Define the INPUT port (Z=9-F, default C). Any other Z is refused with error $08 (since V0061.30).'),
 0x03: ('io', 'DZ', 'Define the EF source: D=EF line (0-4), Z=0 normal / 1 inverted.'),
 0x04: ('io', 'NN', 'Output an immediate byte on the defined output port.'),
 0x05: ('io', 'DZ', 'Output byte Z of accumulator D (0=Acc, 1=MA, 2=DA).'),
@@ -53,7 +53,7 @@ DESC = {
 0x17: ('reg', '0Z', 'Shift MA bytes (0=Left, 1=Ring Left, 2=Right, 3=Ring Right).'),
 0x18: ('reg', 'NN', 'Set the bit(s) in the mask in the Acc low byte.'),
 0x19: ('reg', 'NN', 'Reset the bit(s) in the mask in the Acc low byte.'),
-0x1A: ('reg', 'NN', 'Test whether the masked bit(s) are set in the Acc low byte.'),
+0x1A: ('reg', 'NN', 'Test whether EVERY bit of the mask NN is set in the Acc low byte: true when (Acc.lo AND NN) = NN. Single-bit and multi-bit masks (since V0061.29; before that only single bits, and a false result left the flag unchanged).'),
 
 0x20: ('move', '0Z', 'Set memory mode (0=Absolute, 1=Relative; default Relative).'),
 0x21: ('move', 'ZX', 'Copy accumulator Z (0=Acc,1=MA,2=DA) to register X.'),
@@ -104,8 +104,8 @@ DESC = {
 0x53: ('math', '0X NN NN', 'Subtract an immediate value from register X.'),
 0x54: ('math', 'DZ XY', 'Add D bytes at M(RX)+M(RY) into MA (Z: 0=destructive, 1=accumulative).'),
 0x55: ('math', 'DZ XY', 'Subtract D bytes M(RX)-M(RY) into MA (Z: 0=destructive, 1=accumulative).'),
-0x56: ('math', 'ZX', 'Add Acc + Z bytes at M(RX) into MA.'),
-0x57: ('math', 'ZX', 'Subtract Acc - Z bytes at M(RX) into MA.'),
+0x56: ('math', 'ZX', 'Add Acc + Z bytes (Z = 1 or 2) at M(RX) into MA. Any other Z does nothing.'),
+0x57: ('math', 'ZX', 'Subtract Acc - Z bytes (Z = 1 or 2) at M(RX) into MA. Any other Z does nothing.'),
 0x58: ('math', '0X', 'Multiply Acc * two bytes at M(RX) into MA.'),
 0x59: ('math', '0X', 'Divide Acc / two bytes at M(RX) into MA.'),
 0x5A: ('math', 'XY', 'Multiply M(RX) * M(RY) into MA.'),
@@ -128,8 +128,8 @@ DESC = {
 0x71: ('stack', '0Z', 'Pop the complete contents of accumulator Z (0=Acc, 1=MA, 2=DA).'),
 0x72: ('stack', '0X', 'Push register X onto the stack (two bytes).'),
 0x73: ('stack', '0X', 'Pop the stack into register X (two bytes).'),
-0x74: ('stack', 'ZX', 'Push the memory pointed to by RX onto the stack (Z=0: 16 bytes).'),
-0x75: ('stack', 'ZX', 'Pop the stack into the memory pointed to by RX (Z=0: 16 bytes).'),
+0x74: ('stack', 'ZX', 'Push Z bytes of memory onto the stack, starting at M(RX) and walking DOWN (RX, RX-1, ...) (Z=0: 16 bytes). Pair with POPMX from the start of the block to copy it in order.'),
+0x75: ('stack', 'ZX', 'Pop Z bytes from the stack into memory, starting at M(RX) and walking UP (RX, RX+1, ...) (Z=0: 16 bytes).'),
 0x76: ('stack', '0Z', 'Push one special byte: Z = 0 IO, 1 EF, 2 MEMMODE, 3 DATADIR, 4 HEXFLAG, 6 ERROR, 8 ExitCode. Z = 5 and 7 are unassigned and do nothing.'),
 0x77: ('stack', '0Z', 'Pop one special byte back off the stack, Z as for PUSHS.'),
 0x78: ('stack', '', 'Push the Q output state onto the stack.'),
@@ -164,9 +164,9 @@ DESC = {
 0x9A: ('test', '0Z', 'Test whether accumulator Z low byte is even (0=Acc, 1=MA).'),
 0x9B: ('test', 'DZ', 'Test whether byte D (from LSB) of accumulator Z is zero (low-byte-safe null test).'),
 0x9C: ('test', 'DD XY', 'Compare D bytes at M(RX) with M(RY) into the Test Flag.'),
-0x9D: ('test', 'ZX NN...', 'Test Z bytes at M(RX) = immediate bytes.'),
+0x9D: ('test', 'ZX NN...', 'Test the Z bytes at M(RX) = the Z immediate bytes that follow (Z = 1-15; Z = 0 is refused with error $0C). Before V0061.29 it always compared exactly 2 bytes.'),
 0x9E: ('test', 'NN', 'Test System Status = NN.'),
-0x9F: ('test', '0Z NN', 'Test input-port Z value = NN.'),
+0x9F: ('test', '0Z NN', 'Test the value on input port Z (9-F; Z=0: the defined port) = NN. Reads the port for this test only; the VM\'s defined input port is unchanged (since V0061.30).'),
 
 0xA0: ('branch', 'MM MM', 'If Test=True, go to an absolute address.'),
 0xA1: ('branch', 'MM MM', 'If Test=False, go to an absolute address.'),
@@ -208,7 +208,7 @@ DESC = {
         'goes. X = cursor register (advances), Y = buffer-start register (the floor backspace '
         'cannot pass). CR ends the line and stores $00; $08/$7F backspace. Handles one '
         'character per execution and yields between them, so other VMs keep running (custom).'),
-0xC3: ('misc', '', 'Generate a pseudo-random two-byte number into Acc.'),
+0xC3: ('misc', '', 'Generate a pseudo-random two-byte number into Acc. Each VM gets its own sequence.'),
 0xC4: ('misc', '', 'No operation.'),
 0xC5: ('misc', '', 'Enable external interrupt.'),
 0xC6: ('misc', '', 'Disable external interrupt (default: disabled).'),
