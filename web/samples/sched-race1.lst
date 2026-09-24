@@ -8,14 +8,16 @@
 ; $C7 SETMULTI 00 / 01 and gets exactly 1000. VM1 prints the scores.
 ;
 ; The counter is in VM1's memory (relative $0F00); VM1 opens it with $D0 SHAREVM
-; read/write, and VM2 uses the cross-VM copies $D4 COPYVMXY / $D5 COPYXVMY.
+; read/write, and VM2 uses the cross-VM copies $D4 COPYVMXY / $D5 COPYXVMY. The
+; ADDRESS in those copies is VM1's register (R7 counter, R8 GO, R9 DONE - VM1 sets
+; them once and never reuses them); only the value register is VM2's own.
 ; GO ($0F02) and DONE ($0F04) words coordinate the rounds; Race-VM1.lst clears
 ; them in its D-lines so leftovers from an earlier run cannot start a round early.
 ;
-; VERIFICATION (Firmware-Math/race_verify.py, V0061.33, two-VM cold boot): round 1 loses 196 of 1000 (got 804), round 2 gets exactly 1000; the loss is deterministic (opcode-count scheduler), so the Elf2K should show the same 196.
+; VERIFICATION (Firmware-Math/race_verify.py, V0061.33, two-VM cold boot): round 1 loses 200 of 1000 (got 800), round 2 gets exactly 1000; the loss is deterministic (opcode-count scheduler), so the Elf2K should show the same 200.
 ; NOT YET RUN ON HARDWARE.
 ;
-; 106 STELLAR commands.
+; 109 STELLAR commands.
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
@@ -24,118 +26,121 @@
 ; D 4000 CD             START
 ; D 4001 11 0F 00 0A    LOADXI R15 000A
 ; D 4005 D0 12          SHAREVM on, read/write             Let VM2 reach the counter
-; D 4007 11 03 0F 02    LOADXI R3 0F02
-; D 400B 32 03 00 00    COPYMX2I R3 0000                   Nothing started yet
-; D 400F 11 03 0F 00    LOADXI R3 0F00
-; D 4013 32 03 00 00    COPYMX2I R3 0000                   Counter = 0
-; D 4017 11 0E 0C 00    LOADXI R14 0C00
-; D 401B C1 0E          PRINTSTR R14
-; D 401D 11 03 0F 02    LOADXI R3 0F02
-; D 4021 32 03 00 01    COPYMX2I R3 0001                   GO round 1
-; D 4025 11 05 01 F4    LOADXI R5 01F4
-; D 4029 11 06 00 32    LOADXI R6 0032
-; D 402D 11 0A 0F 00    LOADXI R10 0F00
+; D 4007 11 07 0F 00    LOADXI R7 0F00                     VM2's cross-VM copies take their address from
+; D 400B 11 08 0F 02    LOADXI R8 0F02                     OUR registers: R7 counter, R8 GO, R9 DONE -
+; D 400F 11 09 0F 04    LOADXI R9 0F04                     set once and never touched again
+; D 4013 11 03 0F 02    LOADXI R3 0F02
+; D 4017 32 03 00 00    COPYMX2I R3 0000                   Nothing started yet
+; D 401B 11 03 0F 00    LOADXI R3 0F00
+; D 401F 32 03 00 00    COPYMX2I R3 0000                   Counter = 0
+; D 4023 11 0E 0C 00    LOADXI R14 0C00
+; D 4027 C1 0E          PRINTSTR R14
+; D 4029 11 03 0F 02    LOADXI R3 0F02
+; D 402D 32 03 00 01    COPYMX2I R3 0001                   GO round 1
+; D 4031 11 05 01 F4    LOADXI R5 01F4
+; D 4035 11 06 00 32    LOADXI R6 0032
+; D 4039 11 0A 0F 00    LOADXI R10 0F00
 ; L1:
-; D 4031 39 02 AB       COPYMXY M(R10) -> R11              READ the counter
-; D 4034 42 0B          INCX R11                           ADD one
-; D 4036 3A 02 BA       COPYXMY R11 -> M(R10)              WRITE it back
-; D 4039 43 06          DECX R6
-; D 403B 8C 06          TESTXZ R6
-; D 403D A1 00 46       IFFALSEI N1
-; D 4040 CA 31          SEROUTI 31 '1'                     A mark every 50 adds
-; D 4042 11 06 00 32    LOADXI R6 0032
+; D 403D 39 02 AB       COPYMXY M(R10) -> R11              READ the counter
+; D 4040 42 0B          INCX R11                           ADD one
+; D 4042 3A 02 BA       COPYXMY R11 -> M(R10)              WRITE it back
+; D 4045 43 06          DECX R6
+; D 4047 8C 06          TESTXZ R6
+; D 4049 A1 00 52       IFFALSEI N1
+; D 404C CA 31          SEROUTI 31 '1'                     A mark every 50 adds
+; D 404E 11 06 00 32    LOADXI R6 0032
 ; N1:
-; D 4046 43 05          DECX R5
-; D 4048 8C 05          TESTXZ R5
-; D 404A A1 00 31       IFFALSEI L1
-; D 404D 11 03 0F 04    LOADXI R3 0F04
+; D 4052 43 05          DECX R5
+; D 4054 8C 05          TESTXZ R5
+; D 4056 A1 00 3D       IFFALSEI L1
+; D 4059 11 03 0F 04    LOADXI R3 0F04
 ; W1:
-; D 4051 39 02 34       COPYMXY M(R3) -> R4
-; D 4054 86 04 00 01    TESTXI R4 0001
-; D 4058 A1 00 51       IFFALSEI W1                        Wait for VM2
-; D 405B BD 00 BB       CALL RESULT
-; D 405E 11 03 0F 00    LOADXI R3 0F00
-; D 4062 32 03 00 00    COPYMX2I R3 0000                   Counter = 0 again
-; D 4066 11 0E 0D 15    LOADXI R14 0D15
-; D 406A C1 0E          PRINTSTR R14
-; D 406C 11 03 0F 02    LOADXI R3 0F02
-; D 4070 32 03 00 02    COPYMX2I R3 0002                   GO round 2
-; D 4074 11 05 01 F4    LOADXI R5 01F4
-; D 4078 11 06 00 32    LOADXI R6 0032
-; D 407C 11 0A 0F 00    LOADXI R10 0F00
+; D 405D 39 02 34       COPYMXY M(R3) -> R4
+; D 4060 86 04 00 01    TESTXI R4 0001
+; D 4064 A1 00 5D       IFFALSEI W1                        Wait for VM2
+; D 4067 BD 00 C7       CALL RESULT
+; D 406A 11 03 0F 00    LOADXI R3 0F00
+; D 406E 32 03 00 00    COPYMX2I R3 0000                   Counter = 0 again
+; D 4072 11 0E 0D 15    LOADXI R14 0D15
+; D 4076 C1 0E          PRINTSTR R14
+; D 4078 11 03 0F 02    LOADXI R3 0F02
+; D 407C 32 03 00 02    COPYMX2I R3 0002                   GO round 2
+; D 4080 11 05 01 F4    LOADXI R5 01F4
+; D 4084 11 06 00 32    LOADXI R6 0032
+; D 4088 11 0A 0F 00    LOADXI R10 0F00
 ; L2:
-; D 4080 C7 00          SETMULTI 00                        Lock: no switching from here ...
-; D 4082 39 02 AB       COPYMXY M(R10) -> R11              READ the counter
-; D 4085 42 0B          INCX R11                           ADD one
-; D 4087 3A 02 BA       COPYXMY R11 -> M(R10)              WRITE it back
-; D 408A C7 01          SETMULTI 01                        ... to here
-; D 408C 43 06          DECX R6
-; D 408E 8C 06          TESTXZ R6
-; D 4090 A1 00 99       IFFALSEI N2
-; D 4093 CA 31          SEROUTI 31 '1'                     A mark every 50 adds
-; D 4095 11 06 00 32    LOADXI R6 0032
+; D 408C C7 00          SETMULTI 00                        Lock: no switching from here ...
+; D 408E 39 02 AB       COPYMXY M(R10) -> R11              READ the counter
+; D 4091 42 0B          INCX R11                           ADD one
+; D 4093 3A 02 BA       COPYXMY R11 -> M(R10)              WRITE it back
+; D 4096 C7 01          SETMULTI 01                        ... to here
+; D 4098 43 06          DECX R6
+; D 409A 8C 06          TESTXZ R6
+; D 409C A1 00 A5       IFFALSEI N2
+; D 409F CA 31          SEROUTI 31 '1'                     A mark every 50 adds
+; D 40A1 11 06 00 32    LOADXI R6 0032
 ; N2:
-; D 4099 43 05          DECX R5
-; D 409B 8C 05          TESTXZ R5
-; D 409D A1 00 80       IFFALSEI L2
-; D 40A0 11 03 0F 04    LOADXI R3 0F04
+; D 40A5 43 05          DECX R5
+; D 40A7 8C 05          TESTXZ R5
+; D 40A9 A1 00 8C       IFFALSEI L2
+; D 40AC 11 03 0F 04    LOADXI R3 0F04
 ; W2:
-; D 40A4 39 02 34       COPYMXY M(R3) -> R4
-; D 40A7 86 04 00 02    TESTXI R4 0002
-; D 40AB A1 00 A4       IFFALSEI W2                        Wait for VM2
-; D 40AE BD 00 BB       CALL RESULT
-; D 40B1 11 0E 0D F0    LOADXI R14 0DF0
-; D 40B5 C1 0E          PRINTSTR R14
-; D 40B7 00             HALT                               VM1 finished
-; D 40B8 F0 00 00       BREAK                              End marker
+; D 40B0 39 02 34       COPYMXY M(R3) -> R4
+; D 40B3 86 04 00 02    TESTXI R4 0002
+; D 40B7 A1 00 B0       IFFALSEI W2                        Wait for VM2
+; D 40BA BD 00 C7       CALL RESULT
+; D 40BD 11 0E 0D F0    LOADXI R14 0DF0
+; D 40C1 C1 0E          PRINTSTR R14
+; D 40C3 00             HALT                               VM1 finished
+; D 40C4 F0 00 00       BREAK                              End marker
 ; RESULT:
-; D 40BB 11 0E 0D B3    LOADXI R14 0DB3
-; D 40BF C1 0E          PRINTSTR R14
-; D 40C1 11 04 03 E8    LOADXI R4 03E8
-; D 40C5 BD 01 00       CALL PRNUM
-; D 40C8 11 0E 0D C1    LOADXI R14 0DC1
-; D 40CC C1 0E          PRINTSTR R14
-; D 40CE 11 03 0F 00    LOADXI R3 0F00
-; D 40D2 39 02 34       COPYMXY M(R3) -> R4
-; D 40D5 23 00 47       COPYXY R4 -> R7                    R7 = got
-; D 40D8 BD 01 00       CALL PRNUM
-; D 40DB 11 04 03 E8    LOADXI R4 03E8
-; D 40DF 51 47 04       SUBXYZ R4 - R7 -> R4               R4 = lost
-; D 40E2 8C 04          TESTXZ R4
-; D 40E4 A1 00 EF       IFFALSEI RLOST
-; D 40E7 11 0E 0D D2    LOADXI R14 0DD2
-; D 40EB C1 0E          PRINTSTR R14
-; D 40ED BE 00          RETURN
+; D 40C7 11 0E 0D B3    LOADXI R14 0DB3
+; D 40CB C1 0E          PRINTSTR R14
+; D 40CD 11 04 03 E8    LOADXI R4 03E8
+; D 40D1 BD 01 0C       CALL PRNUM
+; D 40D4 11 0E 0D C1    LOADXI R14 0DC1
+; D 40D8 C1 0E          PRINTSTR R14
+; D 40DA 11 03 0F 00    LOADXI R3 0F00
+; D 40DE 39 02 34       COPYMXY M(R3) -> R4
+; D 40E1 23 00 46       COPYXY R4 -> R6                    R6 = got
+; D 40E4 BD 01 0C       CALL PRNUM
+; D 40E7 11 04 03 E8    LOADXI R4 03E8
+; D 40EB 51 46 04       SUBXYZ R4 - R6 -> R4               R4 = lost
+; D 40EE 8C 04          TESTXZ R4
+; D 40F0 A1 00 FB       IFFALSEI RLOST
+; D 40F3 11 0E 0D D2    LOADXI R14 0DD2
+; D 40F7 C1 0E          PRINTSTR R14
+; D 40F9 BE 00          RETURN
 ; RLOST:
-; D 40EF 11 0E 0D C9    LOADXI R14 0DC9
-; D 40F3 C1 0E          PRINTSTR R14
-; D 40F5 BD 01 00       CALL PRNUM
-; D 40F8 11 0E 0D E4    LOADXI R14 0DE4
-; D 40FC C1 0E          PRINTSTR R14
-; D 40FE BE 00          RETURN
+; D 40FB 11 0E 0D C9    LOADXI R14 0DC9
+; D 40FF C1 0E          PRINTSTR R14
+; D 4101 BD 01 0C       CALL PRNUM
+; D 4104 11 0E 0D E4    LOADXI R14 0DE4
+; D 4108 C1 0E          PRINTSTR R14
+; D 410A BE 00          RETURN
 ; PRNUM:
-; D 4100 11 09 03 E8    LOADXI R9 03E8
-; D 4104 4D 49          DIVXY R4 / R9
-; D 4106 25             COPYMAA
-; D 4107 4E 00 30       ADDAI 0030
-; D 410A C9             SEROUT
-; D 410B 27             COPYREMA
-; D 410C 21 04          COPYAX Acc -> R4
-; D 410E 11 09 00 64    LOADXI R9 0064
-; D 4112 4D 49          DIVXY R4 / R9
-; D 4114 25             COPYMAA
-; D 4115 4E 00 30       ADDAI 0030
-; D 4118 C9             SEROUT
-; D 4119 27             COPYREMA
-; D 411A 21 04          COPYAX Acc -> R4
-; D 411C 4D 4F          DIVXY R4 / R15
-; D 411E 25             COPYMAA
-; D 411F 4E 00 30       ADDAI 0030
-; D 4122 C9             SEROUT
-; D 4123 27             COPYREMA
-; D 4124 4E 00 30       ADDAI 0030
-; D 4127 C9             SEROUT
-; D 4128 BE 00          RETURN
+; D 410C 11 03 03 E8    LOADXI R3 03E8
+; D 4110 4D 43          DIVXY R4 / R3
+; D 4112 25             COPYMAA
+; D 4113 4E 00 30       ADDAI 0030
+; D 4116 C9             SEROUT
+; D 4117 27             COPYREMA
+; D 4118 21 04          COPYAX Acc -> R4
+; D 411A 11 03 00 64    LOADXI R3 0064
+; D 411E 4D 43          DIVXY R4 / R3
+; D 4120 25             COPYMAA
+; D 4121 4E 00 30       ADDAI 0030
+; D 4124 C9             SEROUT
+; D 4125 27             COPYREMA
+; D 4126 21 04          COPYAX Acc -> R4
+; D 4128 4D 4F          DIVXY R4 / R15
+; D 412A 25             COPYMAA
+; D 412B 4E 00 30       ADDAI 0030
+; D 412E C9             SEROUT
+; D 412F 27             COPYREMA
+; D 4130 4E 00 30       ADDAI 0030
+; D 4133 C9             SEROUT
+; D 4134 BE 00          RETURN
 
 ; --------------------------------------------------------------------------
 ; CODE  -  download this block
@@ -144,109 +149,112 @@
 D 4000 CD
 D 4001 11 0F 00 0A
 D 4005 D0 12
-D 4007 11 03 0F 02
-D 400B 32 03 00 00
-D 400F 11 03 0F 00
-D 4013 32 03 00 00
-D 4017 11 0E 0C 00
-D 401B C1 0E
-D 401D 11 03 0F 02
-D 4021 32 03 00 01
-D 4025 11 05 01 F4
-D 4029 11 06 00 32
-D 402D 11 0A 0F 00
-D 4031 39 02 AB
-D 4034 42 0B
-D 4036 3A 02 BA
-D 4039 43 06
-D 403B 8C 06
-D 403D A1 00 46
-D 4040 CA 31
-D 4042 11 06 00 32
-D 4046 43 05
-D 4048 8C 05
-D 404A A1 00 31
-D 404D 11 03 0F 04
-D 4051 39 02 34
-D 4054 86 04 00 01
-D 4058 A1 00 51
-D 405B BD 00 BB
-D 405E 11 03 0F 00
-D 4062 32 03 00 00
-D 4066 11 0E 0D 15
-D 406A C1 0E
-D 406C 11 03 0F 02
-D 4070 32 03 00 02
-D 4074 11 05 01 F4
-D 4078 11 06 00 32
-D 407C 11 0A 0F 00
-D 4080 C7 00
-D 4082 39 02 AB
-D 4085 42 0B
-D 4087 3A 02 BA
-D 408A C7 01
-D 408C 43 06
-D 408E 8C 06
-D 4090 A1 00 99
-D 4093 CA 31
-D 4095 11 06 00 32
-D 4099 43 05
-D 409B 8C 05
-D 409D A1 00 80
-D 40A0 11 03 0F 04
-D 40A4 39 02 34
-D 40A7 86 04 00 02
-D 40AB A1 00 A4
-D 40AE BD 00 BB
-D 40B1 11 0E 0D F0
-D 40B5 C1 0E
-D 40B7 00
-D 40B8 F0 00 00
-D 40BB 11 0E 0D B3
-D 40BF C1 0E
-D 40C1 11 04 03 E8
-D 40C5 BD 01 00
-D 40C8 11 0E 0D C1
-D 40CC C1 0E
-D 40CE 11 03 0F 00
-D 40D2 39 02 34
-D 40D5 23 00 47
-D 40D8 BD 01 00
-D 40DB 11 04 03 E8
-D 40DF 51 47 04
-D 40E2 8C 04
-D 40E4 A1 00 EF
-D 40E7 11 0E 0D D2
-D 40EB C1 0E
-D 40ED BE 00
-D 40EF 11 0E 0D C9
-D 40F3 C1 0E
-D 40F5 BD 01 00
-D 40F8 11 0E 0D E4
-D 40FC C1 0E
-D 40FE BE 00
-D 4100 11 09 03 E8
-D 4104 4D 49
-D 4106 25
-D 4107 4E 00 30
-D 410A C9
-D 410B 27
-D 410C 21 04
-D 410E 11 09 00 64
-D 4112 4D 49
-D 4114 25
-D 4115 4E 00 30
-D 4118 C9
-D 4119 27
-D 411A 21 04
-D 411C 4D 4F
-D 411E 25
-D 411F 4E 00 30
-D 4122 C9
-D 4123 27
-D 4124 4E 00 30
-D 4127 C9
-D 4128 BE 00
+D 4007 11 07 0F 00
+D 400B 11 08 0F 02
+D 400F 11 09 0F 04
+D 4013 11 03 0F 02
+D 4017 32 03 00 00
+D 401B 11 03 0F 00
+D 401F 32 03 00 00
+D 4023 11 0E 0C 00
+D 4027 C1 0E
+D 4029 11 03 0F 02
+D 402D 32 03 00 01
+D 4031 11 05 01 F4
+D 4035 11 06 00 32
+D 4039 11 0A 0F 00
+D 403D 39 02 AB
+D 4040 42 0B
+D 4042 3A 02 BA
+D 4045 43 06
+D 4047 8C 06
+D 4049 A1 00 52
+D 404C CA 31
+D 404E 11 06 00 32
+D 4052 43 05
+D 4054 8C 05
+D 4056 A1 00 3D
+D 4059 11 03 0F 04
+D 405D 39 02 34
+D 4060 86 04 00 01
+D 4064 A1 00 5D
+D 4067 BD 00 C7
+D 406A 11 03 0F 00
+D 406E 32 03 00 00
+D 4072 11 0E 0D 15
+D 4076 C1 0E
+D 4078 11 03 0F 02
+D 407C 32 03 00 02
+D 4080 11 05 01 F4
+D 4084 11 06 00 32
+D 4088 11 0A 0F 00
+D 408C C7 00
+D 408E 39 02 AB
+D 4091 42 0B
+D 4093 3A 02 BA
+D 4096 C7 01
+D 4098 43 06
+D 409A 8C 06
+D 409C A1 00 A5
+D 409F CA 31
+D 40A1 11 06 00 32
+D 40A5 43 05
+D 40A7 8C 05
+D 40A9 A1 00 8C
+D 40AC 11 03 0F 04
+D 40B0 39 02 34
+D 40B3 86 04 00 02
+D 40B7 A1 00 B0
+D 40BA BD 00 C7
+D 40BD 11 0E 0D F0
+D 40C1 C1 0E
+D 40C3 00
+D 40C4 F0 00 00
+D 40C7 11 0E 0D B3
+D 40CB C1 0E
+D 40CD 11 04 03 E8
+D 40D1 BD 01 0C
+D 40D4 11 0E 0D C1
+D 40D8 C1 0E
+D 40DA 11 03 0F 00
+D 40DE 39 02 34
+D 40E1 23 00 46
+D 40E4 BD 01 0C
+D 40E7 11 04 03 E8
+D 40EB 51 46 04
+D 40EE 8C 04
+D 40F0 A1 00 FB
+D 40F3 11 0E 0D D2
+D 40F7 C1 0E
+D 40F9 BE 00
+D 40FB 11 0E 0D C9
+D 40FF C1 0E
+D 4101 BD 01 0C
+D 4104 11 0E 0D E4
+D 4108 C1 0E
+D 410A BE 00
+D 410C 11 03 03 E8
+D 4110 4D 43
+D 4112 25
+D 4113 4E 00 30
+D 4116 C9
+D 4117 27
+D 4118 21 04
+D 411A 11 03 00 64
+D 411E 4D 43
+D 4120 25
+D 4121 4E 00 30
+D 4124 C9
+D 4125 27
+D 4126 21 04
+D 4128 4D 4F
+D 412A 25
+D 412B 4E 00 30
+D 412E C9
+D 412F 27
+D 4130 4E 00 30
+D 4133 C9
+D 4134 BE 00
 
 D 4C00 0D 0A 52 41 43 45 20 43 4F 4E 44 49 54 49 4F 4E
 D 4C10 20 2D 20 74 77 6F 20 56 4D 73 2C 20 6F 6E 65 20

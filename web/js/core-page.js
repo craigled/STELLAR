@@ -27,7 +27,7 @@
   });
 
   var samples = [];
-  fetch('samples/manifest.json?v=40').then(function (r) { return r.json(); }).then(function (list) {
+  fetch('samples/manifest.json?v=41').then(function (r) { return r.json(); }).then(function (list) {
     samples = list;
     var sel = byId('sample');
     list.forEach(function (s, i) {
@@ -49,7 +49,7 @@
   function load(i) {
     var s = samples[i];
     byId('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=40').then(function (r) { return r.text(); }).then(function (text) {
+    fetch('samples/' + s.file + '?v=41').then(function (r) { return r.text(); }).then(function (text) {
       var input = (s.input || '').replace(/\\r/g, '\r').replace(/\\n/g, '\n');
       app.load(text, input);
     });

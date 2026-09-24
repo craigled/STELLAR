@@ -14,8 +14,10 @@
       programs: ['sched-echo-tick.lst', 'sched-echo-read.lst'] },
     { name: 'Front panel — two VMs, one latch', blurb: 'Nothing goes to the terminal here — watch the front panel. VM1 holds Q on and writes $11 to the output latch; VM2 holds Q off and writes $22. There is only one Q line and one latch for the whole machine, so the display flips 11/22 and the Q lamp blinks as the scheduler hands the CPU between them.',
       programs: ['sched-panel1.lst', 'sched-panel2.lst'] },
-    { name: 'Race condition — lost updates, then a lock', blurb: 'VM1 and VM2 each add 1 to one shared counter 500 times: READ it, ADD one, WRITE it back. The counter lives in VM1; VM2 reaches it through SHAREVM and the cross-VM copies. In round 1 the scheduler sometimes switches between one VM\'s read and its write, and the other VM\'s updates in that gap are overwritten — 196 of the 1000 are lost. Round 2 wraps the three opcodes in SETMULTI 00 / 01 (multitasking off, the "disable interrupts" critical section) and gets exactly 1000. The marks 1 and 2 show the VMs taking turns.',
-      programs: ['sched-race1.lst', 'sched-race2.lst'] }
+    { name: 'Race condition — lost updates, then a lock', blurb: 'VM1 and VM2 each add 1 to one shared counter 500 times: READ it, ADD one, WRITE it back. The counter lives in VM1; VM2 reaches it through SHAREVM and the cross-VM copies. In round 1 the scheduler sometimes switches between one VM\'s read and its write, and the other VM\'s updates in that gap are overwritten — 200 of the 1000 are lost. Round 2 wraps the three opcodes in SETMULTI 00 / 01 (multitasking off, the "disable interrupts" critical section) and gets exactly 1000. The marks 1 and 2 show the VMs taking turns.',
+      programs: ['sched-race1.lst', 'sched-race2.lst'] },
+    { name: 'Game of Life race — bytecode vs native', blurb: 'The same Game of Life board (an acorn, 24 × 10) on both sides, under the same scheduler. VM1 on the left computes every generation in STELLAR bytecode; VM2 on the right calls raw 1802 code with RUNMC. Each board row is a ready-made string printed with ONE PRINTSTR, and a single opcode is never cut by the scheduler, so the two boards never garble each other. After 8 generations VM1 copies VM2\'s count straight out of VM2\'s register R1 (COPYVXY), stops VM2 with KILLVM, and prints the score: about 134 times as many generations. At Elf2K speed the whole run takes about 6½ minutes (the real machine, with its 9600-baud terminal, about 13); 10× shows it in under a minute. The score is the same at any speed: the scheduler switches VMs on an opcode count, not a clock.',
+      programs: ['sched-life1.lst', 'sched-life2.lst'] }
   ];
   var STATE = { 0x00: 'done', 0x01: 'active', 0x02: 'cycle', 0x03: 'idle', 0x04: 'paused', 0x05: 'killed', 0x06: 'error', 0x0F: 'unknown' };
   function byId(id) { return document.getElementById(id); }
@@ -40,7 +42,7 @@
     byId('blurb').textContent = s.blurb;
     byId('status').textContent = 'loading ' + s.name + '…';
     Promise.all(s.programs.map(function (f) {
-      return fetch('samples/' + f + '?v=40').then(function (r) { return r.text(); });
+      return fetch('samples/' + f + '?v=41').then(function (r) { return r.text(); });
     })).then(function (texts) {
       mv = new window.StellarMultiVM({ firmware: window.STELLAR_FIRMWARE, programs: texts });
       mv.bootUntilReady();      // run CREATE_CIDP + scheduler so VMs are active

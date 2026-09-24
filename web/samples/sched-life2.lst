@@ -1,0 +1,496 @@
+; ==========================================================================
+; STELLAR LIFE RACE  -  VM2: native 1802 via RUNMC   (loads at $5000)   (web copy based at $4000: the Multitasking page moves program 2 to $5000 itself)
+; ==========================================================================
+; Load BOTH programs - Life-Race-VM1.lst at $4000 and Life-Race-VM2.lst at
+; $5000 - then cold-boot. The same Game of Life board (a 24 x 10 acorn) runs on
+; both sides: VM1 on the left computes each generation in STELLAR bytecode, VM2
+; on the right in native 1802 through $F1 RUNMC. After 8 generations VM1 copies
+; VM2's count out of VM2's R1 ($D3), stops VM2 with $CF KILLVM, prints the score.
+;
+; Every board row is ONE PRINTSTR of a ready-made "ESC[rr;ccH" + 24 cells string,
+; so the two VMs never garble each other's output. VT100 cursor addressing only.
+;
+; VERIFICATION (Firmware-Math/liferace_verify.py, V0061.33, two-VM cold boot): all 1,084 boards drawn (VM1 generations 0-8, VM2 0-1074) match a Python Life model; VM2 did 1075 generations to VM1's 8 - about 134 times as many. The scheduler switches on an opcode COUNT, so the Elf2K should print the same score. Run time: ~65.8 million 1802 instructions (~6.5 min at 3 MHz) plus ~372 KB of output (~6.5 min at 9600 baud): expect about 13 minutes.
+; NOT YET RUN ON HARDWARE.
+;
+; 120 STELLAR commands.
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 5000 CD             START
+; D 5001 D0 12          SHAREVM on, read/write             VM1 reads our GEN word - and KILLVM needs RW
+; D 5003 11 01 00 00    LOADXI R1 0000
+; WAIT:
+; D 5007 D3 10 B4       COPYVXY VM1 RB -> R4               VM1's GO register
+; D 500A 86 04 00 01    TESTXI R4 0001
+; D 500E A1 00 07       IFFALSEI WAIT                      Wait for VM1 to clear the screen
+; D 5011 23 00 17       COPYXY R1 -> R7
+; D 5014 11 0E 00 00    LOADXI R14 0000
+; D 5018 11 08 03 E8    LOADXI R8 03E8
+; D 501C 4D 78          DIVXY R7 / R8
+; D 501E 25             COPYMAA
+; D 501F 4E 00 30       ADDAI 0030
+; D 5022 2F 0E 0A 13    WRITEIDX R14 0A13
+; D 5026 27             COPYREMA
+; D 5027 21 07          COPYAX Acc -> R7
+; D 5029 11 08 00 64    LOADXI R8 0064
+; D 502D 4D 78          DIVXY R7 / R8
+; D 502F 25             COPYMAA
+; D 5030 4E 00 30       ADDAI 0030
+; D 5033 2F 0E 0A 14    WRITEIDX R14 0A14
+; D 5037 27             COPYREMA
+; D 5038 21 07          COPYAX Acc -> R7
+; D 503A 11 08 00 0A    LOADXI R8 000A
+; D 503E 4D 78          DIVXY R7 / R8
+; D 5040 25             COPYMAA
+; D 5041 4E 00 30       ADDAI 0030
+; D 5044 2F 0E 0A 15    WRITEIDX R14 0A15
+; D 5048 27             COPYREMA
+; D 5049 21 07          COPYAX Acc -> R7
+; D 504B 22 07          COPYXA R7 -> Acc
+; D 504D 4E 00 30       ADDAI 0030
+; D 5050 2F 0E 0A 16    WRITEIDX R14 0A16
+; D 5054 11 0E 08 00    LOADXI R14 0800
+; D 5058 11 09 00 0A    LOADXI R9 000A
+; SR0:
+; D 505C C1 0E          PRINTSTR R14                       One board row: ONE opcode, never cut
+; D 505E 52 0E 00 21    ADDXI R14 0021
+; D 5062 43 09          DECX R9
+; D 5064 8C 09          TESTXZ R9
+; D 5066 A1 00 5C       IFFALSEI SR0
+; D 5069 11 0E 0A 00    LOADXI R14 0A00
+; D 506D C1 0E          PRINTSTR R14                       The generation count
+; LOOP:
+; D 506F F1 56 00       RUNMC 5600                         One generation, natively
+; D 5072 42 01          INCX R1
+; D 5074 F1 56 80       RUNMC 5680                         Its row strings, natively
+; D 5077 23 00 17       COPYXY R1 -> R7
+; D 507A 11 0E 00 00    LOADXI R14 0000
+; D 507E 11 08 03 E8    LOADXI R8 03E8
+; D 5082 4D 78          DIVXY R7 / R8
+; D 5084 25             COPYMAA
+; D 5085 4E 00 30       ADDAI 0030
+; D 5088 2F 0E 0A 13    WRITEIDX R14 0A13
+; D 508C 27             COPYREMA
+; D 508D 21 07          COPYAX Acc -> R7
+; D 508F 11 08 00 64    LOADXI R8 0064
+; D 5093 4D 78          DIVXY R7 / R8
+; D 5095 25             COPYMAA
+; D 5096 4E 00 30       ADDAI 0030
+; D 5099 2F 0E 0A 14    WRITEIDX R14 0A14
+; D 509D 27             COPYREMA
+; D 509E 21 07          COPYAX Acc -> R7
+; D 50A0 11 08 00 0A    LOADXI R8 000A
+; D 50A4 4D 78          DIVXY R7 / R8
+; D 50A6 25             COPYMAA
+; D 50A7 4E 00 30       ADDAI 0030
+; D 50AA 2F 0E 0A 15    WRITEIDX R14 0A15
+; D 50AE 27             COPYREMA
+; D 50AF 21 07          COPYAX Acc -> R7
+; D 50B1 22 07          COPYXA R7 -> Acc
+; D 50B3 4E 00 30       ADDAI 0030
+; D 50B6 2F 0E 0A 16    WRITEIDX R14 0A16
+; D 50BA 11 0E 08 00    LOADXI R14 0800
+; D 50BE 11 09 00 0A    LOADXI R9 000A
+; SRs0:
+; D 50C2 C1 0E          PRINTSTR R14                       One board row: ONE opcode, never cut
+; D 50C4 52 0E 00 21    ADDXI R14 0021
+; D 50C8 43 09          DECX R9
+; D 50CA 8C 09          TESTXZ R9
+; D 50CC A1 00 C2       IFFALSEI SRs0
+; D 50CF 11 0E 0A 00    LOADXI R14 0A00
+; D 50D3 C1 0E          PRINTSTR R14                       The generation count
+; D 50D5 F1 56 30       RUNMC 5630                         One generation, natively
+; D 50D8 42 01          INCX R1
+; D 50DA F1 56 60       RUNMC 5660                         Its row strings, natively
+; D 50DD 23 00 17       COPYXY R1 -> R7
+; D 50E0 11 0E 00 00    LOADXI R14 0000
+; D 50E4 11 08 03 E8    LOADXI R8 03E8
+; D 50E8 4D 78          DIVXY R7 / R8
+; D 50EA 25             COPYMAA
+; D 50EB 4E 00 30       ADDAI 0030
+; D 50EE 2F 0E 0A 13    WRITEIDX R14 0A13
+; D 50F2 27             COPYREMA
+; D 50F3 21 07          COPYAX Acc -> R7
+; D 50F5 11 08 00 64    LOADXI R8 0064
+; D 50F9 4D 78          DIVXY R7 / R8
+; D 50FB 25             COPYMAA
+; D 50FC 4E 00 30       ADDAI 0030
+; D 50FF 2F 0E 0A 14    WRITEIDX R14 0A14
+; D 5103 27             COPYREMA
+; D 5104 21 07          COPYAX Acc -> R7
+; D 5106 11 08 00 0A    LOADXI R8 000A
+; D 510A 4D 78          DIVXY R7 / R8
+; D 510C 25             COPYMAA
+; D 510D 4E 00 30       ADDAI 0030
+; D 5110 2F 0E 0A 15    WRITEIDX R14 0A15
+; D 5114 27             COPYREMA
+; D 5115 21 07          COPYAX Acc -> R7
+; D 5117 22 07          COPYXA R7 -> Acc
+; D 5119 4E 00 30       ADDAI 0030
+; D 511C 2F 0E 0A 16    WRITEIDX R14 0A16
+; D 5120 11 0E 08 00    LOADXI R14 0800
+; D 5124 11 09 00 0A    LOADXI R9 000A
+; SRs1:
+; D 5128 C1 0E          PRINTSTR R14                       One board row: ONE opcode, never cut
+; D 512A 52 0E 00 21    ADDXI R14 0021
+; D 512E 43 09          DECX R9
+; D 5130 8C 09          TESTXZ R9
+; D 5132 A1 01 28       IFFALSEI SRs1
+; D 5135 11 0E 0A 00    LOADXI R14 0A00
+; D 5139 C1 0E          PRINTSTR R14                       The generation count
+; D 513B B0 00 6F       GAL LOOP
+; D 513E 00             HALT                               never reached - VM1 kills VM2
+; D 513F F0 00 00       BREAK
+
+; --- native engine: a18 listing of Firmware-Math/gollife_native.asm ---
+; 5600 F8 5B        GENAB:  LDI     HIGH GRIDA
+; 5602 B7                   PHI     R7
+; 5603 F8 00                LDI     LOW  GRIDA
+; 5605 A7                   PLO     R7
+; 5606 F8 5B                LDI     HIGH (GRIDA+STRIDE)
+; 5608 B8                   PHI     R8
+; 5609 F8 1A                LDI     LOW  (GRIDA+STRIDE)
+; 560B A8                   PLO     R8
+; 560C F8 5B                LDI     HIGH (GRIDA+2*STRIDE)
+; 560E B9                   PHI     R9
+; 560F F8 34                LDI     LOW  (GRIDA+2*STRIDE)
+; 5611 A9                   PLO     R9
+; 5612 F8 5D                LDI     HIGH (GRIDB+STRIDE+1)
+; 5614 BE                   PHI     R14
+; 5615 F8 1B                LDI     LOW  (GRIDB+STRIDE+1)
+; 5617 AE                   PLO     R14
+; 5618 C0 57 00             LBR     BODY
+; 5630 F8 5D        GENBA:  LDI     HIGH GRIDB
+; 5632 B7                   PHI     R7
+; 5633 F8 00                LDI     LOW  GRIDB
+; 5635 A7                   PLO     R7
+; 5636 F8 5D                LDI     HIGH (GRIDB+STRIDE)
+; 5638 B8                   PHI     R8
+; 5639 F8 1A                LDI     LOW  (GRIDB+STRIDE)
+; 563B A8                   PLO     R8
+; 563C F8 5D                LDI     HIGH (GRIDB+2*STRIDE)
+; 563E B9                   PHI     R9
+; 563F F8 34                LDI     LOW  (GRIDB+2*STRIDE)
+; 5641 A9                   PLO     R9
+; 5642 F8 5B                LDI     HIGH (GRIDA+STRIDE+1)
+; 5644 BE                   PHI     R14
+; 5645 F8 1B                LDI     LOW  (GRIDA+STRIDE+1)
+; 5647 AE                   PLO     R14
+; 5648 C0 57 00             LBR     BODY
+; 5660 F8 5B        ROWSA:  LDI     HIGH (GRIDA+STRIDE+1)
+; 5662 B7                   PHI     R7
+; 5663 F8 1B                LDI     LOW  (GRIDA+STRIDE+1)
+; 5665 A7                   PLO     R7
+; 5666 C0 57 41             LBR     RBODY
+; 5680 F8 5D        ROWSB:  LDI     HIGH (GRIDB+STRIDE+1)
+; 5682 B7                   PHI     R7
+; 5683 F8 1B                LDI     LOW  (GRIDB+STRIDE+1)
+; 5685 A7                   PLO     R7
+; 5686 C0 57 41             LBR     RBODY
+; 5700 F8 0A        BODY:   LDI     ROWS
+; 5702 AB                   PLO     R11
+; 5703 F8 18        ROW:    LDI     COLS
+; 5705 AF                   PLO     R15
+; 5706 F8 00        COL:    LDI     000H
+; 5708 E7                   SEX     R7              ; row above: three cells
+; 5709 F4                   ADD
+; 570A 60                   IRX
+; 570B F4                   ADD
+; 570C 60                   IRX
+; 570D F4                   ADD
+; 570E 60                   IRX
+; 570F 27                   DEC     R7
+; 5710 27                   DEC     R7
+; 5711 E9                   SEX     R9              ; row below
+; 5712 F4                   ADD
+; 5713 60                   IRX
+; 5714 F4                   ADD
+; 5715 60                   IRX
+; 5716 F4                   ADD
+; 5717 60                   IRX
+; 5718 29                   DEC     R9
+; 5719 29                   DEC     R9
+; 571A E8                   SEX     R8              ; centre row: left and right
+; 571B F4                   ADD
+; 571C 60                   IRX
+; 571D 60                   IRX
+; 571E F4                   ADD
+; 571F 60                   IRX
+; 5720 28                   DEC     R8
+; 5721 28                   DEC     R8              ; R8 is ON the centre cell
+; 5722 F1                   OR                      ; sum OR centre
+; 5723 FF 03                SMI     003H
+; 5725 3A 2B                BNZ     DEAD
+; 5727 F8 01                LDI     001H
+; 5729 30 2D                BR      PUT
+; 572B F8 00        DEAD:   LDI     000H
+; 572D 5E           PUT:    STR     R14
+; 572E 1E                   INC     R14
+; 572F 2F                   DEC     R15
+; 5730 8F                   GLO     R15
+; 5731 3A 06                BNZ     COL
+; 5733 17                   INC     R7              ; over the two border cells
+; 5734 17                   INC     R7
+; 5735 18                   INC     R8
+; 5736 18                   INC     R8
+; 5737 19                   INC     R9
+; 5738 19                   INC     R9
+; 5739 1E                   INC     R14
+; 573A 1E                   INC     R14
+; 573B 2B                   DEC     R11
+; 573C 8B                   GLO     R11
+; 573D 3A 03                BNZ     ROW
+; 573F E2                   SEX     R2
+; 5740 D5                   SEP     R5
+; 5741 F8 58        RBODY:  LDI     HIGH (ROWSTR+8)
+; 5743 B8                   PHI     R8
+; 5744 F8 08                LDI     LOW  (ROWSTR+8)
+; 5746 A8                   PLO     R8
+; 5747 F8 0A                LDI     ROWS
+; 5749 AB                   PLO     R11
+; 574A F8 18        RROW:   LDI     COLS
+; 574C AF                   PLO     R15
+; 574D 47           RCOL:   LDA     R7
+; 574E 32 54                BZ      RDOT
+; 5750 F8 23                LDI     '#'
+; 5752 30 56                BR      RPUT
+; 5754 F8 2E        RDOT:   LDI     '.'
+; 5756 58           RPUT:   STR     R8
+; 5757 18                   INC     R8
+; 5758 2F                   DEC     R15
+; 5759 8F                   GLO     R15
+; 575A 3A 4D                BNZ     RCOL
+; 575C 17                   INC     R7              ; next board row: over two border cells
+; 575D 17                   INC     R7
+; 575E 88                   GLO     R8              ; next row string: past $00 and the header
+; 575F FC 09                ADI     RSTR-COLS
+; 5761 A8                   PLO     R8
+; 5762 98                   GHI     R8
+; 5763 7C 00                ADCI    0
+; 5765 B8                   PHI     R8
+; 5766 2B                   DEC     R11
+; 5767 8B                   GLO     R11
+; 5768 3A 4A                BNZ     RROW
+; 576A E2                   SEX     R2
+; 576B D5                   SEP     R5
+
+; --------------------------------------------------------------------------
+; CODE  -  download this block
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 D0 12
+D 4003 11 01 00 00
+D 4007 D3 10 B4
+D 400A 86 04 00 01
+D 400E A1 00 07
+D 4011 23 00 17
+D 4014 11 0E 00 00
+D 4018 11 08 03 E8
+D 401C 4D 78
+D 401E 25
+D 401F 4E 00 30
+D 4022 2F 0E 0A 13
+D 4026 27
+D 4027 21 07
+D 4029 11 08 00 64
+D 402D 4D 78
+D 402F 25
+D 4030 4E 00 30
+D 4033 2F 0E 0A 14
+D 4037 27
+D 4038 21 07
+D 403A 11 08 00 0A
+D 403E 4D 78
+D 4040 25
+D 4041 4E 00 30
+D 4044 2F 0E 0A 15
+D 4048 27
+D 4049 21 07
+D 404B 22 07
+D 404D 4E 00 30
+D 4050 2F 0E 0A 16
+D 4054 11 0E 08 00
+D 4058 11 09 00 0A
+D 405C C1 0E
+D 405E 52 0E 00 21
+D 4062 43 09
+D 4064 8C 09
+D 4066 A1 00 5C
+D 4069 11 0E 0A 00
+D 406D C1 0E
+D 406F F1 56 00
+D 4072 42 01
+D 4074 F1 56 80
+D 4077 23 00 17
+D 407A 11 0E 00 00
+D 407E 11 08 03 E8
+D 4082 4D 78
+D 4084 25
+D 4085 4E 00 30
+D 4088 2F 0E 0A 13
+D 408C 27
+D 408D 21 07
+D 408F 11 08 00 64
+D 4093 4D 78
+D 4095 25
+D 4096 4E 00 30
+D 4099 2F 0E 0A 14
+D 409D 27
+D 409E 21 07
+D 40A0 11 08 00 0A
+D 40A4 4D 78
+D 40A6 25
+D 40A7 4E 00 30
+D 40AA 2F 0E 0A 15
+D 40AE 27
+D 40AF 21 07
+D 40B1 22 07
+D 40B3 4E 00 30
+D 40B6 2F 0E 0A 16
+D 40BA 11 0E 08 00
+D 40BE 11 09 00 0A
+D 40C2 C1 0E
+D 40C4 52 0E 00 21
+D 40C8 43 09
+D 40CA 8C 09
+D 40CC A1 00 C2
+D 40CF 11 0E 0A 00
+D 40D3 C1 0E
+D 40D5 F1 56 30
+D 40D8 42 01
+D 40DA F1 56 60
+D 40DD 23 00 17
+D 40E0 11 0E 00 00
+D 40E4 11 08 03 E8
+D 40E8 4D 78
+D 40EA 25
+D 40EB 4E 00 30
+D 40EE 2F 0E 0A 13
+D 40F2 27
+D 40F3 21 07
+D 40F5 11 08 00 64
+D 40F9 4D 78
+D 40FB 25
+D 40FC 4E 00 30
+D 40FF 2F 0E 0A 14
+D 4103 27
+D 4104 21 07
+D 4106 11 08 00 0A
+D 410A 4D 78
+D 410C 25
+D 410D 4E 00 30
+D 4110 2F 0E 0A 15
+D 4114 27
+D 4115 21 07
+D 4117 22 07
+D 4119 4E 00 30
+D 411C 2F 0E 0A 16
+D 4120 11 0E 08 00
+D 4124 11 09 00 0A
+D 4128 C1 0E
+D 412A 52 0E 00 21
+D 412E 43 09
+D 4130 8C 09
+D 4132 A1 01 28
+D 4135 11 0E 0A 00
+D 4139 C1 0E
+D 413B B0 00 6F
+D 413E 00
+D 413F F0 00 00
+
+D 4600 F8 5B B7 F8 00 A7 F8 5B B8 F8 1A A8 F8 5B B9 F8
+D 4610 34 A9 F8 5D BE F8 1B AE C0 57 00 00 00 00 00 00
+D 4620 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4630 F8 5D B7 F8 00 A7 F8 5D B8 F8 1A A8 F8 5D B9 F8
+D 4640 34 A9 F8 5B BE F8 1B AE C0 57 00 00 00 00 00 00
+D 4650 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4660 F8 5B B7 F8 1B A7 C0 57 41 00 00 00 00 00 00 00
+D 4670 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4680 F8 5D B7 F8 1B A7 C0 57 41 00 00 00 00 00 00 00
+D 4690 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 46A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 46B0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 46C0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 46D0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 46E0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 46F0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4700 F8 0A AB F8 18 AF F8 00 E7 F4 60 F4 60 F4 60 27
+D 4710 27 E9 F4 60 F4 60 F4 60 29 29 E8 F4 60 60 F4 60
+D 4720 28 28 F1 FF 03 3A 2B F8 01 30 2D F8 00 5E 1E 2F
+D 4730 8F 3A 06 17 17 18 18 19 19 1E 1E 2B 8B 3A 03 E2
+D 4740 D5 F8 58 B8 F8 08 A8 F8 0A AB F8 18 AF 47 32 54
+D 4750 F8 23 30 56 F8 2E 58 18 2F 8F 3A 4D 17 17 88 FC
+D 4760 09 A8 98 7C 00 B8 2B 8B 3A 4A E2 D5
+
+D 4800 1B 5B 30 35 3B 34 36 48 2E 2E 2E 2E 2E 2E 2E 2E
+D 4810 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4820 00 1B 5B 30 36 3B 34 36 48 2E 2E 2E 2E 2E 2E 2E
+D 4830 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4840 2E 00 1B 5B 30 37 3B 34 36 48 2E 2E 2E 2E 2E 2E
+D 4850 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4860 2E 2E 00 1B 5B 30 38 3B 34 36 48 2E 2E 2E 2E 2E
+D 4870 2E 2E 2E 2E 23 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4880 2E 2E 2E 00 1B 5B 30 39 3B 34 36 48 2E 2E 2E 2E
+D 4890 2E 2E 2E 2E 2E 2E 2E 23 2E 2E 2E 2E 2E 2E 2E 2E
+D 48A0 2E 2E 2E 2E 00 1B 5B 31 30 3B 34 36 48 2E 2E 2E
+D 48B0 2E 2E 2E 2E 2E 23 23 2E 2E 23 23 23 2E 2E 2E 2E
+D 48C0 2E 2E 2E 2E 2E 00 1B 5B 31 31 3B 34 36 48 2E 2E
+D 48D0 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 48E0 2E 2E 2E 2E 2E 2E 00 1B 5B 31 32 3B 34 36 48 2E
+D 48F0 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4900 2E 2E 2E 2E 2E 2E 2E 00 1B 5B 31 33 3B 34 36 48
+D 4910 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4920 2E 2E 2E 2E 2E 2E 2E 2E 00 1B 5B 31 34 3B 34 36
+D 4930 48 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4940 2E 2E 2E 2E 2E 2E 2E 2E 2E 00
+
+D 4A00 1B 5B 31 36 3B 34 36 48 67 65 6E 65 72 61 74 69
+D 4A10 6F 6E 20 30 30 30 30 00
+
+D 4A60 2E 23
+
+D 4B00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4B10 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4B20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4B30 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4B40 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4B50 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4B60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4B70 00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4B80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 00
+D 4B90 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4BA0 00 00 00 00 00 01 01 00 00 01 01 01 00 00 00 00
+D 4BB0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4BC0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4BD0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4BE0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4BF0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4C00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4C10 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4C20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4C30 00 00 00 00 00 00 00 00
+
+D 4D00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4D10 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4D20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4D30 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4D40 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4D50 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4D60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4D70 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4D80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4D90 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4DA0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4DB0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4DC0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4DD0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4DE0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4DF0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4E00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4E10 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4E20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4E30 00 00 00 00 00 00 00 00

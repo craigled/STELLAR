@@ -1,5 +1,5 @@
 ; ==========================================================================
-; STELLAR RACE CONDITION  -  VM2: the second worker   (web copy based at $4000: the Multitasking page moves program 2 to $5000 itself)
+; STELLAR RACE CONDITION  -  VM2: the second worker   (loads at $5000)   (web copy based at $4000: the Multitasking page moves program 2 to $5000 itself)
 ; ==========================================================================
 ; Load BOTH programs - Race-VM1.lst at $4000 and Race-VM2.lst at $5000 - then
 ; cold-boot. VM1 and VM2 each add 1 to a shared counter 500 times (READ it, ADD
@@ -8,14 +8,16 @@
 ; $C7 SETMULTI 00 / 01 and gets exactly 1000. VM1 prints the scores.
 ;
 ; The counter is in VM1's memory (relative $0F00); VM1 opens it with $D0 SHAREVM
-; read/write, and VM2 uses the cross-VM copies $D4 COPYVMXY / $D5 COPYXVMY.
+; read/write, and VM2 uses the cross-VM copies $D4 COPYVMXY / $D5 COPYXVMY. The
+; ADDRESS in those copies is VM1's register (R7 counter, R8 GO, R9 DONE - VM1 sets
+; them once and never reuses them); only the value register is VM2's own.
 ; GO ($0F02) and DONE ($0F04) words coordinate the rounds; Race-VM1.lst clears
 ; them in its D-lines so leftovers from an earlier run cannot start a round early.
 ;
-; VERIFICATION (Firmware-Math/race_verify.py, V0061.33, two-VM cold boot): round 1 loses 196 of 1000 (got 804), round 2 gets exactly 1000; the loss is deterministic (opcode-count scheduler), so the Elf2K should show the same 196.
+; VERIFICATION (Firmware-Math/race_verify.py, V0061.33, two-VM cold boot): round 1 loses 200 of 1000 (got 800), round 2 gets exactly 1000; the loss is deterministic (opcode-count scheduler), so the Elf2K should show the same 200.
 ; NOT YET RUN ON HARDWARE.
 ;
-; 48 STELLAR commands.
+; 44 STELLAR commands.
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
@@ -23,58 +25,54 @@
 
 ; D 5000 CD             START
 ; D 5001 11 0F 00 0A    LOADXI R15 000A
-; D 5005 11 03 0F 02    LOADXI R3 0F02
 ; W1:
-; D 5009 D4 10 34       COPYVMXY VM1 M(R3) -> R4           VM1's GO word
-; D 500C 86 04 00 01    TESTXI R4 0001
-; D 5010 A1 00 09       IFFALSEI W1                        Wait for round 1
-; D 5013 11 05 01 F4    LOADXI R5 01F4
-; D 5017 11 06 00 32    LOADXI R6 0032
-; D 501B 11 0A 0F 00    LOADXI R10 0F00
+; D 5005 D4 10 84       COPYVMXY VM1 M(VM1 R8) -> R4       VM1's GO word
+; D 5008 86 04 00 01    TESTXI R4 0001
+; D 500C A1 00 05       IFFALSEI W1                        Wait for round 1
+; D 500F 11 05 01 F4    LOADXI R5 01F4
+; D 5013 11 06 00 32    LOADXI R6 0032
+; D 5017 11 0A 0F 00    LOADXI R10 0F00
 ; L1:
-; D 501F D4 10 AB       COPYVMXY VM1 M(RA) -> RB           READ the counter (from VM1)
-; D 5022 42 0B          INCX R11                           ADD one
-; D 5024 D5 10 BA       COPYXVMY RB -> VM1 M(RA)           WRITE it back (to VM1)
-; D 5027 43 06          DECX R6
-; D 5029 8C 06          TESTXZ R6
-; D 502B A1 00 34       IFFALSEI N1
-; D 502E CA 32          SEROUTI 32 '2'                     A mark every 50 adds
-; D 5030 11 06 00 32    LOADXI R6 0032
+; D 501B D4 10 7B       COPYVMXY VM1 M(VM1 R7) -> RB       READ the counter (from VM1)
+; D 501E 42 0B          INCX R11                           ADD one
+; D 5020 D5 10 B7       COPYXVMY RB -> VM1 M(VM1 R7)       WRITE it back (to VM1)
+; D 5023 43 06          DECX R6
+; D 5025 8C 06          TESTXZ R6
+; D 5027 A1 00 30       IFFALSEI N1
+; D 502A CA 32          SEROUTI 32 '2'                     A mark every 50 adds
+; D 502C 11 06 00 32    LOADXI R6 0032
 ; N1:
-; D 5034 43 05          DECX R5
-; D 5036 8C 05          TESTXZ R5
-; D 5038 A1 00 1F       IFFALSEI L1
-; D 503B 11 03 0F 04    LOADXI R3 0F04
-; D 503F 11 04 00 01    LOADXI R4 0001
-; D 5043 D5 10 43       COPYXVMY R4 -> VM1 M(R3)           DONE round 1
-; D 5046 11 03 0F 02    LOADXI R3 0F02
+; D 5030 43 05          DECX R5
+; D 5032 8C 05          TESTXZ R5
+; D 5034 A1 00 1B       IFFALSEI L1
+; D 5037 11 04 00 01    LOADXI R4 0001
+; D 503B D5 10 49       COPYXVMY R4 -> VM1 M(VM1 R9)       DONE round 1
 ; W2:
-; D 504A D4 10 34       COPYVMXY VM1 M(R3) -> R4
-; D 504D 86 04 00 02    TESTXI R4 0002
-; D 5051 A1 00 4A       IFFALSEI W2                        Wait for round 2
-; D 5054 11 05 01 F4    LOADXI R5 01F4
-; D 5058 11 06 00 32    LOADXI R6 0032
-; D 505C 11 0A 0F 00    LOADXI R10 0F00
+; D 503E D4 10 84       COPYVMXY VM1 M(VM1 R8) -> R4
+; D 5041 86 04 00 02    TESTXI R4 0002
+; D 5045 A1 00 3E       IFFALSEI W2                        Wait for round 2
+; D 5048 11 05 01 F4    LOADXI R5 01F4
+; D 504C 11 06 00 32    LOADXI R6 0032
+; D 5050 11 0A 0F 00    LOADXI R10 0F00
 ; L2:
-; D 5060 C7 00          SETMULTI 00                        Lock: no switching from here ...
-; D 5062 D4 10 AB       COPYVMXY VM1 M(RA) -> RB           READ the counter (from VM1)
-; D 5065 42 0B          INCX R11                           ADD one
-; D 5067 D5 10 BA       COPYXVMY RB -> VM1 M(RA)           WRITE it back (to VM1)
-; D 506A C7 01          SETMULTI 01                        ... to here
-; D 506C 43 06          DECX R6
-; D 506E 8C 06          TESTXZ R6
-; D 5070 A1 00 79       IFFALSEI N2
-; D 5073 CA 32          SEROUTI 32 '2'                     A mark every 50 adds
-; D 5075 11 06 00 32    LOADXI R6 0032
+; D 5054 C7 00          SETMULTI 00                        Lock: no switching from here ...
+; D 5056 D4 10 7B       COPYVMXY VM1 M(VM1 R7) -> RB       READ the counter (from VM1)
+; D 5059 42 0B          INCX R11                           ADD one
+; D 505B D5 10 B7       COPYXVMY RB -> VM1 M(VM1 R7)       WRITE it back (to VM1)
+; D 505E C7 01          SETMULTI 01                        ... to here
+; D 5060 43 06          DECX R6
+; D 5062 8C 06          TESTXZ R6
+; D 5064 A1 00 6D       IFFALSEI N2
+; D 5067 CA 32          SEROUTI 32 '2'                     A mark every 50 adds
+; D 5069 11 06 00 32    LOADXI R6 0032
 ; N2:
-; D 5079 43 05          DECX R5
-; D 507B 8C 05          TESTXZ R5
-; D 507D A1 00 60       IFFALSEI L2
-; D 5080 11 03 0F 04    LOADXI R3 0F04
-; D 5084 11 04 00 02    LOADXI R4 0002
-; D 5088 D5 10 43       COPYXVMY R4 -> VM1 M(R3)           DONE round 2
-; D 508B 00             HALT                               VM2 finished
-; D 508C F0 00 00       BREAK                              End marker
+; D 506D 43 05          DECX R5
+; D 506F 8C 05          TESTXZ R5
+; D 5071 A1 00 54       IFFALSEI L2
+; D 5074 11 04 00 02    LOADXI R4 0002
+; D 5078 D5 10 49       COPYXVMY R4 -> VM1 M(VM1 R9)       DONE round 2
+; D 507B 00             HALT                               VM2 finished
+; D 507C F0 00 00       BREAK                              End marker
 
 ; --------------------------------------------------------------------------
 ; CODE  -  download this block
@@ -82,49 +80,45 @@
 
 D 4000 CD
 D 4001 11 0F 00 0A
-D 4005 11 03 0F 02
-D 4009 D4 10 34
-D 400C 86 04 00 01
-D 4010 A1 00 09
-D 4013 11 05 01 F4
-D 4017 11 06 00 32
-D 401B 11 0A 0F 00
-D 401F D4 10 AB
-D 4022 42 0B
-D 4024 D5 10 BA
-D 4027 43 06
-D 4029 8C 06
-D 402B A1 00 34
-D 402E CA 32
-D 4030 11 06 00 32
-D 4034 43 05
-D 4036 8C 05
-D 4038 A1 00 1F
-D 403B 11 03 0F 04
-D 403F 11 04 00 01
-D 4043 D5 10 43
-D 4046 11 03 0F 02
-D 404A D4 10 34
-D 404D 86 04 00 02
-D 4051 A1 00 4A
-D 4054 11 05 01 F4
-D 4058 11 06 00 32
-D 405C 11 0A 0F 00
-D 4060 C7 00
-D 4062 D4 10 AB
-D 4065 42 0B
-D 4067 D5 10 BA
-D 406A C7 01
-D 406C 43 06
-D 406E 8C 06
-D 4070 A1 00 79
-D 4073 CA 32
-D 4075 11 06 00 32
-D 4079 43 05
-D 407B 8C 05
-D 407D A1 00 60
-D 4080 11 03 0F 04
-D 4084 11 04 00 02
-D 4088 D5 10 43
-D 408B 00
-D 408C F0 00 00
+D 4005 D4 10 84
+D 4008 86 04 00 01
+D 400C A1 00 05
+D 400F 11 05 01 F4
+D 4013 11 06 00 32
+D 4017 11 0A 0F 00
+D 401B D4 10 7B
+D 401E 42 0B
+D 4020 D5 10 B7
+D 4023 43 06
+D 4025 8C 06
+D 4027 A1 00 30
+D 402A CA 32
+D 402C 11 06 00 32
+D 4030 43 05
+D 4032 8C 05
+D 4034 A1 00 1B
+D 4037 11 04 00 01
+D 403B D5 10 49
+D 403E D4 10 84
+D 4041 86 04 00 02
+D 4045 A1 00 3E
+D 4048 11 05 01 F4
+D 404C 11 06 00 32
+D 4050 11 0A 0F 00
+D 4054 C7 00
+D 4056 D4 10 7B
+D 4059 42 0B
+D 405B D5 10 B7
+D 405E C7 01
+D 4060 43 06
+D 4062 8C 06
+D 4064 A1 00 6D
+D 4067 CA 32
+D 4069 11 06 00 32
+D 406D 43 05
+D 406F 8C 05
+D 4071 A1 00 54
+D 4074 11 04 00 02
+D 4078 D5 10 49
+D 407B 00
+D 407C F0 00 00
