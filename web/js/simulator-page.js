@@ -4,22 +4,6 @@
 // samples never appear in the dropdown - which is exactly what happened when the five
 // VT100 programs were added.
 (function () {
-  // The clock. The first two are teaching speeds counted in STELLAR opcodes, so a
-  // single step can be followed on the core view. The rest are REAL TIME, paced by
-  // 1802 instructions per wall-clock second: Craig's 3 MHz Elf2K runs 375,000
-  // machine cycles a second at about 2.2 cycles an instruction, ~170,000.
-  var ELF2K = 170000;
-  var SPEEDS = [
-    { label: '1 op/s',   ops: 1, ms: 1000, title: 'One STELLAR opcode a second - follow every step on the core view' },
-    { label: '10 op/s',  ops: 1, ms: 100,  title: 'Ten STELLAR opcodes a second' },
-    { label: 'Elf2K',    ms: 16, ips: ELF2K,      title: 'Real time: the speed of a 3 MHz Elf2K' },
-    { label: '2×',       ms: 16, ips: ELF2K * 2,  title: 'Twice the Elf2K' },
-    { label: '5×',       ms: 16, ips: ELF2K * 5,  title: 'Five times the Elf2K' },
-    { label: '10×',      ms: 16, ips: ELF2K * 10, title: 'Ten times the Elf2K' },
-    { label: 'flat out', ops: 200, ms: 0,         title: 'As fast as this browser can go' }
-  ];
-  var ALIAS = { turbo: 'flat out', 'Elf2K 1×': 'Elf2K' };   // older manifest names
-  var speedIdx = 2;                                          // real time by default
 
   var panel = new window.FrontPanel(document.getElementById('frontpanel'));
   var memView = null;   // built after the app exists, so it can read the live memory
@@ -64,7 +48,7 @@
   function btn(id) { return document.getElementById(id); }
   var samples = [];
 
-  fetch('samples/manifest.json?v=37')
+  fetch('samples/manifest.json?v=38')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       samples = list;
@@ -91,17 +75,16 @@
     var s = samples[i];
     btn('input').value = (s.input || '').replace(/\r/g, '\\r');
     btn('blurb').textContent = s.blurb || '';
-    // A sample can ask for a speed by its label ("turbo", "Elf2K", ...). ELIZA wants
-    // turbo (at 4x its start-up outlasts a visitor's first keystrokes); Pong wants
-    // Elf2K, the hardware's real pace - at turbo a whole game is over in seconds.
-    var want = SPEEDS.map(function (x) { return x.label; }).indexOf(ALIAS[s.speed] || s.speed);
-    if (want >= 0) setSpeed(want);
+    // A sample can ask for a speed by its label ("flat out", "Elf2K", ...). ELIZA
+    // wants flat out (slower, its start-up outlasts a visitor's first keystrokes);
+    // Pong wants Elf2K, the hardware's real pace - flat out a game is over in seconds.
+    if (s.speed && clock) clock.set(s.speed);
     loadSample(s);
   }
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=37')
+    fetch('samples/' + s.file + '?v=38')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
@@ -192,21 +175,7 @@
     document.getElementById('body').classList.toggle('side-open');
   });
 
-  var clockBtns = btn('clockBtns');
-  SPEEDS.forEach(function (sp, i) {
-    var b = document.createElement('button');
-    b.type = 'button'; b.textContent = sp.label; b.title = sp.title;
-    b.setAttribute('role', 'radio');
-    b.addEventListener('click', function () { setSpeed(i); });
-    clockBtns.appendChild(b);
-  });
-  function setSpeed(i) {
-    speedIdx = i;
-    var sp = SPEEDS[i];
-    [].forEach.call(clockBtns.children, function (b, k) { b.setAttribute('aria-checked', k === i ? 'true' : 'false'); });
-    btn('speedLabel').textContent = sp.ips ? '≈ ' + Math.round(sp.ips / 1000) + 'k 1802 instructions a second'
-      : sp.ms ? sp.label + ', to watch it step' : 'no pacing';
+  var clock = window.ClockRow(btn('clockBtns'), btn('speedLabel'), function (sp) {
     app.setSpeed(sp.ops || 0, sp.ms, sp.ips);
-  }
-  setSpeed(speedIdx);
+  });
 })();

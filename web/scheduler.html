@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Multitasking</title>
 <meta name="description" content="Watch STELLAR run 2–4 cooperative VMs at once — the decoded $2F00 CIDP page, the quantum countdown, and the round-robin hand-off, live on the real firmware.">
-<link rel="stylesheet" href="css/site.css?v=37">
+<link rel="stylesheet" href="css/site.css?v=38">
 </head>
 <body>
 <main class="wrap">
@@ -19,10 +19,11 @@
     <button id="run">Run ▶</button>
     <button id="pause" disabled>Pause ⏸</button>
     <button id="reset">Reset ↺</button>
-    <span class="speed-row">speed
-      <input type="range" id="speed" min="0" max="3" step="1" value="0">
-      <span id="speedLabel" class="mono">1×</span>
-    </span>
+  </div>
+  <div class="clock-row" role="radiogroup" aria-label="Clock speed">
+    <span class="clock-lbl">clock</span>
+    <span id="clockBtns"></span>
+    <span id="speedLabel" class="mono clock-now"></span>
   </div>
   <p class="sim-blurb" id="blurb"></p>
   <div class="status-line" id="status">loading…</div>
@@ -66,14 +67,15 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=37"></script>
-<script src="js/firmware-0061-33.js?v=37"></script>
-<script src="js/stellar-vm.js?v=37"></script>
-<script src="js/core-view.js?v=37"></script>
-<script src="js/front-panel.js?v=37"></script>
-<script src="js/vt100.js?v=37"></script>
-<script src="js/term-input.js?v=37"></script>
-<script src="js/scheduler-page.js?v=37"></script>
-<script src="js/nav.js?v=37"></script>
+<script src="js/opcodes.js?v=38"></script>
+<script src="js/firmware-0061-33.js?v=38"></script>
+<script src="js/stellar-vm.js?v=38"></script>
+<script src="js/core-view.js?v=38"></script>
+<script src="js/front-panel.js?v=38"></script>
+<script src="js/vt100.js?v=38"></script>
+<script src="js/term-input.js?v=38"></script>
+<script src="js/clock-row.js?v=38"></script>
+<script src="js/scheduler-page.js?v=38"></script>
+<script src="js/nav.js?v=38"></script>
 </body>
 </html>

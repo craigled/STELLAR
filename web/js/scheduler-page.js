@@ -15,12 +15,6 @@
     { name: 'Front panel — two VMs, one latch', blurb: 'Nothing goes to the terminal here — watch the front panel. VM1 holds Q on and writes $11 to the output latch; VM2 holds Q off and writes $22. There is only one Q line and one latch for the whole machine, so the display flips 11/22 and the Q lamp blinks as the scheduler hands the CPU between them.',
       programs: ['sched-panel1.lst', 'sched-panel2.lst'] }
   ];
-  var SPEEDS = [
-    { label: '1×', slices: 1, ms: 320 },
-    { label: '4×', slices: 1, ms: 90 },
-    { label: '16×', slices: 4, ms: 40 },
-    { label: 'turbo', slices: 120, ms: 0 }
-  ];
   var STATE = { 0x00: 'done', 0x01: 'active', 0x02: 'cycle', 0x03: 'idle', 0x04: 'paused', 0x05: 'killed', 0x06: 'error', 0x0F: 'unknown' };
   function byId(id) { return document.getElementById(id); }
   var panel = new window.FrontPanel(byId('frontpanel'));
@@ -35,7 +29,7 @@
     return '';
   }
 
-  var mv = null, running = false, timer = null, opsPerTick = 1, tickMs = 320;
+  var mv = null, running = false, timer = null, opsPerTick = 1, tickMs = 16, instrPerSec = 0;
   var serialLen = 0, prevRegs = {}, built = 0, vt = null;
   var expandedVM = null, coreView = null;
 
@@ -44,7 +38,7 @@
     byId('blurb').textContent = s.blurb;
     byId('status').textContent = 'loading ' + s.name + '…';
     Promise.all(s.programs.map(function (f) {
-      return fetch('samples/' + f + '?v=37').then(function (r) { return r.text(); });
+      return fetch('samples/' + f + '?v=38').then(function (r) { return r.text(); });
     })).then(function (texts) {
       mv = new window.StellarMultiVM({ firmware: window.STELLAR_FIRMWARE, programs: texts });
       mv.bootUntilReady();      // run CREATE_CIDP + scheduler so VMs are active
@@ -229,8 +223,14 @@
   function run() {
     if (running || !mv) return;
     running = true; byId('status').textContent = 'running…';
+    // Real-time speeds spend the 1802 instructions the elapsed wall-clock time buys
+    // (a backgrounded tab is capped at 60 ms, not raced); teaching speeds count slices.
+    var last = Date.now();
     timer = setInterval(function () {
-      for (var i = 0; i < opsPerTick; i++) {
+      var now = Date.now(), budget = instrPerSec ? Math.min(now - last, 60) / 1000 * instrPerSec : 0;
+      var s0 = mv.cpu.steps;
+      last = now;
+      for (var i = 0; instrPerSec ? mv.cpu.steps - s0 < budget : i < opsPerTick; i++) {
         var r = mv.stepSlice();
         if (r.halted) { render(); stop(); byId('status').textContent = 'all VMs done'; return; }
       }
@@ -261,9 +261,9 @@
   byId('run').addEventListener('click', run);
   byId('pause').addEventListener('click', function () { stop(); byId('status').textContent = 'paused'; });
   byId('reset').addEventListener('click', function () { if (mv) { mv.reset(); mv.bootUntilReady(); serialLen = 0; prevRegs = {}; built = 0; if (vt) vt.reset(); else byId('term').textContent = ''; byId('cores').innerHTML = ''; render(); byId('status').textContent = 'reset'; } });
-  var speed = byId('speed');
-  function applySpeed() { var s = SPEEDS[+speed.value]; byId('speedLabel').textContent = s.label; opsPerTick = s.slices; tickMs = s.ms; if (running) { stop(); run(); } }
-  speed.addEventListener('input', applySpeed);
-  applySpeed();
+  window.ClockRow(byId('clockBtns'), byId('speedLabel'), function (sp) {
+    opsPerTick = sp.ops || 0; tickMs = sp.ms; instrPerSec = sp.ips || 0;
+    if (running) { stop(); run(); }
+  });
   loadScenario(0);
 })();
