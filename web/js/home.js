@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=28';
+  var V = '?v=29';
   var LINEUP = [
     { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
     { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },
@@ -475,7 +475,8 @@
     speed = s;
     var bs = document.querySelectorAll('.speed button[data-speed]');
     for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-checked', +bs[i].dataset.speed === s ? 'true' : 'false');
-    $('clockStep').classList.toggle('on', s < 0);
+    var st = document.querySelectorAll('.clock-step');
+    for (var j = 0; j < st.length; j++) st[j].classList.toggle('on', s < 0);
   }
   var stepMsg = 'single step';
   function clockStep() {
@@ -484,11 +485,21 @@
     stepMsg = vm ? 'single step · VM' + vm + ' ran one opcode' : 'single step · nothing to run';
     $('tmSpeed').textContent = stepMsg;
   }
+  // The clock row is repeated above the CIDP panel and above the 1802 machine-code
+  // layer, so it can be changed without scrolling back to the top. The copies are
+  // clones of the first row; setSpeed keeps every row's highlight in step.
+  function cloneClocks() {
+    var main = document.querySelector('.console-top .speed');
+    var slots = document.querySelectorAll('[data-clock-copy]');
+    for (var i = 0; i < slots.length; i++) slots[i].innerHTML = main.innerHTML;
+  }
   function bindControls() {
+    cloneClocks();
     var bs = document.querySelectorAll('.speed button[data-speed]');
     for (var i = 0; i < bs.length; i++) bs[i].addEventListener('click', function () { setSpeed(+this.dataset.speed); });
     setSpeed(speed);
-    $('clockStep').addEventListener('click', clockStep);
+    var st = document.querySelectorAll('.clock-step');
+    for (var j = 0; j < st.length; j++) st[j].addEventListener('click', clockStep);
     $('pauseBtn').addEventListener('click', function () {
       paused = !paused;
       this.textContent = paused ? '▶ run' : '❚❚ pause';

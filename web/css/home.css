@@ -56,6 +56,11 @@ body.home button{font-family:var(--pmono)}
 .speed button:hover, .console-btns button:hover, .d-controls button:hover{color:var(--k-ink); border-color:#3a4252}
 .speed button.on, .speed button[aria-checked="true"]{background:var(--k-amber); color:#1a1305; border-color:var(--k-amber); font-weight:600}
 .console-btns{display:flex; gap:6px}
+/* the repeated clock rows - above the CIDP panel and the 1802 machine-code layer */
+.speed-copy{gap:3px; margin:0 0 8px}
+.speed-copy .speed-lbl{font-size:10px; margin-right:4px}
+.speed-copy button{padding:3px 7px; font-size:11px; border-radius:6px}
+.die-wrap .speed-copy{border-top:1px solid var(--k-line); padding-top:8px}
 
 .console-body{display:grid; grid-template-columns:minmax(0,1fr) 392px; gap:0;
   border:1px solid var(--k-line); background:var(--k-panel)}
