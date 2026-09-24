@@ -54,7 +54,7 @@ body.home button{font-family:var(--pmono)}
   background:transparent; border:1px solid var(--k-line2); color:var(--k-soft); border-radius:8px;
   padding:6px 11px; font-size:12.5px; cursor:pointer; transition:all .15s}
 .speed button:hover, .console-btns button:hover, .d-controls button:hover{color:var(--k-ink); border-color:#3a4252}
-.speed button[aria-checked="true"]{background:var(--k-amber); color:#1a1305; border-color:var(--k-amber); font-weight:600}
+.speed button.on, .speed button[aria-checked="true"]{background:var(--k-amber); color:#1a1305; border-color:var(--k-amber); font-weight:600}
 .console-btns{display:flex; gap:6px}
 
 .console-body{display:grid; grid-template-columns:minmax(0,1fr) 392px; gap:0;

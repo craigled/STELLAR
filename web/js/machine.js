@@ -84,6 +84,12 @@
     this.ops = [];                                       // completed opcode records (traced VM)
     this.opCount = 0;
     this.mvm.bootUntilReady();
+    // what a VM looks like before its first opcode - RUN puts a finished VM back to this
+    this.bootSnap = {
+      cores: M.slice(0x3000, 0x4000),        // all four 1KB VM cores
+      cidp: M.slice(0x2F00, 0x2F60),         // the four entries and the system bytes
+      cpu: { R: Array.prototype.slice.call(c.R), D: c.D, DF: c.DF, X: c.X, P: c.P, T: c.T, Q: c.Q, IE: c.IE }
+    };
     this.shadow.set(M.subarray(0, RAM));
     this._ccAddr = coreBase(this.traceVM) + 0x36;
     this._cc = M[this._ccAddr];
@@ -210,6 +216,52 @@
     var M = this.M, b = coreBase(vm) + 0x33;
     return M[b] * 0x1000000 + (M[b + 1] << 16) + (M[b + 2] << 8) + M[b + 3];
   };
+  // Single-step the clock: run until any VM's opcode counter (core+$33) moves on,
+  // i.e. exactly one STELLAR opcode has completed - whichever VM holds the CPU.
+  // Returns the VM that ran it, or 0 if nothing completed (halted, or all idle).
+  Machine.prototype.stepOpcode = function () {
+    var before = [0, this.vmOps(1), this.vmOps(2), this.vmOps(3), this.vmOps(4)];
+    for (var guard = 0; guard < 400000 && !this.halted; guard++) {
+      this.run(1);
+      for (var v = 1; v <= 4; v++) if (this.vmOps(v) !== before[v]) return v;
+    }
+    return 0;
+  };
+
+  // A finished VM ($00 done, $05 killed, $06 stopped on error) can be RUN again.
+  Machine.prototype.vmFinished = function (vm) {
+    if (vm < 1 || vm > this.programs.length) return false;
+    var st = this.vmState(vm);
+    return st === 0x00 || st === 0x05 || st === 0x06;
+  };
+
+  // RUN: start a finished VM's program again from the top, the others undisturbed.
+  // Reload its bytes into its own 4KB block (the app may have written over its data),
+  // put its core and CIDP entry back as they were after the cold boot, and re-queue its
+  // preset input. The firmware changes nothing else when a VM finishes - the system
+  // bytes at $2F50 stay as they were - so the scheduler simply finds it active again.
+  // If EVERY VM had finished, the 1802 left the scheduler through R1; it is put back
+  // where it stood after the boot, which is inside the scheduler.
+  Machine.prototype.rerun = function (vm) {
+    if (!this.vmFinished(vm)) return false;
+    var M = this.M, snap = this.bootSnap, off = (vm - 1) * 0x1000, c = this.cpu;
+    this.mvm.programs[vm - 1].forEach(function (p) { M[(p[0] + off) & 0xFFFF] = p[1]; });
+    var core = (vm - 1) * 0x400;
+    M.set(snap.cores.subarray(core, core + 0x400), 0x3000 + core);
+    M.set(snap.cidp.subarray((vm - 1) * 16, vm * 16), 0x2F00 + (vm - 1) * 16);
+    if (this.halted) {
+      M.set(snap.cidp.subarray(0x50, 0x60), 0x2F50);
+      for (var i = 0; i < 16; i++) c.R[i] = snap.cpu.R[i];
+      ['D', 'DF', 'X', 'P', 'T', 'Q', 'IE'].forEach(function (k) { c[k] = snap.cpu[k]; });
+      c.halted = false; this.halted = false;
+    }
+    var q = this.keys[vm], s = this.programs[vm - 1].input || '';
+    q.length = 0;
+    for (var k = 0; k < s.length; k++) q.push(s.charCodeAt(k) & 0xFF);
+    this.out[vm].length = 0;
+    return true;
+  };
+
   Machine.prototype.vmState = function (vm) { return this.M[0x2F00 + (vm - 1) * 0x10 + 5]; };
   Machine.prototype.currentVM = function () { return this.M[0x2F52]; };
 

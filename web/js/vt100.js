@@ -6,7 +6,8 @@
 // in the browser at all. This keeps a real 24x80 screen with a cursor, and renders
 // it after each batch of output.
 //
-// It is a deliberate subset: exactly the sequences STELLAR programs emit, which is
+// It is a deliberate subset: exactly the sequences STELLAR programs emit (plus the
+// VT102 insert/delete character pair Starship v02 uses), which is
 // the same set the Python screen-replay harness parses (scratchpad/starrun.py) and
 // which was checked frame by frame against five programs there.
 //
@@ -133,6 +134,17 @@
     else if (fin === 'B') { this.cy = Math.min(this.rows - 1, this.cy + (p0 || 1)); }
     else if (fin === 'C') { this.cx = Math.min(this.cols - 1, this.cx + (p0 || 1)); }
     else if (fin === 'D') { this.cx = Math.max(0, this.cx - (p0 || 1)); }
+    // VT102 insert / delete character - Starship v02 slides its picture with these.
+    // The cells at and right of the cursor move; the cursor itself stays put.
+    else if (fin === '@' || fin === 'P') {
+      var n = Math.min(p0 || 1, this.cols - this.cx), row = this.grid[this.cy], b;
+      if (this.cx < this.cols) {
+        for (b = 0; b < n; b++) {
+          if (fin === '@') { row.splice(this.cx, 0, { ch: ' ', rev: false }); row.pop(); }
+          else { row.splice(this.cx, 1); row.push({ ch: ' ', rev: false }); }
+        }
+      }
+    }
     return j - i + 1;
   };
 

@@ -3,12 +3,12 @@
 (function () {
   'use strict';
 
-  var V = '?v=25';
+  var V = '?v=28';
   var LINEUP = [
     { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
     { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },
     { file: 'Invaders.lst',   name: 'Invaders',   input: '',       what: 'a game: click, press a key' },
-    { file: 'Starship.lst',   name: 'Starship',   input: '',       what: 'a picture, run-length drawn' }
+    { file: 'Starship.lst',   name: 'Starship',   input: '',       what: 'click, then ← → to steer it' }
   ];
   var VMC = ['#9aa3b8', '#ffb547', '#5fe3d0', '#ff7a90', '#b8f36a'];
 
@@ -55,9 +55,49 @@
         var b = keyBytes(e);
         if (!b) return;
         e.preventDefault();
-        if (m) m.sendKeys(vm, b);
+        if (!m) return;
+        if (prompted[vm]) runPromptKey(vm, b);
+        else m.sendKeys(vm, b);
       });
     });
+  }
+
+  // ---------------------------------------------------------------- RUN prompt
+  // When a VM's app finishes, its screen offers a prompt; RUN + Enter starts the app
+  // again in that VM (Machine.rerun) while the others carry on. Typing here is echoed
+  // locally - the VM itself is finished and reads nothing.
+  var prompted = [false, false, false, false, false], runLine = ['', '', '', '', ''];
+  function say(vm, text) {
+    var b = [];
+    for (var i = 0; i < text.length; i++) b.push(text.charCodeAt(i));
+    screens[vm - 1].write(b);
+  }
+  function checkFinished() {
+    for (var v = 1; v <= 4; v++) {
+      if (prompted[v] || !m.vmFinished(v)) continue;
+      var b = m.drain(v);
+      if (b) screens[v - 1].write(b);
+      prompted[v] = true; runLine[v] = '';
+      say(v, '\x1b[0m\x1b[?25h\r\n' + LINEUP[v - 1].name + ' has finished. Type RUN to start it again.\r\n> ');
+    }
+  }
+  function runPromptKey(vm, b) {
+    var ch = b[0];
+    if (b.length === 1 && ch === 0x0D) {
+      if (runLine[vm].trim().toUpperCase() === 'RUN' && m.rerun(vm)) {
+        prompted[vm] = false; runLine[vm] = '';
+        screens[vm - 1].reset();
+        markTabs();
+      } else {
+        say(vm, '\r\n?  only RUN is understood here\r\n> ');
+        runLine[vm] = '';
+      }
+    } else if (b.length === 1 && (ch === 0x08 || ch === 0x7F)) {
+      if (runLine[vm].length) { runLine[vm] = runLine[vm].slice(0, -1); say(vm, '\b \b'); }
+    } else if (b.length === 1 && ch >= 0x20 && ch < 0x7F && runLine[vm].length < 40) {
+      runLine[vm] += String.fromCharCode(ch); say(vm, String.fromCharCode(ch));
+    }
+    screens[vm - 1].render();
   }
 
   function keyBytes(e) {
@@ -225,7 +265,7 @@
       var dt = (now - lastTelT) / 1000, di = m.instr - lastInstr;
       var rate = di / dt;   // 1802 instructions per real second
       var x = (m.cycles - lastCyc) / dt / Machine.CYCLES_PER_SEC;
-      $('tmSpeed').textContent = paused || frozen ? 'paused' : (x < 1.5 ? '≈ Elf2K speed' : x.toFixed(0) + '× the Elf2K');
+      $('tmSpeed').textContent = speed < 0 ? stepMsg : paused || frozen ? 'paused' : (x < 1.5 ? '≈ Elf2K speed' : x.toFixed(0) + '× the Elf2K');
       $('tmSpeed').title = fmt(rate) + ' 1802 instructions per second';
     }
     lastTelT = now; lastInstr = m.instr; lastCyc = m.cycles;
@@ -405,7 +445,7 @@
     // allow long frames (a busy or backgrounded tab) so the chosen speed holds; cap stops a runaway after sleep
     var dt = lastT ? Math.min(t - lastT, 500) : 16;
     lastT = t;
-    if (!paused && !frozen && !m.halted) {
+    if (speed >= 0 && !paused && !frozen && !m.halted) {
       var budget = speed ? dt / 1000 * Machine.CYCLES_PER_SEC * speed : Infinity;
       // ~11 ms of work per frame at 60 fps; a throttled tab gets few, long frames, so it may
       // spend proportionally more per frame (up to 60 ms) to keep the chosen speed
@@ -418,6 +458,7 @@
       renderCidp();
       die.render();
       paintScreens();
+      checkFinished();
       drawTimeline();
     } else if (!frozen) {
       // keep the serial buffers from growing while nobody is looking
@@ -429,15 +470,25 @@
   }
 
   // ---------------------------------------------------------------- controls
+  // speed < 0 is the single-step clock: the machine runs only when step is clicked
   function setSpeed(s) {
     speed = s;
-    var bs = document.querySelectorAll('.speed button');
+    var bs = document.querySelectorAll('.speed button[data-speed]');
     for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-checked', +bs[i].dataset.speed === s ? 'true' : 'false');
+    $('clockStep').classList.toggle('on', s < 0);
+  }
+  var stepMsg = 'single step';
+  function clockStep() {
+    if (speed >= 0) setSpeed(-1);
+    var vm = m.stepOpcode();
+    stepMsg = vm ? 'single step · VM' + vm + ' ran one opcode' : 'single step · nothing to run';
+    $('tmSpeed').textContent = stepMsg;
   }
   function bindControls() {
-    var bs = document.querySelectorAll('.speed button');
+    var bs = document.querySelectorAll('.speed button[data-speed]');
     for (var i = 0; i < bs.length; i++) bs[i].addEventListener('click', function () { setSpeed(+this.dataset.speed); });
     setSpeed(speed);
+    $('clockStep').addEventListener('click', clockStep);
     $('pauseBtn').addEventListener('click', function () {
       paused = !paused;
       this.textContent = paused ? '▶ run' : '❚❚ pause';
@@ -487,6 +538,7 @@
     });
     if (die) die.setMachine(m); else die = new Die($('die'), m);
     screens.forEach(function (s) { s.reset(); });
+    for (var v = 1; v <= 4; v++) { prompted[v] = false; runLine[v] = ''; }
     lastInstr = 0; lastTelT = 0; lastCyc = 0; shownRec = null;
     markTabs();
   }
