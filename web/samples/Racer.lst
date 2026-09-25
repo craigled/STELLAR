@@ -12,7 +12,7 @@
 ; never moved down on the Elf2K.
 ;
 ; VERIFICATION (Firmware-Math/racer_verify.py, V0061.33): an autopilot driving from the screen: 300 frames without a crash, every road line (1-24) exactly two edges 17 apart and moving at most one column a line, the car whole on lines 23-24, the distance counting; up/down arrows take SPD 5->9 (capped) and down to 1 (capped); hands off the wheel it crashes at exactly the first frame the road touches the car's padding; after a crash an arrow key starts a new game and a lone ESC quits (screen cleared, cursor shown); never sends a scrolling region; a rerun without reloading plays cleanly and ESC at the title quits. ~17,500 1802 instructions a frame at speed 9, ~51,000 at speed 1.
-; This version not yet run on hardware.
+; HW-VERIFIED on the Elf2K (V0061.33), 2026-09-24 - v2 works.
 ;
 ; 279 STELLAR commands.
 ;
