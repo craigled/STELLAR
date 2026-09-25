@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..');
-const firmware = require(join(WEB,'js','firmware-0061-33.js'));
+const firmware = require(join(WEB,'js','firmware-0061-34.js'));
 const { StellarVM } = require(join(WEB,'js','stellar-vm.js'));
 const VT100 = require(join(WEB,'js','vt100.js'));
 const manifest = JSON.parse(readFileSync(join(WEB,'samples','manifest.json'),'utf8'));

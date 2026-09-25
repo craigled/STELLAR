@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # tools/stellar_disasm.py lives in the sibling work repo
 DISASM = os.path.expanduser('~/Projects/stellar-1802/tools/stellar_disasm.py')
 FMATH  = os.path.expanduser('~/Projects/stellar-1802/Firmware-Math')
-DOCX   = 'STELLAR MAIN V0061.33.docx'
+DOCX   = 'STELLAR MAIN V0061.34.docx'
 
 def load_disasm():
     spec = importlib.util.spec_from_file_location('stellar_disasm', DISASM)
@@ -55,7 +55,7 @@ DESC = {
 0x19: ('reg', 'NN', 'Reset the bit(s) in the mask in the Acc low byte.'),
 0x1A: ('reg', 'NN', 'Test whether EVERY bit of the mask NN is set in the Acc low byte: true when (Acc.lo AND NN) = NN. Single-bit and multi-bit masks (since V0061.29; before that only single bits, and a false result left the flag unchanged).'),
 
-0x20: ('move', '0Z', 'Set memory mode (0=Absolute, 1=Relative; default Relative).'),
+0x20: ('move', '0Z', 'Set memory mode (0=Absolute, 1=Relative; default Relative). In absolute mode a branch target is absolute too - switch back before branching.'),
 0x21: ('move', 'ZX', 'Copy accumulator Z (0=Acc,1=MA,2=DA) to register X.'),
 0x22: ('move', 'ZX', 'Copy register X to accumulator Z.'),
 0x23: ('move', '0Z XY', 'Copy register X to register Y (Z=0: all, 1: low, 2: high).'),
@@ -66,8 +66,8 @@ DESC = {
 0x29: ('move', '', 'Copy the I/O register to the Acc low byte.'),
 0x2A: ('move', '', 'Copy the Acc low byte to the I/O register.'),
 0x2B: ('move', '', 'Copy the MA high word ($3068/$3069) into the Acc, mirroring COPYMAA.'),
-0x2E: ('move', '0X MM MM', 'READIDX — Acc = M(MMMM + RX), zero-extended; RX preserved. Relative mode.'),
-0x2F: ('move', '0X MM MM', 'WRITEIDX — M(MMMM + RX) = Acc.low. One-op array store. Relative mode.'),
+0x2E: ('move', '0X MM MM', 'READIDX — Acc = M(MMMM + RX), zero-extended; RX preserved. Honours MEMMODE absolute since V0061.34 (before, it always added the VM base).'),
+0x2F: ('move', '0X MM MM', 'WRITEIDX — M(MMMM + RX) = Acc.low. One-op array store. Honours MEMMODE absolute since V0061.34.'),
 0x31: ('move', '0X NN', 'Copy immediate byte NN to memory at register X.'),
 0x32: ('move', '0X NN NN', 'Copy two immediate bytes to memory at register X.'),
 0x33: ('move', 'ZX', 'Copy memory at RX to accumulator Z (0=Acc:2B, 1=MA:5B, 2=DA:7B).'),
@@ -76,7 +76,7 @@ DESC = {
 0x36: ('move', '0D ZX', 'Copy D bytes (1-4) of accumulator Z to M(RX). For the MA (Z=1) since V0061.31.'),
 0x37: ('move', 'DE ZX', 'Copy D bytes starting at byte E of accumulator Z from M(RX).'),
 0x38: ('move', 'DE ZX', 'Copy D bytes of accumulator Z starting at byte E to M(RX).'),
-0x39: ('move', '0D XY', 'Copy D bytes (1,2) from M(RX) to register Y.'),
+0x39: ('move', '0D XY', 'Copy D bytes (1,2) from M(RX) to register Y. Works in MEMMODE absolute since V0061.34 - before, a dead range check stopped the VM.'),
 0x3A: ('move', '0D XY', 'Copy D bytes (1,2) from register X to M(RY).'),
 0x3B: ('move', 'XY NN', 'Copy NN bytes from M(RX) to M(RY).'),
 0x3C: ('move', 'XY 0Z', 'Copy a memory block from RX to RY until RZ is reached.'),
