@@ -19,7 +19,9 @@
     { name: 'Game of Life race — bytecode vs native', blurb: 'The same Game of Life board (an acorn, 24 × 10) on both sides, under the same scheduler. VM1 on the left computes every generation in STELLAR bytecode; VM2 on the right calls raw 1802 code with RUNMC. Each board row is a ready-made string printed with ONE PRINTSTR, and a single opcode is never cut by the scheduler, so the two boards never garble each other. After 8 generations VM1 copies VM2\'s count straight out of VM2\'s register R1 (COPYVXY), stops VM2 with KILLVM, and prints the score: about 134 times as many generations. At Elf2K speed the whole run takes about 6½ minutes (the real machine, with its 9600-baud terminal, about 13); 10× shows it in under a minute. The score is the same at any speed: the scheduler switches VMs on an opcode count, not a clock.',
       programs: ['sched-life1.lst', 'sched-life2.lst'] },
     { name: 'Maze — VM1 builds it, VM2 solves it', blurb: 'Press Run, then click the shared terminal and press any key (how long you wait decides the maze). VM1 switches multitasking off — VM2 has nothing to do yet — and carves a random 25 × 10 maze as you watch. Then it copies the whole 1,196-byte grid into VM2\'s memory with COPYBVMXVMY ($DC, 240 bytes at a time) and triggers VM2 by writing 1 into VM2\'s register RB with COPYVXY ($D3). VM2 walks it keeping its right hand on the wall: o marks the path, and a dead end it backs out of turns to dots, so the o\'s left at the end are the way through.',
-      programs: ['sched-maze1.lst', 'sched-maze2.lst'] }
+      programs: ['sched-maze1.lst', 'sched-maze2.lst'] },
+    { name: 'Maze race — right hand vs left hand (3 VMs)', blurb: 'Press Run, click the shared terminal and press any key. VM1 carves a random maze (multitasking off) and draws it twice, then copies it into VM2 and VM3 ($DC) and triggers both ($D3). VM2 on the left keeps its right hand on the wall; VM3 on the right keeps its left hand on the wall; the scheduler runs them at the same time. Neither hand is better in general — each maze is a new race. The finish is decided with multitasking off for a moment, so exactly one of them is 1st: it writes "you are 2nd" and its step count into the other\'s registers, and the 2nd prints the score. Every cursor move is drawn with multitasking off too — otherwise the two solvers\' escape sequences would interleave.',
+      programs: ['sched-mrace1.lst', 'sched-mrace2.lst', 'sched-mrace3.lst'] }
   ];
   var STATE = { 0x00: 'done', 0x01: 'active', 0x02: 'cycle', 0x03: 'idle', 0x04: 'paused', 0x05: 'killed', 0x06: 'error', 0x0F: 'unknown' };
   function byId(id) { return document.getElementById(id); }
@@ -44,7 +46,7 @@
     byId('blurb').textContent = s.blurb;
     byId('status').textContent = 'loading ' + s.name + '…';
     Promise.all(s.programs.map(function (f) {
-      return fetch('samples/' + f + '?v=43').then(function (r) { return r.text(); });
+      return fetch('samples/' + f + '?v=44').then(function (r) { return r.text(); });
     })).then(function (texts) {
       mv = new window.StellarMultiVM({ firmware: window.STELLAR_FIRMWARE, programs: texts });
       mv.bootUntilReady();      // run CREATE_CIDP + scheduler so VMs are active
