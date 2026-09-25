@@ -48,12 +48,13 @@
     "halts": true
   },
   {
-    "name": "Simple-Calc",
-    "file": "Simple-Calc.lst",
-    "input": "12+30\r",
-    "blurb": "Interactive calculator (runs a fixed step budget here). Exercises the decimal/fixed-point math path.",
-    "maxSteps": 3000000,
-    "halts": false
+    "name": "Simple-Calc-5 (5 digits, bytecode)",
+    "file": "Simple-Calc-5.lst",
+    "input": "2+3*4\r",
+    "blurb": "A five-digit decimal calculator written entirely in STELLAR bytecode: 1/7 = 0.14286, 60000*60000 = 3600000000, 1/60000/60000 = 2.7778E-10. Works left to right like a pocket calculator (2+3*4 = 20); a line starting with + * / carries on from the last answer; a leading - is a negative number; 5/0 = Err. Numbers are a 16-bit mantissa and a decimal exponent, and every result is rounded, not truncated - all the arithmetic is native STELLAR ops (MULTXY, DIVXY, DIVMAX). Enter on its own quits. 2+3*4 is pre-typed; click the terminal to type more. Compare Simple-Calc-8, which does its arithmetic in native 1802 code. Verified on the Elf2K.",
+    "maxSteps": 8000000,
+    "halts": false,
+    "speed": "Elf2K"
   },
   {
     "name": "Simple-Calc-8 (8 digits, RUNMC)",
