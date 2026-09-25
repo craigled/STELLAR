@@ -141,6 +141,15 @@
     "speed": "Elf2K"
   },
   {
+    "name": "Lunar Lander (VT100, arrow keys)",
+    "file": "Lunar-Lander.lst",
+    "input": "",
+    "blurb": "Bring the lander down gently on the '=' pad. Click the terminal and press any key; the up arrow fires the main engine, left and right the side thrusters - one burst per press, each costing fuel (hold a key to repeat). Land with all three feet on the pad, falling slowly and hardly drifting. ESC quits; any key flies again. A new random moon every game. Opens at Elf2K speed - the real hardware's pace.",
+    "maxSteps": 14000000,
+    "halts": false,
+    "speed": "Elf2K"
+  },
+  {
     "name": "Starship (VT100)",
     "file": "Starship.lst",
     "input": "",
