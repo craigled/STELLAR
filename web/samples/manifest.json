@@ -144,7 +144,7 @@
     "name": "Lunar Lander (VT100, arrow keys)",
     "file": "Lunar-Lander.lst",
     "input": "",
-    "blurb": "Bring the lander down gently on the '=' pad. Click the terminal and press E for Easy or H for Hard. The up arrow fires the main engine, left and right the side thrusters - one burst per press, each costing fuel (hold a key to repeat). Land with all three feet on the pad, falling slowly and hardly drifting. Easy has half the gravity, finer bursts, more fuel, a gentler limit and a wider pad. ESC quits; E or H flies again on a new random moon. Opens at Elf2K speed. The first (Hard-only) version was verified on the Elf2K.",
+    "blurb": "Bring the lander down gently on the '=' pad. Click the terminal and press E for Easy or H for Hard. The up arrow fires the main engine, left and right the side thrusters - one burst per press, each costing fuel (hold a key to repeat). Land with all three feet on the pad, falling slowly and hardly drifting. Easy has half the gravity, finer bursts, more fuel, a gentler limit and a wider pad. ESC quits; E or H flies again on a new random moon. Opens at Elf2K speed. Verified on the Elf2K.",
     "maxSteps": 14000000,
     "halts": false,
     "speed": "Elf2K"

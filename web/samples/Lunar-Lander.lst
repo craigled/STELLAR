@@ -16,8 +16,8 @@
 ; VT100: cursor addressing, erase to end of line, hide/show cursor. No scrolling.
 ;
 ; VERIFICATION (Firmware-Math/lander_verify.py, V0061.34): an autopilot that reads the lander's registers and presses the keys: HARD - lands on two moons (vy 8-9); a pilot coming in at ~26 crashes; lined up over the pad, engine off from 12 rows -> crashes ON the pad at vy 44. EASY - lands on two moons with the 11-wide pad (vy 10-11); engine off from 14 rows still crashes ON the pad at vy 32. Both: the chosen table is the one in use and its name is on the status line; the ground drawn is exactly the height/pad tables; every frame the lander is drawn whole with no copy left; only E or H starts (an arrow does not); hands off it crashes where it comes down; a lone ESC quits cleanly; a rerun without reloading lands again.
-; The first version (Hard only) ran on the Elf2K 2026-09-25 - works, but too hard to
-; land softly, hence Easy. This version not yet run on hardware.
+; HW-VERIFIED on the Elf2K (V0061.34), 2026-09-25: Easy "works BEAUTIFULLY". (The
+; first, Hard-only version worked but was too hard to land softly - hence Easy.)
 ;
 ; 476 STELLAR commands.
 ;
