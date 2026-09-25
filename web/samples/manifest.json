@@ -132,6 +132,15 @@
     "speed": "Elf2K"
   },
   {
+    "name": "Racer (VT100, arrow keys)",
+    "file": "Racer.lst",
+    "input": "",
+    "blurb": "Keep the car on the winding road. Click the terminal and press any key to start; the left and right arrows steer, up and down change the speed (1-9), and a lone ESC quits. Touch either edge and you crash - any key drives again. The road scrolls with a VT100 scrolling region and reverse index, so each frame is only two short strings. Opens at Elf2K speed - the real hardware's pace.",
+    "maxSteps": 14000000,
+    "halts": false,
+    "speed": "Elf2K"
+  },
+  {
     "name": "Starship (VT100)",
     "file": "Starship.lst",
     "input": "",

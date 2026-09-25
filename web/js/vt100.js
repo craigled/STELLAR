@@ -7,7 +7,9 @@
 // it after each batch of output.
 //
 // It is a deliberate subset: exactly the sequences STELLAR programs emit (plus the
-// VT102 insert/delete character pair Starship v02 uses), which is
+// VT102 insert/delete character pair Starship v02 uses, and the VT100 scrolling
+// region - DECSTBM "ESC [ t ; b r" and reverse index "ESC M" - that the car racer
+// scrolls its road with), which is
 // the same set the Python screen-replay harness parses (scratchpad/starrun.py) and
 // which was checked frame by frame against five programs there.
 //
@@ -42,6 +44,7 @@
     for (var r = 0; r < this.rows; r++) this.grid.push(blankRow());
     this.scroll = [];          // lines that have scrolled off the top
     this.cx = 0; this.cy = 0;  // zero-based
+    this.top = 0; this.bot = this.rows - 1;   // the scrolling region (DECSTBM)
     this.rev = false;
     this.curVis = true;
     this.pending = '';         // a partial escape sequence split across batches
@@ -59,8 +62,18 @@
   };
 
   VT100.prototype._nl = function () {
-    this.cy++;
-    if (this.cy >= this.rows) { this.cy = this.rows - 1; this._scrollUp(); }
+    if (this.cy === this.bot) {
+      // at the bottom margin: scroll the region up. A full-screen region keeps
+      // the scrollback, as before; a partial one just loses its top line.
+      if (this.top === 0 && this.bot === this.rows - 1) this._scrollUp();
+      else { this.grid.splice(this.top, 1); this.grid.splice(this.bot, 0, blankRow()); }
+    } else if (this.cy < this.rows - 1) this.cy++;
+  };
+
+  // ESC M - reverse index: up a line, or at the top margin scroll the region DOWN
+  VT100.prototype._ri = function () {
+    if (this.cy === this.top) { this.grid.splice(this.bot, 1); this.grid.splice(this.top, 0, blankRow()); }
+    else if (this.cy > 0) this.cy--;
   };
 
   VT100.prototype._put = function (ch) {
@@ -96,7 +109,9 @@
   VT100.prototype._esc = function (s, i) {
     if (i + 1 >= s.length) return -1;
     var c1 = s.charAt(i + 1);
-    if (c1 !== '[') { return 2; }                 // ESC x - not used by STELLAR, drop
+    if (c1 === 'M') { this._ri(); return 2; }    // reverse index
+    if (c1 === 'D') { this._nl(); return 2; }    // index
+    if (c1 !== '[') { return 2; }                 // other ESC x - not used by STELLAR, drop
     var j = i + 2, priv = '';
     if (j < s.length && s.charAt(j) === '?') { priv = '?'; j++; }
     var num = '';
@@ -117,6 +132,12 @@
     } else if (fin === 'H' || fin === 'f') {
       this.cy = Math.min(this.rows - 1, Math.max(0, (parts.length ? p0 : 1) - 1));
       this.cx = Math.min(this.cols - 1, Math.max(0, (parts.length > 1 ? p1 : 1) - 1));
+    } else if (fin === 'r' && !priv) {
+      // DECSTBM: set the scrolling region; the cursor goes home
+      var t = (parts.length && p0) ? p0 : 1, bb = (parts.length > 1 && p1) ? p1 : this.rows;
+      if (t < bb && bb <= this.rows) { this.top = t - 1; this.bot = bb - 1; }
+      else { this.top = 0; this.bot = this.rows - 1; }
+      this.cx = 0; this.cy = 0;
     } else if (fin === 'J') {
       this._erase(parts.length ? p0 : 0);
       if ((parts.length ? p0 : 0) === 2) { this.cx = 0; this.cy = 0; }
