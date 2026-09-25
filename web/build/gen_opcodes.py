@@ -225,7 +225,7 @@ DESC = {
 0xD0: ('vm', 'ZD', 'Enable/disable sharing (Z=0: off, 1: on; D=1: RO, 2: RW).'),
 0xD1: ('vm', 'VD', 'Test whether VM V is available for access D (1=Read, 2=RW).'),
 0xD2: ('vm', 'VZ', 'Z=0: load VM(V) Acc into local; Z=1: save local to VM(V) Acc.'),
-0xD3: ('vm', 'VZ XY', 'Z=0: load VM(V) RX into local RY; Z=1: save local RX to VM(V) RY.'),
+0xD3: ('vm', 'VZ XY', 'Z=0: load VM(V) RX into local RY; Z=1: save local RY to VM(V) RX. X is always VM(V)\'s register, Y always ours.'),
 0xD4: ('vm', 'V0 XY', 'Copy two bytes from VM(V) M(RX) into local RY.'),
 0xD5: ('vm', 'V0 XY', 'Copy two bytes from local RX to VM(V) M(RY).'),
 0xD6: ('vm', 'VX VY', 'Copy one byte from VM(V) M(RX) to VM(V) M(RY).'),

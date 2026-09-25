@@ -178,7 +178,7 @@ var OPS = [
   {op:0xD0, name:"SHAREVM", length:1, group:"vm", operands:"ZD", desc:"Enable/disable sharing (Z=0: off, 1: on; D=1: RO, 2: RW)."},
   {op:0xD1, name:"TESTVM", length:1, group:"vm", operands:"VD", desc:"Test whether VM V is available for access D (1=Read, 2=RW)."},
   {op:0xD2, name:"COPYVA", length:1, group:"vm", operands:"VZ", desc:"Z=0: load VM(V) Acc into local; Z=1: save local to VM(V) Acc."},
-  {op:0xD3, name:"COPYVXY", length:2, group:"vm", operands:"VZ XY", desc:"Z=0: load VM(V) RX into local RY; Z=1: save local RX to VM(V) RY."},
+  {op:0xD3, name:"COPYVXY", length:2, group:"vm", operands:"VZ XY", desc:"Z=0: load VM(V) RX into local RY; Z=1: save local RY to VM(V) RX. X is always VM(V)'s register, Y always ours."},
   {op:0xD4, name:"COPYVMXY", length:2, group:"vm", operands:"V0 XY", desc:"Copy two bytes from VM(V) M(RX) into local RY."},
   {op:0xD5, name:"COPYXVMY", length:2, group:"vm", operands:"V0 XY", desc:"Copy two bytes from local RX to VM(V) M(RY)."},
   {op:0xD6, name:"COPYVMXVMY", length:2, group:"vm", operands:"VX VY", desc:"Copy one byte from VM(V) M(RX) to VM(V) M(RY)."},
