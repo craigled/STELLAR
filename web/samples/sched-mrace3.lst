@@ -1,6 +1,6 @@
-; STELLAR MAZE RACE - VM3 ($6000): left hand on the wall
+; STELLAR MAZE RACE - VM3
 ; web copy based at $4000: the Multitasking page moves program 3 to $6000 itself.
-; The Elf2K download is APPLICATIONS/Maze/MazeRace.lst (all three programs in one file).
+; The Elf2K download is APPLICATIONS/Maze/MazeRace.lst (all programs in one file).
 
 D 4000 CD
 D 4001 11 0B 00 00
