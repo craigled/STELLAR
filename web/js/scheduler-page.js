@@ -21,7 +21,9 @@
     { name: 'Maze — VM1 builds it, VM2 solves it', blurb: 'Press Run, then click the shared terminal and press any key (how long you wait decides the maze). VM1 switches multitasking off — VM2 has nothing to do yet — and carves a random 25 × 10 maze as you watch. Then it copies the whole 1,196-byte grid into VM2\'s memory with COPYBVMXVMY ($DC, 240 bytes at a time) and triggers VM2 by writing 1 into VM2\'s register RB with COPYVXY ($D3). VM2 walks it keeping its right hand on the wall: o marks the path, and a dead end it backs out of turns to dots, so the o\'s left at the end are the way through.',
       programs: ['sched-maze1.lst', 'sched-maze2.lst'] },
     { name: 'Maze race — right hand vs left hand (3 VMs)', blurb: 'Press Run, click the shared terminal and press any key. VM1 carves a random maze (multitasking off) and draws it twice, then copies it into VM2 and VM3 ($DC) and triggers both ($D3). VM2 on the left keeps its right hand on the wall; VM3 on the right keeps its left hand on the wall; the scheduler runs them at the same time. Neither hand is better in general — each maze is a new race. The finish is decided with multitasking off for a moment, so exactly one of them is 1st: it writes "you are 2nd" and its step count into the other\'s registers, and the 2nd prints the score. Every cursor move is drawn with multitasking off too — otherwise the two solvers\' escape sequences would interleave.',
-      programs: ['sched-mrace1.lst', 'sched-mrace2.lst', 'sched-mrace3.lst'] }
+      programs: ['sched-mrace1.lst', 'sched-mrace2.lst', 'sched-mrace3.lst'] },
+    { name: 'Mandelbrot × 4 — one quarter per VM', blurb: 'The same 40 × 24 Mandelbrot as the Simulator sample, drawn by all four VMs at once: VM1 top-left, VM2 top-right, VM3 bottom-left, VM4 bottom-right. There is still one 1802, so four VMs are not faster than one — what you see is the scheduler sharing it, all four quarters growing together. Each pixel is ONE PRINTSTR (cursor position and character together), so the VMs never garble each other. VM1 clears the screen and then opens itself with SHAREVM, which is the others\' start signal; the last one to finish reads the four VM states in the CIDP page and puts the cursor back. About 6½ minutes at Elf2K speed — try 10× or flat out.',
+      programs: ['sched-mandel1.lst', 'sched-mandel2.lst', 'sched-mandel3.lst', 'sched-mandel4.lst'] }
   ];
   var STATE = { 0x00: 'done', 0x01: 'active', 0x02: 'cycle', 0x03: 'idle', 0x04: 'paused', 0x05: 'killed', 0x06: 'error', 0x0F: 'unknown' };
   function byId(id) { return document.getElementById(id); }
@@ -46,7 +48,7 @@
     byId('blurb').textContent = s.blurb;
     byId('status').textContent = 'loading ' + s.name + '…';
     Promise.all(s.programs.map(function (f) {
-      return fetch('samples/' + f + '?v=50').then(function (r) { return r.text(); });
+      return fetch('samples/' + f + '?v=51').then(function (r) { return r.text(); });
     })).then(function (texts) {
       mv = new window.StellarMultiVM({ firmware: window.STELLAR_FIRMWARE, programs: texts });
       mv.bootUntilReady();      // run CREATE_CIDP + scheduler so VMs are active

@@ -1,5 +1,12 @@
 # Mandelbrot — ASCII fractal renderer
 
+> **v09 (2026-09-24):** `Mandelbrot.lst` is now v09, rewritten for firmware V0061.33 -
+> the same output byte for byte, about 2.5x faster (~4.4 min on the Elf2K instead of
+> ~10.9). MULTXY + SHIFTMA + COPYAX MA make a multiply three opcodes instead of five,
+> and the escape loop is inline (no SMUL/SADD calls, no LBL/GTL): ~37 opcodes an
+> iteration instead of ~75. A four-VM version, each VM drawing a quarter at the same
+> time, is on the website's Multitasking page.
+
 Renders the Mandelbrot set as an ASCII density map to the terminal, computed
 entirely on the RCA 1802 through the STELLAR virtual CPU. Loads at `$4000` (VM1),
 terminal output only.

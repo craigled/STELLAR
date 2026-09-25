@@ -86,8 +86,8 @@
     "name": "Mandelbrot",
     "file": "Mandelbrot.lst",
     "input": "",
-    "blurb": "ASCII Mandelbrot in Q8.8 fixed point (fixed step budget here). Exercises signed multiply and the MA pipeline.",
-    "maxSteps": 8000000,
+    "blurb": "ASCII Mandelbrot, 40 x 24, in Q8.8 sign-magnitude fixed point. v09, rewritten for V0061.33: MULTXY + COPYAX MA make a multiply three opcodes, and the escape loop is all inline - 2.5x faster than the July version, with byte-identical output. Try 10x or flat out; at Elf2K speed it takes about 4½ minutes.",
+    "maxSteps": 60000000,
     "halts": false
   },
   {

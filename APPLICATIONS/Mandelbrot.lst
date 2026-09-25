@@ -1,198 +1,272 @@
-; ============================================================
-; Mandel-v08  —  Mandelbrot 40x24, POLISHED
-;                (loads at $4000, VM1)
-; ============================================================
-; Same fractal as v07 (verified), plus:
-;   - a title banner "STELLAR MANDELBROT" printed first (inline
-;     LOADAI+SEROUT per char -- all verified opcodes, no loop)
-;   - a refined 16-level character ramp for smoother shading
+; ==========================================================================
+; STELLAR MANDELBROT v09  -  40 x 24, rewritten for V0061.33   (loads at $4000)
+; ==========================================================================
+; Load, cold-boot: the banner, then the Mandelbrot row by row. The same picture
+; as v08 (APPLICATIONS/Mandel-v08.lst), faster: MULTXY + COPYAX MA make a multiply
+; 3 opcodes instead of 5, and everything is inline (no SMUL/SADD calls, no LBL/GTL)
+; - about 37 opcodes an iteration instead of ~75. x -2.5..+1.0, y -1.2..+1.2,
+; Q8.8 sign-magnitude, 15 iterations, ramp ' .:-=+coa*x%#&W@'.
+; Rerunnable without reloading.
 ;
-; Main body is byte-identical to v07, relocated below the banner;
-; addresses + BD call targets were recomputed by a small assembler
-; (scratchpad/asm), so no hand-addressing. Grid 40x24, x[-2.5,1.0],
-; y[-1.2,1.2]. Subs: SMUL @ $0185  SADD @ $019E.
-; Ramp @ $0900 (light->dark): ' .:-=+coa*x%#&W@'
-; Prints banner, then the fractal row by row (~10+ min).
-; D-lines are a clean block (Elf2K loader).
-; ============================================================
+; VERIFICATION (Firmware-Math/mandel1_verify.py, V0061.33): output BYTE FOR BYTE identical to the July Mandel-v08 (banner + 24 rows of 40), 2.47x faster: 45.0 million 1802 instructions (~4.4 min at 3 MHz) against v08's 111.3 million (~10.9 min); a rerun without reloading prints the same again.
+; NOT YET RUN ON HARDWARE.
+;
+; 113 STELLAR commands.
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 4000 CD             START
+; D 4001 11 0E 06 00    LOADXI R14 0600
+; D 4005 C1 0E          PRINTSTR R14                       The banner
+; D 4007 11 09 00 00    LOADXI R9 0000
+; D 400B 11 0A 0A 00    LOADXI R10 0A00
+; D 400F 3A 02 9A       COPYXMY R9 -> M(R10)               row 0
+; ROW:
+; D 4012 11 09 00 00    LOADXI R9 0000
+; D 4016 11 0A 0A 02    LOADXI R10 0A02
+; D 401A 3A 02 9A       COPYXMY R9 -> M(R10)               col 0
+; COL:
+; D 401D 11 0A 0A 02    LOADXI R10 0A02
+; D 4021 39 02 A9       COPYMXY M(R10) -> R9
+; D 4024 10 00 16       LOADAI 0016
+; D 4027 49 09          MULTXA R9                          col x 22
+; D 4029 25             COPYMAA
+; D 402A 21 09          COPYAX Acc -> R9
+; D 402C 11 0A 02 80    LOADXI R10 0280
+; D 4030 88 9A          TESTGXY R9 >= R10
+; D 4032 A1 00 3F       IFFALSEI XN
+; D 4035 51 9A 05       SUBXYZ R9 - R10 -> R5
+; D 4038 11 06 00 00    LOADXI R6 0000
+; D 403C B0 00 46       GAL XD
+; XN:
+; D 403F 51 A9 05       SUBXYZ R10 - R9 -> R5              x0 < 0: |x0| = 2.5 - col x step
+; D 4042 11 06 00 01    LOADXI R6 0001
+; XD:
+; D 4046 11 0A 0A 00    LOADXI R10 0A00
+; D 404A 39 02 A9       COPYMXY M(R10) -> R9
+; D 404D 10 00 1A       LOADAI 001A
+; D 4050 49 09          MULTXA R9                          row x 26
+; D 4052 25             COPYMAA
+; D 4053 21 09          COPYAX Acc -> R9
+; D 4055 11 0A 01 33    LOADXI R10 0133
+; D 4059 88 9A          TESTGXY R9 >= R10
+; D 405B A1 00 68       IFFALSEI YN
+; D 405E 51 9A 07       SUBXYZ R9 - R10 -> R7
+; D 4061 11 08 00 00    LOADXI R8 0000
+; D 4065 B0 00 6F       GAL YD
+; YN:
+; D 4068 51 A9 07       SUBXYZ R10 - R9 -> R7
+; D 406B 11 08 00 01    LOADXI R8 0001
+; YD:
+; D 406F 11 01 00 00    LOADXI R1 0000
+; D 4073 11 02 00 00    LOADXI R2 0000
+; D 4077 11 03 00 00    LOADXI R3 0000
+; D 407B 11 04 00 00    LOADXI R4 0000
+; D 407F 11 0D 00 00    LOADXI R13 0000                    z = 0, no iterations yet
+; D 4083 11 0E 04 00    LOADXI R14 0400                    4.0
+; IT:
+; D 4087 4A 11          MULTXY R1 * R1                     xx = x*x >> 8
+; D 4089 17 02          SHIFTMA right a byte               >> 8
+; D 408B 21 19          COPYAX MA -> R9
+; D 408D 4A 33          MULTXY R3 * R3                     yy = y*y >> 8
+; D 408F 17 02          SHIFTMA right a byte               >> 8
+; D 4091 21 1A          COPYAX MA -> R10
+; D 4093 50 9A 0B       ADDXYZ R9 + R10 -> R11
+; D 4096 88 BE          TESTGXY R11 >= R14
+; D 4098 A0 01 14       IFTRUEI ESC                        xx + yy >= 4: escaped
+; D 409B 4A 13          MULTXY R1 * R3                     x*y >> 8
+; D 409D 17 02          SHIFTMA right a byte               >> 8
+; D 409F 21 1B          COPYAX MA -> R11
+; D 40A1 50 BB 0B       ADDXYZ R11 + R11 -> R11            2xy
+; D 40A4 11 0C 00 00    LOADXI R12 0000
+; D 40A8 87 24          TESTXY R2 = R4
+; D 40AA A0 00 B1       IFTRUEI SS
+; D 40AD 11 0C 00 01    LOADXI R12 0001                    signs differ: 2xy < 0
+; SS:
+; D 40B1 11 0F 00 00    LOADXI R15 0000
+; D 40B5 88 9A          TESTGXY R9 >= R10
+; D 40B7 A0 00 C4       IFTRUEI TP                         xx - yy, as sign-magnitude
+; D 40BA 51 A9 09       SUBXYZ R10 - R9 -> R9
+; D 40BD 11 0F 00 01    LOADXI R15 0001
+; D 40C1 B0 00 C7       GAL TD
+; TP:
+; D 40C4 51 9A 09       SUBXYZ R9 - R10 -> R9
+; TD:
+; D 40C7 87 F6          TESTXY R15 = R6
+; D 40C9 A1 00 D5       IFFALSEI SDX
+; D 40CC 50 95 01       ADDXYZ R9 + R5 -> R1               same sign: add
+; D 40CF 23 00 F2       COPYXY R15 -> R2
+; D 40D2 B0 00 E9       GAL SEX
+; SDX:
+; D 40D5 88 95          TESTGXY R9 >= R5
+; D 40D7 A1 00 E3       IFFALSEI SBX
+; D 40DA 51 95 01       SUBXYZ R9 - R5 -> R1               signs differ, |a| >= |b|: a - b, sign of a
+; D 40DD 23 00 F2       COPYXY R15 -> R2
+; D 40E0 B0 00 E9       GAL SEX
+; SBX:
+; D 40E3 51 59 01       SUBXYZ R5 - R9 -> R1               |b| > |a|: b - a, sign of b
+; D 40E6 23 00 62       COPYXY R6 -> R2
+; SEX:
+; D 40E9 87 C8          TESTXY R12 = R8
+; D 40EB A1 00 F7       IFFALSEI SDY
+; D 40EE 50 B7 03       ADDXYZ R11 + R7 -> R3              same sign: add
+; D 40F1 23 00 C4       COPYXY R12 -> R4
+; D 40F4 B0 01 0B       GAL SEY
+; SDY:
+; D 40F7 88 B7          TESTGXY R11 >= R7
+; D 40F9 A1 01 05       IFFALSEI SBY
+; D 40FC 51 B7 03       SUBXYZ R11 - R7 -> R3              signs differ, |a| >= |b|: a - b, sign of a
+; D 40FF 23 00 C4       COPYXY R12 -> R4
+; D 4102 B0 01 0B       GAL SEY
+; SBY:
+; D 4105 51 7B 03       SUBXYZ R7 - R11 -> R3              |b| > |a|: b - a, sign of b
+; D 4108 23 00 84       COPYXY R8 -> R4
+; SEY:
+; D 410B 42 0D          INCX R13
+; D 410D 86 0D 00 0F    TESTXI R13 000F
+; D 4111 A1 00 87       IFFALSEI IT
+; ESC:
+; D 4114 11 0E 00 00    LOADXI R14 0000
+; D 4118 2E 0D 09 00    READIDX R13 0900                   iterations -> the character
+; D 411C C9             SEROUT
+; D 411D 11 0A 0A 02    LOADXI R10 0A02
+; D 4121 39 02 A9       COPYMXY M(R10) -> R9
+; D 4124 42 09          INCX R9
+; D 4126 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 4129 86 09 00 28    TESTXI R9 0028
+; D 412D A1 00 1D       IFFALSEI COL
+; D 4130 CA 0D          SEROUTI 0D
+; D 4132 CA 0A          SEROUTI 0A
+; D 4134 11 0A 0A 00    LOADXI R10 0A00
+; D 4138 39 02 A9       COPYMXY M(R10) -> R9
+; D 413B 42 09          INCX R9
+; D 413D 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 4140 86 09 00 18    TESTXI R9 0018
+; D 4144 A1 00 12       IFFALSEI ROW
+; D 4147 00             HALT
+; D 4148 F0 00 00       BREAK
+
+; --------------------------------------------------------------------------
+; CODE  -  download this block
+; --------------------------------------------------------------------------
 
 D 4000 CD
-D 4001 10 00 53 C9
-D 4005 10 00 54 C9
-D 4009 10 00 45 C9
-D 400D 10 00 4C C9
-D 4011 10 00 4C C9
-D 4015 10 00 41 C9
-D 4019 10 00 52 C9
-D 401D 10 00 20 C9
-D 4021 10 00 4D C9
-D 4025 10 00 41 C9
-D 4029 10 00 4E C9
-D 402D 10 00 44 C9
-D 4031 10 00 45 C9
-D 4035 10 00 4C C9
-D 4039 10 00 42 C9
-D 403D 10 00 52 C9
-D 4041 10 00 4F C9
-D 4045 10 00 54 C9
-D 4049 10 00 0D C9
-D 404D 10 00 0A C9
-D 4051 11 01 00 00
-D 4055 11 08 08 2C
-D 4059 3A 02 18
-D 405C B3 40
-D 405E 11 08 08 2C
-D 4062 39 02 81
-D 4065 10 00 1A
-D 4068 49 01
-D 406A 25
-D 406B 21 06
-D 406D 11 04 01 33
-D 4071 11 05 00 01
-D 4075 11 07 00 00
-D 4079 BD 01 9E
-D 407C 11 0B 08 28
-D 4080 3A 02 8B
-D 4083 11 0B 08 2A
-D 4087 3A 02 9B
-D 408A 11 01 00 00
-D 408E 11 08 08 2E
-D 4092 3A 02 18
-D 4095 B3 42
-D 4097 11 08 08 2E
-D 409B 39 02 81
-D 409E 10 00 16
-D 40A1 49 01
-D 40A3 25
-D 40A4 21 06
-D 40A6 11 04 02 80
-D 40AA 11 05 00 01
-D 40AE 11 07 00 00
-D 40B2 BD 01 9E
-D 40B5 11 0B 08 24
-D 40B9 3A 02 8B
-D 40BC 11 0B 08 26
-D 40C0 3A 02 9B
-D 40C3 11 01 00 00
-D 40C7 11 02 00 00
-D 40CB 11 03 00 00
-D 40CF 11 0A 00 00
-D 40D3 11 0F 00 00
-D 40D7 B3 10
-D 40D9 23 00 14
-D 40DC 23 00 25
-D 40DF 23 00 16
-D 40E2 23 00 27
-D 40E5 BD 01 85
-D 40E8 23 00 8B
-D 40EB 23 00 34
-D 40EE 23 00 A5
-D 40F1 23 00 36
-D 40F4 23 00 A7
-D 40F7 BD 01 85
-D 40FA 23 00 8C
-D 40FD 44 BC
-D 40FF 25
-D 4100 21 08
-D 4102 11 09 04 00
-D 4106 88 89
-D 4108 A2 11
-D 410A 23 00 14
-D 410D 23 00 25
-D 4110 23 00 36
-D 4113 23 00 A7
-D 4116 BD 01 85
-D 4119 23 00 8D
-D 411C 23 00 9E
-D 411F 23 00 B4
-D 4122 11 05 00 00
-D 4126 23 00 C6
-D 4129 11 07 00 01
-D 412D BD 01 9E
-D 4130 23 00 84
-D 4133 23 00 95
-D 4136 11 08 08 24
-D 413A 39 02 86
-D 413D 11 08 08 26
-D 4141 39 02 87
-D 4144 BD 01 9E
-D 4147 23 00 81
-D 414A 23 00 92
-D 414D 23 00 D4
-D 4150 23 00 E5
-D 4153 23 00 D6
-D 4156 23 00 E7
-D 4159 BD 01 9E
-D 415C 23 00 84
-D 415F 23 00 95
-D 4162 11 08 08 28
-D 4166 39 02 86
-D 4169 11 08 08 2A
-D 416D 39 02 87
-D 4170 BD 01 9E
-D 4173 23 00 83
-D 4176 23 00 9A
-D 4179 42 0F
-D 417B 11 08 00 0F
-D 417F 88 F8
-D 4181 A3 10
-D 4183 B4 11
-D 4185 22 04
-D 4187 49 06
-D 4189 17 02
-D 418B 25
-D 418C 21 08
-D 418E 11 09 00 00
-D 4192 87 57
-D 4194 A2 20
-D 4196 11 09 00 01
-D 419A B3 20
-D 419C BE 00
-D 419E 87 57
-D 41A0 A3 30
-D 41A2 44 46
-D 41A4 25
-D 41A5 21 08
-D 41A7 22 05
-D 41A9 21 09
-D 41AB B4 32
-D 41AD B3 30
-D 41AF 88 46
-D 41B1 A3 31
-D 41B3 45 46
-D 41B5 25
-D 41B6 21 08
-D 41B8 22 05
-D 41BA 21 09
-D 41BC B4 32
-D 41BE B3 31
-D 41C0 45 64
-D 41C2 25
-D 41C3 21 08
-D 41C5 22 07
-D 41C7 21 09
-D 41C9 B3 32
-D 41CB BE 00
-D 41CD B3 11
-D 41CF 2E 0F 09 00
-D 41D3 C9
-D 41D4 11 08 08 2E
-D 41D8 39 02 81
-D 41DB 42 01
-D 41DD 3A 02 18
-D 41E0 11 09 00 28
-D 41E4 88 19
-D 41E6 A3 42
-D 41E8 10 00 0D C9
-D 41EC 10 00 0A C9
-D 41F0 11 08 08 2C
-D 41F4 39 02 81
-D 41F7 42 01
-D 41F9 3A 02 18
-D 41FC 11 09 00 18
-D 4200 88 19
-D 4202 A3 40
-D 4204 B4 43
-D 4206 B3 43
-D 4208 F0 00 00
+D 4001 11 0E 06 00
+D 4005 C1 0E
+D 4007 11 09 00 00
+D 400B 11 0A 0A 00
+D 400F 3A 02 9A
+D 4012 11 09 00 00
+D 4016 11 0A 0A 02
+D 401A 3A 02 9A
+D 401D 11 0A 0A 02
+D 4021 39 02 A9
+D 4024 10 00 16
+D 4027 49 09
+D 4029 25
+D 402A 21 09
+D 402C 11 0A 02 80
+D 4030 88 9A
+D 4032 A1 00 3F
+D 4035 51 9A 05
+D 4038 11 06 00 00
+D 403C B0 00 46
+D 403F 51 A9 05
+D 4042 11 06 00 01
+D 4046 11 0A 0A 00
+D 404A 39 02 A9
+D 404D 10 00 1A
+D 4050 49 09
+D 4052 25
+D 4053 21 09
+D 4055 11 0A 01 33
+D 4059 88 9A
+D 405B A1 00 68
+D 405E 51 9A 07
+D 4061 11 08 00 00
+D 4065 B0 00 6F
+D 4068 51 A9 07
+D 406B 11 08 00 01
+D 406F 11 01 00 00
+D 4073 11 02 00 00
+D 4077 11 03 00 00
+D 407B 11 04 00 00
+D 407F 11 0D 00 00
+D 4083 11 0E 04 00
+D 4087 4A 11
+D 4089 17 02
+D 408B 21 19
+D 408D 4A 33
+D 408F 17 02
+D 4091 21 1A
+D 4093 50 9A 0B
+D 4096 88 BE
+D 4098 A0 01 14
+D 409B 4A 13
+D 409D 17 02
+D 409F 21 1B
+D 40A1 50 BB 0B
+D 40A4 11 0C 00 00
+D 40A8 87 24
+D 40AA A0 00 B1
+D 40AD 11 0C 00 01
+D 40B1 11 0F 00 00
+D 40B5 88 9A
+D 40B7 A0 00 C4
+D 40BA 51 A9 09
+D 40BD 11 0F 00 01
+D 40C1 B0 00 C7
+D 40C4 51 9A 09
+D 40C7 87 F6
+D 40C9 A1 00 D5
+D 40CC 50 95 01
+D 40CF 23 00 F2
+D 40D2 B0 00 E9
+D 40D5 88 95
+D 40D7 A1 00 E3
+D 40DA 51 95 01
+D 40DD 23 00 F2
+D 40E0 B0 00 E9
+D 40E3 51 59 01
+D 40E6 23 00 62
+D 40E9 87 C8
+D 40EB A1 00 F7
+D 40EE 50 B7 03
+D 40F1 23 00 C4
+D 40F4 B0 01 0B
+D 40F7 88 B7
+D 40F9 A1 01 05
+D 40FC 51 B7 03
+D 40FF 23 00 C4
+D 4102 B0 01 0B
+D 4105 51 7B 03
+D 4108 23 00 84
+D 410B 42 0D
+D 410D 86 0D 00 0F
+D 4111 A1 00 87
+D 4114 11 0E 00 00
+D 4118 2E 0D 09 00
+D 411C C9
+D 411D 11 0A 0A 02
+D 4121 39 02 A9
+D 4124 42 09
+D 4126 3A 02 9A
+D 4129 86 09 00 28
+D 412D A1 00 1D
+D 4130 CA 0D
+D 4132 CA 0A
+D 4134 11 0A 0A 00
+D 4138 39 02 A9
+D 413B 42 09
+D 413D 3A 02 9A
+D 4140 86 09 00 18
+D 4144 A1 00 12
+D 4147 00
+D 4148 F0 00 00
+
+D 4600 53 54 45 4C 4C 41 52 20 4D 41 4E 44 45 4C 42 52
+D 4610 4F 54 0D 0A 00
+
 D 4900 20 2E 3A 2D 3D 2B 63 6F 61 2A 78 25 23 26 57 40
