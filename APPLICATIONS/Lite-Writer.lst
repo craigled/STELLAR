@@ -4,7 +4,7 @@
 ; ============================================================
 ; Loads at $4000 (VM1 program block).  Relative addressing (default).
 ;
-; Memory layout (dedicated blocks; multitasking suspended via C7 00 at start):
+; Memory layout (dedicated blocks, taken with F2 03 SETSIZE 3 at start):
 ;   $4000..$4336  Program code
 ;   $4700..$47DE  Status / banner / help strings (rel $0700+)
 ;   $5000..$57FF  Text buffer (2048 bytes, rel $1000..$17FF)
@@ -13,8 +13,8 @@
 ;
 ; The text buffer and save banks live in the VM2/3/4 RAM ($5000-$7EFF),
 ; reached via the relative-mode M(Rx) = R[x] + $4000 translation.  Lite-Writer
-; issues C7 00 (SETMULTI off) right after CD so the scheduler stays on VM1 and
-; those blocks are ours alone.  (Hardware-validated: rel $1000/$2000 r/w OK.)
+; issues F2 03 (SETSIZE 3) right after CD, so $5000-$6FFF are ours alone and no
+; other VM can be started there (until 2026-09-26 it used C7 00 SETMULTI off).  (Hardware-validated: rel $1000/$2000 r/w OK.)
 ;
 ; Control keys:
 ;   CR        store CR+LF, echo CR+LF
@@ -82,7 +82,7 @@
 ;
 ; Assembled + label-checked (every GTL/IFTRUEL/IFFALSEL target verified to
 ; have a matching LBL; stream decodes cleanly $4000..$4336 with no stray
-; bytes; 51 labels, 81 targets matched).  C7 00 = SETMULTI off (see firmware).
+; bytes; 51 labels, 81 targets matched).  F2 03 = SETSIZE 3 (was C7 00 SETMULTI off).
 ; ============================================================
 
 ; ---- FULL DISASSEMBLY ----
@@ -92,7 +92,7 @@
 ;   Lxx = label xx (STELLAR label array).  Rn = vCPU register n.
 ; ============================================================
 4000  CD             START
-4001  C7 00          SETMULTI $00   ; multitasking off
+4001  F2 03          SETSIZE 3      ; take $5000-$6FFF
 4003  11 01 10 00    LOADXI R1,$1000
 4007  11 02 10 00    LOADXI R2,$1000
 400B  11 03 18 00    LOADXI R3,$1800
@@ -517,7 +517,7 @@
 ;   STRINGS $4700..47DE
 ; ============================================================
 ; ---- CODE ----
-D 4000 CD C7 00 11 01 10 00 11 02 10 00 11 03 18 00 11
+D 4000 CD F2 03 11 01 10 00 11 02 10 00 11 03 18 00 11
 D 4010 05 17 FF 11 09 17 E0 10 00 00 11 0A 07 00 B3 80
 D 4020 35 01 0A 81 00 00 A2 81 C9 42 0A B4 80 B3 81 35
 D 4030 01 02 81 00 00 A2 01 11 0A 07 28 B3 82 35 01 0A
@@ -585,4 +585,7 @@ D 47A0 77 0D 0A 5E 53 20 73 61 76 65 20 20 5E 4C 20 6C
 D 47B0 6F 61 64 20 20 5E 57 20 6D 65 6D 0D 0A 5E 58 20
 D 47C0 65 78 69 74 20 20 5E 47 20 68 65 6C 70 0D 0A 00
 D 47D0 57 68 65 72 65 3F 20 00 43 6F 70 69 65 64 00
+D 5000 00
+D 6000 00
+D 7000 00
 

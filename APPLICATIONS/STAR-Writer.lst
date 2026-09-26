@@ -51,3 +51,6 @@ D 4100 35 01 04 C9 42 04 B4 63 B3 64 B4 01
 ;   scans dirty RAM past here and can corrupt the 16 labels / 30
 ;   branches (the Prime-Gen bug class). Marker stops the scan cleanly.
 D 410C F0 00 00
+D 5000 00
+D 6000 00
+D 7000 00
