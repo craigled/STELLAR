@@ -398,3 +398,10 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .st-ready{background:#1f6f3f}
 .st-error{background:#8a2f22}
 .st-unk{background:#555}
+
+.dl-list{border:1px solid var(--line); border-radius:8px; background:var(--bg-panel); padding:8px 14px; margin:4px 0 12px}
+.dl-list summary{cursor:pointer; font-weight:600}
+.dl-list h4{margin:12px 0 4px; font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent)}
+.dl-list ul{margin:0; padding-left:18px}
+.dl-list li{margin:3px 0; font-size:13.5px; line-height:1.45}
+.dl-list li a{white-space:nowrap}

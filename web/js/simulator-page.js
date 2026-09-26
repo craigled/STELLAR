@@ -48,7 +48,7 @@
   function btn(id) { return document.getElementById(id); }
   var samples = [];
 
-  fetch('samples/manifest.json?v=58')
+  fetch('samples/manifest.json?v=59')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       samples = list;
@@ -85,7 +85,7 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=58')
+    fetch('samples/' + s.file + '?v=59')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
@@ -204,7 +204,7 @@
   btn('dlApp').addEventListener('click', function () {
     var s = samples[+btn('sample').value];
     if (!s) return;
-    fetch('samples/' + s.file + '?v=58')
+    fetch('samples/' + s.file + '?v=59')
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         saveFile(s.file, text);
@@ -212,6 +212,31 @@
       })
       .catch(function (e) { btn('dlNote').textContent = 'could not fetch ' + s.file + ': ' + e; });
   });
+  // The full catalogue (web/build/gen_downloads.py): every finished app, one link each.
+  fetch('downloads/catalog.json?v=59')
+    .then(function (r) { return r.json(); })
+    .then(function (list) {
+      var box = btn('dlGroups'), groups = {};
+      btn('dlCount').textContent = '(' + list.length + ' programs)';
+      list.forEach(function (a) {
+        if (!groups[a.group]) {
+          var h = document.createElement('h4'); h.textContent = a.group; box.appendChild(h);
+          groups[a.group] = document.createElement('ul'); box.appendChild(groups[a.group]);
+        }
+        var li = document.createElement('li'), link = document.createElement('a');
+        var fn = a.href.split('/').pop();
+        link.href = a.href; link.download = fn; link.textContent = fn; link.className = 'mono';
+        var name = document.createElement('b'); name.textContent = a.name;
+        li.appendChild(name); li.appendChild(document.createTextNode(' \u2014 ' + a.what + ' '));
+        if (a.note) {
+          var n = document.createElement('em'); n.textContent = '(' + a.note + ') '; li.appendChild(n);
+        }
+        li.appendChild(link);
+        groups[a.group].appendChild(li);
+      });
+    })
+    .catch(function () { btn('dlList').hidden = true; });
+
   function labelAppButton() {
     var s = samples[+btn('sample').value];
     btn('dlApp').textContent = s ? s.file : 'App (.lst)';

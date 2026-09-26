@@ -1,0 +1,226 @@
+[
+ {
+  "group": "Games",
+  "name": "MOONBASE",
+  "what": "Text adventure: escape the damaged moon base. Two-word commands, 10 rooms.",
+  "href": "downloads/Moonbase.lst",
+  "note": null
+ },
+ {
+  "group": "Games",
+  "name": "Lunar Lander",
+  "what": "Land on the pad before the fuel runs out. Easy and Hard. VT100, arrow keys.",
+  "href": "samples/Lunar-Lander.lst",
+  "note": null
+ },
+ {
+  "group": "Games",
+  "name": "Pong",
+  "what": "You on the right against the computer. VT100, arrow keys.",
+  "href": "samples/Pong.lst",
+  "note": null
+ },
+ {
+  "group": "Games",
+  "name": "Racer",
+  "what": "Keep the car on a scrolling, winding road. VT100, arrow keys.",
+  "href": "samples/Racer.lst",
+  "note": null
+ },
+ {
+  "group": "Games",
+  "name": "Invaders",
+  "what": "Two rows of six invaders and an arrow-key gun. VT100.",
+  "href": "samples/Invaders.lst",
+  "note": null
+ },
+ {
+  "group": "Games",
+  "name": "Tic-Tac-Toe",
+  "what": "You are X against a simple AI.",
+  "href": "samples/Tic-Tac-Toe.lst",
+  "note": null
+ },
+ {
+  "group": "Games",
+  "name": "Maze",
+  "what": "VM1 builds a maze, VM2 solves it. Two programs, one file. VT100.",
+  "href": "downloads/Maze.lst",
+  "note": null
+ },
+ {
+  "group": "Text",
+  "name": "Lite-Writer 2",
+  "what": "Full-screen word processor: word wrap, find, cut/paste, 4 save slots. VT100.",
+  "href": "samples/Lite-Writer-2.lst",
+  "note": null
+ },
+ {
+  "group": "Text",
+  "name": "ELIZA",
+  "what": "The classic 1966 chatbot psychotherapist.",
+  "href": "samples/ELIZA.lst",
+  "note": null
+ },
+ {
+  "group": "Text",
+  "name": "Banner",
+  "what": "Prints what you type as big block letters.",
+  "href": "samples/Banner.lst",
+  "note": null
+ },
+ {
+  "group": "Text",
+  "name": "GETSTR",
+  "what": "The $C2 line-input opcode: read a line, print it back.",
+  "href": "samples/GETSTR.lst",
+  "note": null
+ },
+ {
+  "group": "Text",
+  "name": "String Store",
+  "what": "Keep three typed lines in slots and print them back.",
+  "href": "samples/String-Store.lst",
+  "note": null
+ },
+ {
+  "group": "Morse",
+  "name": "Morse Sender v17",
+  "what": "Type text; it is sent as Morse code on the Q output.",
+  "href": "downloads/Morse-Sender-v17.lst",
+  "note": null
+ },
+ {
+  "group": "Morse",
+  "name": "Morse Receiver v10",
+  "what": "Key Morse on the Input switch; it learns your hand and prints the text.",
+  "href": "downloads/Morse-Receiver-v10.lst",
+  "note": "simulator-verified, not yet run on hardware"
+ },
+ {
+  "group": "Math",
+  "name": "Simple-Calc-5",
+  "what": "5-digit calculator, all in STELLAR bytecode.",
+  "href": "samples/Simple-Calc-5.lst",
+  "note": null
+ },
+ {
+  "group": "Math",
+  "name": "Simple-Calc-8",
+  "what": "8-digit calculator, math in native 1802 via RUNMC.",
+  "href": "samples/Simple-Calc-8.lst",
+  "note": null
+ },
+ {
+  "group": "Math",
+  "name": "Prime-Gen v07",
+  "what": "Primes in a range you choose, using the native OUTDEC print.",
+  "href": "samples/Prime-Gen-v07.lst",
+  "note": null
+ },
+ {
+  "group": "Math",
+  "name": "Prime-Gen v05",
+  "what": "Primes by odd-only trial division.",
+  "href": "samples/Prime-Gen-v05.lst",
+  "note": null
+ },
+ {
+  "group": "Math",
+  "name": "Prime-Gen v04",
+  "what": "An earlier prime generator (multiply-back divide test).",
+  "href": "samples/Prime-Gen-v04.lst",
+  "note": null
+ },
+ {
+  "group": "Graphics",
+  "name": "Mandelbrot",
+  "what": "The Mandelbrot set in ASCII.",
+  "href": "samples/Mandelbrot.lst",
+  "note": null
+ },
+ {
+  "group": "Graphics",
+  "name": "Game of Life",
+  "what": "Conway's Life on a 40x20 grid: a blinker and a glider. VT100.",
+  "href": "samples/Game-of-Life.lst",
+  "note": null
+ },
+ {
+  "group": "Graphics",
+  "name": "Sort visualiser",
+  "what": "Watch a bubble sort as VT100 bars.",
+  "href": "samples/Sort-Visualiser.lst",
+  "note": null
+ },
+ {
+  "group": "Graphics",
+  "name": "Starfield",
+  "what": "Stars streaming outward; you pick how many. VT100.",
+  "href": "samples/Starfield.lst",
+  "note": null
+ },
+ {
+  "group": "Graphics",
+  "name": "Bouncing Ball",
+  "what": "Two balls bouncing around the screen and off each other. VT100.",
+  "href": "samples/Bouncing-Ball.lst",
+  "note": null
+ },
+ {
+  "group": "Graphics",
+  "name": "Starship",
+  "what": "The COSMAC ELF starship logo in ASCII.",
+  "href": "samples/Starship.lst",
+  "note": null
+ },
+ {
+  "group": "Graphics",
+  "name": "Front panel",
+  "what": "Lights the Q lamp and counts $00-$1F on the hex display.",
+  "href": "samples/Front-Panel.lst",
+  "note": null
+ },
+ {
+  "group": "Multitasking",
+  "name": "Mandelbrot x 4",
+  "what": "Four VMs draw a quarter of the Mandelbrot set each. One file.",
+  "href": "downloads/Mandelbrot-4VM.lst",
+  "note": null
+ },
+ {
+  "group": "Multitasking",
+  "name": "Maze Race",
+  "what": "VM1 builds a maze; VM2 and VM3 race it, right hand against left. One file.",
+  "href": "downloads/MazeRace.lst",
+  "note": null
+ },
+ {
+  "group": "Multitasking",
+  "name": "Life Race",
+  "what": "Game of Life in bytecode against native 1802, side by side. One file.",
+  "href": "downloads/Life-Race.lst",
+  "note": null
+ },
+ {
+  "group": "Multitasking",
+  "name": "Race condition (VM1)",
+  "what": "Two VMs share a counter: without a lock, counts go missing. Load this file first.",
+  "href": "downloads/Race-VM1.lst",
+  "note": null
+ },
+ {
+  "group": "Multitasking",
+  "name": "Race condition (VM2)",
+  "what": "The second worker for the race-condition demo. Load after VM1.",
+  "href": "downloads/Race-VM2.lst",
+  "note": null
+ },
+ {
+  "group": "Firmware",
+  "name": "FW-Checksum V0061.34",
+  "what": "Checks the firmware after loading: prints 15 checksums to compare with the list in the file.",
+  "href": "downloads/FW-Checksum-V0061.34.lst",
+  "note": null
+ }
+]

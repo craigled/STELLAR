@@ -1,0 +1,709 @@
+; ==========================================================================
+; STELLAR MAZE  -  VM1 builds a maze, VM2 solves it   (two programs, one file)
+; ==========================================================================
+; Load this ONE file - it holds both programs: VM1 at $4000 and VM2 at $5000 -
+; then cold-boot and press a key. VM1 carves a random 25 x 10 maze on screen (a
+; depth-first backtracker, multitasking OFF so it has the whole CPU). Then it
+; copies the grid into VM2's memory with $DC COPYBVMXVMY and triggers VM2 by
+; writing 1 into VM2's RB with $D3 COPYVXY. VM2 solves it right-hand-on-the-wall:
+; 'o' is the path, '.' the dead ends it backed out of.
+;
+; VT100: cursor addressing and reverse video (the walls) only.
+;
+; VERIFICATION (Firmware-Math/maze_verify.py, V0061.33, two-VM cold boot): three mazes, the first booted into DIRTY grid RAM and the second a RERUN from the memory the first left (no reload, as on the Elf2K) - it draws a NEW maze; each reads back off the screen as a PERFECT 25 x 10 maze equal to VM1's grid; VM2's copy has identical walls ($DC); the 'o' left on screen is exactly the start-to-exit path, '.' only off it, and the step and path counts match a Python right-hand walk. About 12-16 million 1802 instructions (~1.5 min at 3 MHz) + ~12 KB of output.
+; The first build was HW-VERIFIED on the Elf2K (V0061.33), 2026-09-24. This build
+; also rebuilds the grid at the start of every run (FILLMEM), so a rerun without
+; reloading makes a new maze - that change is not yet run on hardware.
+;
+; VM1: 167 STELLAR commands.   VM2: 137 STELLAR commands.
+
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  VM1 ($4000): builds the maze, hands it over  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 4000 CD             START
+; D 4001 11 0F 00 0A    LOADXI R15 000A
+; D 4005 11 0C 00 34    LOADXI R12 0034                    The grid stride
+; D 4009 11 0A 00 02    LOADXI R10 0002
+; D 400D 11 03 08 00    LOADXI R3 0800
+; D 4011 11 04 0C AB    LOADXI R4 0CAB
+; D 4015 FB 34 58       FILLMEMXY R3..R4 'X'               A fresh grid: everything a sentinel ...
+; D 4018 11 03 08 34    LOADXI R3 0834                     row 0
+; D 401C 11 05 00 15    LOADXI R5 0015
+; CLR:
+; D 4020 23 00 34       COPYXY R3 -> R4
+; D 4023 52 04 00 32    ADDXI R4 0032
+; D 4027 FB 34 23       FILLMEMXY R3..R4 '#'               ... then each maze row solid, unvisited
+; D 402A 52 03 00 34    ADDXI R3 0034
+; D 402E 43 05          DECX R5
+; D 4030 8C 05          TESTXZ R5
+; D 4032 A1 00 20       IFFALSEI CLR
+; D 4035 D0 11          SHAREVM on, read-only              VM2 may read us (the $DC source)
+; WAIT2:
+; D 4037 D1 22          TESTVM 2 RW                        Has VM2 opened itself read/write yet?
+; D 4039 A1 00 37       IFFALSEI WAIT2                     Not yet - it needs one turn first
+; D 403C 11 0E 06 00    LOADXI R14 0600
+; D 4040 C1 0E          PRINTSTR R14
+; D 4042 11 0E 06 44    LOADXI R14 0644
+; D 4046 C1 0E          PRINTSTR R14
+; SEED:
+; D 4048 C3             RAND                               Spin the generator until a key comes - every maze differs
+; D 4049 CC             SERST
+; D 404A A1 00 48       IFFALSEI SEED
+; D 404D CB             SERIN                              and throw the key away
+; D 404E C7 00          SETMULTI 00                        Multitasking OFF: VM2 is only waiting
+; D 4050 11 0E 06 72    LOADXI R14 0672
+; D 4054 C1 0E          PRINTSTR R14
+; D 4056 11 0E 06 B4    LOADXI R14 06B4
+; D 405A C1 0E          PRINTSTR R14                       Reverse video: a space is a wall block
+; D 405C 11 0D 00 03    LOADXI R13 0003
+; D 4060 11 03 00 15    LOADXI R3 0015
+; BLK:
+; D 4064 11 0E 00 0F    LOADXI R14 000F
+; D 4068 BD 01 BB       CALL POSXY
+; D 406B 11 0E 07 C0    LOADXI R14 07C0
+; D 406F C1 0E          PRINTSTR R14                       51 blocks
+; D 4071 42 0D          INCX R13
+; D 4073 43 03          DECX R3
+; D 4075 8C 03          TESTXZ R3
+; D 4077 A1 00 64       IFFALSEI BLK
+; D 407A 11 0E 06 B9    LOADXI R14 06B9
+; D 407E C1 0E          PRINTSTR R14
+; D 4080 11 07 00 20    LOADXI R7 0020                     R7 = the carving character, a normal-video space
+; D 4084 11 0B 00 35    LOADXI R11 0035
+; D 4088 BD 01 A3       CALL DRAW                          The way in (screen only)
+; D 408B 11 0B 04 75    LOADXI R11 0475
+; D 408F BD 01 A3       CALL DRAW                          The way out
+; D 4092 11 06 00 69    LOADXI R6 0069
+; D 4096 10 00 20       LOADAI 0020
+; D 4099 2F 06 08 00    WRITEIDX R6 0800                   Carve the first cell
+; D 409D 23 00 6B       COPYXY R6 -> R11
+; D 40A0 BD 01 A3       CALL DRAW
+; D 40A3 11 01 0D 00    LOADXI R1 0D00                     R1 = stack pointer
+; D 40A7 3A 02 61       COPYXMY R6 -> M(R1)                push it
+; D 40AA 52 01 00 02    ADDXI R1 0002
+; LOOP:
+; D 40AE 86 01 0D 00    TESTXI R1 0D00
+; D 40B2 A0 01 76       IFTRUEI BUILT                      Stack empty: every cell visited
+; D 40B5 23 00 18       COPYXY R1 -> R8
+; D 40B8 53 08 00 02    SUBXI R8 0002
+; D 40BC 39 02 82       COPYMXY M(R8) -> R2                R2 = current cell
+; D 40BF 11 05 00 00    LOADXI R5 0000                     R5 = unvisited neighbours found
+; D 40C3 11 09 0F 00    LOADXI R9 0F00
+; D 40C7 23 00 26       COPYXY R2 -> R6
+; D 40CA 52 06 00 02    ADDXI R6 0002                      right
+; D 40CE 2E 06 08 00    READIDX R6 0800
+; D 40D2 81 00 23       TESTAI 0023                        '#' = unvisited ('X' = off the edge)
+; D 40D5 A1 00 E1       IFFALSEI NB0
+; D 40D8 3A 02 69       COPYXMY R6 -> M(R9)                a candidate
+; D 40DB 52 09 00 02    ADDXI R9 0002
+; D 40DF 42 05          INCX R5
+; NB0:
+; D 40E1 23 00 26       COPYXY R2 -> R6
+; D 40E4 53 06 00 02    SUBXI R6 0002                      left
+; D 40E8 2E 06 08 00    READIDX R6 0800
+; D 40EC 81 00 23       TESTAI 0023                        '#' = unvisited ('X' = off the edge)
+; D 40EF A1 00 FB       IFFALSEI NB1
+; D 40F2 3A 02 69       COPYXMY R6 -> M(R9)                a candidate
+; D 40F5 52 09 00 02    ADDXI R9 0002
+; D 40F9 42 05          INCX R5
+; NB1:
+; D 40FB 23 00 26       COPYXY R2 -> R6
+; D 40FE 52 06 00 68    ADDXI R6 0068                      down
+; D 4102 2E 06 08 00    READIDX R6 0800
+; D 4106 81 00 23       TESTAI 0023                        '#' = unvisited ('X' = off the edge)
+; D 4109 A1 01 15       IFFALSEI NB2
+; D 410C 3A 02 69       COPYXMY R6 -> M(R9)                a candidate
+; D 410F 52 09 00 02    ADDXI R9 0002
+; D 4113 42 05          INCX R5
+; NB2:
+; D 4115 23 00 26       COPYXY R2 -> R6
+; D 4118 53 06 00 68    SUBXI R6 0068                      up
+; D 411C 2E 06 08 00    READIDX R6 0800
+; D 4120 81 00 23       TESTAI 0023                        '#' = unvisited ('X' = off the edge)
+; D 4123 A1 01 2F       IFFALSEI NB3
+; D 4126 3A 02 69       COPYXMY R6 -> M(R9)                a candidate
+; D 4129 52 09 00 02    ADDXI R9 0002
+; D 412D 42 05          INCX R5
+; NB3:
+; D 412F 8C 05          TESTXZ R5
+; D 4131 A1 01 3B       IFFALSEI PICK
+; D 4134 53 01 00 02    SUBXI R1 0002                      Dead end: pop
+; D 4138 B0 00 AE       GAL LOOP
+; PICK:
+; D 413B C3             RAND                               A random one of them
+; D 413C 21 06          COPYAX Acc -> R6
+; D 413E 4D 65          DIVXY R6 / R5
+; D 4140 27             COPYREMA
+; D 4141 21 08          COPYAX Acc -> R8
+; D 4143 50 88 08       ADDXYZ R8 + R8 -> R8               x2: a word each
+; D 4146 52 08 0F 00    ADDXI R8 0F00
+; D 414A 39 02 86       COPYMXY M(R8) -> R6                R6 = the chosen cell
+; D 414D 50 26 08       ADDXYZ R2 + R6 -> R8
+; D 4150 4D 8A          DIVXY R8 / R10
+; D 4152 25             COPYMAA
+; D 4153 21 08          COPYAX Acc -> R8                   R8 = the wall between = (cur + next) / 2
+; D 4155 10 00 20       LOADAI 0020
+; D 4158 2F 08 08 00    WRITEIDX R8 0800                   knock it down
+; D 415C 2F 06 08 00    WRITEIDX R6 0800                   and visit the cell
+; D 4160 23 00 8B       COPYXY R8 -> R11
+; D 4163 BD 01 A3       CALL DRAW
+; D 4166 23 00 6B       COPYXY R6 -> R11
+; D 4169 BD 01 A3       CALL DRAW
+; D 416C 3A 02 61       COPYXMY R6 -> M(R1)                push it
+; D 416F 52 01 00 02    ADDXI R1 0002
+; D 4173 B0 00 AE       GAL LOOP
+; BUILT:
+; D 4176 11 03 08 00    LOADXI R3 0800                     The grid is at the same place in both VMs
+; D 417A 11 06 00 05    LOADXI R6 0005
+; COPY:
+; D 417E D3 21 33       COPYVXY save R3 -> VM2 R3          VM2's R3 = the same address, in VM2
+; D 4181 DC 13 23 F0    COPYBVMXVMY VM1 R3 -> VM2 R3 F0    240 bytes, VM1 to VM2
+; D 4185 52 03 00 F0    ADDXI R3 00F0
+; D 4189 43 06          DECX R6
+; D 418B 8C 06          TESTXZ R6
+; D 418D A1 01 7E       IFFALSEI COPY
+; D 4190 11 0B 00 01    LOADXI R11 0001
+; D 4194 D3 21 BB       COPYVXY save RB -> VM2 RB          The trigger: VM2 is waiting for RB = 1
+; D 4197 11 0E 06 BE    LOADXI R14 06BE
+; D 419B C1 0E          PRINTSTR R14
+; D 419D C7 01          SETMULTI 01                        Multitasking back ON - VM2 takes over
+; D 419F 00             HALT                               VM1 is done
+; D 41A0 F0 00 00       BREAK
+; DRAW:
+; D 41A3 4D BC          DIVXY R11 / R12                    row + 1, column
+; D 41A5 25             COPYMAA
+; D 41A6 21 0D          COPYAX Acc -> R13
+; D 41A8 52 0D 00 02    ADDXI R13 0002
+; D 41AC 27             COPYREMA
+; D 41AD 21 0E          COPYAX Acc -> R14
+; D 41AF 52 0E 00 0F    ADDXI R14 000F
+; D 41B3 BD 01 BB       CALL POSXY
+; D 41B6 22 07          COPYXA R7 -> Acc
+; D 41B8 C9             SEROUT
+; D 41B9 BE 00          RETURN
+; POSXY:
+; D 41BB CA 1B          SEROUTI 1B
+; D 41BD CA 5B          SEROUTI 5B '['
+; D 41BF 4D DF          DIVXY R13 / R15
+; D 41C1 25             COPYMAA
+; D 41C2 4E 00 30       ADDAI 0030
+; D 41C5 C9             SEROUT
+; D 41C6 27             COPYREMA
+; D 41C7 4E 00 30       ADDAI 0030
+; D 41CA C9             SEROUT
+; D 41CB CA 3B          SEROUTI 3B ';'
+; D 41CD 4D EF          DIVXY R14 / R15
+; D 41CF 25             COPYMAA
+; D 41D0 4E 00 30       ADDAI 0030
+; D 41D3 C9             SEROUT
+; D 41D4 27             COPYREMA
+; D 41D5 4E 00 30       ADDAI 0030
+; D 41D8 C9             SEROUT
+; D 41D9 CA 48          SEROUTI 48 'H'
+; D 41DB BE 00          RETURN
+
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  VM2 ($5000): solves it  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 5000 CD             START
+; D 5001 11 0B 00 00    LOADXI R11 0000                    RB = 0: VM1 sets it to 1 when the maze is ours
+; D 5005 D0 12          SHAREVM on, read/write             VM1 may write our memory and registers
+; D 5007 11 0F 00 0A    LOADXI R15 000A
+; D 500B 11 0C 00 34    LOADXI R12 0034
+; WAIT:
+; D 500F 86 0B 00 01    TESTXI R11 0001
+; D 5013 A1 00 0F       IFFALSEI WAIT                      Wait for the trigger
+; D 5016 11 0E 06 00    LOADXI R14 0600
+; D 501A C1 0E          PRINTSTR R14
+; D 501C 11 05 04 41    LOADXI R5 0441                     R5 = the bottom-right cell
+; D 5020 11 02 00 69    LOADXI R2 0069                     R2 = where we are
+; D 5024 11 03 00 02    LOADXI R3 0002                     R3 = heading: 0 up 1 right 2 down 3 left
+; D 5028 10 00 6F       LOADAI 006F
+; D 502B 2F 02 08 00    WRITEIDX R2 0800
+; D 502F 11 0A 00 6F    LOADXI R10 006F
+; D 5033 23 00 2B       COPYXY R2 -> R11
+; D 5036 BD 01 21       CALL DRAW
+; D 5039 11 08 00 01    LOADXI R8 0001                     R8 = path length (cells)
+; D 503D 11 09 00 00    LOADXI R9 0000                     R9 = steps
+; STEP:
+; D 5041 87 25          TESTXY R2 = R5
+; D 5043 A0 00 C3       IFTRUEI SOLVED
+; D 5046 23 00 34       COPYXY R3 -> R4
+; D 5049 42 04          INCX R4
+; D 504B 86 04 00 04    TESTXI R4 0004
+; D 504F A1 00 56       IFFALSEI TRY                       R4 = heading + 1: try RIGHT first
+; D 5052 11 04 00 00    LOADXI R4 0000
+; TRY:
+; D 5056 BD 00 E8       CALL OFF                           R6 = the wall that way, R7 = the cell beyond
+; D 5059 2E 06 08 00    READIDX R6 0800
+; D 505D 81 00 23       TESTAI 0023
+; D 5060 A1 00 71       IFFALSEI FOUND                     Open
+; D 5063 8C 04          TESTXZ R4
+; D 5065 A1 00 6C       IFFALSEI TL                        Blocked: turn left one
+; D 5068 11 04 00 04    LOADXI R4 0004
+; TL:
+; D 506C 43 04          DECX R4
+; D 506E B0 00 56       GAL TRY
+; FOUND:
+; D 5071 42 09          INCX R9
+; D 5073 2E 07 08 00    READIDX R7 0800
+; D 5077 81 00 6F       TESTAI 006F
+; D 507A A0 00 9D       IFTRUEI BACK                       Stepping back onto the path
+; D 507D 10 00 6F       LOADAI 006F
+; D 5080 2F 06 08 00    WRITEIDX R6 0800
+; D 5084 2F 07 08 00    WRITEIDX R7 0800
+; D 5088 11 0A 00 6F    LOADXI R10 006F
+; D 508C 23 00 6B       COPYXY R6 -> R11
+; D 508F BD 01 21       CALL DRAW
+; D 5092 23 00 7B       COPYXY R7 -> R11
+; D 5095 BD 01 21       CALL DRAW
+; D 5098 42 08          INCX R8
+; D 509A B0 00 BA       GAL MOVED
+; BACK:
+; D 509D 10 00 2E       LOADAI 002E
+; D 50A0 2F 02 08 00    WRITEIDX R2 0800
+; D 50A4 2F 06 08 00    WRITEIDX R6 0800
+; D 50A8 11 0A 00 2E    LOADXI R10 002E
+; D 50AC 23 00 2B       COPYXY R2 -> R11
+; D 50AF BD 01 21       CALL DRAW
+; D 50B2 23 00 6B       COPYXY R6 -> R11
+; D 50B5 BD 01 21       CALL DRAW
+; D 50B8 43 08          DECX R8
+; MOVED:
+; D 50BA 23 00 72       COPYXY R7 -> R2
+; D 50BD 23 00 43       COPYXY R4 -> R3
+; D 50C0 B0 00 41       GAL STEP
+; SOLVED:
+; D 50C3 23 00 87       COPYXY R8 -> R7                    Path length out of R8: PRNUM counts digits in R8
+; D 50C6 11 0E 06 39    LOADXI R14 0639
+; D 50CA C1 0E          PRINTSTR R14
+; D 50CC 23 00 94       COPYXY R9 -> R4
+; D 50CF BD 01 5B       CALL PRNUM
+; D 50D2 11 0E 06 51    LOADXI R14 0651
+; D 50D6 C1 0E          PRINTSTR R14
+; D 50D8 23 00 74       COPYXY R7 -> R4
+; D 50DB BD 01 5B       CALL PRNUM
+; D 50DE 11 0E 06 67    LOADXI R14 0667
+; D 50E2 C1 0E          PRINTSTR R14
+; D 50E4 00             HALT
+; D 50E5 F0 00 00       BREAK
+; OFF:
+; D 50E8 23 00 26       COPYXY R2 -> R6
+; D 50EB 86 04 00 00    TESTXI R4 0000
+; D 50EF A0 01 07       IFTRUEI OU
+; D 50F2 86 04 00 01    TESTXI R4 0001
+; D 50F6 A0 01 0E       IFTRUEI OR
+; D 50F9 86 04 00 02    TESTXI R4 0002
+; D 50FD A0 01 15       IFTRUEI OD
+; D 5100 53 06 00 01    SUBXI R6 0001                      left
+; D 5104 B0 01 19       GAL ON
+; OU:
+; D 5107 53 06 00 34    SUBXI R6 0034
+; D 510B B0 01 19       GAL ON
+; OR:
+; D 510E 52 06 00 01    ADDXI R6 0001
+; D 5112 B0 01 19       GAL ON
+; OD:
+; D 5115 52 06 00 34    ADDXI R6 0034
+; ON:
+; D 5119 50 66 07       ADDXYZ R6 + R6 -> R7
+; D 511C 51 72 07       SUBXYZ R7 - R2 -> R7               next = 2 x wall - here
+; D 511F BE 00          RETURN
+; DRAW:
+; D 5121 4D BC          DIVXY R11 / R12                    row + 1, column
+; D 5123 25             COPYMAA
+; D 5124 21 0D          COPYAX Acc -> R13
+; D 5126 52 0D 00 02    ADDXI R13 0002
+; D 512A 27             COPYREMA
+; D 512B 21 0E          COPYAX Acc -> R14
+; D 512D 52 0E 00 0F    ADDXI R14 000F
+; D 5131 BD 01 39       CALL POSXY
+; D 5134 22 0A          COPYXA R10 -> Acc
+; D 5136 C9             SEROUT
+; D 5137 BE 00          RETURN
+; POSXY:
+; D 5139 CA 1B          SEROUTI 1B
+; D 513B CA 5B          SEROUTI 5B '['
+; D 513D 4D DF          DIVXY R13 / R15
+; D 513F 25             COPYMAA
+; D 5140 4E 00 30       ADDAI 0030
+; D 5143 C9             SEROUT
+; D 5144 27             COPYREMA
+; D 5145 4E 00 30       ADDAI 0030
+; D 5148 C9             SEROUT
+; D 5149 CA 3B          SEROUTI 3B ';'
+; D 514B 4D EF          DIVXY R14 / R15
+; D 514D 25             COPYMAA
+; D 514E 4E 00 30       ADDAI 0030
+; D 5151 C9             SEROUT
+; D 5152 27             COPYREMA
+; D 5153 4E 00 30       ADDAI 0030
+; D 5156 C9             SEROUT
+; D 5157 CA 48          SEROUTI 48 'H'
+; D 5159 BE 00          RETURN
+; PRNUM:
+; D 515B 11 08 00 00    LOADXI R8 0000
+; PN1:
+; D 515F 4D 4F          DIVXY R4 / R15
+; D 5161 27             COPYREMA
+; D 5162 70 00          PUSHA Acc                          digits onto the stack
+; D 5164 42 08          INCX R8
+; D 5166 25             COPYMAA
+; D 5167 21 04          COPYAX Acc -> R4
+; D 5169 8C 04          TESTXZ R4
+; D 516B A1 01 5F       IFFALSEI PN1
+; PN2:
+; D 516E 71 00          POPA Acc
+; D 5170 4E 00 30       ADDAI 0030
+; D 5173 C9             SEROUT
+; D 5174 43 08          DECX R8
+; D 5176 8C 08          TESTXZ R8
+; D 5178 A1 01 6E       IFFALSEI PN2
+; D 517B BE 00          RETURN
+
+; --------------------------------------------------------------------------
+; CODE  -  download this block (VM1 then VM2)
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 11 0F 00 0A
+D 4005 11 0C 00 34
+D 4009 11 0A 00 02
+D 400D 11 03 08 00
+D 4011 11 04 0C AB
+D 4015 FB 34 58
+D 4018 11 03 08 34
+D 401C 11 05 00 15
+D 4020 23 00 34
+D 4023 52 04 00 32
+D 4027 FB 34 23
+D 402A 52 03 00 34
+D 402E 43 05
+D 4030 8C 05
+D 4032 A1 00 20
+D 4035 D0 11
+D 4037 D1 22
+D 4039 A1 00 37
+D 403C 11 0E 06 00
+D 4040 C1 0E
+D 4042 11 0E 06 44
+D 4046 C1 0E
+D 4048 C3
+D 4049 CC
+D 404A A1 00 48
+D 404D CB
+D 404E C7 00
+D 4050 11 0E 06 72
+D 4054 C1 0E
+D 4056 11 0E 06 B4
+D 405A C1 0E
+D 405C 11 0D 00 03
+D 4060 11 03 00 15
+D 4064 11 0E 00 0F
+D 4068 BD 01 BB
+D 406B 11 0E 07 C0
+D 406F C1 0E
+D 4071 42 0D
+D 4073 43 03
+D 4075 8C 03
+D 4077 A1 00 64
+D 407A 11 0E 06 B9
+D 407E C1 0E
+D 4080 11 07 00 20
+D 4084 11 0B 00 35
+D 4088 BD 01 A3
+D 408B 11 0B 04 75
+D 408F BD 01 A3
+D 4092 11 06 00 69
+D 4096 10 00 20
+D 4099 2F 06 08 00
+D 409D 23 00 6B
+D 40A0 BD 01 A3
+D 40A3 11 01 0D 00
+D 40A7 3A 02 61
+D 40AA 52 01 00 02
+D 40AE 86 01 0D 00
+D 40B2 A0 01 76
+D 40B5 23 00 18
+D 40B8 53 08 00 02
+D 40BC 39 02 82
+D 40BF 11 05 00 00
+D 40C3 11 09 0F 00
+D 40C7 23 00 26
+D 40CA 52 06 00 02
+D 40CE 2E 06 08 00
+D 40D2 81 00 23
+D 40D5 A1 00 E1
+D 40D8 3A 02 69
+D 40DB 52 09 00 02
+D 40DF 42 05
+D 40E1 23 00 26
+D 40E4 53 06 00 02
+D 40E8 2E 06 08 00
+D 40EC 81 00 23
+D 40EF A1 00 FB
+D 40F2 3A 02 69
+D 40F5 52 09 00 02
+D 40F9 42 05
+D 40FB 23 00 26
+D 40FE 52 06 00 68
+D 4102 2E 06 08 00
+D 4106 81 00 23
+D 4109 A1 01 15
+D 410C 3A 02 69
+D 410F 52 09 00 02
+D 4113 42 05
+D 4115 23 00 26
+D 4118 53 06 00 68
+D 411C 2E 06 08 00
+D 4120 81 00 23
+D 4123 A1 01 2F
+D 4126 3A 02 69
+D 4129 52 09 00 02
+D 412D 42 05
+D 412F 8C 05
+D 4131 A1 01 3B
+D 4134 53 01 00 02
+D 4138 B0 00 AE
+D 413B C3
+D 413C 21 06
+D 413E 4D 65
+D 4140 27
+D 4141 21 08
+D 4143 50 88 08
+D 4146 52 08 0F 00
+D 414A 39 02 86
+D 414D 50 26 08
+D 4150 4D 8A
+D 4152 25
+D 4153 21 08
+D 4155 10 00 20
+D 4158 2F 08 08 00
+D 415C 2F 06 08 00
+D 4160 23 00 8B
+D 4163 BD 01 A3
+D 4166 23 00 6B
+D 4169 BD 01 A3
+D 416C 3A 02 61
+D 416F 52 01 00 02
+D 4173 B0 00 AE
+D 4176 11 03 08 00
+D 417A 11 06 00 05
+D 417E D3 21 33
+D 4181 DC 13 23 F0
+D 4185 52 03 00 F0
+D 4189 43 06
+D 418B 8C 06
+D 418D A1 01 7E
+D 4190 11 0B 00 01
+D 4194 D3 21 BB
+D 4197 11 0E 06 BE
+D 419B C1 0E
+D 419D C7 01
+D 419F 00
+D 41A0 F0 00 00
+D 41A3 4D BC
+D 41A5 25
+D 41A6 21 0D
+D 41A8 52 0D 00 02
+D 41AC 27
+D 41AD 21 0E
+D 41AF 52 0E 00 0F
+D 41B3 BD 01 BB
+D 41B6 22 07
+D 41B8 C9
+D 41B9 BE 00
+D 41BB CA 1B
+D 41BD CA 5B
+D 41BF 4D DF
+D 41C1 25
+D 41C2 4E 00 30
+D 41C5 C9
+D 41C6 27
+D 41C7 4E 00 30
+D 41CA C9
+D 41CB CA 3B
+D 41CD 4D EF
+D 41CF 25
+D 41D0 4E 00 30
+D 41D3 C9
+D 41D4 27
+D 41D5 4E 00 30
+D 41D8 C9
+D 41D9 CA 48
+D 41DB BE 00
+
+D 4600 1B 5B 30 6D 1B 5B 32 4A 1B 5B 3F 32 35 6C 1B 5B
+D 4610 30 31 3B 31 35 48 53 54 45 4C 4C 41 52 20 4D 41
+D 4620 5A 45 20 20 2D 20 20 56 4D 31 20 62 75 69 6C 64
+D 4630 73 20 69 74 2C 20 56 4D 32 20 73 6F 6C 76 65 73
+D 4640 20 69 74 00 1B 5B 30 32 3B 31 35 48 56 4D 31 3A
+D 4650 20 70 72 65 73 73 20 61 6E 79 20 6B 65 79 20 74
+D 4660 6F 20 62 75 69 6C 64 20 61 20 6D 61 7A 65 1B 5B
+D 4670 4B 00 1B 5B 30 32 3B 31 35 48 56 4D 31 3A 20 63
+D 4680 61 72 76 69 6E 67 20 2D 20 6D 75 6C 74 69 74 61
+D 4690 73 6B 69 6E 67 20 6F 66 66 2C 20 74 68 65 20 77
+D 46A0 68 6F 6C 65 20 43 50 55 20 69 73 20 6D 69 6E 65
+D 46B0 1B 5B 4B 00 1B 5B 37 6D 00 1B 5B 30 6D 00 1B 5B
+D 46C0 30 32 3B 31 35 48 56 4D 31 3A 20 62 75 69 6C 74
+D 46D0 20 2D 20 63 6F 70 69 65 64 20 74 6F 20 56 4D 32
+D 46E0 20 28 24 44 43 29 20 61 6E 64 20 56 4D 32 20 74
+D 46F0 72 69 67 67 65 72 65 64 20 28 24 44 33 29 1B 5B
+D 4700 4B 00
+
+D 47C0 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+D 47D0 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+D 47E0 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+D 47F0 20 20 20 00
+
+D 5000 CD
+D 5001 11 0B 00 00
+D 5005 D0 12
+D 5007 11 0F 00 0A
+D 500B 11 0C 00 34
+D 500F 86 0B 00 01
+D 5013 A1 00 0F
+D 5016 11 0E 06 00
+D 501A C1 0E
+D 501C 11 05 04 41
+D 5020 11 02 00 69
+D 5024 11 03 00 02
+D 5028 10 00 6F
+D 502B 2F 02 08 00
+D 502F 11 0A 00 6F
+D 5033 23 00 2B
+D 5036 BD 01 21
+D 5039 11 08 00 01
+D 503D 11 09 00 00
+D 5041 87 25
+D 5043 A0 00 C3
+D 5046 23 00 34
+D 5049 42 04
+D 504B 86 04 00 04
+D 504F A1 00 56
+D 5052 11 04 00 00
+D 5056 BD 00 E8
+D 5059 2E 06 08 00
+D 505D 81 00 23
+D 5060 A1 00 71
+D 5063 8C 04
+D 5065 A1 00 6C
+D 5068 11 04 00 04
+D 506C 43 04
+D 506E B0 00 56
+D 5071 42 09
+D 5073 2E 07 08 00
+D 5077 81 00 6F
+D 507A A0 00 9D
+D 507D 10 00 6F
+D 5080 2F 06 08 00
+D 5084 2F 07 08 00
+D 5088 11 0A 00 6F
+D 508C 23 00 6B
+D 508F BD 01 21
+D 5092 23 00 7B
+D 5095 BD 01 21
+D 5098 42 08
+D 509A B0 00 BA
+D 509D 10 00 2E
+D 50A0 2F 02 08 00
+D 50A4 2F 06 08 00
+D 50A8 11 0A 00 2E
+D 50AC 23 00 2B
+D 50AF BD 01 21
+D 50B2 23 00 6B
+D 50B5 BD 01 21
+D 50B8 43 08
+D 50BA 23 00 72
+D 50BD 23 00 43
+D 50C0 B0 00 41
+D 50C3 23 00 87
+D 50C6 11 0E 06 39
+D 50CA C1 0E
+D 50CC 23 00 94
+D 50CF BD 01 5B
+D 50D2 11 0E 06 51
+D 50D6 C1 0E
+D 50D8 23 00 74
+D 50DB BD 01 5B
+D 50DE 11 0E 06 67
+D 50E2 C1 0E
+D 50E4 00
+D 50E5 F0 00 00
+D 50E8 23 00 26
+D 50EB 86 04 00 00
+D 50EF A0 01 07
+D 50F2 86 04 00 01
+D 50F6 A0 01 0E
+D 50F9 86 04 00 02
+D 50FD A0 01 15
+D 5100 53 06 00 01
+D 5104 B0 01 19
+D 5107 53 06 00 34
+D 510B B0 01 19
+D 510E 52 06 00 01
+D 5112 B0 01 19
+D 5115 52 06 00 34
+D 5119 50 66 07
+D 511C 51 72 07
+D 511F BE 00
+D 5121 4D BC
+D 5123 25
+D 5124 21 0D
+D 5126 52 0D 00 02
+D 512A 27
+D 512B 21 0E
+D 512D 52 0E 00 0F
+D 5131 BD 01 39
+D 5134 22 0A
+D 5136 C9
+D 5137 BE 00
+D 5139 CA 1B
+D 513B CA 5B
+D 513D 4D DF
+D 513F 25
+D 5140 4E 00 30
+D 5143 C9
+D 5144 27
+D 5145 4E 00 30
+D 5148 C9
+D 5149 CA 3B
+D 514B 4D EF
+D 514D 25
+D 514E 4E 00 30
+D 5151 C9
+D 5152 27
+D 5153 4E 00 30
+D 5156 C9
+D 5157 CA 48
+D 5159 BE 00
+D 515B 11 08 00 00
+D 515F 4D 4F
+D 5161 27
+D 5162 70 00
+D 5164 42 08
+D 5166 25
+D 5167 21 04
+D 5169 8C 04
+D 516B A1 01 5F
+D 516E 71 00
+D 5170 4E 00 30
+D 5173 C9
+D 5174 43 08
+D 5176 8C 08
+D 5178 A1 01 6E
+D 517B BE 00
+
+D 5600 1B 5B 30 32 3B 31 35 48 56 4D 32 3A 20 67 6F 74
+D 5610 20 74 68 65 20 6D 61 7A 65 20 2D 20 72 69 67 68
+D 5620 74 20 68 61 6E 64 20 6F 6E 20 74 68 65 20 77 61
+D 5630 6C 6C 2E 2E 2E 1B 5B 4B 00 1B 5B 30 32 3B 31 35
+D 5640 48 56 4D 32 3A 20 73 6F 6C 76 65 64 20 69 6E 20
+D 5650 00 20 73 74 65 70 73 20 2D 20 74 68 65 20 70 61
+D 5660 74 68 20 69 73 20 00 20 63 65 6C 6C 73 20 6C 6F
+D 5670 6E 67 2E 1B 5B 4B 1B 5B 32 34 3B 30 31 48 1B 5B
+D 5680 3F 32 35 68 00
+D 6000 00
+D 7000 00

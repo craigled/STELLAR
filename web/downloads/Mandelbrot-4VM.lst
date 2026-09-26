@@ -1,0 +1,1590 @@
+; ==========================================================================
+; STELLAR MANDELBROT x 4  -  four VMs, one quarter each   (4 programs, 1 file)
+; ==========================================================================
+; Load this ONE file - VM1 $4000, VM2 $5000, VM3 $6000, VM4 $7000 - and
+; cold-boot. The 40 x 24 Mandelbrot is drawn by all four VMs at once, each its
+; own quarter (VM1 top-left, VM2 top-right, VM3 bottom-left, VM4 bottom-right).
+; One 1802 is shared, so it is not faster than one VM - it shows the scheduler.
+; Each pixel is one PRINTSTR, so the four never garble each other's output.
+; Rerunnable without reloading.
+;
+; HW-VERIFIED on the Elf2K (V0061.34), 2026-09-26 (Craig).
+;
+; VERIFICATION (Firmware-Math/mandel4_verify.py, V0061.33, four-VM cold boot): the finished 40 x 24 picture is exactly the single-VM Mandelbrot's (itself byte for byte the July v08's); every pixel drawn exactly once, by the VM that owns its quarter; all four quarters start within the first 14 pixels drawn and grow together; no garbled output; all four 'done' marks and 'All four done.' once, last, cursor restored; no VM errors; a rerun without reloading draws the same. About 66 million 1802 instructions (~6.5 min at 3 MHz) + 9 KB of output.
+; NOT YET RUN ON HARDWARE.
+;
+; VM1: 177   VM2: 176   VM3: 176   VM4: 176 STELLAR commands.
+
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  VM1 ($4000), the top-left quarter  -  commented out
+; --------------------------------------------------------------------------
+
+; D 4000 CD             START
+; D 4001 11 0E 06 4B    LOADXI R14 064B
+; D 4005 C1 0E          PRINTSTR R14                       Clear the screen, hide the cursor, the side panel
+; D 4007 D0 11          SHAREVM on, read-only              The GO signal: VM2-4 wait for it
+; D 4009 11 09 00 00    LOADXI R9 0000
+; D 400D 11 0A 0A 00    LOADXI R10 0A00
+; D 4011 3A 02 9A       COPYXMY R9 -> M(R10)               row = our first row
+; D 4014 11 09 00 00    LOADXI R9 0000
+; D 4018 11 0A 0A 04    LOADXI R10 0A04
+; D 401C 3A 02 9A       COPYXMY R9 -> M(R10)               pixels drawn = 0
+; ROW:
+; D 401F 11 09 00 00    LOADXI R9 0000
+; D 4023 11 0A 0A 02    LOADXI R10 0A02
+; D 4027 3A 02 9A       COPYXMY R9 -> M(R10)               col = our first column
+; COL:
+; D 402A 11 0A 0A 02    LOADXI R10 0A02
+; D 402E 39 02 A9       COPYMXY M(R10) -> R9
+; D 4031 10 00 16       LOADAI 0016
+; D 4034 49 09          MULTXA R9                          col x 22
+; D 4036 25             COPYMAA
+; D 4037 21 09          COPYAX Acc -> R9
+; D 4039 11 0A 02 80    LOADXI R10 0280
+; D 403D 88 9A          TESTGXY R9 >= R10
+; D 403F A1 00 4C       IFFALSEI XN
+; D 4042 51 9A 05       SUBXYZ R9 - R10 -> R5
+; D 4045 11 06 00 00    LOADXI R6 0000
+; D 4049 B0 00 53       GAL XD
+; XN:
+; D 404C 51 A9 05       SUBXYZ R10 - R9 -> R5              x0 < 0: |x0| = 2.5 - col x step
+; D 404F 11 06 00 01    LOADXI R6 0001
+; XD:
+; D 4053 11 0A 0A 00    LOADXI R10 0A00
+; D 4057 39 02 A9       COPYMXY M(R10) -> R9
+; D 405A 10 00 1A       LOADAI 001A
+; D 405D 49 09          MULTXA R9                          row x 26
+; D 405F 25             COPYMAA
+; D 4060 21 09          COPYAX Acc -> R9
+; D 4062 11 0A 01 33    LOADXI R10 0133
+; D 4066 88 9A          TESTGXY R9 >= R10
+; D 4068 A1 00 75       IFFALSEI YN
+; D 406B 51 9A 07       SUBXYZ R9 - R10 -> R7
+; D 406E 11 08 00 00    LOADXI R8 0000
+; D 4072 B0 00 7C       GAL YD
+; YN:
+; D 4075 51 A9 07       SUBXYZ R10 - R9 -> R7
+; D 4078 11 08 00 01    LOADXI R8 0001
+; YD:
+; D 407C 11 01 00 00    LOADXI R1 0000
+; D 4080 11 02 00 00    LOADXI R2 0000
+; D 4084 11 03 00 00    LOADXI R3 0000
+; D 4088 11 04 00 00    LOADXI R4 0000
+; D 408C 11 0D 00 00    LOADXI R13 0000                    z = 0, no iterations yet
+; D 4090 11 0E 04 00    LOADXI R14 0400                    4.0
+; IT:
+; D 4094 4A 11          MULTXY R1 * R1                     xx = x*x >> 8
+; D 4096 17 02          SHIFTMA right a byte               >> 8
+; D 4098 21 19          COPYAX MA -> R9
+; D 409A 4A 33          MULTXY R3 * R3                     yy = y*y >> 8
+; D 409C 17 02          SHIFTMA right a byte               >> 8
+; D 409E 21 1A          COPYAX MA -> R10
+; D 40A0 50 9A 0B       ADDXYZ R9 + R10 -> R11
+; D 40A3 88 BE          TESTGXY R11 >= R14
+; D 40A5 A0 01 21       IFTRUEI ESC                        xx + yy >= 4: escaped
+; D 40A8 4A 13          MULTXY R1 * R3                     x*y >> 8
+; D 40AA 17 02          SHIFTMA right a byte               >> 8
+; D 40AC 21 1B          COPYAX MA -> R11
+; D 40AE 50 BB 0B       ADDXYZ R11 + R11 -> R11            2xy
+; D 40B1 11 0C 00 00    LOADXI R12 0000
+; D 40B5 87 24          TESTXY R2 = R4
+; D 40B7 A0 00 BE       IFTRUEI SS
+; D 40BA 11 0C 00 01    LOADXI R12 0001                    signs differ: 2xy < 0
+; SS:
+; D 40BE 11 0F 00 00    LOADXI R15 0000
+; D 40C2 88 9A          TESTGXY R9 >= R10
+; D 40C4 A0 00 D1       IFTRUEI TP                         xx - yy, as sign-magnitude
+; D 40C7 51 A9 09       SUBXYZ R10 - R9 -> R9
+; D 40CA 11 0F 00 01    LOADXI R15 0001
+; D 40CE B0 00 D4       GAL TD
+; TP:
+; D 40D1 51 9A 09       SUBXYZ R9 - R10 -> R9
+; TD:
+; D 40D4 87 F6          TESTXY R15 = R6
+; D 40D6 A1 00 E2       IFFALSEI SDX
+; D 40D9 50 95 01       ADDXYZ R9 + R5 -> R1               same sign: add
+; D 40DC 23 00 F2       COPYXY R15 -> R2
+; D 40DF B0 00 F6       GAL SEX
+; SDX:
+; D 40E2 88 95          TESTGXY R9 >= R5
+; D 40E4 A1 00 F0       IFFALSEI SBX
+; D 40E7 51 95 01       SUBXYZ R9 - R5 -> R1               signs differ, |a| >= |b|: a - b, sign of a
+; D 40EA 23 00 F2       COPYXY R15 -> R2
+; D 40ED B0 00 F6       GAL SEX
+; SBX:
+; D 40F0 51 59 01       SUBXYZ R5 - R9 -> R1               |b| > |a|: b - a, sign of b
+; D 40F3 23 00 62       COPYXY R6 -> R2
+; SEX:
+; D 40F6 87 C8          TESTXY R12 = R8
+; D 40F8 A1 01 04       IFFALSEI SDY
+; D 40FB 50 B7 03       ADDXYZ R11 + R7 -> R3              same sign: add
+; D 40FE 23 00 C4       COPYXY R12 -> R4
+; D 4101 B0 01 18       GAL SEY
+; SDY:
+; D 4104 88 B7          TESTGXY R11 >= R7
+; D 4106 A1 01 12       IFFALSEI SBY
+; D 4109 51 B7 03       SUBXYZ R11 - R7 -> R3              signs differ, |a| >= |b|: a - b, sign of a
+; D 410C 23 00 C4       COPYXY R12 -> R4
+; D 410F B0 01 18       GAL SEY
+; SBY:
+; D 4112 51 7B 03       SUBXYZ R7 - R11 -> R3              |b| > |a|: b - a, sign of b
+; D 4115 23 00 84       COPYXY R8 -> R4
+; SEY:
+; D 4118 42 0D          INCX R13
+; D 411A 86 0D 00 0F    TESTXI R13 000F
+; D 411E A1 00 94       IFFALSEI IT
+; ESC:
+; D 4121 11 0E 00 00    LOADXI R14 0000
+; D 4125 11 0F 00 0A    LOADXI R15 000A
+; D 4129 2E 0D 09 00    READIDX R13 0900                   iterations -> the character
+; D 412D 2F 0E 06 08    WRITEIDX R14 0608
+; D 4131 11 0A 0A 00    LOADXI R10 0A00
+; D 4135 39 02 A9       COPYMXY M(R10) -> R9
+; D 4138 42 09          INCX R9                            screen lines/columns count from 1
+; D 413A 4D 9F          DIVXY R9 / R15
+; D 413C 25             COPYMAA
+; D 413D 4E 00 30       ADDAI 0030
+; D 4140 2F 0E 06 02    WRITEIDX R14 0602
+; D 4144 27             COPYREMA
+; D 4145 4E 00 30       ADDAI 0030
+; D 4148 2F 0E 06 03    WRITEIDX R14 0603
+; D 414C 11 0A 0A 02    LOADXI R10 0A02
+; D 4150 39 02 A9       COPYMXY M(R10) -> R9
+; D 4153 42 09          INCX R9                            screen lines/columns count from 1
+; D 4155 4D 9F          DIVXY R9 / R15
+; D 4157 25             COPYMAA
+; D 4158 4E 00 30       ADDAI 0030
+; D 415B 2F 0E 06 05    WRITEIDX R14 0605
+; D 415F 27             COPYREMA
+; D 4160 4E 00 30       ADDAI 0030
+; D 4163 2F 0E 06 06    WRITEIDX R14 0606
+; D 4167 11 0E 06 00    LOADXI R14 0600
+; D 416B C1 0E          PRINTSTR R14                       The pixel: position and character in ONE opcode
+; D 416D 11 0A 0A 04    LOADXI R10 0A04
+; D 4171 39 02 A9       COPYMXY M(R10) -> R9
+; D 4174 42 09          INCX R9
+; D 4176 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 4179 11 0A 0A 02    LOADXI R10 0A02
+; D 417D 39 02 A9       COPYMXY M(R10) -> R9
+; D 4180 42 09          INCX R9
+; D 4182 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 4185 86 09 00 14    TESTXI R9 0014
+; D 4189 A1 00 2A       IFFALSEI COL
+; D 418C 11 0A 0A 00    LOADXI R10 0A00
+; D 4190 39 02 A9       COPYMXY M(R10) -> R9
+; D 4193 42 09          INCX R9
+; D 4195 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 4198 86 09 00 0C    TESTXI R9 000C
+; D 419C A1 00 1F       IFFALSEI ROW
+; D 419F C7 00          SETMULTI 00                        Nothing in between: check and print as one
+; D 41A1 11 0E 06 0A    LOADXI R14 060A
+; D 41A5 C1 0E          PRINTSTR R14
+; D 41A7 20 00          MEMMODE 00                         ABSOLUTE addressing, to read the CIDP page
+; D 41A9 11 09 2F 05    LOADXI R9 2F05
+; D 41AD 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM1 state (1 = active) - READIDX ignores ABSOLUTE
+; D 41B0 21 01          COPYAX Acc -> R1
+; D 41B2 11 09 2F 15    LOADXI R9 2F15
+; D 41B6 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM2 state (1 = active) - READIDX ignores ABSOLUTE
+; D 41B9 21 02          COPYAX Acc -> R2
+; D 41BB 11 09 2F 25    LOADXI R9 2F25
+; D 41BF 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM3 state (1 = active) - READIDX ignores ABSOLUTE
+; D 41C2 21 03          COPYAX Acc -> R3
+; D 41C4 11 09 2F 35    LOADXI R9 2F35
+; D 41C8 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM4 state (1 = active) - READIDX ignores ABSOLUTE
+; D 41CB 21 04          COPYAX Acc -> R4
+; D 41CD 20 01          MEMMODE 01                         back to relative
+; D 41CF 11 05 00 00    LOADXI R5 0000                     R5 = VMs still active
+; D 41D3 86 01 00 01    TESTXI R1 0001
+; D 41D7 A1 01 DC       IFFALSEI A1
+; D 41DA 42 05          INCX R5
+; A1:
+; D 41DC 86 02 00 01    TESTXI R2 0001
+; D 41E0 A1 01 E5       IFFALSEI A2
+; D 41E3 42 05          INCX R5
+; A2:
+; D 41E5 86 03 00 01    TESTXI R3 0001
+; D 41E9 A1 01 EE       IFFALSEI A3
+; D 41EC 42 05          INCX R5
+; A3:
+; D 41EE 86 04 00 01    TESTXI R4 0001
+; D 41F2 A1 01 F7       IFFALSEI A4
+; D 41F5 42 05          INCX R5
+; A4:
+; D 41F7 86 05 00 01    TESTXI R5 0001
+; D 41FB A1 02 04       IFFALSEI NOTL                      others still drawing
+; D 41FE 11 0E 06 26    LOADXI R14 0626
+; D 4202 C1 0E          PRINTSTR R14                       We are the last: the cursor back
+; NOTL:
+; D 4204 C7 01          SETMULTI 01
+; D 4206 00             HALT
+; D 4207 F0 00 00       BREAK
+
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  VM2 ($5000), the top-right quarter  -  commented out
+; --------------------------------------------------------------------------
+
+; D 5000 CD             START
+; WAIT:
+; D 5001 D1 11          TESTVM 1 read                      Has VM1 cleared the screen yet?
+; D 5003 A1 00 01       IFFALSEI WAIT                      No: wait (share flags reset at every cold boot)
+; D 5006 11 09 00 00    LOADXI R9 0000
+; D 500A 11 0A 0A 00    LOADXI R10 0A00
+; D 500E 3A 02 9A       COPYXMY R9 -> M(R10)               row = our first row
+; D 5011 11 09 00 00    LOADXI R9 0000
+; D 5015 11 0A 0A 04    LOADXI R10 0A04
+; D 5019 3A 02 9A       COPYXMY R9 -> M(R10)               pixels drawn = 0
+; ROW:
+; D 501C 11 09 00 14    LOADXI R9 0014
+; D 5020 11 0A 0A 02    LOADXI R10 0A02
+; D 5024 3A 02 9A       COPYXMY R9 -> M(R10)               col = our first column
+; COL:
+; D 5027 11 0A 0A 02    LOADXI R10 0A02
+; D 502B 39 02 A9       COPYMXY M(R10) -> R9
+; D 502E 10 00 16       LOADAI 0016
+; D 5031 49 09          MULTXA R9                          col x 22
+; D 5033 25             COPYMAA
+; D 5034 21 09          COPYAX Acc -> R9
+; D 5036 11 0A 02 80    LOADXI R10 0280
+; D 503A 88 9A          TESTGXY R9 >= R10
+; D 503C A1 00 49       IFFALSEI XN
+; D 503F 51 9A 05       SUBXYZ R9 - R10 -> R5
+; D 5042 11 06 00 00    LOADXI R6 0000
+; D 5046 B0 00 50       GAL XD
+; XN:
+; D 5049 51 A9 05       SUBXYZ R10 - R9 -> R5              x0 < 0: |x0| = 2.5 - col x step
+; D 504C 11 06 00 01    LOADXI R6 0001
+; XD:
+; D 5050 11 0A 0A 00    LOADXI R10 0A00
+; D 5054 39 02 A9       COPYMXY M(R10) -> R9
+; D 5057 10 00 1A       LOADAI 001A
+; D 505A 49 09          MULTXA R9                          row x 26
+; D 505C 25             COPYMAA
+; D 505D 21 09          COPYAX Acc -> R9
+; D 505F 11 0A 01 33    LOADXI R10 0133
+; D 5063 88 9A          TESTGXY R9 >= R10
+; D 5065 A1 00 72       IFFALSEI YN
+; D 5068 51 9A 07       SUBXYZ R9 - R10 -> R7
+; D 506B 11 08 00 00    LOADXI R8 0000
+; D 506F B0 00 79       GAL YD
+; YN:
+; D 5072 51 A9 07       SUBXYZ R10 - R9 -> R7
+; D 5075 11 08 00 01    LOADXI R8 0001
+; YD:
+; D 5079 11 01 00 00    LOADXI R1 0000
+; D 507D 11 02 00 00    LOADXI R2 0000
+; D 5081 11 03 00 00    LOADXI R3 0000
+; D 5085 11 04 00 00    LOADXI R4 0000
+; D 5089 11 0D 00 00    LOADXI R13 0000                    z = 0, no iterations yet
+; D 508D 11 0E 04 00    LOADXI R14 0400                    4.0
+; IT:
+; D 5091 4A 11          MULTXY R1 * R1                     xx = x*x >> 8
+; D 5093 17 02          SHIFTMA right a byte               >> 8
+; D 5095 21 19          COPYAX MA -> R9
+; D 5097 4A 33          MULTXY R3 * R3                     yy = y*y >> 8
+; D 5099 17 02          SHIFTMA right a byte               >> 8
+; D 509B 21 1A          COPYAX MA -> R10
+; D 509D 50 9A 0B       ADDXYZ R9 + R10 -> R11
+; D 50A0 88 BE          TESTGXY R11 >= R14
+; D 50A2 A0 01 1E       IFTRUEI ESC                        xx + yy >= 4: escaped
+; D 50A5 4A 13          MULTXY R1 * R3                     x*y >> 8
+; D 50A7 17 02          SHIFTMA right a byte               >> 8
+; D 50A9 21 1B          COPYAX MA -> R11
+; D 50AB 50 BB 0B       ADDXYZ R11 + R11 -> R11            2xy
+; D 50AE 11 0C 00 00    LOADXI R12 0000
+; D 50B2 87 24          TESTXY R2 = R4
+; D 50B4 A0 00 BB       IFTRUEI SS
+; D 50B7 11 0C 00 01    LOADXI R12 0001                    signs differ: 2xy < 0
+; SS:
+; D 50BB 11 0F 00 00    LOADXI R15 0000
+; D 50BF 88 9A          TESTGXY R9 >= R10
+; D 50C1 A0 00 CE       IFTRUEI TP                         xx - yy, as sign-magnitude
+; D 50C4 51 A9 09       SUBXYZ R10 - R9 -> R9
+; D 50C7 11 0F 00 01    LOADXI R15 0001
+; D 50CB B0 00 D1       GAL TD
+; TP:
+; D 50CE 51 9A 09       SUBXYZ R9 - R10 -> R9
+; TD:
+; D 50D1 87 F6          TESTXY R15 = R6
+; D 50D3 A1 00 DF       IFFALSEI SDX
+; D 50D6 50 95 01       ADDXYZ R9 + R5 -> R1               same sign: add
+; D 50D9 23 00 F2       COPYXY R15 -> R2
+; D 50DC B0 00 F3       GAL SEX
+; SDX:
+; D 50DF 88 95          TESTGXY R9 >= R5
+; D 50E1 A1 00 ED       IFFALSEI SBX
+; D 50E4 51 95 01       SUBXYZ R9 - R5 -> R1               signs differ, |a| >= |b|: a - b, sign of a
+; D 50E7 23 00 F2       COPYXY R15 -> R2
+; D 50EA B0 00 F3       GAL SEX
+; SBX:
+; D 50ED 51 59 01       SUBXYZ R5 - R9 -> R1               |b| > |a|: b - a, sign of b
+; D 50F0 23 00 62       COPYXY R6 -> R2
+; SEX:
+; D 50F3 87 C8          TESTXY R12 = R8
+; D 50F5 A1 01 01       IFFALSEI SDY
+; D 50F8 50 B7 03       ADDXYZ R11 + R7 -> R3              same sign: add
+; D 50FB 23 00 C4       COPYXY R12 -> R4
+; D 50FE B0 01 15       GAL SEY
+; SDY:
+; D 5101 88 B7          TESTGXY R11 >= R7
+; D 5103 A1 01 0F       IFFALSEI SBY
+; D 5106 51 B7 03       SUBXYZ R11 - R7 -> R3              signs differ, |a| >= |b|: a - b, sign of a
+; D 5109 23 00 C4       COPYXY R12 -> R4
+; D 510C B0 01 15       GAL SEY
+; SBY:
+; D 510F 51 7B 03       SUBXYZ R7 - R11 -> R3              |b| > |a|: b - a, sign of b
+; D 5112 23 00 84       COPYXY R8 -> R4
+; SEY:
+; D 5115 42 0D          INCX R13
+; D 5117 86 0D 00 0F    TESTXI R13 000F
+; D 511B A1 00 91       IFFALSEI IT
+; ESC:
+; D 511E 11 0E 00 00    LOADXI R14 0000
+; D 5122 11 0F 00 0A    LOADXI R15 000A
+; D 5126 2E 0D 09 00    READIDX R13 0900                   iterations -> the character
+; D 512A 2F 0E 06 08    WRITEIDX R14 0608
+; D 512E 11 0A 0A 00    LOADXI R10 0A00
+; D 5132 39 02 A9       COPYMXY M(R10) -> R9
+; D 5135 42 09          INCX R9                            screen lines/columns count from 1
+; D 5137 4D 9F          DIVXY R9 / R15
+; D 5139 25             COPYMAA
+; D 513A 4E 00 30       ADDAI 0030
+; D 513D 2F 0E 06 02    WRITEIDX R14 0602
+; D 5141 27             COPYREMA
+; D 5142 4E 00 30       ADDAI 0030
+; D 5145 2F 0E 06 03    WRITEIDX R14 0603
+; D 5149 11 0A 0A 02    LOADXI R10 0A02
+; D 514D 39 02 A9       COPYMXY M(R10) -> R9
+; D 5150 42 09          INCX R9                            screen lines/columns count from 1
+; D 5152 4D 9F          DIVXY R9 / R15
+; D 5154 25             COPYMAA
+; D 5155 4E 00 30       ADDAI 0030
+; D 5158 2F 0E 06 05    WRITEIDX R14 0605
+; D 515C 27             COPYREMA
+; D 515D 4E 00 30       ADDAI 0030
+; D 5160 2F 0E 06 06    WRITEIDX R14 0606
+; D 5164 11 0E 06 00    LOADXI R14 0600
+; D 5168 C1 0E          PRINTSTR R14                       The pixel: position and character in ONE opcode
+; D 516A 11 0A 0A 04    LOADXI R10 0A04
+; D 516E 39 02 A9       COPYMXY M(R10) -> R9
+; D 5171 42 09          INCX R9
+; D 5173 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 5176 11 0A 0A 02    LOADXI R10 0A02
+; D 517A 39 02 A9       COPYMXY M(R10) -> R9
+; D 517D 42 09          INCX R9
+; D 517F 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 5182 86 09 00 28    TESTXI R9 0028
+; D 5186 A1 00 27       IFFALSEI COL
+; D 5189 11 0A 0A 00    LOADXI R10 0A00
+; D 518D 39 02 A9       COPYMXY M(R10) -> R9
+; D 5190 42 09          INCX R9
+; D 5192 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 5195 86 09 00 0C    TESTXI R9 000C
+; D 5199 A1 00 1C       IFFALSEI ROW
+; D 519C C7 00          SETMULTI 00                        Nothing in between: check and print as one
+; D 519E 11 0E 06 0A    LOADXI R14 060A
+; D 51A2 C1 0E          PRINTSTR R14
+; D 51A4 20 00          MEMMODE 00                         ABSOLUTE addressing, to read the CIDP page
+; D 51A6 11 09 2F 05    LOADXI R9 2F05
+; D 51AA 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM1 state (1 = active) - READIDX ignores ABSOLUTE
+; D 51AD 21 01          COPYAX Acc -> R1
+; D 51AF 11 09 2F 15    LOADXI R9 2F15
+; D 51B3 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM2 state (1 = active) - READIDX ignores ABSOLUTE
+; D 51B6 21 02          COPYAX Acc -> R2
+; D 51B8 11 09 2F 25    LOADXI R9 2F25
+; D 51BC 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM3 state (1 = active) - READIDX ignores ABSOLUTE
+; D 51BF 21 03          COPYAX Acc -> R3
+; D 51C1 11 09 2F 35    LOADXI R9 2F35
+; D 51C5 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM4 state (1 = active) - READIDX ignores ABSOLUTE
+; D 51C8 21 04          COPYAX Acc -> R4
+; D 51CA 20 01          MEMMODE 01                         back to relative
+; D 51CC 11 05 00 00    LOADXI R5 0000                     R5 = VMs still active
+; D 51D0 86 01 00 01    TESTXI R1 0001
+; D 51D4 A1 01 D9       IFFALSEI A1
+; D 51D7 42 05          INCX R5
+; A1:
+; D 51D9 86 02 00 01    TESTXI R2 0001
+; D 51DD A1 01 E2       IFFALSEI A2
+; D 51E0 42 05          INCX R5
+; A2:
+; D 51E2 86 03 00 01    TESTXI R3 0001
+; D 51E6 A1 01 EB       IFFALSEI A3
+; D 51E9 42 05          INCX R5
+; A3:
+; D 51EB 86 04 00 01    TESTXI R4 0001
+; D 51EF A1 01 F4       IFFALSEI A4
+; D 51F2 42 05          INCX R5
+; A4:
+; D 51F4 86 05 00 01    TESTXI R5 0001
+; D 51F8 A1 02 01       IFFALSEI NOTL                      others still drawing
+; D 51FB 11 0E 06 26    LOADXI R14 0626
+; D 51FF C1 0E          PRINTSTR R14                       We are the last: the cursor back
+; NOTL:
+; D 5201 C7 01          SETMULTI 01
+; D 5203 00             HALT
+; D 5204 F0 00 00       BREAK
+
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  VM3 ($6000), the bottom-left quarter  -  commented out
+; --------------------------------------------------------------------------
+
+; D 6000 CD             START
+; WAIT:
+; D 6001 D1 11          TESTVM 1 read                      Has VM1 cleared the screen yet?
+; D 6003 A1 00 01       IFFALSEI WAIT                      No: wait (share flags reset at every cold boot)
+; D 6006 11 09 00 0C    LOADXI R9 000C
+; D 600A 11 0A 0A 00    LOADXI R10 0A00
+; D 600E 3A 02 9A       COPYXMY R9 -> M(R10)               row = our first row
+; D 6011 11 09 00 00    LOADXI R9 0000
+; D 6015 11 0A 0A 04    LOADXI R10 0A04
+; D 6019 3A 02 9A       COPYXMY R9 -> M(R10)               pixels drawn = 0
+; ROW:
+; D 601C 11 09 00 00    LOADXI R9 0000
+; D 6020 11 0A 0A 02    LOADXI R10 0A02
+; D 6024 3A 02 9A       COPYXMY R9 -> M(R10)               col = our first column
+; COL:
+; D 6027 11 0A 0A 02    LOADXI R10 0A02
+; D 602B 39 02 A9       COPYMXY M(R10) -> R9
+; D 602E 10 00 16       LOADAI 0016
+; D 6031 49 09          MULTXA R9                          col x 22
+; D 6033 25             COPYMAA
+; D 6034 21 09          COPYAX Acc -> R9
+; D 6036 11 0A 02 80    LOADXI R10 0280
+; D 603A 88 9A          TESTGXY R9 >= R10
+; D 603C A1 00 49       IFFALSEI XN
+; D 603F 51 9A 05       SUBXYZ R9 - R10 -> R5
+; D 6042 11 06 00 00    LOADXI R6 0000
+; D 6046 B0 00 50       GAL XD
+; XN:
+; D 6049 51 A9 05       SUBXYZ R10 - R9 -> R5              x0 < 0: |x0| = 2.5 - col x step
+; D 604C 11 06 00 01    LOADXI R6 0001
+; XD:
+; D 6050 11 0A 0A 00    LOADXI R10 0A00
+; D 6054 39 02 A9       COPYMXY M(R10) -> R9
+; D 6057 10 00 1A       LOADAI 001A
+; D 605A 49 09          MULTXA R9                          row x 26
+; D 605C 25             COPYMAA
+; D 605D 21 09          COPYAX Acc -> R9
+; D 605F 11 0A 01 33    LOADXI R10 0133
+; D 6063 88 9A          TESTGXY R9 >= R10
+; D 6065 A1 00 72       IFFALSEI YN
+; D 6068 51 9A 07       SUBXYZ R9 - R10 -> R7
+; D 606B 11 08 00 00    LOADXI R8 0000
+; D 606F B0 00 79       GAL YD
+; YN:
+; D 6072 51 A9 07       SUBXYZ R10 - R9 -> R7
+; D 6075 11 08 00 01    LOADXI R8 0001
+; YD:
+; D 6079 11 01 00 00    LOADXI R1 0000
+; D 607D 11 02 00 00    LOADXI R2 0000
+; D 6081 11 03 00 00    LOADXI R3 0000
+; D 6085 11 04 00 00    LOADXI R4 0000
+; D 6089 11 0D 00 00    LOADXI R13 0000                    z = 0, no iterations yet
+; D 608D 11 0E 04 00    LOADXI R14 0400                    4.0
+; IT:
+; D 6091 4A 11          MULTXY R1 * R1                     xx = x*x >> 8
+; D 6093 17 02          SHIFTMA right a byte               >> 8
+; D 6095 21 19          COPYAX MA -> R9
+; D 6097 4A 33          MULTXY R3 * R3                     yy = y*y >> 8
+; D 6099 17 02          SHIFTMA right a byte               >> 8
+; D 609B 21 1A          COPYAX MA -> R10
+; D 609D 50 9A 0B       ADDXYZ R9 + R10 -> R11
+; D 60A0 88 BE          TESTGXY R11 >= R14
+; D 60A2 A0 01 1E       IFTRUEI ESC                        xx + yy >= 4: escaped
+; D 60A5 4A 13          MULTXY R1 * R3                     x*y >> 8
+; D 60A7 17 02          SHIFTMA right a byte               >> 8
+; D 60A9 21 1B          COPYAX MA -> R11
+; D 60AB 50 BB 0B       ADDXYZ R11 + R11 -> R11            2xy
+; D 60AE 11 0C 00 00    LOADXI R12 0000
+; D 60B2 87 24          TESTXY R2 = R4
+; D 60B4 A0 00 BB       IFTRUEI SS
+; D 60B7 11 0C 00 01    LOADXI R12 0001                    signs differ: 2xy < 0
+; SS:
+; D 60BB 11 0F 00 00    LOADXI R15 0000
+; D 60BF 88 9A          TESTGXY R9 >= R10
+; D 60C1 A0 00 CE       IFTRUEI TP                         xx - yy, as sign-magnitude
+; D 60C4 51 A9 09       SUBXYZ R10 - R9 -> R9
+; D 60C7 11 0F 00 01    LOADXI R15 0001
+; D 60CB B0 00 D1       GAL TD
+; TP:
+; D 60CE 51 9A 09       SUBXYZ R9 - R10 -> R9
+; TD:
+; D 60D1 87 F6          TESTXY R15 = R6
+; D 60D3 A1 00 DF       IFFALSEI SDX
+; D 60D6 50 95 01       ADDXYZ R9 + R5 -> R1               same sign: add
+; D 60D9 23 00 F2       COPYXY R15 -> R2
+; D 60DC B0 00 F3       GAL SEX
+; SDX:
+; D 60DF 88 95          TESTGXY R9 >= R5
+; D 60E1 A1 00 ED       IFFALSEI SBX
+; D 60E4 51 95 01       SUBXYZ R9 - R5 -> R1               signs differ, |a| >= |b|: a - b, sign of a
+; D 60E7 23 00 F2       COPYXY R15 -> R2
+; D 60EA B0 00 F3       GAL SEX
+; SBX:
+; D 60ED 51 59 01       SUBXYZ R5 - R9 -> R1               |b| > |a|: b - a, sign of b
+; D 60F0 23 00 62       COPYXY R6 -> R2
+; SEX:
+; D 60F3 87 C8          TESTXY R12 = R8
+; D 60F5 A1 01 01       IFFALSEI SDY
+; D 60F8 50 B7 03       ADDXYZ R11 + R7 -> R3              same sign: add
+; D 60FB 23 00 C4       COPYXY R12 -> R4
+; D 60FE B0 01 15       GAL SEY
+; SDY:
+; D 6101 88 B7          TESTGXY R11 >= R7
+; D 6103 A1 01 0F       IFFALSEI SBY
+; D 6106 51 B7 03       SUBXYZ R11 - R7 -> R3              signs differ, |a| >= |b|: a - b, sign of a
+; D 6109 23 00 C4       COPYXY R12 -> R4
+; D 610C B0 01 15       GAL SEY
+; SBY:
+; D 610F 51 7B 03       SUBXYZ R7 - R11 -> R3              |b| > |a|: b - a, sign of b
+; D 6112 23 00 84       COPYXY R8 -> R4
+; SEY:
+; D 6115 42 0D          INCX R13
+; D 6117 86 0D 00 0F    TESTXI R13 000F
+; D 611B A1 00 91       IFFALSEI IT
+; ESC:
+; D 611E 11 0E 00 00    LOADXI R14 0000
+; D 6122 11 0F 00 0A    LOADXI R15 000A
+; D 6126 2E 0D 09 00    READIDX R13 0900                   iterations -> the character
+; D 612A 2F 0E 06 08    WRITEIDX R14 0608
+; D 612E 11 0A 0A 00    LOADXI R10 0A00
+; D 6132 39 02 A9       COPYMXY M(R10) -> R9
+; D 6135 42 09          INCX R9                            screen lines/columns count from 1
+; D 6137 4D 9F          DIVXY R9 / R15
+; D 6139 25             COPYMAA
+; D 613A 4E 00 30       ADDAI 0030
+; D 613D 2F 0E 06 02    WRITEIDX R14 0602
+; D 6141 27             COPYREMA
+; D 6142 4E 00 30       ADDAI 0030
+; D 6145 2F 0E 06 03    WRITEIDX R14 0603
+; D 6149 11 0A 0A 02    LOADXI R10 0A02
+; D 614D 39 02 A9       COPYMXY M(R10) -> R9
+; D 6150 42 09          INCX R9                            screen lines/columns count from 1
+; D 6152 4D 9F          DIVXY R9 / R15
+; D 6154 25             COPYMAA
+; D 6155 4E 00 30       ADDAI 0030
+; D 6158 2F 0E 06 05    WRITEIDX R14 0605
+; D 615C 27             COPYREMA
+; D 615D 4E 00 30       ADDAI 0030
+; D 6160 2F 0E 06 06    WRITEIDX R14 0606
+; D 6164 11 0E 06 00    LOADXI R14 0600
+; D 6168 C1 0E          PRINTSTR R14                       The pixel: position and character in ONE opcode
+; D 616A 11 0A 0A 04    LOADXI R10 0A04
+; D 616E 39 02 A9       COPYMXY M(R10) -> R9
+; D 6171 42 09          INCX R9
+; D 6173 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 6176 11 0A 0A 02    LOADXI R10 0A02
+; D 617A 39 02 A9       COPYMXY M(R10) -> R9
+; D 617D 42 09          INCX R9
+; D 617F 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 6182 86 09 00 14    TESTXI R9 0014
+; D 6186 A1 00 27       IFFALSEI COL
+; D 6189 11 0A 0A 00    LOADXI R10 0A00
+; D 618D 39 02 A9       COPYMXY M(R10) -> R9
+; D 6190 42 09          INCX R9
+; D 6192 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 6195 86 09 00 18    TESTXI R9 0018
+; D 6199 A1 00 1C       IFFALSEI ROW
+; D 619C C7 00          SETMULTI 00                        Nothing in between: check and print as one
+; D 619E 11 0E 06 0A    LOADXI R14 060A
+; D 61A2 C1 0E          PRINTSTR R14
+; D 61A4 20 00          MEMMODE 00                         ABSOLUTE addressing, to read the CIDP page
+; D 61A6 11 09 2F 05    LOADXI R9 2F05
+; D 61AA 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM1 state (1 = active) - READIDX ignores ABSOLUTE
+; D 61AD 21 01          COPYAX Acc -> R1
+; D 61AF 11 09 2F 15    LOADXI R9 2F15
+; D 61B3 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM2 state (1 = active) - READIDX ignores ABSOLUTE
+; D 61B6 21 02          COPYAX Acc -> R2
+; D 61B8 11 09 2F 25    LOADXI R9 2F25
+; D 61BC 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM3 state (1 = active) - READIDX ignores ABSOLUTE
+; D 61BF 21 03          COPYAX Acc -> R3
+; D 61C1 11 09 2F 35    LOADXI R9 2F35
+; D 61C5 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM4 state (1 = active) - READIDX ignores ABSOLUTE
+; D 61C8 21 04          COPYAX Acc -> R4
+; D 61CA 20 01          MEMMODE 01                         back to relative
+; D 61CC 11 05 00 00    LOADXI R5 0000                     R5 = VMs still active
+; D 61D0 86 01 00 01    TESTXI R1 0001
+; D 61D4 A1 01 D9       IFFALSEI A1
+; D 61D7 42 05          INCX R5
+; A1:
+; D 61D9 86 02 00 01    TESTXI R2 0001
+; D 61DD A1 01 E2       IFFALSEI A2
+; D 61E0 42 05          INCX R5
+; A2:
+; D 61E2 86 03 00 01    TESTXI R3 0001
+; D 61E6 A1 01 EB       IFFALSEI A3
+; D 61E9 42 05          INCX R5
+; A3:
+; D 61EB 86 04 00 01    TESTXI R4 0001
+; D 61EF A1 01 F4       IFFALSEI A4
+; D 61F2 42 05          INCX R5
+; A4:
+; D 61F4 86 05 00 01    TESTXI R5 0001
+; D 61F8 A1 02 01       IFFALSEI NOTL                      others still drawing
+; D 61FB 11 0E 06 26    LOADXI R14 0626
+; D 61FF C1 0E          PRINTSTR R14                       We are the last: the cursor back
+; NOTL:
+; D 6201 C7 01          SETMULTI 01
+; D 6203 00             HALT
+; D 6204 F0 00 00       BREAK
+
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  VM4 ($7000), the bottom-right quarter  -  commented out
+; --------------------------------------------------------------------------
+
+; D 7000 CD             START
+; WAIT:
+; D 7001 D1 11          TESTVM 1 read                      Has VM1 cleared the screen yet?
+; D 7003 A1 00 01       IFFALSEI WAIT                      No: wait (share flags reset at every cold boot)
+; D 7006 11 09 00 0C    LOADXI R9 000C
+; D 700A 11 0A 0A 00    LOADXI R10 0A00
+; D 700E 3A 02 9A       COPYXMY R9 -> M(R10)               row = our first row
+; D 7011 11 09 00 00    LOADXI R9 0000
+; D 7015 11 0A 0A 04    LOADXI R10 0A04
+; D 7019 3A 02 9A       COPYXMY R9 -> M(R10)               pixels drawn = 0
+; ROW:
+; D 701C 11 09 00 14    LOADXI R9 0014
+; D 7020 11 0A 0A 02    LOADXI R10 0A02
+; D 7024 3A 02 9A       COPYXMY R9 -> M(R10)               col = our first column
+; COL:
+; D 7027 11 0A 0A 02    LOADXI R10 0A02
+; D 702B 39 02 A9       COPYMXY M(R10) -> R9
+; D 702E 10 00 16       LOADAI 0016
+; D 7031 49 09          MULTXA R9                          col x 22
+; D 7033 25             COPYMAA
+; D 7034 21 09          COPYAX Acc -> R9
+; D 7036 11 0A 02 80    LOADXI R10 0280
+; D 703A 88 9A          TESTGXY R9 >= R10
+; D 703C A1 00 49       IFFALSEI XN
+; D 703F 51 9A 05       SUBXYZ R9 - R10 -> R5
+; D 7042 11 06 00 00    LOADXI R6 0000
+; D 7046 B0 00 50       GAL XD
+; XN:
+; D 7049 51 A9 05       SUBXYZ R10 - R9 -> R5              x0 < 0: |x0| = 2.5 - col x step
+; D 704C 11 06 00 01    LOADXI R6 0001
+; XD:
+; D 7050 11 0A 0A 00    LOADXI R10 0A00
+; D 7054 39 02 A9       COPYMXY M(R10) -> R9
+; D 7057 10 00 1A       LOADAI 001A
+; D 705A 49 09          MULTXA R9                          row x 26
+; D 705C 25             COPYMAA
+; D 705D 21 09          COPYAX Acc -> R9
+; D 705F 11 0A 01 33    LOADXI R10 0133
+; D 7063 88 9A          TESTGXY R9 >= R10
+; D 7065 A1 00 72       IFFALSEI YN
+; D 7068 51 9A 07       SUBXYZ R9 - R10 -> R7
+; D 706B 11 08 00 00    LOADXI R8 0000
+; D 706F B0 00 79       GAL YD
+; YN:
+; D 7072 51 A9 07       SUBXYZ R10 - R9 -> R7
+; D 7075 11 08 00 01    LOADXI R8 0001
+; YD:
+; D 7079 11 01 00 00    LOADXI R1 0000
+; D 707D 11 02 00 00    LOADXI R2 0000
+; D 7081 11 03 00 00    LOADXI R3 0000
+; D 7085 11 04 00 00    LOADXI R4 0000
+; D 7089 11 0D 00 00    LOADXI R13 0000                    z = 0, no iterations yet
+; D 708D 11 0E 04 00    LOADXI R14 0400                    4.0
+; IT:
+; D 7091 4A 11          MULTXY R1 * R1                     xx = x*x >> 8
+; D 7093 17 02          SHIFTMA right a byte               >> 8
+; D 7095 21 19          COPYAX MA -> R9
+; D 7097 4A 33          MULTXY R3 * R3                     yy = y*y >> 8
+; D 7099 17 02          SHIFTMA right a byte               >> 8
+; D 709B 21 1A          COPYAX MA -> R10
+; D 709D 50 9A 0B       ADDXYZ R9 + R10 -> R11
+; D 70A0 88 BE          TESTGXY R11 >= R14
+; D 70A2 A0 01 1E       IFTRUEI ESC                        xx + yy >= 4: escaped
+; D 70A5 4A 13          MULTXY R1 * R3                     x*y >> 8
+; D 70A7 17 02          SHIFTMA right a byte               >> 8
+; D 70A9 21 1B          COPYAX MA -> R11
+; D 70AB 50 BB 0B       ADDXYZ R11 + R11 -> R11            2xy
+; D 70AE 11 0C 00 00    LOADXI R12 0000
+; D 70B2 87 24          TESTXY R2 = R4
+; D 70B4 A0 00 BB       IFTRUEI SS
+; D 70B7 11 0C 00 01    LOADXI R12 0001                    signs differ: 2xy < 0
+; SS:
+; D 70BB 11 0F 00 00    LOADXI R15 0000
+; D 70BF 88 9A          TESTGXY R9 >= R10
+; D 70C1 A0 00 CE       IFTRUEI TP                         xx - yy, as sign-magnitude
+; D 70C4 51 A9 09       SUBXYZ R10 - R9 -> R9
+; D 70C7 11 0F 00 01    LOADXI R15 0001
+; D 70CB B0 00 D1       GAL TD
+; TP:
+; D 70CE 51 9A 09       SUBXYZ R9 - R10 -> R9
+; TD:
+; D 70D1 87 F6          TESTXY R15 = R6
+; D 70D3 A1 00 DF       IFFALSEI SDX
+; D 70D6 50 95 01       ADDXYZ R9 + R5 -> R1               same sign: add
+; D 70D9 23 00 F2       COPYXY R15 -> R2
+; D 70DC B0 00 F3       GAL SEX
+; SDX:
+; D 70DF 88 95          TESTGXY R9 >= R5
+; D 70E1 A1 00 ED       IFFALSEI SBX
+; D 70E4 51 95 01       SUBXYZ R9 - R5 -> R1               signs differ, |a| >= |b|: a - b, sign of a
+; D 70E7 23 00 F2       COPYXY R15 -> R2
+; D 70EA B0 00 F3       GAL SEX
+; SBX:
+; D 70ED 51 59 01       SUBXYZ R5 - R9 -> R1               |b| > |a|: b - a, sign of b
+; D 70F0 23 00 62       COPYXY R6 -> R2
+; SEX:
+; D 70F3 87 C8          TESTXY R12 = R8
+; D 70F5 A1 01 01       IFFALSEI SDY
+; D 70F8 50 B7 03       ADDXYZ R11 + R7 -> R3              same sign: add
+; D 70FB 23 00 C4       COPYXY R12 -> R4
+; D 70FE B0 01 15       GAL SEY
+; SDY:
+; D 7101 88 B7          TESTGXY R11 >= R7
+; D 7103 A1 01 0F       IFFALSEI SBY
+; D 7106 51 B7 03       SUBXYZ R11 - R7 -> R3              signs differ, |a| >= |b|: a - b, sign of a
+; D 7109 23 00 C4       COPYXY R12 -> R4
+; D 710C B0 01 15       GAL SEY
+; SBY:
+; D 710F 51 7B 03       SUBXYZ R7 - R11 -> R3              |b| > |a|: b - a, sign of b
+; D 7112 23 00 84       COPYXY R8 -> R4
+; SEY:
+; D 7115 42 0D          INCX R13
+; D 7117 86 0D 00 0F    TESTXI R13 000F
+; D 711B A1 00 91       IFFALSEI IT
+; ESC:
+; D 711E 11 0E 00 00    LOADXI R14 0000
+; D 7122 11 0F 00 0A    LOADXI R15 000A
+; D 7126 2E 0D 09 00    READIDX R13 0900                   iterations -> the character
+; D 712A 2F 0E 06 08    WRITEIDX R14 0608
+; D 712E 11 0A 0A 00    LOADXI R10 0A00
+; D 7132 39 02 A9       COPYMXY M(R10) -> R9
+; D 7135 42 09          INCX R9                            screen lines/columns count from 1
+; D 7137 4D 9F          DIVXY R9 / R15
+; D 7139 25             COPYMAA
+; D 713A 4E 00 30       ADDAI 0030
+; D 713D 2F 0E 06 02    WRITEIDX R14 0602
+; D 7141 27             COPYREMA
+; D 7142 4E 00 30       ADDAI 0030
+; D 7145 2F 0E 06 03    WRITEIDX R14 0603
+; D 7149 11 0A 0A 02    LOADXI R10 0A02
+; D 714D 39 02 A9       COPYMXY M(R10) -> R9
+; D 7150 42 09          INCX R9                            screen lines/columns count from 1
+; D 7152 4D 9F          DIVXY R9 / R15
+; D 7154 25             COPYMAA
+; D 7155 4E 00 30       ADDAI 0030
+; D 7158 2F 0E 06 05    WRITEIDX R14 0605
+; D 715C 27             COPYREMA
+; D 715D 4E 00 30       ADDAI 0030
+; D 7160 2F 0E 06 06    WRITEIDX R14 0606
+; D 7164 11 0E 06 00    LOADXI R14 0600
+; D 7168 C1 0E          PRINTSTR R14                       The pixel: position and character in ONE opcode
+; D 716A 11 0A 0A 04    LOADXI R10 0A04
+; D 716E 39 02 A9       COPYMXY M(R10) -> R9
+; D 7171 42 09          INCX R9
+; D 7173 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 7176 11 0A 0A 02    LOADXI R10 0A02
+; D 717A 39 02 A9       COPYMXY M(R10) -> R9
+; D 717D 42 09          INCX R9
+; D 717F 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 7182 86 09 00 28    TESTXI R9 0028
+; D 7186 A1 00 27       IFFALSEI COL
+; D 7189 11 0A 0A 00    LOADXI R10 0A00
+; D 718D 39 02 A9       COPYMXY M(R10) -> R9
+; D 7190 42 09          INCX R9
+; D 7192 3A 02 9A       COPYXMY R9 -> M(R10)
+; D 7195 86 09 00 18    TESTXI R9 0018
+; D 7199 A1 00 1C       IFFALSEI ROW
+; D 719C C7 00          SETMULTI 00                        Nothing in between: check and print as one
+; D 719E 11 0E 06 0A    LOADXI R14 060A
+; D 71A2 C1 0E          PRINTSTR R14
+; D 71A4 20 00          MEMMODE 00                         ABSOLUTE addressing, to read the CIDP page
+; D 71A6 11 09 2F 05    LOADXI R9 2F05
+; D 71AA 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM1 state (1 = active) - READIDX ignores ABSOLUTE
+; D 71AD 21 01          COPYAX Acc -> R1
+; D 71AF 11 09 2F 15    LOADXI R9 2F15
+; D 71B3 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM2 state (1 = active) - READIDX ignores ABSOLUTE
+; D 71B6 21 02          COPYAX Acc -> R2
+; D 71B8 11 09 2F 25    LOADXI R9 2F25
+; D 71BC 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM3 state (1 = active) - READIDX ignores ABSOLUTE
+; D 71BF 21 03          COPYAX Acc -> R3
+; D 71C1 11 09 2F 35    LOADXI R9 2F35
+; D 71C5 35 01 09       COPYIMXA 1 byte M(R9) -> Acc       VM4 state (1 = active) - READIDX ignores ABSOLUTE
+; D 71C8 21 04          COPYAX Acc -> R4
+; D 71CA 20 01          MEMMODE 01                         back to relative
+; D 71CC 11 05 00 00    LOADXI R5 0000                     R5 = VMs still active
+; D 71D0 86 01 00 01    TESTXI R1 0001
+; D 71D4 A1 01 D9       IFFALSEI A1
+; D 71D7 42 05          INCX R5
+; A1:
+; D 71D9 86 02 00 01    TESTXI R2 0001
+; D 71DD A1 01 E2       IFFALSEI A2
+; D 71E0 42 05          INCX R5
+; A2:
+; D 71E2 86 03 00 01    TESTXI R3 0001
+; D 71E6 A1 01 EB       IFFALSEI A3
+; D 71E9 42 05          INCX R5
+; A3:
+; D 71EB 86 04 00 01    TESTXI R4 0001
+; D 71EF A1 01 F4       IFFALSEI A4
+; D 71F2 42 05          INCX R5
+; A4:
+; D 71F4 86 05 00 01    TESTXI R5 0001
+; D 71F8 A1 02 01       IFFALSEI NOTL                      others still drawing
+; D 71FB 11 0E 06 26    LOADXI R14 0626
+; D 71FF C1 0E          PRINTSTR R14                       We are the last: the cursor back
+; NOTL:
+; D 7201 C7 01          SETMULTI 01
+; D 7203 00             HALT
+; D 7204 F0 00 00       BREAK
+
+; --------------------------------------------------------------------------
+; CODE  -  download this block (VM1, VM2, VM3, VM4)
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 11 0E 06 4B
+D 4005 C1 0E
+D 4007 D0 11
+D 4009 11 09 00 00
+D 400D 11 0A 0A 00
+D 4011 3A 02 9A
+D 4014 11 09 00 00
+D 4018 11 0A 0A 04
+D 401C 3A 02 9A
+D 401F 11 09 00 00
+D 4023 11 0A 0A 02
+D 4027 3A 02 9A
+D 402A 11 0A 0A 02
+D 402E 39 02 A9
+D 4031 10 00 16
+D 4034 49 09
+D 4036 25
+D 4037 21 09
+D 4039 11 0A 02 80
+D 403D 88 9A
+D 403F A1 00 4C
+D 4042 51 9A 05
+D 4045 11 06 00 00
+D 4049 B0 00 53
+D 404C 51 A9 05
+D 404F 11 06 00 01
+D 4053 11 0A 0A 00
+D 4057 39 02 A9
+D 405A 10 00 1A
+D 405D 49 09
+D 405F 25
+D 4060 21 09
+D 4062 11 0A 01 33
+D 4066 88 9A
+D 4068 A1 00 75
+D 406B 51 9A 07
+D 406E 11 08 00 00
+D 4072 B0 00 7C
+D 4075 51 A9 07
+D 4078 11 08 00 01
+D 407C 11 01 00 00
+D 4080 11 02 00 00
+D 4084 11 03 00 00
+D 4088 11 04 00 00
+D 408C 11 0D 00 00
+D 4090 11 0E 04 00
+D 4094 4A 11
+D 4096 17 02
+D 4098 21 19
+D 409A 4A 33
+D 409C 17 02
+D 409E 21 1A
+D 40A0 50 9A 0B
+D 40A3 88 BE
+D 40A5 A0 01 21
+D 40A8 4A 13
+D 40AA 17 02
+D 40AC 21 1B
+D 40AE 50 BB 0B
+D 40B1 11 0C 00 00
+D 40B5 87 24
+D 40B7 A0 00 BE
+D 40BA 11 0C 00 01
+D 40BE 11 0F 00 00
+D 40C2 88 9A
+D 40C4 A0 00 D1
+D 40C7 51 A9 09
+D 40CA 11 0F 00 01
+D 40CE B0 00 D4
+D 40D1 51 9A 09
+D 40D4 87 F6
+D 40D6 A1 00 E2
+D 40D9 50 95 01
+D 40DC 23 00 F2
+D 40DF B0 00 F6
+D 40E2 88 95
+D 40E4 A1 00 F0
+D 40E7 51 95 01
+D 40EA 23 00 F2
+D 40ED B0 00 F6
+D 40F0 51 59 01
+D 40F3 23 00 62
+D 40F6 87 C8
+D 40F8 A1 01 04
+D 40FB 50 B7 03
+D 40FE 23 00 C4
+D 4101 B0 01 18
+D 4104 88 B7
+D 4106 A1 01 12
+D 4109 51 B7 03
+D 410C 23 00 C4
+D 410F B0 01 18
+D 4112 51 7B 03
+D 4115 23 00 84
+D 4118 42 0D
+D 411A 86 0D 00 0F
+D 411E A1 00 94
+D 4121 11 0E 00 00
+D 4125 11 0F 00 0A
+D 4129 2E 0D 09 00
+D 412D 2F 0E 06 08
+D 4131 11 0A 0A 00
+D 4135 39 02 A9
+D 4138 42 09
+D 413A 4D 9F
+D 413C 25
+D 413D 4E 00 30
+D 4140 2F 0E 06 02
+D 4144 27
+D 4145 4E 00 30
+D 4148 2F 0E 06 03
+D 414C 11 0A 0A 02
+D 4150 39 02 A9
+D 4153 42 09
+D 4155 4D 9F
+D 4157 25
+D 4158 4E 00 30
+D 415B 2F 0E 06 05
+D 415F 27
+D 4160 4E 00 30
+D 4163 2F 0E 06 06
+D 4167 11 0E 06 00
+D 416B C1 0E
+D 416D 11 0A 0A 04
+D 4171 39 02 A9
+D 4174 42 09
+D 4176 3A 02 9A
+D 4179 11 0A 0A 02
+D 417D 39 02 A9
+D 4180 42 09
+D 4182 3A 02 9A
+D 4185 86 09 00 14
+D 4189 A1 00 2A
+D 418C 11 0A 0A 00
+D 4190 39 02 A9
+D 4193 42 09
+D 4195 3A 02 9A
+D 4198 86 09 00 0C
+D 419C A1 00 1F
+D 419F C7 00
+D 41A1 11 0E 06 0A
+D 41A5 C1 0E
+D 41A7 20 00
+D 41A9 11 09 2F 05
+D 41AD 35 01 09
+D 41B0 21 01
+D 41B2 11 09 2F 15
+D 41B6 35 01 09
+D 41B9 21 02
+D 41BB 11 09 2F 25
+D 41BF 35 01 09
+D 41C2 21 03
+D 41C4 11 09 2F 35
+D 41C8 35 01 09
+D 41CB 21 04
+D 41CD 20 01
+D 41CF 11 05 00 00
+D 41D3 86 01 00 01
+D 41D7 A1 01 DC
+D 41DA 42 05
+D 41DC 86 02 00 01
+D 41E0 A1 01 E5
+D 41E3 42 05
+D 41E5 86 03 00 01
+D 41E9 A1 01 EE
+D 41EC 42 05
+D 41EE 86 04 00 01
+D 41F2 A1 01 F7
+D 41F5 42 05
+D 41F7 86 05 00 01
+D 41FB A1 02 04
+D 41FE 11 0E 06 26
+D 4202 C1 0E
+D 4204 C7 01
+D 4206 00
+D 4207 F0 00 00
+
+D 4600 1B 5B 72 72 3B 63 63 48 23 00 1B 5B 30 39 3B 34
+D 4610 35 48 56 4D 31 3A 20 64 6F 6E 65 20 20 20 20 20
+D 4620 20 20 20 20 20 00 1B 5B 31 34 3B 34 35 48 41 6C
+D 4630 6C 20 66 6F 75 72 20 64 6F 6E 65 2E 1B 5B 32 34
+D 4640 3B 34 31 48 1B 5B 3F 32 35 68 00 1B 5B 30 6D 1B
+D 4650 5B 32 4A 1B 5B 3F 32 35 6C 1B 5B 30 32 3B 34 35
+D 4660 48 53 54 45 4C 4C 41 52 20 4D 41 4E 44 45 4C 42
+D 4670 52 4F 54 20 78 20 34 1B 5B 30 34 3B 34 35 48 46
+D 4680 6F 75 72 20 56 4D 73 2C 20 6F 6E 65 20 71 75 61
+D 4690 72 74 65 72 20 65 61 63 68 2C 1B 5B 30 35 3B 34
+D 46A0 35 48 61 6C 6C 20 64 72 61 77 69 6E 67 20 61 74
+D 46B0 20 74 68 65 20 73 61 6D 65 20 74 69 6D 65 2E 1B
+D 46C0 5B 30 39 3B 34 35 48 56 4D 31 3A 20 74 6F 70 2D
+D 46D0 6C 65 66 74 1B 5B 31 30 3B 34 35 48 56 4D 32 3A
+D 46E0 20 74 6F 70 2D 72 69 67 68 74 1B 5B 31 31 3B 34
+D 46F0 35 48 56 4D 33 3A 20 62 6F 74 74 6F 6D 2D 6C 65
+D 4700 66 74 1B 5B 31 32 3B 34 35 48 56 4D 34 3A 20 62
+D 4710 6F 74 74 6F 6D 2D 72 69 67 68 74 00
+
+D 4900 20 2E 3A 2D 3D 2B 63 6F 61 2A 78 25 23 26 57 40
+
+D 5000 CD
+D 5001 D1 11
+D 5003 A1 00 01
+D 5006 11 09 00 00
+D 500A 11 0A 0A 00
+D 500E 3A 02 9A
+D 5011 11 09 00 00
+D 5015 11 0A 0A 04
+D 5019 3A 02 9A
+D 501C 11 09 00 14
+D 5020 11 0A 0A 02
+D 5024 3A 02 9A
+D 5027 11 0A 0A 02
+D 502B 39 02 A9
+D 502E 10 00 16
+D 5031 49 09
+D 5033 25
+D 5034 21 09
+D 5036 11 0A 02 80
+D 503A 88 9A
+D 503C A1 00 49
+D 503F 51 9A 05
+D 5042 11 06 00 00
+D 5046 B0 00 50
+D 5049 51 A9 05
+D 504C 11 06 00 01
+D 5050 11 0A 0A 00
+D 5054 39 02 A9
+D 5057 10 00 1A
+D 505A 49 09
+D 505C 25
+D 505D 21 09
+D 505F 11 0A 01 33
+D 5063 88 9A
+D 5065 A1 00 72
+D 5068 51 9A 07
+D 506B 11 08 00 00
+D 506F B0 00 79
+D 5072 51 A9 07
+D 5075 11 08 00 01
+D 5079 11 01 00 00
+D 507D 11 02 00 00
+D 5081 11 03 00 00
+D 5085 11 04 00 00
+D 5089 11 0D 00 00
+D 508D 11 0E 04 00
+D 5091 4A 11
+D 5093 17 02
+D 5095 21 19
+D 5097 4A 33
+D 5099 17 02
+D 509B 21 1A
+D 509D 50 9A 0B
+D 50A0 88 BE
+D 50A2 A0 01 1E
+D 50A5 4A 13
+D 50A7 17 02
+D 50A9 21 1B
+D 50AB 50 BB 0B
+D 50AE 11 0C 00 00
+D 50B2 87 24
+D 50B4 A0 00 BB
+D 50B7 11 0C 00 01
+D 50BB 11 0F 00 00
+D 50BF 88 9A
+D 50C1 A0 00 CE
+D 50C4 51 A9 09
+D 50C7 11 0F 00 01
+D 50CB B0 00 D1
+D 50CE 51 9A 09
+D 50D1 87 F6
+D 50D3 A1 00 DF
+D 50D6 50 95 01
+D 50D9 23 00 F2
+D 50DC B0 00 F3
+D 50DF 88 95
+D 50E1 A1 00 ED
+D 50E4 51 95 01
+D 50E7 23 00 F2
+D 50EA B0 00 F3
+D 50ED 51 59 01
+D 50F0 23 00 62
+D 50F3 87 C8
+D 50F5 A1 01 01
+D 50F8 50 B7 03
+D 50FB 23 00 C4
+D 50FE B0 01 15
+D 5101 88 B7
+D 5103 A1 01 0F
+D 5106 51 B7 03
+D 5109 23 00 C4
+D 510C B0 01 15
+D 510F 51 7B 03
+D 5112 23 00 84
+D 5115 42 0D
+D 5117 86 0D 00 0F
+D 511B A1 00 91
+D 511E 11 0E 00 00
+D 5122 11 0F 00 0A
+D 5126 2E 0D 09 00
+D 512A 2F 0E 06 08
+D 512E 11 0A 0A 00
+D 5132 39 02 A9
+D 5135 42 09
+D 5137 4D 9F
+D 5139 25
+D 513A 4E 00 30
+D 513D 2F 0E 06 02
+D 5141 27
+D 5142 4E 00 30
+D 5145 2F 0E 06 03
+D 5149 11 0A 0A 02
+D 514D 39 02 A9
+D 5150 42 09
+D 5152 4D 9F
+D 5154 25
+D 5155 4E 00 30
+D 5158 2F 0E 06 05
+D 515C 27
+D 515D 4E 00 30
+D 5160 2F 0E 06 06
+D 5164 11 0E 06 00
+D 5168 C1 0E
+D 516A 11 0A 0A 04
+D 516E 39 02 A9
+D 5171 42 09
+D 5173 3A 02 9A
+D 5176 11 0A 0A 02
+D 517A 39 02 A9
+D 517D 42 09
+D 517F 3A 02 9A
+D 5182 86 09 00 28
+D 5186 A1 00 27
+D 5189 11 0A 0A 00
+D 518D 39 02 A9
+D 5190 42 09
+D 5192 3A 02 9A
+D 5195 86 09 00 0C
+D 5199 A1 00 1C
+D 519C C7 00
+D 519E 11 0E 06 0A
+D 51A2 C1 0E
+D 51A4 20 00
+D 51A6 11 09 2F 05
+D 51AA 35 01 09
+D 51AD 21 01
+D 51AF 11 09 2F 15
+D 51B3 35 01 09
+D 51B6 21 02
+D 51B8 11 09 2F 25
+D 51BC 35 01 09
+D 51BF 21 03
+D 51C1 11 09 2F 35
+D 51C5 35 01 09
+D 51C8 21 04
+D 51CA 20 01
+D 51CC 11 05 00 00
+D 51D0 86 01 00 01
+D 51D4 A1 01 D9
+D 51D7 42 05
+D 51D9 86 02 00 01
+D 51DD A1 01 E2
+D 51E0 42 05
+D 51E2 86 03 00 01
+D 51E6 A1 01 EB
+D 51E9 42 05
+D 51EB 86 04 00 01
+D 51EF A1 01 F4
+D 51F2 42 05
+D 51F4 86 05 00 01
+D 51F8 A1 02 01
+D 51FB 11 0E 06 26
+D 51FF C1 0E
+D 5201 C7 01
+D 5203 00
+D 5204 F0 00 00
+
+D 5600 1B 5B 72 72 3B 63 63 48 23 00 1B 5B 31 30 3B 34
+D 5610 35 48 56 4D 32 3A 20 64 6F 6E 65 20 20 20 20 20
+D 5620 20 20 20 20 20 00 1B 5B 31 34 3B 34 35 48 41 6C
+D 5630 6C 20 66 6F 75 72 20 64 6F 6E 65 2E 1B 5B 32 34
+D 5640 3B 34 31 48 1B 5B 3F 32 35 68 00
+
+D 5900 20 2E 3A 2D 3D 2B 63 6F 61 2A 78 25 23 26 57 40
+
+D 6000 CD
+D 6001 D1 11
+D 6003 A1 00 01
+D 6006 11 09 00 0C
+D 600A 11 0A 0A 00
+D 600E 3A 02 9A
+D 6011 11 09 00 00
+D 6015 11 0A 0A 04
+D 6019 3A 02 9A
+D 601C 11 09 00 00
+D 6020 11 0A 0A 02
+D 6024 3A 02 9A
+D 6027 11 0A 0A 02
+D 602B 39 02 A9
+D 602E 10 00 16
+D 6031 49 09
+D 6033 25
+D 6034 21 09
+D 6036 11 0A 02 80
+D 603A 88 9A
+D 603C A1 00 49
+D 603F 51 9A 05
+D 6042 11 06 00 00
+D 6046 B0 00 50
+D 6049 51 A9 05
+D 604C 11 06 00 01
+D 6050 11 0A 0A 00
+D 6054 39 02 A9
+D 6057 10 00 1A
+D 605A 49 09
+D 605C 25
+D 605D 21 09
+D 605F 11 0A 01 33
+D 6063 88 9A
+D 6065 A1 00 72
+D 6068 51 9A 07
+D 606B 11 08 00 00
+D 606F B0 00 79
+D 6072 51 A9 07
+D 6075 11 08 00 01
+D 6079 11 01 00 00
+D 607D 11 02 00 00
+D 6081 11 03 00 00
+D 6085 11 04 00 00
+D 6089 11 0D 00 00
+D 608D 11 0E 04 00
+D 6091 4A 11
+D 6093 17 02
+D 6095 21 19
+D 6097 4A 33
+D 6099 17 02
+D 609B 21 1A
+D 609D 50 9A 0B
+D 60A0 88 BE
+D 60A2 A0 01 1E
+D 60A5 4A 13
+D 60A7 17 02
+D 60A9 21 1B
+D 60AB 50 BB 0B
+D 60AE 11 0C 00 00
+D 60B2 87 24
+D 60B4 A0 00 BB
+D 60B7 11 0C 00 01
+D 60BB 11 0F 00 00
+D 60BF 88 9A
+D 60C1 A0 00 CE
+D 60C4 51 A9 09
+D 60C7 11 0F 00 01
+D 60CB B0 00 D1
+D 60CE 51 9A 09
+D 60D1 87 F6
+D 60D3 A1 00 DF
+D 60D6 50 95 01
+D 60D9 23 00 F2
+D 60DC B0 00 F3
+D 60DF 88 95
+D 60E1 A1 00 ED
+D 60E4 51 95 01
+D 60E7 23 00 F2
+D 60EA B0 00 F3
+D 60ED 51 59 01
+D 60F0 23 00 62
+D 60F3 87 C8
+D 60F5 A1 01 01
+D 60F8 50 B7 03
+D 60FB 23 00 C4
+D 60FE B0 01 15
+D 6101 88 B7
+D 6103 A1 01 0F
+D 6106 51 B7 03
+D 6109 23 00 C4
+D 610C B0 01 15
+D 610F 51 7B 03
+D 6112 23 00 84
+D 6115 42 0D
+D 6117 86 0D 00 0F
+D 611B A1 00 91
+D 611E 11 0E 00 00
+D 6122 11 0F 00 0A
+D 6126 2E 0D 09 00
+D 612A 2F 0E 06 08
+D 612E 11 0A 0A 00
+D 6132 39 02 A9
+D 6135 42 09
+D 6137 4D 9F
+D 6139 25
+D 613A 4E 00 30
+D 613D 2F 0E 06 02
+D 6141 27
+D 6142 4E 00 30
+D 6145 2F 0E 06 03
+D 6149 11 0A 0A 02
+D 614D 39 02 A9
+D 6150 42 09
+D 6152 4D 9F
+D 6154 25
+D 6155 4E 00 30
+D 6158 2F 0E 06 05
+D 615C 27
+D 615D 4E 00 30
+D 6160 2F 0E 06 06
+D 6164 11 0E 06 00
+D 6168 C1 0E
+D 616A 11 0A 0A 04
+D 616E 39 02 A9
+D 6171 42 09
+D 6173 3A 02 9A
+D 6176 11 0A 0A 02
+D 617A 39 02 A9
+D 617D 42 09
+D 617F 3A 02 9A
+D 6182 86 09 00 14
+D 6186 A1 00 27
+D 6189 11 0A 0A 00
+D 618D 39 02 A9
+D 6190 42 09
+D 6192 3A 02 9A
+D 6195 86 09 00 18
+D 6199 A1 00 1C
+D 619C C7 00
+D 619E 11 0E 06 0A
+D 61A2 C1 0E
+D 61A4 20 00
+D 61A6 11 09 2F 05
+D 61AA 35 01 09
+D 61AD 21 01
+D 61AF 11 09 2F 15
+D 61B3 35 01 09
+D 61B6 21 02
+D 61B8 11 09 2F 25
+D 61BC 35 01 09
+D 61BF 21 03
+D 61C1 11 09 2F 35
+D 61C5 35 01 09
+D 61C8 21 04
+D 61CA 20 01
+D 61CC 11 05 00 00
+D 61D0 86 01 00 01
+D 61D4 A1 01 D9
+D 61D7 42 05
+D 61D9 86 02 00 01
+D 61DD A1 01 E2
+D 61E0 42 05
+D 61E2 86 03 00 01
+D 61E6 A1 01 EB
+D 61E9 42 05
+D 61EB 86 04 00 01
+D 61EF A1 01 F4
+D 61F2 42 05
+D 61F4 86 05 00 01
+D 61F8 A1 02 01
+D 61FB 11 0E 06 26
+D 61FF C1 0E
+D 6201 C7 01
+D 6203 00
+D 6204 F0 00 00
+
+D 6600 1B 5B 72 72 3B 63 63 48 23 00 1B 5B 31 31 3B 34
+D 6610 35 48 56 4D 33 3A 20 64 6F 6E 65 20 20 20 20 20
+D 6620 20 20 20 20 20 00 1B 5B 31 34 3B 34 35 48 41 6C
+D 6630 6C 20 66 6F 75 72 20 64 6F 6E 65 2E 1B 5B 32 34
+D 6640 3B 34 31 48 1B 5B 3F 32 35 68 00
+
+D 6900 20 2E 3A 2D 3D 2B 63 6F 61 2A 78 25 23 26 57 40
+
+D 7000 CD
+D 7001 D1 11
+D 7003 A1 00 01
+D 7006 11 09 00 0C
+D 700A 11 0A 0A 00
+D 700E 3A 02 9A
+D 7011 11 09 00 00
+D 7015 11 0A 0A 04
+D 7019 3A 02 9A
+D 701C 11 09 00 14
+D 7020 11 0A 0A 02
+D 7024 3A 02 9A
+D 7027 11 0A 0A 02
+D 702B 39 02 A9
+D 702E 10 00 16
+D 7031 49 09
+D 7033 25
+D 7034 21 09
+D 7036 11 0A 02 80
+D 703A 88 9A
+D 703C A1 00 49
+D 703F 51 9A 05
+D 7042 11 06 00 00
+D 7046 B0 00 50
+D 7049 51 A9 05
+D 704C 11 06 00 01
+D 7050 11 0A 0A 00
+D 7054 39 02 A9
+D 7057 10 00 1A
+D 705A 49 09
+D 705C 25
+D 705D 21 09
+D 705F 11 0A 01 33
+D 7063 88 9A
+D 7065 A1 00 72
+D 7068 51 9A 07
+D 706B 11 08 00 00
+D 706F B0 00 79
+D 7072 51 A9 07
+D 7075 11 08 00 01
+D 7079 11 01 00 00
+D 707D 11 02 00 00
+D 7081 11 03 00 00
+D 7085 11 04 00 00
+D 7089 11 0D 00 00
+D 708D 11 0E 04 00
+D 7091 4A 11
+D 7093 17 02
+D 7095 21 19
+D 7097 4A 33
+D 7099 17 02
+D 709B 21 1A
+D 709D 50 9A 0B
+D 70A0 88 BE
+D 70A2 A0 01 1E
+D 70A5 4A 13
+D 70A7 17 02
+D 70A9 21 1B
+D 70AB 50 BB 0B
+D 70AE 11 0C 00 00
+D 70B2 87 24
+D 70B4 A0 00 BB
+D 70B7 11 0C 00 01
+D 70BB 11 0F 00 00
+D 70BF 88 9A
+D 70C1 A0 00 CE
+D 70C4 51 A9 09
+D 70C7 11 0F 00 01
+D 70CB B0 00 D1
+D 70CE 51 9A 09
+D 70D1 87 F6
+D 70D3 A1 00 DF
+D 70D6 50 95 01
+D 70D9 23 00 F2
+D 70DC B0 00 F3
+D 70DF 88 95
+D 70E1 A1 00 ED
+D 70E4 51 95 01
+D 70E7 23 00 F2
+D 70EA B0 00 F3
+D 70ED 51 59 01
+D 70F0 23 00 62
+D 70F3 87 C8
+D 70F5 A1 01 01
+D 70F8 50 B7 03
+D 70FB 23 00 C4
+D 70FE B0 01 15
+D 7101 88 B7
+D 7103 A1 01 0F
+D 7106 51 B7 03
+D 7109 23 00 C4
+D 710C B0 01 15
+D 710F 51 7B 03
+D 7112 23 00 84
+D 7115 42 0D
+D 7117 86 0D 00 0F
+D 711B A1 00 91
+D 711E 11 0E 00 00
+D 7122 11 0F 00 0A
+D 7126 2E 0D 09 00
+D 712A 2F 0E 06 08
+D 712E 11 0A 0A 00
+D 7132 39 02 A9
+D 7135 42 09
+D 7137 4D 9F
+D 7139 25
+D 713A 4E 00 30
+D 713D 2F 0E 06 02
+D 7141 27
+D 7142 4E 00 30
+D 7145 2F 0E 06 03
+D 7149 11 0A 0A 02
+D 714D 39 02 A9
+D 7150 42 09
+D 7152 4D 9F
+D 7154 25
+D 7155 4E 00 30
+D 7158 2F 0E 06 05
+D 715C 27
+D 715D 4E 00 30
+D 7160 2F 0E 06 06
+D 7164 11 0E 06 00
+D 7168 C1 0E
+D 716A 11 0A 0A 04
+D 716E 39 02 A9
+D 7171 42 09
+D 7173 3A 02 9A
+D 7176 11 0A 0A 02
+D 717A 39 02 A9
+D 717D 42 09
+D 717F 3A 02 9A
+D 7182 86 09 00 28
+D 7186 A1 00 27
+D 7189 11 0A 0A 00
+D 718D 39 02 A9
+D 7190 42 09
+D 7192 3A 02 9A
+D 7195 86 09 00 18
+D 7199 A1 00 1C
+D 719C C7 00
+D 719E 11 0E 06 0A
+D 71A2 C1 0E
+D 71A4 20 00
+D 71A6 11 09 2F 05
+D 71AA 35 01 09
+D 71AD 21 01
+D 71AF 11 09 2F 15
+D 71B3 35 01 09
+D 71B6 21 02
+D 71B8 11 09 2F 25
+D 71BC 35 01 09
+D 71BF 21 03
+D 71C1 11 09 2F 35
+D 71C5 35 01 09
+D 71C8 21 04
+D 71CA 20 01
+D 71CC 11 05 00 00
+D 71D0 86 01 00 01
+D 71D4 A1 01 D9
+D 71D7 42 05
+D 71D9 86 02 00 01
+D 71DD A1 01 E2
+D 71E0 42 05
+D 71E2 86 03 00 01
+D 71E6 A1 01 EB
+D 71E9 42 05
+D 71EB 86 04 00 01
+D 71EF A1 01 F4
+D 71F2 42 05
+D 71F4 86 05 00 01
+D 71F8 A1 02 01
+D 71FB 11 0E 06 26
+D 71FF C1 0E
+D 7201 C7 01
+D 7203 00
+D 7204 F0 00 00
+
+D 7600 1B 5B 72 72 3B 63 63 48 23 00 1B 5B 31 32 3B 34
+D 7610 35 48 56 4D 34 3A 20 64 6F 6E 65 20 20 20 20 20
+D 7620 20 20 20 20 20 00 1B 5B 31 34 3B 34 35 48 41 6C
+D 7630 6C 20 66 6F 75 72 20 64 6F 6E 65 2E 1B 5B 32 34
+D 7640 3B 34 31 48 1B 5B 3F 32 35 68 00
+
+D 7900 20 2E 3A 2D 3D 2B 63 6F 61 2A 78 25 23 26 57 40

@@ -1,0 +1,2026 @@
+; ==========================================================================
+; STELLAR MOONBASE  -  a text adventure   (VM1 @ $4000, SETSIZE 3)
+; ==========================================================================
+; A moonquake has wrecked Moonbase Tycho. The crew got away without you, the
+; air is running out, and the last lander is out on the crater floor. Get to
+; it and get it off the ground.
+;
+; Type commands of one or two words: N, S, E, W, UP, DOWN, IN, OUT, LOOK,
+; INVENTORY (I), TAKE WRENCH, DROP, EXAMINE LOCKER, OPEN, READ, WEAR, USE,
+; TURN ON FLASHLIGHT, PUSH, TYPE, HELP, QUIT. Any case. Only the first four
+; letters of a word count. Every move uses air.
+;
+; 10 rooms, 16 objects (5 to carry), 134 words. The parser is native 1802 at
+; $4C00 (Firmware-Math/adventure_native.asm, 288 bytes, run with RUNMC after
+; each line); the game is the STELLAR program below. Edit the world - rooms,
+; exits, objects, words, messages - in Firmware-Math/build_adventure.py.
+;
+; MEMORY. SETSIZE 3 takes $4000-$6FFF, so load it with no program in the $5000
+; or $6000 blocks. Messages $5200-$6EFF, variables and the typed line $6F00-$6FFF.
+; Everything the game changes is reset at the start of each game, so it can be
+; played again without reloading.
+; Needs SETSIZE ($F2), RUNMC ($F1), PRINTSTR ($C1), GETSTR ($C2): V0061.28 on.
+;
+; VERIFICATION (Firmware-Math/adventure_verify.py, V0061.34 image): walkthrough (24 moves) escapes; PLAY AGAIN resets the world and escapes again; 22 parser cases, 22 rule cases, death by vacuum and by air - all as expected (sim, 2026-09-26).
+;
+; HW-VERIFIED on the Elf2K (V0061.34), 2026-09-26 - Craig: "It works!"
+;
+; 645 STELLAR commands, $4000-$4824 (2085 bytes).
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 4000 CD             START                              Start of program, and run the label pre-pass
+; D 4001 F2 03          SETSIZE 3                          Take $4000-$6FFF: VM1 plus the two blocks above it
+; D 4003 11 0B 00 00    LOADXI R11 0000                    RB = 0: the index for flags
+; D 4007 11 0E 2F 40    LOADXI R14 2F40
+; D 400B 10 00 00       LOADAI 0000
+; D 400E 2F 0E 00 00    WRITEIDX R14 0000                  no line yet
+; D 4012 11 04 00 25    LOADXI R4 0025                     TITLE
+; D 4016 BD 07 2A       CALL SAY
+; NEWGAME:
+; D 4019 11 0D 10 60    LOADXI R13 1060
+; D 401D 11 0E 2F 20    LOADXI R14 2F20
+; D 4021 3B DE 20       COPYMXMY RD RE 20                  STATE := INIT (places + flags)
+; D 4024 11 01 00 01    LOADXI R1 0001                     the crew quarters
+; D 4028 11 06 00 00    LOADXI R6 0000                     no moves yet
+; D 402C 11 07 00 FA    LOADXI R7 00FA                     air
+; D 4030 11 04 00 26    LOADXI R4 0026                     INTRO
+; D 4034 BD 07 2A       CALL SAY
+; D 4037 BD 07 38       CALL DESCRIBE
+; LOOP:
+; D 403A 11 04 00 27    LOADXI R4 0027                     PROMPT
+; D 403E BD 07 2A       CALL SAY
+; D 4041 11 0C 2F 40    LOADXI R12 2F40
+; D 4045 11 0D 2F 40    LOADXI R13 2F40
+; D 4049 C2 CD          GETSTR R12 R13                     Read the line (echoed; backspace works)
+; D 404B 11 04 00 28    LOADXI R4 0028                     CRLF
+; D 404F BD 07 2A       CALL SAY
+; D 4052 F1 4C 00       RUNMC 4C00                         Parse: VERB, NOUN, BAD, WBUF
+; D 4055 2E 0B 2F 02    READIDX R11 2F02
+; D 4059 81 00 00       TESTAI 0000
+; D 405C A1 00 89       IFFALSEI BADWORD
+; D 405F 2E 0B 2F 00    READIDX R11 2F00
+; D 4063 21 02          COPYAX Acc -> R2                   R2 = the verb
+; D 4065 2E 0B 2F 01    READIDX R11 2F01
+; D 4069 21 03          COPYAX Acc -> R3                   R3 = the noun
+; D 406B 8C 02          TESTXZ R2
+; D 406D A1 00 A0       IFFALSEI HAVEVERB
+; D 4070 8C 03          TESTXZ R3
+; D 4072 A0 00 7F       IFTRUEI PARDON                     an empty line
+; D 4075 11 04 00 2A    LOADXI R4 002A                     WHATDO
+; D 4079 BD 07 2A       CALL SAY
+; D 407C B0 00 3A       GAL LOOP
+; PARDON:
+; D 407F 11 04 00 29    LOADXI R4 0029                     PARDON
+; D 4083 BD 07 2A       CALL SAY
+; D 4086 B0 00 3A       GAL LOOP
+; BADWORD:
+; D 4089 11 04 00 2B    LOADXI R4 002B                     DK1
+; D 408D BD 07 2A       CALL SAY
+; D 4090 11 0E 2F 08    LOADXI R14 2F08
+; D 4094 C1 0E          PRINTSTR R14                       the word
+; D 4096 11 04 00 2C    LOADXI R4 002C                     DK2
+; D 409A BD 07 2A       CALL SAY
+; D 409D B0 00 3A       GAL LOOP
+; HAVEVERB:
+; D 40A0 42 06          INCX R6                            one more move
+; D 40A2 11 08 00 09    LOADXI R8 0009
+; D 40A6 89 28          TESTLXY R2 < R8
+; D 40A8 A0 01 77       IFTRUEI GO                         verbs 1-8 are the directions
+; D 40AB 86 02 00 09    TESTXI R2 0009
+; D 40AF A0 01 F8       IFTRUEI V_LOOK
+; D 40B2 86 02 00 0A    TESTXI R2 000A
+; D 40B6 A0 02 03       IFTRUEI V_INV
+; D 40B9 86 02 00 0B    TESTXI R2 000B
+; D 40BD A0 02 E5       IFTRUEI V_TAKE
+; D 40C0 86 02 00 0C    TESTXI R2 000C
+; D 40C4 A0 03 32       IFTRUEI V_DROP
+; D 40C7 86 02 00 0D    TESTXI R2 000D
+; D 40CB A0 02 51       IFTRUEI V_EXAMINE
+; D 40CE 86 02 00 0E    TESTXI R2 000E
+; D 40D2 A0 03 6A       IFTRUEI V_OPEN
+; D 40D5 86 02 00 0F    TESTXI R2 000F
+; D 40D9 A0 03 BC       IFTRUEI V_READ
+; D 40DC 86 02 00 10    TESTXI R2 0010
+; D 40E0 A0 03 E1       IFTRUEI V_WEAR
+; D 40E3 86 02 00 11    TESTXI R2 0011
+; D 40E7 A0 04 1E       IFTRUEI V_LOOSEN
+; D 40EA 86 02 00 12    TESTXI R2 0012
+; D 40EE A0 04 4A       IFTRUEI V_TYPE
+; D 40F1 86 02 00 13    TESTXI R2 0013
+; D 40F5 A0 04 97       IFTRUEI V_PUSH
+; D 40F8 86 02 00 14    TESTXI R2 0014
+; D 40FC A0 04 E5       IFTRUEI V_INSERT
+; D 40FF 86 02 00 15    TESTXI R2 0015
+; D 4103 A0 04 CA       IFTRUEI V_LAUNCH
+; D 4106 86 02 00 16    TESTXI R2 0016
+; D 410A A0 05 21       IFTRUEI V_ON
+; D 410D 86 02 00 17    TESTXI R2 0017
+; D 4111 A0 05 4E       IFTRUEI V_OFF
+; D 4114 86 02 00 18    TESTXI R2 0018
+; D 4118 A0 05 C5       IFTRUEI V_HELP
+; D 411B 86 02 00 19    TESTXI R2 0019
+; D 411F A0 05 CF       IFTRUEI V_QUIT
+; D 4122 86 02 00 1A    TESTXI R2 001A
+; D 4126 A0 05 71       IFTRUEI V_USE
+; D 4129 86 02 00 1B    TESTXI R2 001B
+; D 412D A0 05 B1       IFTRUEI V_CLOSE
+; D 4130 86 02 00 1C    TESTXI R2 001C
+; D 4134 A0 05 BB       IFTRUEI V_WAIT
+; D 4137 11 04 00 29    LOADXI R4 0029                     PARDON
+; D 413B BD 07 2A       CALL SAY
+; D 413E B0 00 3A       GAL LOOP
+; TURNEND:
+; D 4141 43 07          DECX R7
+; D 4143 86 07 00 3C    TESTXI R7 003C
+; D 4147 A0 01 59       IFTRUEI AIR1
+; D 414A 86 07 00 14    TESTXI R7 0014
+; D 414E A0 01 63       IFTRUEI AIR2
+; D 4151 8C 07          TESTXZ R7
+; D 4153 A0 01 6D       IFTRUEI AIR0
+; D 4156 B0 00 3A       GAL LOOP
+; AIR1:
+; D 4159 11 04 00 64    LOADXI R4 0064                     THIN
+; D 415D BD 07 2A       CALL SAY
+; D 4160 B0 00 3A       GAL LOOP
+; AIR2:
+; D 4163 11 04 00 65    LOADXI R4 0065                     GASP
+; D 4167 BD 07 2A       CALL SAY
+; D 416A B0 00 3A       GAL LOOP
+; AIR0:
+; D 416D 11 04 00 66    LOADXI R4 0066                     SUFFOCATE
+; D 4171 BD 07 2A       CALL SAY
+; D 4174 B0 06 E7       GAL DEAD
+; GO:
+; D 4177 BD 07 A6       CALL ISDARK
+; D 417A 8C 09          TESTXZ R9
+; D 417C A0 01 90       IFTRUEI GO1
+; D 417F 86 02 00 01    TESTXI R2 0001
+; D 4183 A0 01 90       IFTRUEI GO1                        back north is fine
+; D 4186 11 04 00 2F    LOADXI R4 002F                     DARKMOVE
+; D 418A BD 07 2A       CALL SAY
+; D 418D B0 01 41       GAL TURNEND
+; GO1:
+; D 4190 23 00 1A       COPYXY R1 -> R10
+; D 4193 50 AA 0A       ADDXYZ R10 + R10 -> R10
+; D 4196 50 AA 0A       ADDXYZ R10 + R10 -> R10
+; D 4199 50 AA 0A       ADDXYZ R10 + R10 -> R10            room x 8
+; D 419C 50 A2 0A       ADDXYZ R10 + R2 -> R10
+; D 419F 43 0A          DECX R10                           + direction - 1
+; D 41A1 2E 0A 10 00    READIDX R10 1000
+; D 41A5 21 08          COPYAX Acc -> R8                   R8 = where it leads
+; D 41A7 8C 08          TESTXZ R8
+; D 41A9 A0 01 BC       IFTRUEI NOWAY
+; D 41AC 86 08 00 81    TESTXI R8 0081
+; D 41B0 A0 01 C6       IFTRUEI OUTDOOR
+; D 41B3 23 00 81       COPYXY R8 -> R1
+; D 41B6 BD 07 38       CALL DESCRIBE
+; D 41B9 B0 01 41       GAL TURNEND
+; NOWAY:
+; D 41BC 11 04 00 2D    LOADXI R4 002D                     NOWAY
+; D 41C0 BD 07 2A       CALL SAY
+; D 41C3 B0 01 41       GAL TURNEND
+; OUTDOOR:
+; D 41C6 2E 0B 2F 37    READIDX R11 2F37                   flag DOOR
+; D 41CA 81 00 00       TESTAI 0000
+; D 41CD A1 01 DA       IFFALSEI OD1
+; D 41D0 11 04 00 30    LOADXI R4 0030                     DOORSHUT
+; D 41D4 BD 07 2A       CALL SAY
+; D 41D7 B0 01 41       GAL TURNEND
+; OD1:
+; D 41DA 2E 0B 2F 38    READIDX R11 2F38                   flag WORN
+; D 41DE 81 00 00       TESTAI 0000
+; D 41E1 A1 01 EE       IFFALSEI OD2
+; D 41E4 11 04 00 31    LOADXI R4 0031                     VACUUM
+; D 41E8 BD 07 2A       CALL SAY
+; D 41EB B0 06 E7       GAL DEAD
+; OD2:
+; D 41EE 11 01 00 08    LOADXI R1 0008
+; D 41F2 BD 07 38       CALL DESCRIBE
+; D 41F5 B0 01 41       GAL TURNEND
+; V_LOOK:
+; D 41F8 8C 03          TESTXZ R3
+; D 41FA A1 02 51       IFFALSEI V_EXAMINE                 LOOK AT something
+; D 41FD BD 07 38       CALL DESCRIBE
+; D 4200 B0 01 41       GAL TURNEND
+; V_INV:
+; D 4203 11 04 00 3C    LOADXI R4 003C                     CARRYING
+; D 4207 BD 07 2A       CALL SAY
+; D 420A 11 09 00 00    LOADXI R9 0000
+; D 420E 11 05 00 01    LOADXI R5 0001
+; IN1:
+; D 4212 2E 05 2F 20    READIDX R5 2F20
+; D 4216 81 00 FF       TESTAI 00FF
+; D 4219 A1 02 28       IFFALSEI IN2
+; D 421C 23 00 54       COPYXY R5 -> R4
+; D 421F 52 04 00 0F    ADDXI R4 000F
+; D 4223 BD 07 2A       CALL SAY
+; D 4226 42 09          INCX R9
+; IN2:
+; D 4228 42 05          INCX R5
+; D 422A 86 05 00 06    TESTXI R5 0006
+; D 422E A1 02 12       IFFALSEI IN1
+; D 4231 8C 09          TESTXZ R9
+; D 4233 A1 02 3D       IFFALSEI IN3
+; D 4236 11 04 00 3D    LOADXI R4 003D                     NOTHINGC
+; D 423A BD 07 2A       CALL SAY
+; IN3:
+; D 423D 2E 0B 2F 38    READIDX R11 2F38                   flag WORN
+; D 4241 81 00 00       TESTAI 0000
+; D 4244 A0 01 41       IFTRUEI TURNEND
+; D 4247 11 04 00 3E    LOADXI R4 003E                     WEARING
+; D 424B BD 07 2A       CALL SAY
+; D 424E B0 01 41       GAL TURNEND
+; V_EXAMINE:
+; D 4251 8C 03          TESTXZ R3
+; D 4253 A0 05 D9       IFTRUEI WHATOBJ
+; D 4256 86 03 00 60    TESTXI R3 0060
+; D 425A A0 05 E3       IFTRUEI JUSTNUM
+; D 425D 86 03 00 7F    TESTXI R3 007F
+; D 4261 A0 05 E3       IFTRUEI JUSTNUM
+; D 4264 BD 07 D3       CALL SCOPE
+; D 4267 8C 09          TESTXZ R9
+; D 4269 A0 05 ED       IFTRUEI NOTHERE
+; D 426C 86 05 00 06    TESTXI R5 0006
+; D 4270 A1 02 87       IFFALSEI XNLOCKER
+; D 4273 2E 0B 2F 34    READIDX R11 2F34                   flag LOCKER
+; D 4277 81 00 00       TESTAI 0000
+; D 427A A0 02 D8       IFTRUEI XDEF
+; D 427D 11 04 00 42    LOADXI R4 0042                     XLOCKEROPEN
+; D 4281 BD 07 2A       CALL SAY
+; D 4284 B0 01 41       GAL TURNEND
+; XNLOCKER:
+; D 4287 86 05 00 0A    TESTXI R5 000A
+; D 428B A1 02 A2       IFFALSEI XNDOOR
+; D 428E 2E 0B 2F 37    READIDX R11 2F37                   flag DOOR
+; D 4292 81 00 00       TESTAI 0000
+; D 4295 A0 02 D8       IFTRUEI XDEF
+; D 4298 11 04 00 53    LOADXI R4 0053                     DOORISOPEN
+; D 429C BD 07 2A       CALL SAY
+; D 429F B0 01 41       GAL TURNEND
+; XNDOOR:
+; D 42A2 86 05 00 0B    TESTXI R5 000B
+; D 42A6 A1 02 BD       IFFALSEI XNCLAMP
+; D 42A9 2E 0B 2F 36    READIDX R11 2F36                   flag CLAMP
+; D 42AD 81 00 00       TESTAI 0000
+; D 42B0 A0 02 D8       IFTRUEI XDEF
+; D 42B3 11 04 00 4F    LOADXI R4 004F                     XCLAMPLOOSE
+; D 42B7 BD 07 2A       CALL SAY
+; D 42BA B0 01 41       GAL TURNEND
+; XNCLAMP:
+; D 42BD 86 05 00 0F    TESTXI R5 000F
+; D 42C1 A1 02 D8       IFFALSEI XNSLOT
+; D 42C4 2E 0B 2F 39    READIDX R11 2F39                   flag CELLIN
+; D 42C8 81 00 00       TESTAI 0000
+; D 42CB A0 02 D8       IFTRUEI XDEF
+; D 42CE 11 04 00 5A    LOADXI R4 005A                     XSLOTFULL
+; D 42D2 BD 07 2A       CALL SAY
+; D 42D5 B0 01 41       GAL TURNEND
+; XNSLOT:
+; XDEF:
+; D 42D8 23 00 54       COPYXY R5 -> R4
+; D 42DB 52 04 00 14    ADDXI R4 0014                      its description
+; D 42DF BD 07 2A       CALL SAY
+; D 42E2 B0 01 41       GAL TURNEND
+; V_TAKE:
+; D 42E5 8C 03          TESTXZ R3
+; D 42E7 A0 05 D9       IFTRUEI WHATOBJ
+; D 42EA BD 07 D3       CALL SCOPE
+; D 42ED 8C 09          TESTXZ R9
+; D 42EF A0 05 ED       IFTRUEI NOTHERE
+; D 42F2 2E 05 2F 20    READIDX R5 2F20
+; D 42F6 81 00 FF       TESTAI 00FF
+; D 42F9 A0 05 F7       IFTRUEI ALREADY
+; D 42FC 2E 05 10 90    READIDX R5 1090
+; D 4300 81 00 00       TESTAI 0000
+; D 4303 A1 06 01       IFFALSEI FIXEDMSG
+; D 4306 86 05 00 04    TESTXI R5 0004
+; D 430A A1 03 21       IFFALSEI TK1
+; D 430D 2E 0B 2F 36    READIDX R11 2F36                   flag CLAMP
+; D 4311 81 00 00       TESTAI 0000
+; D 4314 A1 03 21       IFFALSEI TK1
+; D 4317 11 04 00 36    LOADXI R4 0036                     CLAMPED
+; D 431B BD 07 2A       CALL SAY
+; D 431E B0 01 41       GAL TURNEND
+; TK1:
+; D 4321 10 00 FF       LOADAI 00FF
+; D 4324 2F 05 2F 20    WRITEIDX R5 2F20
+; D 4328 11 04 00 37    LOADXI R4 0037                     TAKEN
+; D 432C BD 07 2A       CALL SAY
+; D 432F B0 01 41       GAL TURNEND
+; V_DROP:
+; D 4332 8C 03          TESTXZ R3
+; D 4334 A0 05 D9       IFTRUEI WHATOBJ
+; D 4337 BD 07 D3       CALL SCOPE
+; D 433A 8C 09          TESTXZ R9
+; D 433C A0 06 0B       IFTRUEI NOTCARRY
+; D 433F 2E 05 2F 20    READIDX R5 2F20
+; D 4343 81 00 FF       TESTAI 00FF
+; D 4346 A1 06 0B       IFFALSEI NOTCARRY
+; D 4349 86 05 00 03    TESTXI R5 0003
+; D 434D A1 03 5A       IFFALSEI DR1
+; D 4350 2E 0B 2F 38    READIDX R11 2F38                   flag WORN
+; D 4354 81 00 00       TESTAI 0000
+; D 4357 A1 06 15       IFFALSEI KEEPSUIT
+; DR1:
+; D 435A 22 01          COPYXA R1 -> Acc
+; D 435C 2F 05 2F 20    WRITEIDX R5 2F20                   it is in this room now
+; D 4360 11 04 00 38    LOADXI R4 0038                     DROPPED
+; D 4364 BD 07 2A       CALL SAY
+; D 4367 B0 01 41       GAL TURNEND
+; V_OPEN:
+; D 436A 8C 03          TESTXZ R3
+; D 436C A0 05 D9       IFTRUEI WHATOBJ
+; D 436F BD 07 D3       CALL SCOPE
+; D 4372 8C 09          TESTXZ R9
+; D 4374 A0 05 ED       IFTRUEI NOTHERE
+; D 4377 86 03 00 4A    TESTXI R3 004A
+; D 437B A0 06 1F       IFTRUEI USEKEYPAD
+; D 437E 86 03 00 4B    TESTXI R3 004B
+; D 4382 A0 04 1E       IFTRUEI V_LOOSEN
+; D 4385 86 03 00 48    TESTXI R3 0048
+; D 4389 A0 06 29       IFTRUEI ALOPEN
+; D 438C 86 03 00 4D    TESTXI R3 004D
+; D 4390 A0 06 29       IFTRUEI ALOPEN
+; D 4393 86 03 00 46    TESTXI R3 0046
+; D 4397 A1 06 33       IFFALSEI CANTOPEN
+; D 439A 2E 0B 2F 34    READIDX R11 2F34                   flag LOCKER
+; D 439E 81 00 00       TESTAI 0000
+; D 43A1 A1 06 29       IFFALSEI ALOPEN
+; D 43A4 10 00 01       LOADAI 0001
+; D 43A7 2F 0B 2F 34    WRITEIDX R11 2F34                  LOCKER := 1
+; D 43AB 10 00 01       LOADAI 0001
+; D 43AE 2F 0B 2F 21    WRITEIDX R11 2F21                  the flashlight appears
+; D 43B2 11 04 00 40    LOADXI R4 0040                     LOCKEROPENS
+; D 43B6 BD 07 2A       CALL SAY
+; D 43B9 B0 01 41       GAL TURNEND
+; V_READ:
+; D 43BC 8C 03          TESTXZ R3
+; D 43BE A0 05 D9       IFTRUEI WHATOBJ
+; D 43C1 BD 07 D3       CALL SCOPE
+; D 43C4 8C 09          TESTXZ R9
+; D 43C6 A0 05 ED       IFTRUEI NOTHERE
+; D 43C9 86 05 00 07    TESTXI R5 0007
+; D 43CD A0 02 D8       IFTRUEI XDEF
+; D 43D0 86 05 00 05    TESTXI R5 0005
+; D 43D4 A1 06 3D       IFFALSEI NOREAD
+; D 43D7 11 04 00 45    LOADXI R4 0045                     LOGTEXT
+; D 43DB BD 07 2A       CALL SAY
+; D 43DE B0 01 41       GAL TURNEND
+; V_WEAR:
+; D 43E1 8C 03          TESTXZ R3
+; D 43E3 A0 05 D9       IFTRUEI WHATOBJ
+; D 43E6 86 03 00 43    TESTXI R3 0043
+; D 43EA A1 06 47       IFFALSEI CANTWEAR
+; D 43ED BD 07 D3       CALL SCOPE
+; D 43F0 8C 09          TESTXZ R9
+; D 43F2 A0 05 ED       IFTRUEI NOTHERE
+; D 43F5 2E 0B 2F 23    READIDX R11 2F23                   where the SUIT is
+; D 43F9 81 00 FF       TESTAI 00FF
+; D 43FC A1 06 51       IFFALSEI NEEDCARRY
+; D 43FF 2E 0B 2F 38    READIDX R11 2F38                   flag WORN
+; D 4403 81 00 00       TESTAI 0000
+; D 4406 A1 06 5B       IFFALSEI ALWEAR
+; D 4409 10 00 01       LOADAI 0001
+; D 440C 2F 0B 2F 38    WRITEIDX R11 2F38                  WORN := 1
+; D 4410 11 07 00 96    LOADXI R7 0096                     a full suit tank
+; D 4414 11 04 00 47    LOADXI R4 0047                     SUITON
+; D 4418 BD 07 2A       CALL SAY
+; D 441B B0 01 41       GAL TURNEND
+; V_LOOSEN:
+; D 441E 86 01 00 07    TESTXI R1 0007                     in the REACTOR?
+; D 4422 A1 06 65       IFFALSEI NOLOOSEN
+; D 4425 2E 0B 2F 36    READIDX R11 2F36                   flag CLAMP
+; D 4429 81 00 00       TESTAI 0000
+; D 442C A1 06 6F       IFFALSEI ALLOOSE
+; D 442F 2E 0B 2F 22    READIDX R11 2F22                   where the WRENCH is
+; D 4433 81 00 FF       TESTAI 00FF
+; D 4436 A1 06 79       IFFALSEI NEEDTOOL
+; D 4439 10 00 01       LOADAI 0001
+; D 443C 2F 0B 2F 36    WRITEIDX R11 2F36                  CLAMP := 1
+; D 4440 11 04 00 4D    LOADXI R4 004D                     LOOSENED
+; D 4444 BD 07 2A       CALL SAY
+; D 4447 B0 01 41       GAL TURNEND
+; V_TYPE:
+; D 444A 8C 03          TESTXZ R3
+; D 444C A0 06 83       IFTRUEI TYPEWHAT
+; D 444F 86 03 00 60    TESTXI R3 0060
+; D 4453 A0 04 64       IFTRUEI TY1
+; D 4456 86 03 00 7F    TESTXI R3 007F
+; D 445A A0 04 86       IFTRUEI TY2
+; D 445D 11 02 00 07    LOADXI R2 0007                     ENTER <something>: go in
+; D 4461 B0 01 77       GAL GO
+; TY1:
+; D 4464 86 01 00 06    TESTXI R1 0006                     in the AIRLOCK?
+; D 4468 A1 06 8D       IFFALSEI NOKEYPAD
+; D 446B 2E 0B 2F 37    READIDX R11 2F37                   flag DOOR
+; D 446F 81 00 00       TESTAI 0000
+; D 4472 A1 06 97       IFFALSEI DOORAL
+; D 4475 10 00 01       LOADAI 0001
+; D 4478 2F 0B 2F 37    WRITEIDX R11 2F37                  DOOR := 1
+; D 447C 11 04 00 52    LOADXI R4 0052                     DOOROPENS
+; D 4480 BD 07 2A       CALL SAY
+; D 4483 B0 01 41       GAL TURNEND
+; TY2:
+; D 4486 86 01 00 06    TESTXI R1 0006                     in the AIRLOCK?
+; D 448A A1 06 8D       IFFALSEI NOKEYPAD
+; D 448D 11 04 00 54    LOADXI R4 0054                     DENIED
+; D 4491 BD 07 2A       CALL SAY
+; D 4494 B0 01 41       GAL TURNEND
+; V_PUSH:
+; D 4497 86 03 00 60    TESTXI R3 0060
+; D 449B A0 04 4A       IFTRUEI V_TYPE
+; D 449E 86 03 00 7F    TESTXI R3 007F
+; D 44A2 A0 04 4A       IFTRUEI V_TYPE
+; D 44A5 8C 03          TESTXZ R3
+; D 44A7 A0 05 D9       IFTRUEI WHATOBJ
+; D 44AA BD 07 D3       CALL SCOPE
+; D 44AD 8C 09          TESTXZ R9
+; D 44AF A0 05 ED       IFTRUEI NOTHERE
+; D 44B2 86 05 00 0E    TESTXI R5 000E
+; D 44B6 A0 04 CA       IFTRUEI V_LAUNCH
+; D 44B9 86 05 00 09    TESTXI R5 0009
+; D 44BD A0 06 83       IFTRUEI TYPEWHAT
+; D 44C0 11 04 00 56    LOADXI R4 0056                     NOTHING
+; D 44C4 BD 07 2A       CALL SAY
+; D 44C7 B0 01 41       GAL TURNEND
+; V_LAUNCH:
+; D 44CA 86 01 00 0A    TESTXI R1 000A                     in the CABIN?
+; D 44CE A1 06 A1       IFFALSEI NOTLANDER
+; D 44D1 2E 0B 2F 39    READIDX R11 2F39                   flag CELLIN
+; D 44D5 81 00 00       TESTAI 0000
+; D 44D8 A1 06 C9       IFFALSEI WIN
+; D 44DB 11 04 00 58    LOADXI R4 0058                     NOPOWER
+; D 44DF BD 07 2A       CALL SAY
+; D 44E2 B0 01 41       GAL TURNEND
+; V_INSERT:
+; D 44E5 8C 03          TESTXZ R3
+; D 44E7 A0 05 D9       IFTRUEI WHATOBJ
+; D 44EA 86 03 00 43    TESTXI R3 0043
+; D 44EE A0 03 E1       IFTRUEI V_WEAR
+; D 44F1 86 03 00 44    TESTXI R3 0044
+; D 44F5 A1 06 AB       IFFALSEI CANTPUT
+; D 44F8 2E 0B 2F 24    READIDX R11 2F24                   where the CELL is
+; D 44FC 81 00 FF       TESTAI 00FF
+; D 44FF A1 06 0B       IFFALSEI NOTCARRY
+; D 4502 86 01 00 0A    TESTXI R1 000A                     in the CABIN?
+; D 4506 A1 06 B5       IFFALSEI NOWHERE
+; D 4509 10 00 01       LOADAI 0001
+; D 450C 2F 0B 2F 39    WRITEIDX R11 2F39                  CELLIN := 1
+; D 4510 10 00 00       LOADAI 0000
+; D 4513 2F 0B 2F 24    WRITEIDX R11 2F24                  the cell is in the slot
+; D 4517 11 04 00 59    LOADXI R4 0059                     CELLGOESIN
+; D 451B BD 07 2A       CALL SAY
+; D 451E B0 01 41       GAL TURNEND
+; V_ON:
+; D 4521 2E 0B 2F 21    READIDX R11 2F21                   where the FLASH is
+; D 4525 21 08          COPYAX Acc -> R8
+; D 4527 86 08 00 FF    TESTXI R8 00FF
+; D 452B A0 05 33       IFTRUEI ON1
+; D 452E 87 81          TESTXY R8 = R1
+; D 4530 A1 06 BF       IFFALSEI NOLAMP
+; ON1:
+; D 4533 10 00 01       LOADAI 0001
+; D 4536 2F 0B 2F 35    WRITEIDX R11 2F35                  LIGHT := 1
+; D 453A 11 04 00 5E    LOADXI R4 005E                     LIGHTON
+; D 453E BD 07 2A       CALL SAY
+; D 4541 86 01 00 05    TESTXI R1 0005                     in the TUNNEL?
+; D 4545 A1 01 41       IFFALSEI TURNEND
+; D 4548 BD 07 38       CALL DESCRIBE
+; D 454B B0 01 41       GAL TURNEND
+; V_OFF:
+; D 454E 2E 0B 2F 21    READIDX R11 2F21                   where the FLASH is
+; D 4552 21 08          COPYAX Acc -> R8
+; D 4554 86 08 00 FF    TESTXI R8 00FF
+; D 4558 A0 05 60       IFTRUEI OF1
+; D 455B 87 81          TESTXY R8 = R1
+; D 455D A1 06 BF       IFFALSEI NOLAMP
+; OF1:
+; D 4560 10 00 00       LOADAI 0000
+; D 4563 2F 0B 2F 35    WRITEIDX R11 2F35                  LIGHT := 0
+; D 4567 11 04 00 5F    LOADXI R4 005F                     LIGHTOFF
+; D 456B BD 07 2A       CALL SAY
+; D 456E B0 01 41       GAL TURNEND
+; V_USE:
+; D 4571 8C 03          TESTXZ R3
+; D 4573 A0 05 D9       IFTRUEI WHATOBJ
+; D 4576 86 03 00 42    TESTXI R3 0042
+; D 457A A0 04 1E       IFTRUEI V_LOOSEN
+; D 457D 86 03 00 41    TESTXI R3 0041
+; D 4581 A0 05 21       IFTRUEI V_ON
+; D 4584 86 03 00 44    TESTXI R3 0044
+; D 4588 A0 04 E5       IFTRUEI V_INSERT
+; D 458B 86 03 00 43    TESTXI R3 0043
+; D 458F A0 03 E1       IFTRUEI V_WEAR
+; D 4592 86 03 00 49    TESTXI R3 0049
+; D 4596 A0 06 83       IFTRUEI TYPEWHAT
+; D 4599 86 03 00 4E    TESTXI R3 004E
+; D 459D A0 04 97       IFTRUEI V_PUSH
+; D 45A0 86 03 00 45    TESTXI R3 0045
+; D 45A4 A0 03 BC       IFTRUEI V_READ
+; D 45A7 11 04 00 60    LOADXI R4 0060                     HOWUSE
+; D 45AB BD 07 2A       CALL SAY
+; D 45AE B0 01 41       GAL TURNEND
+; V_CLOSE:
+; D 45B1 11 04 00 61    LOADXI R4 0061                     NOCLOSE
+; D 45B5 BD 07 2A       CALL SAY
+; D 45B8 B0 01 41       GAL TURNEND
+; V_WAIT:
+; D 45BB 11 04 00 62    LOADXI R4 0062                     WAITED
+; D 45BF BD 07 2A       CALL SAY
+; D 45C2 B0 01 41       GAL TURNEND
+; V_HELP:
+; D 45C5 11 04 00 63    LOADXI R4 0063                     HELP
+; D 45C9 BD 07 2A       CALL SAY
+; D 45CC B0 01 41       GAL TURNEND
+; V_QUIT:
+; D 45CF 11 04 00 6C    LOADXI R4 006C                     BYE
+; D 45D3 BD 07 2A       CALL SAY
+; D 45D6 F0 00 00       BREAK                              End of program
+; WHATOBJ:
+; D 45D9 11 04 00 32    LOADXI R4 0032                     WHATOBJ
+; D 45DD BD 07 2A       CALL SAY
+; D 45E0 B0 01 41       GAL TURNEND
+; JUSTNUM:
+; D 45E3 11 04 00 3B    LOADXI R4 003B                     JUSTNUM
+; D 45E7 BD 07 2A       CALL SAY
+; D 45EA B0 01 41       GAL TURNEND
+; NOTHERE:
+; D 45ED 11 04 00 33    LOADXI R4 0033                     NOTHERE
+; D 45F1 BD 07 2A       CALL SAY
+; D 45F4 B0 01 41       GAL TURNEND
+; ALREADY:
+; D 45F7 11 04 00 34    LOADXI R4 0034                     ALREADY
+; D 45FB BD 07 2A       CALL SAY
+; D 45FE B0 01 41       GAL TURNEND
+; FIXEDMSG:
+; D 4601 11 04 00 35    LOADXI R4 0035                     FIXEDMSG
+; D 4605 BD 07 2A       CALL SAY
+; D 4608 B0 01 41       GAL TURNEND
+; NOTCARRY:
+; D 460B 11 04 00 39    LOADXI R4 0039                     NOTCARRY
+; D 460F BD 07 2A       CALL SAY
+; D 4612 B0 01 41       GAL TURNEND
+; KEEPSUIT:
+; D 4615 11 04 00 3A    LOADXI R4 003A                     KEEPSUIT
+; D 4619 BD 07 2A       CALL SAY
+; D 461C B0 01 41       GAL TURNEND
+; USEKEYPAD:
+; D 461F 11 04 00 43    LOADXI R4 0043                     USEKEYPAD
+; D 4623 BD 07 2A       CALL SAY
+; D 4626 B0 01 41       GAL TURNEND
+; ALOPEN:
+; D 4629 11 04 00 3F    LOADXI R4 003F                     ALOPEN
+; D 462D BD 07 2A       CALL SAY
+; D 4630 B0 01 41       GAL TURNEND
+; CANTOPEN:
+; D 4633 11 04 00 44    LOADXI R4 0044                     CANTOPEN
+; D 4637 BD 07 2A       CALL SAY
+; D 463A B0 01 41       GAL TURNEND
+; NOREAD:
+; D 463D 11 04 00 46    LOADXI R4 0046                     NOREAD
+; D 4641 BD 07 2A       CALL SAY
+; D 4644 B0 01 41       GAL TURNEND
+; CANTWEAR:
+; D 4647 11 04 00 49    LOADXI R4 0049                     CANTWEAR
+; D 464B BD 07 2A       CALL SAY
+; D 464E B0 01 41       GAL TURNEND
+; NEEDCARRY:
+; D 4651 11 04 00 4A    LOADXI R4 004A                     NEEDCARRY
+; D 4655 BD 07 2A       CALL SAY
+; D 4658 B0 01 41       GAL TURNEND
+; ALWEAR:
+; D 465B 11 04 00 48    LOADXI R4 0048                     ALWEAR
+; D 465F BD 07 2A       CALL SAY
+; D 4662 B0 01 41       GAL TURNEND
+; NOLOOSEN:
+; D 4665 11 04 00 4B    LOADXI R4 004B                     NOLOOSEN
+; D 4669 BD 07 2A       CALL SAY
+; D 466C B0 01 41       GAL TURNEND
+; ALLOOSE:
+; D 466F 11 04 00 4C    LOADXI R4 004C                     ALLOOSE
+; D 4673 BD 07 2A       CALL SAY
+; D 4676 B0 01 41       GAL TURNEND
+; NEEDTOOL:
+; D 4679 11 04 00 4E    LOADXI R4 004E                     NEEDTOOL
+; D 467D BD 07 2A       CALL SAY
+; D 4680 B0 01 41       GAL TURNEND
+; TYPEWHAT:
+; D 4683 11 04 00 55    LOADXI R4 0055                     TYPEWHAT
+; D 4687 BD 07 2A       CALL SAY
+; D 468A B0 01 41       GAL TURNEND
+; NOKEYPAD:
+; D 468D 11 04 00 50    LOADXI R4 0050                     NOKEYPAD
+; D 4691 BD 07 2A       CALL SAY
+; D 4694 B0 01 41       GAL TURNEND
+; DOORAL:
+; D 4697 11 04 00 51    LOADXI R4 0051                     DOORAL
+; D 469B BD 07 2A       CALL SAY
+; D 469E B0 01 41       GAL TURNEND
+; NOTLANDER:
+; D 46A1 11 04 00 57    LOADXI R4 0057                     NOTLANDER
+; D 46A5 BD 07 2A       CALL SAY
+; D 46A8 B0 01 41       GAL TURNEND
+; CANTPUT:
+; D 46AB 11 04 00 5C    LOADXI R4 005C                     CANTPUT
+; D 46AF BD 07 2A       CALL SAY
+; D 46B2 B0 01 41       GAL TURNEND
+; NOWHERE:
+; D 46B5 11 04 00 5B    LOADXI R4 005B                     NOWHERE
+; D 46B9 BD 07 2A       CALL SAY
+; D 46BC B0 01 41       GAL TURNEND
+; NOLAMP:
+; D 46BF 11 04 00 5D    LOADXI R4 005D                     NOLAMP
+; D 46C3 BD 07 2A       CALL SAY
+; D 46C6 B0 01 41       GAL TURNEND
+; WIN:
+; D 46C9 11 04 00 68    LOADXI R4 0068                     WIN
+; D 46CD BD 07 2A       CALL SAY
+; D 46D0 11 04 00 69    LOADXI R4 0069                     WIN2
+; D 46D4 BD 07 2A       CALL SAY
+; D 46D7 23 00 6A       COPYXY R6 -> R10
+; D 46DA BD 07 FF       CALL PRNUM                         the moves
+; D 46DD 11 04 00 6A    LOADXI R4 006A                     WIN3
+; D 46E1 BD 07 2A       CALL SAY
+; D 46E4 B0 06 EE       GAL AGAIN
+; DEAD:
+; D 46E7 11 04 00 67    LOADXI R4 0067                     DEAD
+; D 46EB BD 07 2A       CALL SAY
+; AGAIN:
+; D 46EE 11 04 00 6B    LOADXI R4 006B                     AGAIN
+; D 46F2 BD 07 2A       CALL SAY
+; D 46F5 11 0C 2F 40    LOADXI R12 2F40
+; D 46F9 11 0D 2F 40    LOADXI R13 2F40
+; D 46FD C2 CD          GETSTR R12 R13
+; D 46FF 11 04 00 28    LOADXI R4 0028                     CRLF
+; D 4703 BD 07 2A       CALL SAY
+; D 4706 2E 0B 2F 40    READIDX R11 2F40                   the first letter
+; D 470A 81 00 59       TESTAI 0059
+; D 470D A0 07 20       IFTRUEI YES
+; D 4710 81 00 79       TESTAI 0079
+; D 4713 A0 07 20       IFTRUEI YES
+; D 4716 11 04 00 6C    LOADXI R4 006C                     BYE
+; D 471A BD 07 2A       CALL SAY
+; D 471D F0 00 00       BREAK
+; YES:
+; D 4720 11 04 00 28    LOADXI R4 0028                     CRLF
+; D 4724 BD 07 2A       CALL SAY
+; D 4727 B0 00 19       GAL NEWGAME
+; SAY:
+; D 472A 50 44 0A       ADDXYZ R4 + R4 -> R10              RA = 2 x message
+; D 472D 52 0A 10 C0    ADDXI R10 10C0
+; D 4731 39 02 AE       COPYMXY M(R10) -> R14              RE = its address
+; D 4734 C1 0E          PRINTSTR R14
+; D 4736 BE 00          RETURN
+; DESCRIBE:
+; D 4738 BD 07 A6       CALL ISDARK
+; D 473B 8C 09          TESTXZ R9
+; D 473D A0 07 49       IFTRUEI DE1
+; D 4740 11 04 00 2E    LOADXI R4 002E                     DARK
+; D 4744 BD 07 2A       CALL SAY
+; D 4747 BE 00          RETURN
+; DE1:
+; D 4749 23 00 14       COPYXY R1 -> R4                    rooms are messages 1-10
+; D 474C BD 07 2A       CALL SAY
+; D 474F 86 01 00 01    TESTXI R1 0001                     in the QUARTERS?
+; D 4753 A1 07 6A       IFFALSEI DE2
+; D 4756 2E 0B 2F 34    READIDX R11 2F34                   flag LOCKER
+; D 475A 81 00 00       TESTAI 0000
+; D 475D A0 07 82       IFTRUEI DE3
+; D 4760 11 04 00 41    LOADXI R4 0041                     LOCKERISOPEN
+; D 4764 BD 07 2A       CALL SAY
+; D 4767 B0 07 82       GAL DE3
+; DE2:
+; D 476A 86 01 00 06    TESTXI R1 0006                     in the AIRLOCK?
+; D 476E A1 07 82       IFFALSEI DE3
+; D 4771 2E 0B 2F 37    READIDX R11 2F37                   flag DOOR
+; D 4775 81 00 00       TESTAI 0000
+; D 4778 A0 07 82       IFTRUEI DE3
+; D 477B 11 04 00 53    LOADXI R4 0053                     DOORISOPEN
+; D 477F BD 07 2A       CALL SAY
+; DE3:
+; D 4782 11 05 00 01    LOADXI R5 0001
+; DE4:
+; D 4786 2E 05 2F 20    READIDX R5 2F20
+; D 478A 21 08          COPYAX Acc -> R8
+; D 478C 87 81          TESTXY R8 = R1
+; D 478E A1 07 9B       IFFALSEI DE5
+; D 4791 23 00 54       COPYXY R5 -> R4
+; D 4794 52 04 00 0A    ADDXI R4 000A
+; D 4798 BD 07 2A       CALL SAY
+; DE5:
+; D 479B 42 05          INCX R5
+; D 479D 86 05 00 06    TESTXI R5 0006
+; D 47A1 A1 07 86       IFFALSEI DE4
+; D 47A4 BE 00          RETURN
+; ISDARK:
+; D 47A6 11 09 00 00    LOADXI R9 0000
+; D 47AA 86 01 00 05    TESTXI R1 0005                     in the TUNNEL?
+; D 47AE A1 07 D1       IFFALSEI IDR
+; D 47B1 2E 0B 2F 35    READIDX R11 2F35                   flag LIGHT
+; D 47B5 81 00 00       TESTAI 0000
+; D 47B8 A0 07 CD       IFTRUEI IDD
+; D 47BB 2E 0B 2F 21    READIDX R11 2F21                   where the FLASH is
+; D 47BF 21 08          COPYAX Acc -> R8
+; D 47C1 86 08 00 FF    TESTXI R8 00FF
+; D 47C5 A0 07 D1       IFTRUEI IDR
+; D 47C8 87 81          TESTXY R8 = R1
+; D 47CA A0 07 D1       IFTRUEI IDR
+; IDD:
+; D 47CD 11 09 00 01    LOADXI R9 0001
+; IDR:
+; D 47D1 BE 00          RETURN
+; SCOPE:
+; D 47D3 11 09 00 00    LOADXI R9 0000
+; D 47D7 11 08 00 51    LOADXI R8 0051
+; D 47DB 89 38          TESTLXY R3 < R8
+; D 47DD A1 07 FD       IFFALSEI SCR                       not an object
+; D 47E0 11 08 00 40    LOADXI R8 0040
+; D 47E4 51 38 05       SUBXYZ R3 - R8 -> R5               R5 = the object
+; D 47E7 2E 05 2F 20    READIDX R5 2F20
+; D 47EB 21 08          COPYAX Acc -> R8
+; D 47ED 86 08 00 FF    TESTXI R8 00FF
+; D 47F1 A0 07 F9       IFTRUEI SCY
+; D 47F4 87 81          TESTXY R8 = R1
+; D 47F6 A1 07 FD       IFFALSEI SCR
+; SCY:
+; D 47F9 11 09 00 01    LOADXI R9 0001
+; SCR:
+; D 47FD BE 00          RETURN
+; PRNUM:
+; D 47FF 11 0C 00 00    LOADXI R12 0000
+; D 4803 11 0F 00 0A    LOADXI R15 000A
+; PN1:
+; D 4807 4D AF          DIVXY R10 / R15
+; D 4809 27             COPYREMA
+; D 480A 70 00          PUSHA Acc                          digits onto the stack
+; D 480C 42 0C          INCX R12
+; D 480E 25             COPYMAA
+; D 480F 21 0A          COPYAX Acc -> R10
+; D 4811 8C 0A          TESTXZ R10
+; D 4813 A1 08 07       IFFALSEI PN1
+; PN2:
+; D 4816 71 00          POPA Acc
+; D 4818 4E 00 30       ADDAI 0030
+; D 481B C9             SEROUT
+; D 481C 43 0C          DECX R12
+; D 481E 8C 0C          TESTXZ R12
+; D 4820 A1 08 16       IFFALSEI PN2
+; D 4823 BE 00          RETURN
+
+; --------------------------------------------------------------------------
+; NATIVE PARSER  -  a18 listing of Firmware-Math/adventure_native.asm
+; --------------------------------------------------------------------------
+; 4C00 E2           ENTRY:  SEX     R2
+; 4C01 F8 6F                LDI     HIGH VERB
+; 4C03 B8                   PHI     R8
+; 4C04 F8 00                LDI     LOW VERB
+; 4C06 A8                   PLO     R8
+; 4C07 F8 00                LDI     0
+; 4C09 58                   STR     R8
+; 4C0A 18                   INC     R8
+; 4C0B 58                   STR     R8
+; 4C0C 18                   INC     R8
+; 4C0D 58                   STR     R8
+; 4C0E F8 6F                LDI     HIGH LINE
+; 4C10 B7                   PHI     R7
+; 4C11 F8 40                LDI     LOW LINE
+; 4C13 A7                   PLO     R7
+; 4C14 07           SKIP:   LDN     R7
+; 4C15 C2 4D 1E             LBZ     DONE
+; 4C18 AF                   PLO     R15
+; 4C19 FF 61                SMI     061H
+; 4C1B CB 4C 27             LBNF    CU1
+; 4C1E FF 1A                SMI     01AH
+; 4C20 C3 4C 27             LBDF    CU1
+; 4C23 8F                   GLO     R15
+; 4C24 FF 20                SMI     020H
+; 4C26 AF                   PLO     R15
+; 4C27 8F           CU1:    GLO     R15
+; 4C28 FF 30                SMI     030H
+; 4C2A CB 4C 3D             LBNF    CN1
+; 4C2D FF 0A                SMI     00AH
+; 4C2F CB 4C 42             LBNF    CY1
+; 4C32 8F                   GLO     R15
+; 4C33 FF 41                SMI     041H
+; 4C35 CB 4C 3D             LBNF    CN1
+; 4C38 FF 1A                SMI     01AH
+; 4C3A CB 4C 42             LBNF    CY1
+; 4C3D FC 00        CN1:    ADI     000H
+; 4C3F C0 4C 44             LBR     CE1
+; 4C42 FF 00        CY1:    SMI     000H
+; 4C44 C3 4C 4B             LBDF    WORD
+; 4C47 17                   INC     R7
+; 4C48 C0 4C 14             LBR     SKIP
+; 4C4B F8 6F                LDI     HIGH WBUF
+; 4C4D B8                   PHI     R8
+; 4C4E F8 08                LDI     LOW WBUF
+; 4C50 A8                   PLO     R8
+; 4C51 F8 10                LDI     16
+; 4C53 AB                   PLO     R11
+; 4C54 F8 00        CLR:    LDI     0
+; 4C56 58                   STR     R8
+; 4C57 18                   INC     R8
+; 4C58 2B                   DEC     R11
+; 4C59 8B                   GLO     R11
+; 4C5A CA 4C 54             LBNZ    CLR
+; 4C5D F8 6F                LDI     HIGH WBUF
+; 4C5F B8                   PHI     R8
+; 4C60 F8 08                LDI     LOW WBUF
+; 4C62 A8                   PLO     R8
+; 4C63 F8 00                LDI     0
+; 4C65 AB                   PLO     R11
+; 4C66 07           COL:    LDN     R7
+; 4C67 AF                   PLO     R15
+; 4C68 FF 61                SMI     061H
+; 4C6A CB 4C 76             LBNF    CU2
+; 4C6D FF 1A                SMI     01AH
+; 4C6F C3 4C 76             LBDF    CU2
+; 4C72 8F                   GLO     R15
+; 4C73 FF 20                SMI     020H
+; 4C75 AF                   PLO     R15
+; 4C76 8F           CU2:    GLO     R15
+; 4C77 FF 30                SMI     030H
+; 4C79 CB 4C 8C             LBNF    CN2
+; 4C7C FF 0A                SMI     00AH
+; 4C7E CB 4C 91             LBNF    CY2
+; 4C81 8F                   GLO     R15
+; 4C82 FF 41                SMI     041H
+; 4C84 CB 4C 8C             LBNF    CN2
+; 4C87 FF 1A                SMI     01AH
+; 4C89 CB 4C 91             LBNF    CY2
+; 4C8C FC 00        CN2:    ADI     000H
+; 4C8E C0 4C 93             LBR     CE2
+; 4C91 FF 00        CY2:    SMI     000H
+; 4C93 CB 4C A4             LBNF    ENDW
+; 4C96 8B                   GLO     R11
+; 4C97 FB 0F                XRI     15
+; 4C99 C2 4C A0             LBZ     COL2
+; 4C9C 8F                   GLO     R15
+; 4C9D 58                   STR     R8
+; 4C9E 18                   INC     R8
+; 4C9F 1B                   INC     R11
+; 4CA0 17           COL2:   INC     R7
+; 4CA1 C0 4C 66             LBR     COL
+; 4CA4 F8 4D                LDI     HIGH VOC
+; 4CA6 B9                   PHI     R9
+; 4CA7 F8 40                LDI     LOW VOC
+; 4CA9 A9                   PLO     R9
+; 4CAA 09           SRCH:   LDN     R9
+; 4CAB C2 4C F4             LBZ     NOTF
+; 4CAE 99                   GHI     R9
+; 4CAF BE                   PHI     R14
+; 4CB0 89                   GLO     R9
+; 4CB1 AE                   PLO     R14
+; 4CB2 F8 6F                LDI     HIGH WBUF
+; 4CB4 BD                   PHI     R13
+; 4CB5 F8 08                LDI     LOW WBUF
+; 4CB7 AD                   PLO     R13
+; 4CB8 F8 04                LDI     4
+; 4CBA AB                   PLO     R11
+; 4CBB 4D           CMP:    LDA     R13
+; 4CBC 52                   STR     R2
+; 4CBD 49                   LDA     R9
+; 4CBE F3                   XOR
+; 4CBF CA 4C E9             LBNZ    MISS
+; 4CC2 2B                   DEC     R11
+; 4CC3 8B                   GLO     R11
+; 4CC4 CA 4C BB             LBNZ    CMP
+; 4CC7 09                   LDN     R9
+; 4CC8 C2 4C 14             LBZ     SKIP
+; 4CCB AF                   PLO     R15
+; 4CCC FA 40                ANI     040H
+; 4CCE CA 4C E0             LBNZ    NOUNW
+; 4CD1 F8 6F                LDI     HIGH VERB
+; 4CD3 B8                   PHI     R8
+; 4CD4 F8 00                LDI     LOW VERB
+; 4CD6 A8                   PLO     R8
+; 4CD7 08           STORE:  LDN     R8
+; 4CD8 CA 4C 14             LBNZ    SKIP
+; 4CDB 8F                   GLO     R15
+; 4CDC 58                   STR     R8
+; 4CDD C0 4C 14             LBR     SKIP
+; 4CE0 F8 6F                LDI     HIGH NOUN
+; 4CE2 B8                   PHI     R8
+; 4CE3 F8 01                LDI     LOW NOUN
+; 4CE5 A8                   PLO     R8
+; 4CE6 C0 4C D7             LBR     STORE
+; 4CE9 8E           MISS:   GLO     R14
+; 4CEA FC 05                ADI     5
+; 4CEC A9                   PLO     R9
+; 4CED 9E                   GHI     R14
+; 4CEE 7C 00                ADCI    0
+; 4CF0 B9                   PHI     R9
+; 4CF1 C0 4C AA             LBR     SRCH
+; 4CF4 F8 6F                LDI     HIGH WBUF
+; 4CF6 B8                   PHI     R8
+; 4CF7 F8 08                LDI     LOW WBUF
+; 4CF9 A8                   PLO     R8
+; 4CFA 08                   LDN     R8
+; 4CFB FF 30                SMI     030H
+; 4CFD CB 4D 15             LBNF    BADW
+; 4D00 FF 0A                SMI     00AH
+; 4D02 C3 4D 15             LBDF    BADW
+; 4D05 F8 6F                LDI     HIGH NOUN
+; 4D07 B8                   PHI     R8
+; 4D08 F8 01                LDI     LOW NOUN
+; 4D0A A8                   PLO     R8
+; 4D0B 08                   LDN     R8
+; 4D0C CA 4C 14             LBNZ    SKIP
+; 4D0F F8 7F                LDI     07FH
+; 4D11 58                   STR     R8
+; 4D12 C0 4C 14             LBR     SKIP
+; 4D15 F8 6F                LDI     HIGH BAD
+; 4D17 B8                   PHI     R8
+; 4D18 F8 02                LDI     LOW BAD
+; 4D1A A8                   PLO     R8
+; 4D1B F8 01                LDI     1
+; 4D1D 58                   STR     R8
+; 4D1E E2           DONE:   SEX     R2
+; 4D1F D5                   SEP     R5
+
+; --------------------------------------------------------------------------
+; CODE  -  download this block (program, parser, the world, messages)
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 F2 03
+D 4003 11 0B 00 00
+D 4007 11 0E 2F 40
+D 400B 10 00 00
+D 400E 2F 0E 00 00
+D 4012 11 04 00 25
+D 4016 BD 07 2A
+D 4019 11 0D 10 60
+D 401D 11 0E 2F 20
+D 4021 3B DE 20
+D 4024 11 01 00 01
+D 4028 11 06 00 00
+D 402C 11 07 00 FA
+D 4030 11 04 00 26
+D 4034 BD 07 2A
+D 4037 BD 07 38
+D 403A 11 04 00 27
+D 403E BD 07 2A
+D 4041 11 0C 2F 40
+D 4045 11 0D 2F 40
+D 4049 C2 CD
+D 404B 11 04 00 28
+D 404F BD 07 2A
+D 4052 F1 4C 00
+D 4055 2E 0B 2F 02
+D 4059 81 00 00
+D 405C A1 00 89
+D 405F 2E 0B 2F 00
+D 4063 21 02
+D 4065 2E 0B 2F 01
+D 4069 21 03
+D 406B 8C 02
+D 406D A1 00 A0
+D 4070 8C 03
+D 4072 A0 00 7F
+D 4075 11 04 00 2A
+D 4079 BD 07 2A
+D 407C B0 00 3A
+D 407F 11 04 00 29
+D 4083 BD 07 2A
+D 4086 B0 00 3A
+D 4089 11 04 00 2B
+D 408D BD 07 2A
+D 4090 11 0E 2F 08
+D 4094 C1 0E
+D 4096 11 04 00 2C
+D 409A BD 07 2A
+D 409D B0 00 3A
+D 40A0 42 06
+D 40A2 11 08 00 09
+D 40A6 89 28
+D 40A8 A0 01 77
+D 40AB 86 02 00 09
+D 40AF A0 01 F8
+D 40B2 86 02 00 0A
+D 40B6 A0 02 03
+D 40B9 86 02 00 0B
+D 40BD A0 02 E5
+D 40C0 86 02 00 0C
+D 40C4 A0 03 32
+D 40C7 86 02 00 0D
+D 40CB A0 02 51
+D 40CE 86 02 00 0E
+D 40D2 A0 03 6A
+D 40D5 86 02 00 0F
+D 40D9 A0 03 BC
+D 40DC 86 02 00 10
+D 40E0 A0 03 E1
+D 40E3 86 02 00 11
+D 40E7 A0 04 1E
+D 40EA 86 02 00 12
+D 40EE A0 04 4A
+D 40F1 86 02 00 13
+D 40F5 A0 04 97
+D 40F8 86 02 00 14
+D 40FC A0 04 E5
+D 40FF 86 02 00 15
+D 4103 A0 04 CA
+D 4106 86 02 00 16
+D 410A A0 05 21
+D 410D 86 02 00 17
+D 4111 A0 05 4E
+D 4114 86 02 00 18
+D 4118 A0 05 C5
+D 411B 86 02 00 19
+D 411F A0 05 CF
+D 4122 86 02 00 1A
+D 4126 A0 05 71
+D 4129 86 02 00 1B
+D 412D A0 05 B1
+D 4130 86 02 00 1C
+D 4134 A0 05 BB
+D 4137 11 04 00 29
+D 413B BD 07 2A
+D 413E B0 00 3A
+D 4141 43 07
+D 4143 86 07 00 3C
+D 4147 A0 01 59
+D 414A 86 07 00 14
+D 414E A0 01 63
+D 4151 8C 07
+D 4153 A0 01 6D
+D 4156 B0 00 3A
+D 4159 11 04 00 64
+D 415D BD 07 2A
+D 4160 B0 00 3A
+D 4163 11 04 00 65
+D 4167 BD 07 2A
+D 416A B0 00 3A
+D 416D 11 04 00 66
+D 4171 BD 07 2A
+D 4174 B0 06 E7
+D 4177 BD 07 A6
+D 417A 8C 09
+D 417C A0 01 90
+D 417F 86 02 00 01
+D 4183 A0 01 90
+D 4186 11 04 00 2F
+D 418A BD 07 2A
+D 418D B0 01 41
+D 4190 23 00 1A
+D 4193 50 AA 0A
+D 4196 50 AA 0A
+D 4199 50 AA 0A
+D 419C 50 A2 0A
+D 419F 43 0A
+D 41A1 2E 0A 10 00
+D 41A5 21 08
+D 41A7 8C 08
+D 41A9 A0 01 BC
+D 41AC 86 08 00 81
+D 41B0 A0 01 C6
+D 41B3 23 00 81
+D 41B6 BD 07 38
+D 41B9 B0 01 41
+D 41BC 11 04 00 2D
+D 41C0 BD 07 2A
+D 41C3 B0 01 41
+D 41C6 2E 0B 2F 37
+D 41CA 81 00 00
+D 41CD A1 01 DA
+D 41D0 11 04 00 30
+D 41D4 BD 07 2A
+D 41D7 B0 01 41
+D 41DA 2E 0B 2F 38
+D 41DE 81 00 00
+D 41E1 A1 01 EE
+D 41E4 11 04 00 31
+D 41E8 BD 07 2A
+D 41EB B0 06 E7
+D 41EE 11 01 00 08
+D 41F2 BD 07 38
+D 41F5 B0 01 41
+D 41F8 8C 03
+D 41FA A1 02 51
+D 41FD BD 07 38
+D 4200 B0 01 41
+D 4203 11 04 00 3C
+D 4207 BD 07 2A
+D 420A 11 09 00 00
+D 420E 11 05 00 01
+D 4212 2E 05 2F 20
+D 4216 81 00 FF
+D 4219 A1 02 28
+D 421C 23 00 54
+D 421F 52 04 00 0F
+D 4223 BD 07 2A
+D 4226 42 09
+D 4228 42 05
+D 422A 86 05 00 06
+D 422E A1 02 12
+D 4231 8C 09
+D 4233 A1 02 3D
+D 4236 11 04 00 3D
+D 423A BD 07 2A
+D 423D 2E 0B 2F 38
+D 4241 81 00 00
+D 4244 A0 01 41
+D 4247 11 04 00 3E
+D 424B BD 07 2A
+D 424E B0 01 41
+D 4251 8C 03
+D 4253 A0 05 D9
+D 4256 86 03 00 60
+D 425A A0 05 E3
+D 425D 86 03 00 7F
+D 4261 A0 05 E3
+D 4264 BD 07 D3
+D 4267 8C 09
+D 4269 A0 05 ED
+D 426C 86 05 00 06
+D 4270 A1 02 87
+D 4273 2E 0B 2F 34
+D 4277 81 00 00
+D 427A A0 02 D8
+D 427D 11 04 00 42
+D 4281 BD 07 2A
+D 4284 B0 01 41
+D 4287 86 05 00 0A
+D 428B A1 02 A2
+D 428E 2E 0B 2F 37
+D 4292 81 00 00
+D 4295 A0 02 D8
+D 4298 11 04 00 53
+D 429C BD 07 2A
+D 429F B0 01 41
+D 42A2 86 05 00 0B
+D 42A6 A1 02 BD
+D 42A9 2E 0B 2F 36
+D 42AD 81 00 00
+D 42B0 A0 02 D8
+D 42B3 11 04 00 4F
+D 42B7 BD 07 2A
+D 42BA B0 01 41
+D 42BD 86 05 00 0F
+D 42C1 A1 02 D8
+D 42C4 2E 0B 2F 39
+D 42C8 81 00 00
+D 42CB A0 02 D8
+D 42CE 11 04 00 5A
+D 42D2 BD 07 2A
+D 42D5 B0 01 41
+D 42D8 23 00 54
+D 42DB 52 04 00 14
+D 42DF BD 07 2A
+D 42E2 B0 01 41
+D 42E5 8C 03
+D 42E7 A0 05 D9
+D 42EA BD 07 D3
+D 42ED 8C 09
+D 42EF A0 05 ED
+D 42F2 2E 05 2F 20
+D 42F6 81 00 FF
+D 42F9 A0 05 F7
+D 42FC 2E 05 10 90
+D 4300 81 00 00
+D 4303 A1 06 01
+D 4306 86 05 00 04
+D 430A A1 03 21
+D 430D 2E 0B 2F 36
+D 4311 81 00 00
+D 4314 A1 03 21
+D 4317 11 04 00 36
+D 431B BD 07 2A
+D 431E B0 01 41
+D 4321 10 00 FF
+D 4324 2F 05 2F 20
+D 4328 11 04 00 37
+D 432C BD 07 2A
+D 432F B0 01 41
+D 4332 8C 03
+D 4334 A0 05 D9
+D 4337 BD 07 D3
+D 433A 8C 09
+D 433C A0 06 0B
+D 433F 2E 05 2F 20
+D 4343 81 00 FF
+D 4346 A1 06 0B
+D 4349 86 05 00 03
+D 434D A1 03 5A
+D 4350 2E 0B 2F 38
+D 4354 81 00 00
+D 4357 A1 06 15
+D 435A 22 01
+D 435C 2F 05 2F 20
+D 4360 11 04 00 38
+D 4364 BD 07 2A
+D 4367 B0 01 41
+D 436A 8C 03
+D 436C A0 05 D9
+D 436F BD 07 D3
+D 4372 8C 09
+D 4374 A0 05 ED
+D 4377 86 03 00 4A
+D 437B A0 06 1F
+D 437E 86 03 00 4B
+D 4382 A0 04 1E
+D 4385 86 03 00 48
+D 4389 A0 06 29
+D 438C 86 03 00 4D
+D 4390 A0 06 29
+D 4393 86 03 00 46
+D 4397 A1 06 33
+D 439A 2E 0B 2F 34
+D 439E 81 00 00
+D 43A1 A1 06 29
+D 43A4 10 00 01
+D 43A7 2F 0B 2F 34
+D 43AB 10 00 01
+D 43AE 2F 0B 2F 21
+D 43B2 11 04 00 40
+D 43B6 BD 07 2A
+D 43B9 B0 01 41
+D 43BC 8C 03
+D 43BE A0 05 D9
+D 43C1 BD 07 D3
+D 43C4 8C 09
+D 43C6 A0 05 ED
+D 43C9 86 05 00 07
+D 43CD A0 02 D8
+D 43D0 86 05 00 05
+D 43D4 A1 06 3D
+D 43D7 11 04 00 45
+D 43DB BD 07 2A
+D 43DE B0 01 41
+D 43E1 8C 03
+D 43E3 A0 05 D9
+D 43E6 86 03 00 43
+D 43EA A1 06 47
+D 43ED BD 07 D3
+D 43F0 8C 09
+D 43F2 A0 05 ED
+D 43F5 2E 0B 2F 23
+D 43F9 81 00 FF
+D 43FC A1 06 51
+D 43FF 2E 0B 2F 38
+D 4403 81 00 00
+D 4406 A1 06 5B
+D 4409 10 00 01
+D 440C 2F 0B 2F 38
+D 4410 11 07 00 96
+D 4414 11 04 00 47
+D 4418 BD 07 2A
+D 441B B0 01 41
+D 441E 86 01 00 07
+D 4422 A1 06 65
+D 4425 2E 0B 2F 36
+D 4429 81 00 00
+D 442C A1 06 6F
+D 442F 2E 0B 2F 22
+D 4433 81 00 FF
+D 4436 A1 06 79
+D 4439 10 00 01
+D 443C 2F 0B 2F 36
+D 4440 11 04 00 4D
+D 4444 BD 07 2A
+D 4447 B0 01 41
+D 444A 8C 03
+D 444C A0 06 83
+D 444F 86 03 00 60
+D 4453 A0 04 64
+D 4456 86 03 00 7F
+D 445A A0 04 86
+D 445D 11 02 00 07
+D 4461 B0 01 77
+D 4464 86 01 00 06
+D 4468 A1 06 8D
+D 446B 2E 0B 2F 37
+D 446F 81 00 00
+D 4472 A1 06 97
+D 4475 10 00 01
+D 4478 2F 0B 2F 37
+D 447C 11 04 00 52
+D 4480 BD 07 2A
+D 4483 B0 01 41
+D 4486 86 01 00 06
+D 448A A1 06 8D
+D 448D 11 04 00 54
+D 4491 BD 07 2A
+D 4494 B0 01 41
+D 4497 86 03 00 60
+D 449B A0 04 4A
+D 449E 86 03 00 7F
+D 44A2 A0 04 4A
+D 44A5 8C 03
+D 44A7 A0 05 D9
+D 44AA BD 07 D3
+D 44AD 8C 09
+D 44AF A0 05 ED
+D 44B2 86 05 00 0E
+D 44B6 A0 04 CA
+D 44B9 86 05 00 09
+D 44BD A0 06 83
+D 44C0 11 04 00 56
+D 44C4 BD 07 2A
+D 44C7 B0 01 41
+D 44CA 86 01 00 0A
+D 44CE A1 06 A1
+D 44D1 2E 0B 2F 39
+D 44D5 81 00 00
+D 44D8 A1 06 C9
+D 44DB 11 04 00 58
+D 44DF BD 07 2A
+D 44E2 B0 01 41
+D 44E5 8C 03
+D 44E7 A0 05 D9
+D 44EA 86 03 00 43
+D 44EE A0 03 E1
+D 44F1 86 03 00 44
+D 44F5 A1 06 AB
+D 44F8 2E 0B 2F 24
+D 44FC 81 00 FF
+D 44FF A1 06 0B
+D 4502 86 01 00 0A
+D 4506 A1 06 B5
+D 4509 10 00 01
+D 450C 2F 0B 2F 39
+D 4510 10 00 00
+D 4513 2F 0B 2F 24
+D 4517 11 04 00 59
+D 451B BD 07 2A
+D 451E B0 01 41
+D 4521 2E 0B 2F 21
+D 4525 21 08
+D 4527 86 08 00 FF
+D 452B A0 05 33
+D 452E 87 81
+D 4530 A1 06 BF
+D 4533 10 00 01
+D 4536 2F 0B 2F 35
+D 453A 11 04 00 5E
+D 453E BD 07 2A
+D 4541 86 01 00 05
+D 4545 A1 01 41
+D 4548 BD 07 38
+D 454B B0 01 41
+D 454E 2E 0B 2F 21
+D 4552 21 08
+D 4554 86 08 00 FF
+D 4558 A0 05 60
+D 455B 87 81
+D 455D A1 06 BF
+D 4560 10 00 00
+D 4563 2F 0B 2F 35
+D 4567 11 04 00 5F
+D 456B BD 07 2A
+D 456E B0 01 41
+D 4571 8C 03
+D 4573 A0 05 D9
+D 4576 86 03 00 42
+D 457A A0 04 1E
+D 457D 86 03 00 41
+D 4581 A0 05 21
+D 4584 86 03 00 44
+D 4588 A0 04 E5
+D 458B 86 03 00 43
+D 458F A0 03 E1
+D 4592 86 03 00 49
+D 4596 A0 06 83
+D 4599 86 03 00 4E
+D 459D A0 04 97
+D 45A0 86 03 00 45
+D 45A4 A0 03 BC
+D 45A7 11 04 00 60
+D 45AB BD 07 2A
+D 45AE B0 01 41
+D 45B1 11 04 00 61
+D 45B5 BD 07 2A
+D 45B8 B0 01 41
+D 45BB 11 04 00 62
+D 45BF BD 07 2A
+D 45C2 B0 01 41
+D 45C5 11 04 00 63
+D 45C9 BD 07 2A
+D 45CC B0 01 41
+D 45CF 11 04 00 6C
+D 45D3 BD 07 2A
+D 45D6 F0 00 00
+D 45D9 11 04 00 32
+D 45DD BD 07 2A
+D 45E0 B0 01 41
+D 45E3 11 04 00 3B
+D 45E7 BD 07 2A
+D 45EA B0 01 41
+D 45ED 11 04 00 33
+D 45F1 BD 07 2A
+D 45F4 B0 01 41
+D 45F7 11 04 00 34
+D 45FB BD 07 2A
+D 45FE B0 01 41
+D 4601 11 04 00 35
+D 4605 BD 07 2A
+D 4608 B0 01 41
+D 460B 11 04 00 39
+D 460F BD 07 2A
+D 4612 B0 01 41
+D 4615 11 04 00 3A
+D 4619 BD 07 2A
+D 461C B0 01 41
+D 461F 11 04 00 43
+D 4623 BD 07 2A
+D 4626 B0 01 41
+D 4629 11 04 00 3F
+D 462D BD 07 2A
+D 4630 B0 01 41
+D 4633 11 04 00 44
+D 4637 BD 07 2A
+D 463A B0 01 41
+D 463D 11 04 00 46
+D 4641 BD 07 2A
+D 4644 B0 01 41
+D 4647 11 04 00 49
+D 464B BD 07 2A
+D 464E B0 01 41
+D 4651 11 04 00 4A
+D 4655 BD 07 2A
+D 4658 B0 01 41
+D 465B 11 04 00 48
+D 465F BD 07 2A
+D 4662 B0 01 41
+D 4665 11 04 00 4B
+D 4669 BD 07 2A
+D 466C B0 01 41
+D 466F 11 04 00 4C
+D 4673 BD 07 2A
+D 4676 B0 01 41
+D 4679 11 04 00 4E
+D 467D BD 07 2A
+D 4680 B0 01 41
+D 4683 11 04 00 55
+D 4687 BD 07 2A
+D 468A B0 01 41
+D 468D 11 04 00 50
+D 4691 BD 07 2A
+D 4694 B0 01 41
+D 4697 11 04 00 51
+D 469B BD 07 2A
+D 469E B0 01 41
+D 46A1 11 04 00 57
+D 46A5 BD 07 2A
+D 46A8 B0 01 41
+D 46AB 11 04 00 5C
+D 46AF BD 07 2A
+D 46B2 B0 01 41
+D 46B5 11 04 00 5B
+D 46B9 BD 07 2A
+D 46BC B0 01 41
+D 46BF 11 04 00 5D
+D 46C3 BD 07 2A
+D 46C6 B0 01 41
+D 46C9 11 04 00 68
+D 46CD BD 07 2A
+D 46D0 11 04 00 69
+D 46D4 BD 07 2A
+D 46D7 23 00 6A
+D 46DA BD 07 FF
+D 46DD 11 04 00 6A
+D 46E1 BD 07 2A
+D 46E4 B0 06 EE
+D 46E7 11 04 00 67
+D 46EB BD 07 2A
+D 46EE 11 04 00 6B
+D 46F2 BD 07 2A
+D 46F5 11 0C 2F 40
+D 46F9 11 0D 2F 40
+D 46FD C2 CD
+D 46FF 11 04 00 28
+D 4703 BD 07 2A
+D 4706 2E 0B 2F 40
+D 470A 81 00 59
+D 470D A0 07 20
+D 4710 81 00 79
+D 4713 A0 07 20
+D 4716 11 04 00 6C
+D 471A BD 07 2A
+D 471D F0 00 00
+D 4720 11 04 00 28
+D 4724 BD 07 2A
+D 4727 B0 00 19
+D 472A 50 44 0A
+D 472D 52 0A 10 C0
+D 4731 39 02 AE
+D 4734 C1 0E
+D 4736 BE 00
+D 4738 BD 07 A6
+D 473B 8C 09
+D 473D A0 07 49
+D 4740 11 04 00 2E
+D 4744 BD 07 2A
+D 4747 BE 00
+D 4749 23 00 14
+D 474C BD 07 2A
+D 474F 86 01 00 01
+D 4753 A1 07 6A
+D 4756 2E 0B 2F 34
+D 475A 81 00 00
+D 475D A0 07 82
+D 4760 11 04 00 41
+D 4764 BD 07 2A
+D 4767 B0 07 82
+D 476A 86 01 00 06
+D 476E A1 07 82
+D 4771 2E 0B 2F 37
+D 4775 81 00 00
+D 4778 A0 07 82
+D 477B 11 04 00 53
+D 477F BD 07 2A
+D 4782 11 05 00 01
+D 4786 2E 05 2F 20
+D 478A 21 08
+D 478C 87 81
+D 478E A1 07 9B
+D 4791 23 00 54
+D 4794 52 04 00 0A
+D 4798 BD 07 2A
+D 479B 42 05
+D 479D 86 05 00 06
+D 47A1 A1 07 86
+D 47A4 BE 00
+D 47A6 11 09 00 00
+D 47AA 86 01 00 05
+D 47AE A1 07 D1
+D 47B1 2E 0B 2F 35
+D 47B5 81 00 00
+D 47B8 A0 07 CD
+D 47BB 2E 0B 2F 21
+D 47BF 21 08
+D 47C1 86 08 00 FF
+D 47C5 A0 07 D1
+D 47C8 87 81
+D 47CA A0 07 D1
+D 47CD 11 09 00 01
+D 47D1 BE 00
+D 47D3 11 09 00 00
+D 47D7 11 08 00 51
+D 47DB 89 38
+D 47DD A1 07 FD
+D 47E0 11 08 00 40
+D 47E4 51 38 05
+D 47E7 2E 05 2F 20
+D 47EB 21 08
+D 47ED 86 08 00 FF
+D 47F1 A0 07 F9
+D 47F4 87 81
+D 47F6 A1 07 FD
+D 47F9 11 09 00 01
+D 47FD BE 00
+D 47FF 11 0C 00 00
+D 4803 11 0F 00 0A
+D 4807 4D AF
+D 4809 27
+D 480A 70 00
+D 480C 42 0C
+D 480E 25
+D 480F 21 0A
+D 4811 8C 0A
+D 4813 A1 08 07
+D 4816 71 00
+D 4818 4E 00 30
+D 481B C9
+D 481C 43 0C
+D 481E 8C 0C
+D 4820 A1 08 16
+D 4823 BE 00
+
+D 4C00 E2 F8 6F B8 F8 00 A8 F8 00 58 18 58 18 58 F8 6F
+D 4C10 B7 F8 40 A7 07 C2 4D 1E AF FF 61 CB 4C 27 FF 1A
+D 4C20 C3 4C 27 8F FF 20 AF 8F FF 30 CB 4C 3D FF 0A CB
+D 4C30 4C 42 8F FF 41 CB 4C 3D FF 1A CB 4C 42 FC 00 C0
+D 4C40 4C 44 FF 00 C3 4C 4B 17 C0 4C 14 F8 6F B8 F8 08
+D 4C50 A8 F8 10 AB F8 00 58 18 2B 8B CA 4C 54 F8 6F B8
+D 4C60 F8 08 A8 F8 00 AB 07 AF FF 61 CB 4C 76 FF 1A C3
+D 4C70 4C 76 8F FF 20 AF 8F FF 30 CB 4C 8C FF 0A CB 4C
+D 4C80 91 8F FF 41 CB 4C 8C FF 1A CB 4C 91 FC 00 C0 4C
+D 4C90 93 FF 00 CB 4C A4 8B FB 0F C2 4C A0 8F 58 18 1B
+D 4CA0 17 C0 4C 66 F8 4D B9 F8 40 A9 09 C2 4C F4 99 BE
+D 4CB0 89 AE F8 6F BD F8 08 AD F8 04 AB 4D 52 49 F3 CA
+D 4CC0 4C E9 2B 8B CA 4C BB 09 C2 4C 14 AF FA 40 CA 4C
+D 4CD0 E0 F8 6F B8 F8 00 A8 08 CA 4C 14 8F 58 C0 4C 14
+D 4CE0 F8 6F B8 F8 01 A8 C0 4C D7 8E FC 05 A9 9E 7C 00
+D 4CF0 B9 C0 4C AA F8 6F B8 F8 08 A8 08 FF 30 CB 4D 15
+D 4D00 FF 0A C3 4D 15 F8 6F B8 F8 01 A8 08 CA 4C 14 F8
+D 4D10 7F 58 C0 4C 14 F8 6F B8 F8 02 A8 F8 01 58 E2 D5
+
+D 4D40 4E 00 00 00 01 4E 4F 52 54 01 53 00 00 00 02 53
+D 4D50 4F 55 54 02 45 00 00 00 03 45 41 53 54 03 57 00
+D 4D60 00 00 04 57 45 53 54 04 55 00 00 00 05 55 50 00
+D 4D70 00 05 43 4C 49 4D 05 41 53 43 45 05 44 00 00 00
+D 4D80 06 44 4F 57 4E 06 44 45 53 43 06 49 4E 00 00 07
+D 4D90 49 4E 53 49 07 42 4F 41 52 07 49 4E 54 4F 07 4F
+D 4DA0 55 54 00 08 4F 55 54 53 08 45 58 49 54 08 4C 45
+D 4DB0 41 56 08 4C 4F 4F 4B 09 4C 00 00 00 09 49 4E 56
+D 4DC0 45 0A 49 00 00 00 0A 49 4E 56 00 0A 54 41 4B 45
+D 4DD0 0B 47 45 54 00 0B 50 49 43 4B 0B 47 52 41 42 0B
+D 4DE0 44 52 4F 50 0C 44 49 53 43 0C 45 58 41 4D 0D 58
+D 4DF0 00 00 00 0D 49 4E 53 50 0D 53 45 41 52 0D 43 48
+D 4E00 45 43 0D 4F 50 45 4E 0E 52 45 41 44 0F 57 45 41
+D 4E10 52 10 44 4F 4E 00 10 4C 4F 4F 53 11 55 4E 53 43
+D 4E20 11 55 4E 42 4F 11 55 4E 44 4F 11 52 45 4C 45 11
+D 4E30 55 4E 43 4C 11 54 59 50 45 12 45 4E 54 45 12 44
+D 4E40 49 41 4C 12 4B 45 59 00 12 50 55 53 48 13 50 52
+D 4E50 45 53 13 48 49 54 00 13 49 4E 53 45 14 50 55 54
+D 4E60 00 14 49 4E 53 54 14 50 4C 41 43 14 46 49 54 00
+D 4E70 14 50 4C 55 47 14 4C 4F 41 44 14 4C 41 55 4E 15
+D 4E80 4C 49 46 54 15 46 4C 59 00 15 42 4C 41 53 15 4F
+D 4E90 4E 00 00 16 4C 49 47 48 16 4F 46 46 00 17 48 45
+D 4EA0 4C 50 18 48 49 4E 54 18 51 55 49 54 19 51 00 00
+D 4EB0 00 19 55 53 45 00 1A 43 4C 4F 53 1B 53 48 55 54
+D 4EC0 1B 57 41 49 54 1C 5A 00 00 00 1C 46 4C 41 53 41
+D 4ED0 54 4F 52 43 41 4C 41 4D 50 41 57 52 45 4E 42 53
+D 4EE0 50 41 4E 42 53 50 41 43 43 53 55 49 54 43 43 45
+D 4EF0 4C 4C 44 46 55 45 4C 44 42 41 54 54 44 4C 4F 47
+D 4F00 00 45 44 41 54 41 45 4E 4F 54 45 45 4C 4F 43 4B
+D 4F10 46 43 41 42 49 46 43 4F 4E 53 47 53 43 52 45 47
+D 4F20 43 4F 4D 50 47 44 52 41 57 48 4B 45 59 50 49 44
+D 4F30 4F 4F 52 4A 48 41 54 43 4A 43 4C 41 4D 4B 42 4F
+D 4F40 4C 54 4B 52 45 41 43 4C 4C 41 4E 44 4D 53 48 49
+D 4F50 50 4D 52 4F 43 4B 4D 4D 4F 44 55 4D 42 55 54 54
+D 4F60 4E 53 4C 4F 54 4F 50 41 4E 45 4F 45 41 52 54 50
+D 4F70 53 4B 59 00 50 31 38 30 32 60 54 48 45 00 00 41
+D 4F80 00 00 00 00 41 4E 00 00 00 54 4F 00 00 00 41 54
+D 4F90 00 00 00 57 49 54 48 00 47 4F 00 00 00 57 41 4C
+D 4FA0 4B 00 52 55 4E 00 00 4D 4F 56 45 00 54 55 52 4E
+D 4FB0 00 53 57 49 54 00 41 4E 44 00 00 4D 59 00 00 00
+D 4FC0 4F 46 00 00 00 46 52 4F 4D 00 55 53 49 4E 00 53
+D 4FD0 4F 4D 45 00 50 4C 45 41 00 54 48 45 4E 00 00
+
+D 5000 00 00 00 00 00 00 00 00 00 00 02 00 00 00 00 02
+D 5010 03 05 04 01 00 05 01 00 00 02 06 00 00 00 00 00
+D 5020 00 00 00 02 00 00 00 02 02 07 00 00 02 07 00 00
+D 5030 00 00 81 03 00 00 00 81 05 00 00 00 05 00 00 05
+D 5040 00 00 09 06 00 00 06 00 00 00 00 08 0A 00 0A 00
+D 5050 00 00 00 00 00 09 00 09
+
+D 5060 00 00 04 06 07 03 01 03 04 06 06 07 07 09 0A 0A
+D 5070 08 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+D 5090 00 00 00 00 00 00 01 01 01 01 01 01 01 01 01 01
+D 50A0 01
+
+D 50C0 12 00 12 01 12 D4 13 87 14 14 14 84 14 FD 15 7E
+D 50D0 15 FE 16 A4 17 1E 17 B4 17 D2 17 EC 18 06 18 23
+D 50E0 18 44 18 55 18 62 18 72 18 82 18 9A 18 B7 18 D2
+D 50F0 19 07 19 44 19 6D 19 92 19 EA 1A 08 1A 3C 1A 5D
+D 5100 1A 9D 1A BA 1A F4 1B 16 1B 39 1B 57 1B A2 1C 63
+D 5110 1C 68 1C 6B 1C 75 1C 97 1C AF 1C B2 1C CB 1C F6
+D 5120 1D 2D 1D 4E 1D A8 1D BB 1D D6 1D ED 1D FF 1E 1A
+D 5130 1E 23 1E 2E 1E 4A 1E 7F 1E 95 1E A9 1E BC 1E DD
+D 5140 1E F2 1F 24 1F 3E 1F 64 1F 80 1F 97 20 8B 20 A6
+D 5150 20 EE 21 0B 21 22 21 45 21 67 21 85 21 CF 22 10
+D 5160 22 29 22 43 22 5F 22 A0 22 BE 22 D5 22 FB 23 0E
+D 5170 23 2E 23 5F 23 A8 23 CB 23 ED 24 09 24 2A 24 46
+D 5180 24 63 24 86 24 AC 24 D1 25 C2 25 E4 25 FF 26 3C
+D 5190 26 56 27 0F 27 1F 27 29 27 3E
+
+D 5200 00 43 52 45 57 20 51 55 41 52 54 45 52 53 0D 0A
+D 5210 59 6F 75 20 61 72 65 20 69 6E 20 61 20 63 72 61
+D 5220 6D 70 65 64 20 63 61 62 69 6E 20 6F 6E 20 4D 6F
+D 5230 6F 6E 62 61 73 65 20 54 79 63 68 6F 2E 20 52 65
+D 5240 64 20 65 6D 65 72 67 65 6E 63 79 0D 0A 6C 69 67
+D 5250 68 74 73 20 66 6C 69 63 6B 65 72 2C 20 61 6E 64
+D 5260 20 74 68 65 20 61 69 72 20 68 69 73 73 65 73 20
+D 5270 66 61 69 6E 74 6C 79 3A 20 6C 69 66 65 20 73 75
+D 5280 70 70 6F 72 74 20 69 73 0D 0A 66 61 69 6C 69 6E
+D 5290 67 2E 20 41 20 6D 65 74 61 6C 20 4C 4F 43 4B 45
+D 52A0 52 20 73 74 61 6E 64 73 20 61 67 61 69 6E 73 74
+D 52B0 20 74 68 65 20 77 61 6C 6C 2E 20 41 20 64 6F 6F
+D 52C0 72 77 61 79 20 6C 65 61 64 73 0D 0A 45 41 53 54
+D 52D0 2E 0D 0A 00 4D 41 49 4E 20 43 4F 52 52 49 44 4F
+D 52E0 52 0D 0A 41 20 63 75 72 76 65 64 20 63 6F 72 72
+D 52F0 69 64 6F 72 20 72 69 6E 67 73 20 74 68 65 20 62
+D 5300 61 73 65 2E 20 44 6F 6F 72 77 61 79 73 20 6C 65
+D 5310 61 64 20 57 45 53 54 20 74 6F 20 74 68 65 20 63
+D 5320 72 65 77 0D 0A 71 75 61 72 74 65 72 73 2C 20 4E
+D 5330 4F 52 54 48 20 74 6F 20 74 68 65 20 63 6F 6D 6D
+D 5340 61 6E 64 20 63 65 6E 74 65 72 20 61 6E 64 20 45
+D 5350 41 53 54 20 74 6F 20 74 68 65 20 67 61 6C 6C 65
+D 5360 79 2E 20 41 0D 0A 64 61 72 6B 20 68 61 74 63 68
+D 5370 20 6F 70 65 6E 73 20 74 6F 20 74 68 65 20 53 4F
+D 5380 55 54 48 2E 0D 0A 00 43 4F 4D 4D 41 4E 44 20 43
+D 5390 45 4E 54 45 52 0D 0A 42 61 6E 6B 73 20 6F 66 20
+D 53A0 64 65 61 64 20 73 63 72 65 65 6E 73 20 73 75 72
+D 53B0 72 6F 75 6E 64 20 74 68 65 20 63 6F 6D 6D 61 6E
+D 53C0 64 65 72 27 73 20 43 4F 4E 53 4F 4C 45 2E 20 41
+D 53D0 0D 0A 70 72 65 73 73 75 72 65 20 64 6F 6F 72 20
+D 53E0 6C 65 61 64 73 20 45 41 53 54 20 74 6F 20 74 68
+D 53F0 65 20 61 69 72 6C 6F 63 6B 2E 20 54 68 65 20 63
+D 5400 6F 72 72 69 64 6F 72 20 69 73 20 53 4F 55 54 48
+D 5410 2E 0D 0A 00 47 41 4C 4C 45 59 0D 0A 46 6F 6F 64
+D 5420 20 74 72 61 79 73 20 6C 69 65 20 73 63 61 74 74
+D 5430 65 72 65 64 20 77 68 65 72 65 20 74 68 65 20 71
+D 5440 75 61 6B 65 20 74 68 72 65 77 20 74 68 65 6D 2E
+D 5450 20 41 20 74 6F 6F 6C 0D 0A 44 52 41 57 45 52 20
+D 5460 68 61 6E 67 73 20 6F 70 65 6E 2E 20 54 68 65 20
+D 5470 63 6F 72 72 69 64 6F 72 20 69 73 20 57 45 53 54
+D 5480 2E 0D 0A 00 4D 41 49 4E 54 45 4E 41 4E 43 45 20
+D 5490 54 55 4E 4E 45 4C 0D 0A 50 69 70 65 73 20 61 6E
+D 54A0 64 20 63 61 62 6C 65 73 20 63 72 6F 77 64 20 61
+D 54B0 20 6E 61 72 72 6F 77 20 74 75 6E 6E 65 6C 20 74
+D 54C0 68 61 74 20 73 6C 6F 70 65 73 20 64 6F 77 6E 20
+D 54D0 74 6F 20 74 68 65 0D 0A 53 4F 55 54 48 2E 20 54
+D 54E0 68 65 20 63 6F 72 72 69 64 6F 72 20 69 73 20 62
+D 54F0 61 63 6B 20 4E 4F 52 54 48 2E 0D 0A 00 41 49 52
+D 5500 4C 4F 43 4B 0D 0A 45 6D 70 74 79 20 73 75 69 74
+D 5510 20 68 6F 6F 6B 73 20 6C 69 6E 65 20 6F 6E 65 20
+D 5520 77 61 6C 6C 2E 20 54 68 65 20 68 65 61 76 79 20
+D 5530 6F 75 74 65 72 20 44 4F 4F 52 20 74 6F 20 74 68
+D 5540 65 20 45 41 53 54 0D 0A 68 61 73 20 61 20 4B 45
+D 5550 59 50 41 44 20 62 65 73 69 64 65 20 69 74 2E 20
+D 5560 54 68 65 20 63 6F 6D 6D 61 6E 64 20 63 65 6E 74
+D 5570 65 72 20 69 73 20 57 45 53 54 2E 0D 0A 00 52 45
+D 5580 41 43 54 4F 52 20 52 4F 4F 4D 0D 0A 54 68 65 20
+D 5590 72 65 61 63 74 6F 72 20 68 75 6D 73 20 61 6E 64
+D 55A0 20 67 6C 6F 77 73 20 61 20 73 69 63 6B 6C 79 20
+D 55B0 62 6C 75 65 2E 20 41 20 68 65 61 76 79 20 43 4C
+D 55C0 41 4D 50 20 69 73 0D 0A 62 6F 6C 74 65 64 20 74
+D 55D0 6F 20 69 74 73 20 68 6F 75 73 69 6E 67 2E 20 54
+D 55E0 68 65 20 74 75 6E 6E 65 6C 20 6C 65 61 64 73 20
+D 55F0 62 61 63 6B 20 4E 4F 52 54 48 2E 0D 0A 00 43 52
+D 5600 41 54 45 52 20 46 4C 4F 4F 52 0D 0A 47 72 65 79
+D 5610 20 64 75 73 74 20 73 74 72 65 74 63 68 65 73 20
+D 5620 74 6F 20 61 20 62 6C 61 63 6B 20 68 6F 72 69 7A
+D 5630 6F 6E 2C 20 61 6E 64 20 74 68 65 20 45 41 52 54
+D 5640 48 20 68 61 6E 67 73 20 62 6C 75 65 0D 0A 61 6E
+D 5650 64 20 77 68 69 74 65 20 6F 76 65 72 68 65 61 64
+D 5660 2E 20 54 68 65 20 61 69 72 6C 6F 63 6B 20 69 73
+D 5670 20 57 45 53 54 2E 20 42 6F 6F 74 20 70 72 69 6E
+D 5680 74 73 20 6C 65 61 64 20 45 41 53 54 0D 0A 74 6F
+D 5690 20 74 68 65 20 6C 61 6E 64 69 6E 67 20 70 61 64
+D 56A0 2E 0D 0A 00 4C 41 4E 44 49 4E 47 20 50 41 44 0D
+D 56B0 0A 54 68 65 20 4C 41 4E 44 45 52 20 73 74 61 6E
+D 56C0 64 73 20 6F 6E 20 69 74 73 20 73 70 69 6E 64 6C
+D 56D0 79 20 6C 65 67 73 2C 20 68 61 74 63 68 20 6F 70
+D 56E0 65 6E 2C 20 77 61 69 74 69 6E 67 2E 20 54 68 65
+D 56F0 0D 0A 63 72 61 74 65 72 20 66 6C 6F 6F 72 20 69
+D 5700 73 20 57 45 53 54 2E 20 59 6F 75 20 63 6F 75 6C
+D 5710 64 20 63 6C 69 6D 62 20 49 4E 2E 0D 0A 00 4C 41
+D 5720 4E 44 45 52 20 43 41 42 49 4E 0D 0A 54 77 6F 20
+D 5730 73 65 61 74 73 20 66 61 63 65 20 61 20 73 6D 61
+D 5740 6C 6C 20 77 69 6E 64 6F 77 2E 20 41 20 53 4C 4F
+D 5750 54 20 69 6E 20 74 68 65 20 70 61 6E 65 6C 20 69
+D 5760 73 20 6D 61 72 6B 65 64 0D 0A 46 55 45 4C 20 43
+D 5770 45 4C 4C 2C 20 61 6E 64 20 61 20 62 69 67 20 72
+D 5780 65 64 20 42 55 54 54 4F 4E 20 69 73 20 6D 61 72
+D 5790 6B 65 64 20 4C 41 55 4E 43 48 2E 20 54 68 65 20
+D 57A0 68 61 74 63 68 0D 0A 6C 65 61 64 73 20 4F 55 54
+D 57B0 2E 0D 0A 00 54 68 65 72 65 20 69 73 20 61 20 46
+D 57C0 4C 41 53 48 4C 49 47 48 54 20 68 65 72 65 2E 0D
+D 57D0 0A 00 54 68 65 72 65 20 69 73 20 61 20 57 52 45
+D 57E0 4E 43 48 20 68 65 72 65 2E 0D 0A 00 41 20 53 50
+D 57F0 41 43 45 53 55 49 54 20 68 61 6E 67 73 20 68 65
+D 5800 72 65 2E 0D 0A 00 54 68 65 72 65 20 69 73 20 61
+D 5810 20 46 55 45 4C 20 43 45 4C 4C 20 68 65 72 65 2E
+D 5820 0D 0A 00 54 68 65 20 63 6F 6D 6D 61 6E 64 65 72
+D 5830 27 73 20 4C 4F 47 20 6C 69 65 73 20 68 65 72 65
+D 5840 2E 0D 0A 00 20 20 61 20 66 6C 61 73 68 6C 69 67
+D 5850 68 74 0D 0A 00 20 20 61 20 77 72 65 6E 63 68 0D
+D 5860 0A 00 20 20 61 20 73 70 61 63 65 73 75 69 74 0D
+D 5870 0A 00 20 20 61 20 66 75 65 6C 20 63 65 6C 6C 0D
+D 5880 0A 00 20 20 74 68 65 20 63 6F 6D 6D 61 6E 64 65
+D 5890 72 27 73 20 6C 6F 67 0D 0A 00 41 20 68 65 61 76
+D 58A0 79 20 72 75 62 62 65 72 20 66 6C 61 73 68 6C 69
+D 58B0 67 68 74 2E 0D 0A 00 41 20 62 69 67 20 61 64 6A
+D 58C0 75 73 74 61 62 6C 65 20 77 72 65 6E 63 68 2E 0D
+D 58D0 0A 00 41 20 77 68 69 74 65 20 70 72 65 73 73 75
+D 58E0 72 65 20 73 75 69 74 2E 20 49 74 73 20 6F 78 79
+D 58F0 67 65 6E 20 74 61 6E 6B 20 72 65 61 64 73 20 46
+D 5900 55 4C 4C 2E 0D 0A 00 41 20 66 75 65 6C 20 63 65
+D 5910 6C 6C 20 74 68 65 20 73 69 7A 65 20 6F 66 20 61
+D 5920 20 6C 6F 61 66 20 6F 66 20 62 72 65 61 64 2E 20
+D 5930 49 74 20 67 6C 6F 77 73 20 66 61 69 6E 74 6C 79
+D 5940 2E 0D 0A 00 41 20 62 61 74 74 65 72 65 64 20 64
+D 5950 61 74 61 70 61 64 2E 20 59 6F 75 20 63 6F 75 6C
+D 5960 64 20 52 45 41 44 20 69 74 2E 0D 0A 00 41 20 74
+D 5970 61 6C 6C 20 6D 65 74 61 6C 20 6C 6F 63 6B 65 72
+D 5980 2E 20 49 74 20 69 73 20 63 6C 6F 73 65 64 2E 0D
+D 5990 0A 00 54 68 65 20 63 6F 6E 73 6F 6C 65 20 69 73
+D 59A0 20 64 65 61 64 20 65 78 63 65 70 74 20 66 6F 72
+D 59B0 20 6F 6E 65 20 6C 69 6E 65 20 6F 66 20 74 65 78
+D 59C0 74 3A 0D 0A 20 20 41 49 52 4C 4F 43 4B 20 43 4F
+D 59D0 44 45 3A 20 53 45 45 20 43 4F 4D 4D 41 4E 44 45
+D 59E0 52 27 53 20 4C 4F 47 0D 0A 00 54 68 65 20 64 72
+D 59F0 61 77 65 72 20 69 73 20 66 75 6C 6C 20 6F 66 20
+D 5A00 6A 75 6E 6B 2E 0D 0A 00 41 20 6E 75 6D 65 72 69
+D 5A10 63 20 6B 65 79 70 61 64 2E 20 54 59 50 45 20 74
+D 5A20 68 65 20 63 6F 64 65 20 74 6F 20 6F 70 65 6E 20
+D 5A30 74 68 65 20 64 6F 6F 72 2E 0D 0A 00 54 68 65 20
+D 5A40 6F 75 74 65 72 20 64 6F 6F 72 20 69 73 20 73 65
+D 5A50 61 6C 65 64 20 73 68 75 74 2E 0D 0A 00 54 68 65
+D 5A60 20 63 6C 61 6D 70 20 68 6F 6C 64 73 20 74 68 65
+D 5A70 20 46 55 45 4C 20 43 45 4C 4C 20 66 61 73 74 2E
+D 5A80 20 49 74 73 20 62 6F 6C 74 73 20 61 72 65 20 76
+D 5A90 65 72 79 20 74 69 67 68 74 2E 0D 0A 00 42 65 73
+D 5AA0 74 20 6E 6F 74 20 74 6F 20 67 65 74 20 74 6F 6F
+D 5AB0 20 63 6C 6F 73 65 2E 0D 0A 00 41 20 73 6D 61 6C
+D 5AC0 6C 20 61 73 63 65 6E 74 20 73 74 61 67 65 2C 20
+D 5AD0 62 75 69 6C 74 20 66 6F 72 20 74 77 6F 2E 20 49
+D 5AE0 74 73 20 68 61 74 63 68 20 69 73 20 6F 70 65 6E
+D 5AF0 2E 0D 0A 00 41 20 62 69 67 20 72 65 64 20 62 75
+D 5B00 74 74 6F 6E 20 6D 61 72 6B 65 64 20 4C 41 55 4E
+D 5B10 43 48 2E 0D 0A 00 41 6E 20 65 6D 70 74 79 20 73
+D 5B20 6C 6F 74 2C 20 6D 61 72 6B 65 64 20 46 55 45 4C
+D 5B30 20 43 45 4C 4C 2E 0D 0A 00 48 6F 6D 65 2E 20 4F
+D 5B40 6E 6C 79 20 33 38 34 2C 30 30 30 20 6B 6D 20 61
+D 5B50 77 61 79 2E 0D 0A 00 0D 0A 0D 0A 20 20 20 20 4D
+D 5B60 20 4F 20 4F 20 4E 20 42 20 41 20 53 20 45 0D 0A
+D 5B70 20 20 20 20 61 20 53 54 45 4C 4C 41 52 20 74 65
+D 5B80 78 74 20 61 64 76 65 6E 74 75 72 65 20 66 6F 72
+D 5B90 20 74 68 65 20 52 43 41 20 31 38 30 32 0D 0A 0D
+D 5BA0 0A 00 41 20 6D 6F 6F 6E 71 75 61 6B 65 20 68 61
+D 5BB0 73 20 63 72 61 63 6B 65 64 20 74 68 65 20 62 61
+D 5BC0 73 65 20 6F 70 65 6E 2E 20 54 68 65 20 63 72 65
+D 5BD0 77 20 67 6F 74 20 61 77 61 79 20 77 69 74 68 6F
+D 5BE0 75 74 0D 0A 79 6F 75 2C 20 61 6E 64 20 74 68 65
+D 5BF0 20 61 69 72 20 69 73 20 72 75 6E 6E 69 6E 67 20
+D 5C00 6F 75 74 2E 20 53 6F 6D 65 77 68 65 72 65 20 6F
+D 5C10 75 74 20 6F 6E 20 74 68 65 20 63 72 61 74 65 72
+D 5C20 0D 0A 66 6C 6F 6F 72 20 73 74 61 6E 64 73 20 74
+D 5C30 68 65 20 6C 61 73 74 20 4C 41 4E 44 45 52 2E 0D
+D 5C40 0A 28 54 79 70 65 20 48 45 4C 50 20 69 66 20 79
+D 5C50 6F 75 20 61 72 65 20 73 74 75 63 6B 2E 29 0D 0A
+D 5C60 0D 0A 00 0D 0A 3E 20 00 0D 0A 00 50 61 72 64 6F
+D 5C70 6E 3F 0D 0A 00 57 68 61 74 20 64 6F 20 79 6F 75
+D 5C80 20 77 61 6E 74 20 74 6F 20 64 6F 20 77 69 74 68
+D 5C90 20 69 74 3F 0D 0A 00 49 20 64 6F 6E 27 74 20 6B
+D 5CA0 6E 6F 77 20 74 68 65 20 77 6F 72 64 20 22 00 22
+D 5CB0 2E 00 59 6F 75 20 63 61 6E 27 74 20 67 6F 20 74
+D 5CC0 68 61 74 20 77 61 79 2E 0D 0A 00 49 74 20 69 73
+D 5CD0 20 70 69 74 63 68 20 64 61 72 6B 2E 20 59 6F 75
+D 5CE0 20 63 61 6E 27 74 20 73 65 65 20 61 20 74 68 69
+D 5CF0 6E 67 2E 0D 0A 00 59 6F 75 20 67 72 6F 70 65 20
+D 5D00 61 72 6F 75 6E 64 20 69 6E 20 74 68 65 20 64 61
+D 5D10 72 6B 20 61 6E 64 20 74 68 69 6E 6B 20 62 65 74
+D 5D20 74 65 72 20 6F 66 20 69 74 2E 0D 0A 00 54 68 65
+D 5D30 20 6F 75 74 65 72 20 64 6F 6F 72 20 69 73 20 73
+D 5D40 65 61 6C 65 64 20 73 68 75 74 2E 0D 0A 00 54 68
+D 5D50 65 20 6F 75 74 65 72 20 64 6F 6F 72 20 6F 70 65
+D 5D60 6E 73 20 6F 6E 74 6F 20 68 61 72 64 20 76 61 63
+D 5D70 75 75 6D 2E 20 57 69 74 68 6F 75 74 20 61 20 73
+D 5D80 75 69 74 2C 20 79 6F 75 20 6C 61 73 74 0D 0A 61
+D 5D90 62 6F 75 74 20 66 69 66 74 65 65 6E 20 73 65 63
+D 5DA0 6F 6E 64 73 2E 0D 0A 00 50 6C 65 61 73 65 20 73
+D 5DB0 61 79 20 77 68 61 74 2E 0D 0A 00 59 6F 75 20 64
+D 5DC0 6F 6E 27 74 20 73 65 65 20 74 68 61 74 20 68 65
+D 5DD0 72 65 2E 0D 0A 00 59 6F 75 20 61 6C 72 65 61 64
+D 5DE0 79 20 68 61 76 65 20 69 74 2E 0D 0A 00 49 74 20
+D 5DF0 77 6F 6E 27 74 20 62 75 64 67 65 2E 0D 0A 00 54
+D 5E00 68 65 20 43 4C 41 4D 50 20 68 6F 6C 64 73 20 69
+D 5E10 74 20 66 61 73 74 2E 0D 0A 00 54 61 6B 65 6E 2E
+D 5E20 0D 0A 00 44 72 6F 70 70 65 64 2E 0D 0A 00 59 6F
+D 5E30 75 20 61 72 65 6E 27 74 20 63 61 72 72 79 69 6E
+D 5E40 67 20 74 68 61 74 2E 0D 0A 00 54 61 6B 69 6E 67
+D 5E50 20 6F 66 66 20 79 6F 75 72 20 73 75 69 74 20 6E
+D 5E60 6F 77 20 77 6F 75 6C 64 20 62 65 20 61 20 76 65
+D 5E70 72 79 20 62 61 64 20 69 64 65 61 2E 0D 0A 00 49
+D 5E80 74 27 73 20 6A 75 73 74 20 61 20 6E 75 6D 62 65
+D 5E90 72 2E 0D 0A 00 59 6F 75 20 61 72 65 20 63 61 72
+D 5EA0 72 79 69 6E 67 3A 0D 0A 00 20 20 6E 6F 74 68 69
+D 5EB0 6E 67 20 61 74 20 61 6C 6C 0D 0A 00 59 6F 75 20
+D 5EC0 61 72 65 20 77 65 61 72 69 6E 67 20 74 68 65 20
+D 5ED0 73 70 61 63 65 73 75 69 74 2E 0D 0A 00 49 74 27
+D 5EE0 73 20 61 6C 72 65 61 64 79 20 6F 70 65 6E 2E 0D
+D 5EF0 0A 00 54 68 65 20 6C 6F 63 6B 65 72 20 63 72 65
+D 5F00 61 6B 73 20 6F 70 65 6E 2E 20 49 6E 73 69 64 65
+D 5F10 20 69 73 20 61 20 46 4C 41 53 48 4C 49 47 48 54
+D 5F20 21 0D 0A 00 54 68 65 20 6C 6F 63 6B 65 72 20 73
+D 5F30 74 61 6E 64 73 20 6F 70 65 6E 2E 0D 0A 00 41 20
+D 5F40 74 61 6C 6C 20 6D 65 74 61 6C 20 6C 6F 63 6B 65
+D 5F50 72 2C 20 73 74 61 6E 64 69 6E 67 20 6F 70 65 6E
+D 5F60 2E 0D 0A 00 49 74 20 6F 70 65 6E 73 20 66 72 6F
+D 5F70 6D 20 74 68 65 20 4B 45 59 50 41 44 2E 0D 0A 00
+D 5F80 59 6F 75 20 63 61 6E 27 74 20 6F 70 65 6E 20 74
+D 5F90 68 61 74 2E 0D 0A 00 43 4F 4D 4D 41 4E 44 45 52
+D 5FA0 27 53 20 4C 4F 47 2C 20 44 41 59 20 32 31 32 3A
+D 5FB0 0D 0A 51 75 61 6B 65 20 64 61 6D 61 67 65 20 65
+D 5FC0 76 65 72 79 77 68 65 72 65 2E 20 45 76 61 63 75
+D 5FD0 61 74 69 6E 67 20 74 6F 20 74 68 65 20 6F 72 62
+D 5FE0 69 74 65 72 2E 20 46 6F 72 20 77 68 6F 65 76 65
+D 5FF0 72 0D 0A 66 69 6E 64 73 20 74 68 69 73 3A 20 74
+D 6000 68 65 20 61 69 72 6C 6F 63 6B 20 63 6F 64 65 20
+D 6010 69 73 20 74 68 65 20 6E 75 6D 62 65 72 20 6F 66
+D 6020 20 74 68 61 74 20 6F 6C 64 20 63 6F 6D 70 75 74
+D 6030 65 72 0D 0A 63 68 69 70 20 6F 6E 20 6D 79 20 64
+D 6040 65 73 6B 20 2D 20 74 68 65 20 52 43 41 20 31 38
+D 6050 30 32 2E 20 54 68 65 20 73 70 61 72 65 20 66 75
+D 6060 65 6C 20 63 65 6C 6C 20 69 73 20 63 6C 61 6D 70
+D 6070 65 64 0D 0A 69 6E 20 74 68 65 20 72 65 61 63 74
+D 6080 6F 72 20 72 6F 6F 6D 2E 0D 0A 00 54 68 65 72 65
+D 6090 27 73 20 6E 6F 74 68 69 6E 67 20 74 6F 20 72 65
+D 60A0 61 64 2E 0D 0A 00 59 6F 75 20 63 6C 69 6D 62 20
+D 60B0 69 6E 74 6F 20 74 68 65 20 73 70 61 63 65 73 75
+D 60C0 69 74 20 61 6E 64 20 73 65 61 6C 20 74 68 65 20
+D 60D0 68 65 6C 6D 65 74 2E 20 43 6F 6F 6C 20 6F 78 79
+D 60E0 67 65 6E 0D 0A 66 6C 6F 77 73 2E 0D 0A 00 59 6F
+D 60F0 75 27 72 65 20 61 6C 72 65 61 64 79 20 77 65 61
+D 6100 72 69 6E 67 20 69 74 2E 0D 0A 00 59 6F 75 20 63
+D 6110 61 6E 27 74 20 77 65 61 72 20 74 68 61 74 2E 0D
+D 6120 0A 00 59 6F 75 27 6C 6C 20 6E 65 65 64 20 74 6F
+D 6130 20 70 69 63 6B 20 69 74 20 75 70 20 66 69 72 73
+D 6140 74 2E 0D 0A 00 54 68 65 72 65 27 73 20 6E 6F 74
+D 6150 68 69 6E 67 20 68 65 72 65 20 74 6F 20 6C 6F 6F
+D 6160 73 65 6E 2E 0D 0A 00 54 68 65 20 63 6C 61 6D 70
+D 6170 20 69 73 20 61 6C 72 65 61 64 79 20 6C 6F 6F 73
+D 6180 65 2E 0D 0A 00 59 6F 75 20 68 65 61 76 65 20 6F
+D 6190 6E 20 74 68 65 20 77 72 65 6E 63 68 2E 20 54 68
+D 61A0 65 20 62 6F 6C 74 73 20 67 69 76 65 2C 20 61 6E
+D 61B0 64 20 74 68 65 20 46 55 45 4C 20 43 45 4C 4C 20
+D 61C0 63 6F 6D 65 73 0D 0A 66 72 65 65 2E 0D 0A 00 54
+D 61D0 68 65 20 62 6F 6C 74 73 20 61 72 65 20 66 61 72
+D 61E0 20 74 6F 6F 20 74 69 67 68 74 20 66 6F 72 20 79
+D 61F0 6F 75 72 20 66 69 6E 67 65 72 73 2E 20 59 6F 75
+D 6200 20 6E 65 65 64 20 61 20 74 6F 6F 6C 2E 0D 0A 00
+D 6210 54 68 65 20 63 6C 61 6D 70 20 68 61 6E 67 73 20
+D 6220 6C 6F 6F 73 65 2E 0D 0A 00 54 68 65 72 65 27 73
+D 6230 20 6E 6F 20 6B 65 79 70 61 64 20 68 65 72 65 2E
+D 6240 0D 0A 00 54 68 65 20 64 6F 6F 72 20 69 73 20 61
+D 6250 6C 72 65 61 64 79 20 6F 70 65 6E 2E 0D 0A 00 42
+D 6260 45 45 50 2E 20 54 68 65 20 6B 65 79 70 61 64 20
+D 6270 66 6C 61 73 68 65 73 20 67 72 65 65 6E 20 61 6E
+D 6280 64 20 74 68 65 20 6F 75 74 65 72 20 64 6F 6F 72
+D 6290 20 67 72 69 6E 64 73 20 6F 70 65 6E 2E 0D 0A 00
+D 62A0 54 68 65 20 6F 75 74 65 72 20 64 6F 6F 72 20 73
+D 62B0 74 61 6E 64 73 20 6F 70 65 6E 2E 0D 0A 00 42 5A
+D 62C0 5A 54 2E 20 41 43 43 45 53 53 20 44 45 4E 49 45
+D 62D0 44 2E 0D 0A 00 54 79 70 65 20 77 68 61 74 3F 20
+D 62E0 28 46 6F 72 20 65 78 61 6D 70 6C 65 3A 20 54 59
+D 62F0 50 45 20 31 32 33 34 29 0D 0A 00 4E 6F 74 68 69
+D 6300 6E 67 20 68 61 70 70 65 6E 73 2E 0D 0A 00 59 6F
+D 6310 75 20 6E 65 65 64 20 74 6F 20 62 65 20 69 6E 20
+D 6320 74 68 65 20 6C 61 6E 64 65 72 2E 0D 0A 00 54 68
+D 6330 65 20 70 61 6E 65 6C 20 73 74 61 79 73 20 64 61
+D 6340 72 6B 2E 20 54 68 65 20 6C 61 6E 64 65 72 20 68
+D 6350 61 73 20 6E 6F 20 70 6F 77 65 72 2E 0D 0A 00 54
+D 6360 68 65 20 66 75 65 6C 20 63 65 6C 6C 20 73 6C 69
+D 6370 64 65 73 20 69 6E 74 6F 20 74 68 65 20 73 6C 6F
+D 6380 74 20 77 69 74 68 20 61 20 63 6C 69 63 6B 2E 20
+D 6390 54 68 65 20 70 61 6E 65 6C 0D 0A 6C 69 67 68 74
+D 63A0 73 20 75 70 21 0D 0A 00 54 68 65 20 66 75 65 6C
+D 63B0 20 63 65 6C 6C 20 67 6C 6F 77 73 20 69 6E 20 69
+D 63C0 74 73 20 73 6C 6F 74 2E 0D 0A 00 54 68 65 72 65
+D 63D0 27 73 20 6E 6F 77 68 65 72 65 20 68 65 72 65 20
+D 63E0 74 6F 20 70 75 74 20 69 74 2E 0D 0A 00 54 68 61
+D 63F0 74 20 64 6F 65 73 6E 27 74 20 67 6F 20 61 6E 79
+D 6400 77 68 65 72 65 2E 0D 0A 00 59 6F 75 20 68 61 76
+D 6410 65 20 6E 6F 74 68 69 6E 67 20 74 6F 20 73 77 69
+D 6420 74 63 68 20 6F 6E 2E 0D 0A 00 54 68 65 20 66 6C
+D 6430 61 73 68 6C 69 67 68 74 20 63 6C 69 63 6B 73 20
+D 6440 6F 6E 2E 0D 0A 00 54 68 65 20 66 6C 61 73 68 6C
+D 6450 69 67 68 74 20 63 6C 69 63 6B 73 20 6F 66 66 2E
+D 6460 0D 0A 00 59 6F 75 27 6C 6C 20 68 61 76 65 20 74
+D 6470 6F 20 62 65 20 6D 6F 72 65 20 73 70 65 63 69 66
+D 6480 69 63 2E 0D 0A 00 42 65 74 74 65 72 20 74 6F 20
+D 6490 6C 65 61 76 65 20 74 68 69 6E 67 73 20 61 73 20
+D 64A0 74 68 65 79 20 61 72 65 2E 0D 0A 00 54 69 6D 65
+D 64B0 20 70 61 73 73 65 73 2E 20 54 68 65 20 61 69 72
+D 64C0 20 67 72 6F 77 73 20 73 74 61 6C 65 72 2E 0D 0A
+D 64D0 00 4D 6F 76 65 20 77 69 74 68 20 4E 2C 20 53 2C
+D 64E0 20 45 2C 20 57 2C 20 55 50 2C 20 44 4F 57 4E 2C
+D 64F0 20 49 4E 20 61 6E 64 20 4F 55 54 2E 20 54 72 79
+D 6500 20 4C 4F 4F 4B 2C 20 49 4E 56 45 4E 54 4F 52 59
+D 6510 2C 0D 0A 54 41 4B 45 2C 20 44 52 4F 50 2C 20 45
+D 6520 58 41 4D 49 4E 45 2C 20 4F 50 45 4E 2C 20 52 45
+D 6530 41 44 2C 20 57 45 41 52 2C 20 55 53 45 2C 20 54
+D 6540 55 52 4E 20 4F 4E 2C 20 50 55 53 48 20 61 6E 64
+D 6550 0D 0A 54 59 50 45 20 2D 20 74 77 6F 20 77 6F 72
+D 6560 64 73 20 61 74 20 6D 6F 73 74 2C 20 6C 69 6B 65
+D 6570 20 54 41 4B 45 20 57 52 45 4E 43 48 2E 20 4F 6E
+D 6580 6C 79 20 74 68 65 20 66 69 72 73 74 20 66 6F 75
+D 6590 72 0D 0A 6C 65 74 74 65 72 73 20 6F 66 20 61 20
+D 65A0 77 6F 72 64 20 63 6F 75 6E 74 2E 20 51 55 49 54
+D 65B0 20 65 6E 64 73 20 74 68 65 20 67 61 6D 65 2E 0D
+D 65C0 0A 00 54 68 65 20 61 69 72 20 69 73 20 67 65 74
+D 65D0 74 69 6E 67 20 74 68 69 6E 2E 20 48 75 72 72 79
+D 65E0 21 0D 0A 00 59 6F 75 20 61 72 65 20 67 61 73 70
+D 65F0 69 6E 67 20 66 6F 72 20 61 69 72 21 0D 0A 00 59
+D 6600 6F 75 72 20 76 69 73 69 6F 6E 20 66 61 64 65 73
+D 6610 20 74 6F 20 67 72 65 79 20 61 73 20 74 68 65 20
+D 6620 6C 61 73 74 20 6F 66 20 74 68 65 20 61 69 72 20
+D 6630 72 75 6E 73 20 6F 75 74 2E 0D 0A 00 0D 0A 2A 2A
+D 6640 2A 20 59 4F 55 20 48 41 56 45 20 44 49 45 44 20
+D 6650 2A 2A 2A 0D 0A 00 59 6F 75 20 73 74 72 61 70 20
+D 6660 69 6E 20 61 6E 64 20 73 6C 61 6D 20 74 68 65 20
+D 6670 4C 41 55 4E 43 48 20 62 75 74 74 6F 6E 2E 20 54
+D 6680 68 65 20 65 6E 67 69 6E 65 73 20 72 6F 61 72 2C
+D 6690 20 74 68 65 0D 0A 63 72 61 74 65 72 20 66 61 6C
+D 66A0 6C 73 20 61 77 61 79 20 62 65 6E 65 61 74 68 20
+D 66B0 79 6F 75 2C 20 61 6E 64 20 74 68 65 20 62 6C 75
+D 66C0 65 20 45 61 72 74 68 20 66 69 6C 6C 73 20 74 68
+D 66D0 65 0D 0A 77 69 6E 64 6F 77 2E 0D 0A 0D 0A 2A 2A
+D 66E0 2A 20 59 4F 55 20 48 41 56 45 20 45 53 43 41 50
+D 66F0 45 44 20 46 52 4F 4D 20 4D 4F 4F 4E 42 41 53 45
+D 6700 20 54 59 43 48 4F 20 2A 2A 2A 0D 0A 0D 0A 00 59
+D 6710 6F 75 20 6D 61 64 65 20 69 74 20 69 6E 20 00 20
+D 6720 6D 6F 76 65 73 2E 0D 0A 00 0D 0A 50 6C 61 79 20
+D 6730 61 67 61 69 6E 20 28 59 2F 4E 29 3F 20 00 47 6F
+D 6740 6F 64 62 79 65 2C 20 61 73 74 72 6F 6E 61 75 74
+D 6750 2E 0D 0A 00
+D 7000 00

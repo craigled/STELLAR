@@ -1,0 +1,1187 @@
+; ==========================================================================
+; STELLAR LIFE RACE  -  bytecode vs native 1802   (two programs, one file)
+; ==========================================================================
+; Load this ONE file - VM1 at $4000, VM2 at $5000 - then cold-boot. The same Game
+; of Life board (a 24 x 10 acorn) runs on both sides: VM1 on the left computes
+; each generation in STELLAR bytecode, VM2 on the right in native 1802 through
+; $F1 RUNMC. After 8 generations VM1 asks VM2 to stop (its RB = 2); VM2 writes
+; its generation count into VM1's R5 ($D3), halts, and VM1 prints the score.
+; ESC quits at any time (VM1 looks once a board row; other keys are ignored).
+; Every run starts fresh (boards built in code), so it can be rerun without
+; reloading.
+;
+; Every board row is ONE PRINTSTR of a ready-made "ESC[rr;ccH" + 24 cells string,
+; so the two VMs never garble each other's output. VT100 cursor addressing only.
+;
+; HW-VERIFIED on the Elf2K (V0061.34), 2026-09-26 (Craig).
+;
+; VERIFICATION (Firmware-Math/liferace_verify.py, V0061.33, two-VM cold boot): a first run booted into DIRTY board RAM and a RERUN from the memory it left (no reload) both pass and match exactly: every board drawn (VM1 generations 0-8, VM2 0-572) matches a Python Life model; VM2 did 572 generations to VM1's 8 - about 71 times as many. ESC tested: 'x' ignored, ESC mid-generation stops both VMs cleanly (VM2 halts itself, START byte intact) and a rerun after it passes in full. VM1 uses RUNNING COLUMN SUMS (~6,300 opcodes a generation, 1.83x the first version). Run time: ~36 million 1802 instructions (~3.5 min at 3 MHz) plus ~200 KB of output (~3.5 min at 9600 baud): expect about 7 minutes.
+; NOT YET RUN ON HARDWARE.
+;
+; VM1: 305   VM2: 138 STELLAR commands (+ 180 bytes of native 1802 code).
+
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  VM1 ($4000): bytecode, the title, the score  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 4000 CD             START
+; D 4001 11 0B 00 00    LOADXI R11 0000                    GO = 0: VM2 waits
+; D 4005 11 0C 00 00    LOADXI R12 0000                    RC = 0: VM2 has not stopped yet
+; D 4009 11 0F 00 0A    LOADXI R15 000A
+; D 400D D0 12          SHAREVM on, read/write             VM2 reads our RB, and writes our R5 and RC when it stops
+; D 400F 11 0E 0E 80    LOADXI R14 0E80
+; D 4013 C1 0E          PRINTSTR R14
+; D 4015 11 0E 0E D9    LOADXI R14 0ED9
+; D 4019 C1 0E          PRINTSTR R14
+; D 401B 11 03 0B 00    LOADXI R3 0B00
+; D 401F 11 04 0E 37    LOADXI R4 0E37
+; D 4023 FB 34 00       FILLMEMXY R3..R4 00                Boards A and B (and the gap between) all dead
+; D 4026 11 03 00 00    LOADXI R3 0000
+; D 402A 10 00 01       LOADAI 0001                        the acorn
+; D 402D 2F 03 0B 72    WRITEIDX R3 0B72
+; D 4031 2F 03 0B 8E    WRITEIDX R3 0B8E
+; D 4035 2F 03 0B A5    WRITEIDX R3 0BA5
+; D 4039 2F 03 0B A6    WRITEIDX R3 0BA6
+; D 403D 2F 03 0B A9    WRITEIDX R3 0BA9
+; D 4041 2F 03 0B AA    WRITEIDX R3 0BAA
+; D 4045 2F 03 0B AB    WRITEIDX R3 0BAB
+; D 4049 11 03 00 1B    LOADXI R3 001B
+; D 404D 11 04 00 08    LOADXI R4 0008                     string index: past the header
+; D 4051 11 0A 00 0A    LOADXI R10 000A
+; BRi:
+; D 4055 11 09 00 18    LOADXI R9 0018
+; BCi:
+; D 4059 2E 03 0B 00    READIDX R3 0B00
+; D 405D 21 07          COPYAX Acc -> R7
+; D 405F 2E 07 0A 60    READIDX R7 0A60                    '.' or '#'
+; D 4063 2F 04 08 00    WRITEIDX R4 0800
+; D 4067 42 03          INCX R3
+; D 4069 42 04          INCX R4
+; D 406B 43 09          DECX R9
+; D 406D 8C 09          TESTXZ R9
+; D 406F A1 00 59       IFFALSEI BCi
+; D 4072 52 03 00 02    ADDXI R3 0002
+; D 4076 52 04 00 09    ADDXI R4 0009
+; D 407A 43 0A          DECX R10
+; D 407C 8C 0A          TESTXZ R10
+; D 407E A1 00 55       IFFALSEI BRi
+; D 4081 11 01 00 00    LOADXI R1 0000
+; D 4085 23 00 17       COPYXY R1 -> R7
+; D 4088 11 0E 00 00    LOADXI R14 0000
+; D 408C 11 08 03 E8    LOADXI R8 03E8
+; D 4090 4D 78          DIVXY R7 / R8
+; D 4092 25             COPYMAA
+; D 4093 4E 00 30       ADDAI 0030
+; D 4096 2F 0E 0A 13    WRITEIDX R14 0A13
+; D 409A 27             COPYREMA
+; D 409B 21 07          COPYAX Acc -> R7
+; D 409D 11 08 00 64    LOADXI R8 0064
+; D 40A1 4D 78          DIVXY R7 / R8
+; D 40A3 25             COPYMAA
+; D 40A4 4E 00 30       ADDAI 0030
+; D 40A7 2F 0E 0A 14    WRITEIDX R14 0A14
+; D 40AB 27             COPYREMA
+; D 40AC 21 07          COPYAX Acc -> R7
+; D 40AE 11 08 00 0A    LOADXI R8 000A
+; D 40B2 4D 78          DIVXY R7 / R8
+; D 40B4 25             COPYMAA
+; D 40B5 4E 00 30       ADDAI 0030
+; D 40B8 2F 0E 0A 15    WRITEIDX R14 0A15
+; D 40BC 27             COPYREMA
+; D 40BD 21 07          COPYAX Acc -> R7
+; D 40BF 22 07          COPYXA R7 -> Acc
+; D 40C1 4E 00 30       ADDAI 0030
+; D 40C4 2F 0E 0A 16    WRITEIDX R14 0A16
+; D 40C8 11 0E 08 00    LOADXI R14 0800
+; D 40CC 11 09 00 0A    LOADXI R9 000A
+; SR0:
+; D 40D0 C1 0E          PRINTSTR R14                       One board row: ONE opcode, never cut
+; D 40D2 52 0E 00 21    ADDXI R14 0021
+; D 40D6 43 09          DECX R9
+; D 40D8 8C 09          TESTXZ R9
+; D 40DA A1 00 D0       IFFALSEI SR0
+; D 40DD 11 0E 0A 00    LOADXI R14 0A00
+; D 40E1 C1 0E          PRINTSTR R14                       The generation count
+; D 40E3 11 0B 00 01    LOADXI R11 0001                    GO: VM2 may start drawing
+; LOOP:
+; D 40E7 11 03 00 1B    LOADXI R3 001B                     The first interior cell
+; D 40EB 11 04 00 08    LOADXI R4 0008                     row string: past the header
+; D 40EF 11 09 00 33    LOADXI R9 0033                     end of the first row
+; D 40F3 11 0A 00 0A    LOADXI R10 000A
+; GR0:
+; D 40F7 BD 03 35       CALL ESCCHK                        Once a row: ESC quits
+; D 40FA 11 05 00 00    LOADXI R5 0000                     L = the dead border column
+; D 40FE 2E 03 0A E6    READIDX R3 0AE6                    M = column sum under the first cell
+; D 4102 21 06          COPYAX Acc -> R6
+; D 4104 2E 03 0B 00    READIDX R3 0B00
+; D 4108 46 06          ADDAX R6
+; D 410A 21 16          COPYAX MA -> R6
+; D 410C 2E 03 0B 1A    READIDX R3 0B1A
+; D 4110 46 06          ADDAX R6
+; D 4112 21 16          COPYAX MA -> R6
+; GC0:
+; D 4114 2E 03 0A E7    READIDX R3 0AE7                    R = the ONE new column sum
+; D 4118 21 07          COPYAX Acc -> R7
+; D 411A 2E 03 0B 01    READIDX R3 0B01
+; D 411E 46 07          ADDAX R7
+; D 4120 21 17          COPYAX MA -> R7
+; D 4122 2E 03 0B 1B    READIDX R3 0B1B
+; D 4126 46 07          ADDAX R7
+; D 4128 21 17          COPYAX MA -> R7
+; D 412A 50 56 08       ADDXYZ R5 + R6 -> R8
+; D 412D 50 87 08       ADDXYZ R8 + R7 -> R8               T = L + M + R: the 3 x 3 total
+; D 4130 86 08 00 03    TESTXI R8 0003
+; D 4134 A0 01 48       IFTRUEI GA0                        3: alive
+; D 4137 86 08 00 04    TESTXI R8 0004
+; D 413B A1 01 59       IFFALSEI GD0                       not 3 or 4: dead
+; D 413E 2E 03 0B 00    READIDX R3 0B00                    4: as it was
+; D 4142 81 00 01       TESTAI 0001
+; D 4145 A1 01 59       IFFALSEI GD0
+; GA0:
+; D 4148 10 00 01       LOADAI 0001
+; D 414B 2F 03 0D 00    WRITEIDX R3 0D00
+; D 414F 10 00 23       LOADAI 0023
+; D 4152 2F 04 08 00    WRITEIDX R4 0800
+; D 4156 B0 01 67       GAL GN0
+; GD0:
+; D 4159 10 00 00       LOADAI 0000
+; D 415C 2F 03 0D 00    WRITEIDX R3 0D00
+; D 4160 10 00 2E       LOADAI 002E
+; D 4163 2F 04 08 00    WRITEIDX R4 0800
+; GN0:
+; D 4167 23 00 65       COPYXY R6 -> R5                    slide: L = M
+; D 416A 23 00 76       COPYXY R7 -> R6                    M = R
+; D 416D 42 03          INCX R3
+; D 416F 42 04          INCX R4
+; D 4171 87 39          TESTXY R3 = R9
+; D 4173 A1 01 14       IFFALSEI GC0
+; D 4176 52 03 00 02    ADDXI R3 0002                      over the two border cells
+; D 417A 52 04 00 09    ADDXI R4 0009                      the next row string
+; D 417E 52 09 00 1A    ADDXI R9 001A
+; D 4182 43 0A          DECX R10
+; D 4184 8C 0A          TESTXZ R10
+; D 4186 A1 00 F7       IFFALSEI GR0
+; D 4189 42 01          INCX R1
+; D 418B 23 00 17       COPYXY R1 -> R7
+; D 418E 11 0E 00 00    LOADXI R14 0000
+; D 4192 11 08 03 E8    LOADXI R8 03E8
+; D 4196 4D 78          DIVXY R7 / R8
+; D 4198 25             COPYMAA
+; D 4199 4E 00 30       ADDAI 0030
+; D 419C 2F 0E 0A 13    WRITEIDX R14 0A13
+; D 41A0 27             COPYREMA
+; D 41A1 21 07          COPYAX Acc -> R7
+; D 41A3 11 08 00 64    LOADXI R8 0064
+; D 41A7 4D 78          DIVXY R7 / R8
+; D 41A9 25             COPYMAA
+; D 41AA 4E 00 30       ADDAI 0030
+; D 41AD 2F 0E 0A 14    WRITEIDX R14 0A14
+; D 41B1 27             COPYREMA
+; D 41B2 21 07          COPYAX Acc -> R7
+; D 41B4 11 08 00 0A    LOADXI R8 000A
+; D 41B8 4D 78          DIVXY R7 / R8
+; D 41BA 25             COPYMAA
+; D 41BB 4E 00 30       ADDAI 0030
+; D 41BE 2F 0E 0A 15    WRITEIDX R14 0A15
+; D 41C2 27             COPYREMA
+; D 41C3 21 07          COPYAX Acc -> R7
+; D 41C5 22 07          COPYXA R7 -> Acc
+; D 41C7 4E 00 30       ADDAI 0030
+; D 41CA 2F 0E 0A 16    WRITEIDX R14 0A16
+; D 41CE 11 0E 08 00    LOADXI R14 0800
+; D 41D2 11 09 00 0A    LOADXI R9 000A
+; SRs0:
+; D 41D6 C1 0E          PRINTSTR R14                       One board row: ONE opcode, never cut
+; D 41D8 52 0E 00 21    ADDXI R14 0021
+; D 41DC 43 09          DECX R9
+; D 41DE 8C 09          TESTXZ R9
+; D 41E0 A1 01 D6       IFFALSEI SRs0
+; D 41E3 11 0E 0A 00    LOADXI R14 0A00
+; D 41E7 C1 0E          PRINTSTR R14                       The generation count
+; D 41E9 86 01 00 08    TESTXI R1 0008
+; D 41ED A0 02 FC       IFTRUEI END
+; D 41F0 11 03 00 1B    LOADXI R3 001B                     The first interior cell
+; D 41F4 11 04 00 08    LOADXI R4 0008                     row string: past the header
+; D 41F8 11 09 00 33    LOADXI R9 0033                     end of the first row
+; D 41FC 11 0A 00 0A    LOADXI R10 000A
+; GR1:
+; D 4200 BD 03 35       CALL ESCCHK                        Once a row: ESC quits
+; D 4203 11 05 00 00    LOADXI R5 0000                     L = the dead border column
+; D 4207 2E 03 0C E6    READIDX R3 0CE6                    M = column sum under the first cell
+; D 420B 21 06          COPYAX Acc -> R6
+; D 420D 2E 03 0D 00    READIDX R3 0D00
+; D 4211 46 06          ADDAX R6
+; D 4213 21 16          COPYAX MA -> R6
+; D 4215 2E 03 0D 1A    READIDX R3 0D1A
+; D 4219 46 06          ADDAX R6
+; D 421B 21 16          COPYAX MA -> R6
+; GC1:
+; D 421D 2E 03 0C E7    READIDX R3 0CE7                    R = the ONE new column sum
+; D 4221 21 07          COPYAX Acc -> R7
+; D 4223 2E 03 0D 01    READIDX R3 0D01
+; D 4227 46 07          ADDAX R7
+; D 4229 21 17          COPYAX MA -> R7
+; D 422B 2E 03 0D 1B    READIDX R3 0D1B
+; D 422F 46 07          ADDAX R7
+; D 4231 21 17          COPYAX MA -> R7
+; D 4233 50 56 08       ADDXYZ R5 + R6 -> R8
+; D 4236 50 87 08       ADDXYZ R8 + R7 -> R8               T = L + M + R: the 3 x 3 total
+; D 4239 86 08 00 03    TESTXI R8 0003
+; D 423D A0 02 51       IFTRUEI GA1                        3: alive
+; D 4240 86 08 00 04    TESTXI R8 0004
+; D 4244 A1 02 62       IFFALSEI GD1                       not 3 or 4: dead
+; D 4247 2E 03 0D 00    READIDX R3 0D00                    4: as it was
+; D 424B 81 00 01       TESTAI 0001
+; D 424E A1 02 62       IFFALSEI GD1
+; GA1:
+; D 4251 10 00 01       LOADAI 0001
+; D 4254 2F 03 0B 00    WRITEIDX R3 0B00
+; D 4258 10 00 23       LOADAI 0023
+; D 425B 2F 04 08 00    WRITEIDX R4 0800
+; D 425F B0 02 70       GAL GN1
+; GD1:
+; D 4262 10 00 00       LOADAI 0000
+; D 4265 2F 03 0B 00    WRITEIDX R3 0B00
+; D 4269 10 00 2E       LOADAI 002E
+; D 426C 2F 04 08 00    WRITEIDX R4 0800
+; GN1:
+; D 4270 23 00 65       COPYXY R6 -> R5                    slide: L = M
+; D 4273 23 00 76       COPYXY R7 -> R6                    M = R
+; D 4276 42 03          INCX R3
+; D 4278 42 04          INCX R4
+; D 427A 87 39          TESTXY R3 = R9
+; D 427C A1 02 1D       IFFALSEI GC1
+; D 427F 52 03 00 02    ADDXI R3 0002                      over the two border cells
+; D 4283 52 04 00 09    ADDXI R4 0009                      the next row string
+; D 4287 52 09 00 1A    ADDXI R9 001A
+; D 428B 43 0A          DECX R10
+; D 428D 8C 0A          TESTXZ R10
+; D 428F A1 02 00       IFFALSEI GR1
+; D 4292 42 01          INCX R1
+; D 4294 23 00 17       COPYXY R1 -> R7
+; D 4297 11 0E 00 00    LOADXI R14 0000
+; D 429B 11 08 03 E8    LOADXI R8 03E8
+; D 429F 4D 78          DIVXY R7 / R8
+; D 42A1 25             COPYMAA
+; D 42A2 4E 00 30       ADDAI 0030
+; D 42A5 2F 0E 0A 13    WRITEIDX R14 0A13
+; D 42A9 27             COPYREMA
+; D 42AA 21 07          COPYAX Acc -> R7
+; D 42AC 11 08 00 64    LOADXI R8 0064
+; D 42B0 4D 78          DIVXY R7 / R8
+; D 42B2 25             COPYMAA
+; D 42B3 4E 00 30       ADDAI 0030
+; D 42B6 2F 0E 0A 14    WRITEIDX R14 0A14
+; D 42BA 27             COPYREMA
+; D 42BB 21 07          COPYAX Acc -> R7
+; D 42BD 11 08 00 0A    LOADXI R8 000A
+; D 42C1 4D 78          DIVXY R7 / R8
+; D 42C3 25             COPYMAA
+; D 42C4 4E 00 30       ADDAI 0030
+; D 42C7 2F 0E 0A 15    WRITEIDX R14 0A15
+; D 42CB 27             COPYREMA
+; D 42CC 21 07          COPYAX Acc -> R7
+; D 42CE 22 07          COPYXA R7 -> Acc
+; D 42D0 4E 00 30       ADDAI 0030
+; D 42D3 2F 0E 0A 16    WRITEIDX R14 0A16
+; D 42D7 11 0E 08 00    LOADXI R14 0800
+; D 42DB 11 09 00 0A    LOADXI R9 000A
+; SRs1:
+; D 42DF C1 0E          PRINTSTR R14                       One board row: ONE opcode, never cut
+; D 42E1 52 0E 00 21    ADDXI R14 0021
+; D 42E5 43 09          DECX R9
+; D 42E7 8C 09          TESTXZ R9
+; D 42E9 A1 02 DF       IFFALSEI SRs1
+; D 42EC 11 0E 0A 00    LOADXI R14 0A00
+; D 42F0 C1 0E          PRINTSTR R14                       The generation count
+; D 42F2 86 01 00 08    TESTXI R1 0008
+; D 42F6 A0 02 FC       IFTRUEI END
+; D 42F9 B0 00 E7       GAL LOOP
+; END:
+; D 42FC 11 0B 00 02    LOADXI R11 0002                    RB = 2: ask VM2 to stop (it looks every two generations)
+; STOPW:
+; D 4300 86 0C 00 01    TESTXI R12 0001
+; D 4304 A1 03 00       IFFALSEI STOPW                     Wait until it has: its count is then in R5
+; D 4307 11 0E 0F 19    LOADXI R14 0F19
+; D 430B C1 0E          PRINTSTR R14
+; D 430D 11 0E 0F 50    LOADXI R14 0F50
+; D 4311 C1 0E          PRINTSTR R14
+; D 4313 23 00 54       COPYXY R5 -> R4
+; D 4316 BD 03 54       CALL PRNUM
+; D 4319 11 0E 0F 61    LOADXI R14 0F61
+; D 431D C1 0E          PRINTSTR R14
+; D 431F 11 07 00 08    LOADXI R7 0008
+; D 4323 4D 57          DIVXY R5 / R7                      VM2 / VM1
+; D 4325 25             COPYMAA
+; D 4326 21 04          COPYAX Acc -> R4
+; D 4328 BD 03 54       CALL PRNUM
+; D 432B 11 0E 0F 7A    LOADXI R14 0F7A
+; D 432F C1 0E          PRINTSTR R14
+; D 4331 00             HALT
+; D 4332 F0 00 00       BREAK
+; ESCCHK:
+; D 4335 CC             SERST
+; D 4336 A1 03 40       IFFALSEI ESCR
+; D 4339 CB             SERIN
+; D 433A 81 00 1B       TESTAI 001B
+; D 433D A0 03 42       IFTRUEI QUIT
+; ESCR:
+; D 4340 BE 00          RETURN
+; QUIT:
+; D 4342 11 0B 00 02    LOADXI R11 0002                    RB = 2: VM2 halts itself (KILLVM would wreck its START byte)
+; QUITW:
+; D 4346 86 0C 00 01    TESTXI R12 0001
+; D 434A A1 03 46       IFFALSEI QUITW                     Wait until it has
+; D 434D 11 0E 0F 98    LOADXI R14 0F98
+; D 4351 C1 0E          PRINTSTR R14
+; D 4353 00             HALT                               Quit by ESC
+; PRNUM:
+; D 4354 11 08 00 00    LOADXI R8 0000
+; PN1:
+; D 4358 4D 4F          DIVXY R4 / R15
+; D 435A 27             COPYREMA
+; D 435B 70 00          PUSHA Acc                          digits onto the stack
+; D 435D 42 08          INCX R8
+; D 435F 25             COPYMAA
+; D 4360 21 04          COPYAX Acc -> R4
+; D 4362 8C 04          TESTXZ R4
+; D 4364 A1 03 58       IFFALSEI PN1
+; PN2:
+; D 4367 71 00          POPA Acc
+; D 4369 4E 00 30       ADDAI 0030
+; D 436C C9             SEROUT
+; D 436D 43 08          DECX R8
+; D 436F 8C 08          TESTXZ R8
+; D 4371 A1 03 67       IFFALSEI PN2
+; D 4374 BE 00          RETURN
+
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  VM2 ($5000): native 1802 via RUNMC  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 5000 CD             START
+; D 5001 D0 11          SHAREVM on, read-only
+; D 5003 11 01 00 00    LOADXI R1 0000
+; D 5007 11 03 0B 00    LOADXI R3 0B00
+; D 500B 11 04 0E 37    LOADXI R4 0E37
+; D 500F FB 34 00       FILLMEMXY R3..R4 00                Boards A and B (and the gap between) all dead
+; D 5012 11 03 00 00    LOADXI R3 0000
+; D 5016 10 00 01       LOADAI 0001                        the acorn
+; D 5019 2F 03 0B 72    WRITEIDX R3 0B72
+; D 501D 2F 03 0B 8E    WRITEIDX R3 0B8E
+; D 5021 2F 03 0B A5    WRITEIDX R3 0BA5
+; D 5025 2F 03 0B A6    WRITEIDX R3 0BA6
+; D 5029 2F 03 0B A9    WRITEIDX R3 0BA9
+; D 502D 2F 03 0B AA    WRITEIDX R3 0BAA
+; D 5031 2F 03 0B AB    WRITEIDX R3 0BAB
+; WAIT:
+; D 5035 D3 10 B4       COPYVXY VM1 RB -> R4               VM1's GO register
+; D 5038 86 04 00 01    TESTXI R4 0001
+; D 503C A1 00 35       IFFALSEI WAIT                      Wait for VM1 to clear the screen
+; D 503F F1 56 60       RUNMC 5660                         The row strings from board A (the acorn), natively
+; D 5042 23 00 17       COPYXY R1 -> R7
+; D 5045 11 0E 00 00    LOADXI R14 0000
+; D 5049 11 08 03 E8    LOADXI R8 03E8
+; D 504D 4D 78          DIVXY R7 / R8
+; D 504F 25             COPYMAA
+; D 5050 4E 00 30       ADDAI 0030
+; D 5053 2F 0E 0A 13    WRITEIDX R14 0A13
+; D 5057 27             COPYREMA
+; D 5058 21 07          COPYAX Acc -> R7
+; D 505A 11 08 00 64    LOADXI R8 0064
+; D 505E 4D 78          DIVXY R7 / R8
+; D 5060 25             COPYMAA
+; D 5061 4E 00 30       ADDAI 0030
+; D 5064 2F 0E 0A 14    WRITEIDX R14 0A14
+; D 5068 27             COPYREMA
+; D 5069 21 07          COPYAX Acc -> R7
+; D 506B 11 08 00 0A    LOADXI R8 000A
+; D 506F 4D 78          DIVXY R7 / R8
+; D 5071 25             COPYMAA
+; D 5072 4E 00 30       ADDAI 0030
+; D 5075 2F 0E 0A 15    WRITEIDX R14 0A15
+; D 5079 27             COPYREMA
+; D 507A 21 07          COPYAX Acc -> R7
+; D 507C 22 07          COPYXA R7 -> Acc
+; D 507E 4E 00 30       ADDAI 0030
+; D 5081 2F 0E 0A 16    WRITEIDX R14 0A16
+; D 5085 11 0E 08 00    LOADXI R14 0800
+; D 5089 11 09 00 0A    LOADXI R9 000A
+; SR0:
+; D 508D C1 0E          PRINTSTR R14                       One board row: ONE opcode, never cut
+; D 508F 52 0E 00 21    ADDXI R14 0021
+; D 5093 43 09          DECX R9
+; D 5095 8C 09          TESTXZ R9
+; D 5097 A1 00 8D       IFFALSEI SR0
+; D 509A 11 0E 0A 00    LOADXI R14 0A00
+; D 509E C1 0E          PRINTSTR R14                       The generation count
+; LOOP:
+; D 50A0 F1 56 00       RUNMC 5600                         One generation, natively
+; D 50A3 42 01          INCX R1
+; D 50A5 F1 56 80       RUNMC 5680                         Its row strings, natively
+; D 50A8 23 00 17       COPYXY R1 -> R7
+; D 50AB 11 0E 00 00    LOADXI R14 0000
+; D 50AF 11 08 03 E8    LOADXI R8 03E8
+; D 50B3 4D 78          DIVXY R7 / R8
+; D 50B5 25             COPYMAA
+; D 50B6 4E 00 30       ADDAI 0030
+; D 50B9 2F 0E 0A 13    WRITEIDX R14 0A13
+; D 50BD 27             COPYREMA
+; D 50BE 21 07          COPYAX Acc -> R7
+; D 50C0 11 08 00 64    LOADXI R8 0064
+; D 50C4 4D 78          DIVXY R7 / R8
+; D 50C6 25             COPYMAA
+; D 50C7 4E 00 30       ADDAI 0030
+; D 50CA 2F 0E 0A 14    WRITEIDX R14 0A14
+; D 50CE 27             COPYREMA
+; D 50CF 21 07          COPYAX Acc -> R7
+; D 50D1 11 08 00 0A    LOADXI R8 000A
+; D 50D5 4D 78          DIVXY R7 / R8
+; D 50D7 25             COPYMAA
+; D 50D8 4E 00 30       ADDAI 0030
+; D 50DB 2F 0E 0A 15    WRITEIDX R14 0A15
+; D 50DF 27             COPYREMA
+; D 50E0 21 07          COPYAX Acc -> R7
+; D 50E2 22 07          COPYXA R7 -> Acc
+; D 50E4 4E 00 30       ADDAI 0030
+; D 50E7 2F 0E 0A 16    WRITEIDX R14 0A16
+; D 50EB 11 0E 08 00    LOADXI R14 0800
+; D 50EF 11 09 00 0A    LOADXI R9 000A
+; SRs0:
+; D 50F3 C1 0E          PRINTSTR R14                       One board row: ONE opcode, never cut
+; D 50F5 52 0E 00 21    ADDXI R14 0021
+; D 50F9 43 09          DECX R9
+; D 50FB 8C 09          TESTXZ R9
+; D 50FD A1 00 F3       IFFALSEI SRs0
+; D 5100 11 0E 0A 00    LOADXI R14 0A00
+; D 5104 C1 0E          PRINTSTR R14                       The generation count
+; D 5106 F1 56 30       RUNMC 5630                         One generation, natively
+; D 5109 42 01          INCX R1
+; D 510B F1 56 60       RUNMC 5660                         Its row strings, natively
+; D 510E 23 00 17       COPYXY R1 -> R7
+; D 5111 11 0E 00 00    LOADXI R14 0000
+; D 5115 11 08 03 E8    LOADXI R8 03E8
+; D 5119 4D 78          DIVXY R7 / R8
+; D 511B 25             COPYMAA
+; D 511C 4E 00 30       ADDAI 0030
+; D 511F 2F 0E 0A 13    WRITEIDX R14 0A13
+; D 5123 27             COPYREMA
+; D 5124 21 07          COPYAX Acc -> R7
+; D 5126 11 08 00 64    LOADXI R8 0064
+; D 512A 4D 78          DIVXY R7 / R8
+; D 512C 25             COPYMAA
+; D 512D 4E 00 30       ADDAI 0030
+; D 5130 2F 0E 0A 14    WRITEIDX R14 0A14
+; D 5134 27             COPYREMA
+; D 5135 21 07          COPYAX Acc -> R7
+; D 5137 11 08 00 0A    LOADXI R8 000A
+; D 513B 4D 78          DIVXY R7 / R8
+; D 513D 25             COPYMAA
+; D 513E 4E 00 30       ADDAI 0030
+; D 5141 2F 0E 0A 15    WRITEIDX R14 0A15
+; D 5145 27             COPYREMA
+; D 5146 21 07          COPYAX Acc -> R7
+; D 5148 22 07          COPYXA R7 -> Acc
+; D 514A 4E 00 30       ADDAI 0030
+; D 514D 2F 0E 0A 16    WRITEIDX R14 0A16
+; D 5151 11 0E 08 00    LOADXI R14 0800
+; D 5155 11 09 00 0A    LOADXI R9 000A
+; SRs1:
+; D 5159 C1 0E          PRINTSTR R14                       One board row: ONE opcode, never cut
+; D 515B 52 0E 00 21    ADDXI R14 0021
+; D 515F 43 09          DECX R9
+; D 5161 8C 09          TESTXZ R9
+; D 5163 A1 01 59       IFFALSEI SRs1
+; D 5166 11 0E 0A 00    LOADXI R14 0A00
+; D 516A C1 0E          PRINTSTR R14                       The generation count
+; D 516C D3 10 B4       COPYVXY VM1 RB -> R4               Every two generations: has VM1 asked us to stop?
+; D 516F 86 04 00 02    TESTXI R4 0002
+; D 5173 A1 00 A0       IFFALSEI LOOP
+; D 5176 D3 11 51       COPYVXY save R1 -> VM1 R5          Tell VM1 our generation count ...
+; D 5179 11 04 00 01    LOADXI R4 0001
+; D 517D D3 11 C4       COPYVXY save R4 -> VM1 RC          ... and that we have stopped
+; D 5180 00             HALT                               Stop by ourselves: KILLVM would erase our START byte
+; D 5181 F0 00 00       BREAK
+
+; --- VM2 native engine: a18 listing of Firmware-Math/gollife_native.asm ---
+; 5600 F8 5B        GENAB:  LDI     HIGH GRIDA
+; 5602 B7                   PHI     R7
+; 5603 F8 00                LDI     LOW  GRIDA
+; 5605 A7                   PLO     R7
+; 5606 F8 5B                LDI     HIGH (GRIDA+STRIDE)
+; 5608 B8                   PHI     R8
+; 5609 F8 1A                LDI     LOW  (GRIDA+STRIDE)
+; 560B A8                   PLO     R8
+; 560C F8 5B                LDI     HIGH (GRIDA+2*STRIDE)
+; 560E B9                   PHI     R9
+; 560F F8 34                LDI     LOW  (GRIDA+2*STRIDE)
+; 5611 A9                   PLO     R9
+; 5612 F8 5D                LDI     HIGH (GRIDB+STRIDE+1)
+; 5614 BE                   PHI     R14
+; 5615 F8 1B                LDI     LOW  (GRIDB+STRIDE+1)
+; 5617 AE                   PLO     R14
+; 5618 C0 57 00             LBR     BODY
+; 5630 F8 5D        GENBA:  LDI     HIGH GRIDB
+; 5632 B7                   PHI     R7
+; 5633 F8 00                LDI     LOW  GRIDB
+; 5635 A7                   PLO     R7
+; 5636 F8 5D                LDI     HIGH (GRIDB+STRIDE)
+; 5638 B8                   PHI     R8
+; 5639 F8 1A                LDI     LOW  (GRIDB+STRIDE)
+; 563B A8                   PLO     R8
+; 563C F8 5D                LDI     HIGH (GRIDB+2*STRIDE)
+; 563E B9                   PHI     R9
+; 563F F8 34                LDI     LOW  (GRIDB+2*STRIDE)
+; 5641 A9                   PLO     R9
+; 5642 F8 5B                LDI     HIGH (GRIDA+STRIDE+1)
+; 5644 BE                   PHI     R14
+; 5645 F8 1B                LDI     LOW  (GRIDA+STRIDE+1)
+; 5647 AE                   PLO     R14
+; 5648 C0 57 00             LBR     BODY
+; 5660 F8 5B        ROWSA:  LDI     HIGH (GRIDA+STRIDE+1)
+; 5662 B7                   PHI     R7
+; 5663 F8 1B                LDI     LOW  (GRIDA+STRIDE+1)
+; 5665 A7                   PLO     R7
+; 5666 C0 57 41             LBR     RBODY
+; 5680 F8 5D        ROWSB:  LDI     HIGH (GRIDB+STRIDE+1)
+; 5682 B7                   PHI     R7
+; 5683 F8 1B                LDI     LOW  (GRIDB+STRIDE+1)
+; 5685 A7                   PLO     R7
+; 5686 C0 57 41             LBR     RBODY
+; 5700 F8 0A        BODY:   LDI     ROWS
+; 5702 AB                   PLO     R11
+; 5703 F8 18        ROW:    LDI     COLS
+; 5705 AF                   PLO     R15
+; 5706 F8 00        COL:    LDI     000H
+; 5708 E7                   SEX     R7              ; row above: three cells
+; 5709 F4                   ADD
+; 570A 60                   IRX
+; 570B F4                   ADD
+; 570C 60                   IRX
+; 570D F4                   ADD
+; 570E 60                   IRX
+; 570F 27                   DEC     R7
+; 5710 27                   DEC     R7
+; 5711 E9                   SEX     R9              ; row below
+; 5712 F4                   ADD
+; 5713 60                   IRX
+; 5714 F4                   ADD
+; 5715 60                   IRX
+; 5716 F4                   ADD
+; 5717 60                   IRX
+; 5718 29                   DEC     R9
+; 5719 29                   DEC     R9
+; 571A E8                   SEX     R8              ; centre row: left and right
+; 571B F4                   ADD
+; 571C 60                   IRX
+; 571D 60                   IRX
+; 571E F4                   ADD
+; 571F 60                   IRX
+; 5720 28                   DEC     R8
+; 5721 28                   DEC     R8              ; R8 is ON the centre cell
+; 5722 F1                   OR                      ; sum OR centre
+; 5723 FF 03                SMI     003H
+; 5725 3A 2B                BNZ     DEAD
+; 5727 F8 01                LDI     001H
+; 5729 30 2D                BR      PUT
+; 572B F8 00        DEAD:   LDI     000H
+; 572D 5E           PUT:    STR     R14
+; 572E 1E                   INC     R14
+; 572F 2F                   DEC     R15
+; 5730 8F                   GLO     R15
+; 5731 3A 06                BNZ     COL
+; 5733 17                   INC     R7              ; over the two border cells
+; 5734 17                   INC     R7
+; 5735 18                   INC     R8
+; 5736 18                   INC     R8
+; 5737 19                   INC     R9
+; 5738 19                   INC     R9
+; 5739 1E                   INC     R14
+; 573A 1E                   INC     R14
+; 573B 2B                   DEC     R11
+; 573C 8B                   GLO     R11
+; 573D 3A 03                BNZ     ROW
+; 573F E2                   SEX     R2
+; 5740 D5                   SEP     R5
+; 5741 F8 58        RBODY:  LDI     HIGH (ROWSTR+8)
+; 5743 B8                   PHI     R8
+; 5744 F8 08                LDI     LOW  (ROWSTR+8)
+; 5746 A8                   PLO     R8
+; 5747 F8 0A                LDI     ROWS
+; 5749 AB                   PLO     R11
+; 574A F8 18        RROW:   LDI     COLS
+; 574C AF                   PLO     R15
+; 574D 47           RCOL:   LDA     R7
+; 574E 32 54                BZ      RDOT
+; 5750 F8 23                LDI     '#'
+; 5752 30 56                BR      RPUT
+; 5754 F8 2E        RDOT:   LDI     '.'
+; 5756 58           RPUT:   STR     R8
+; 5757 18                   INC     R8
+; 5758 2F                   DEC     R15
+; 5759 8F                   GLO     R15
+; 575A 3A 4D                BNZ     RCOL
+; 575C 17                   INC     R7              ; next board row: over two border cells
+; 575D 17                   INC     R7
+; 575E 88                   GLO     R8              ; next row string: past $00 and the header
+; 575F FC 09                ADI     RSTR-COLS
+; 5761 A8                   PLO     R8
+; 5762 98                   GHI     R8
+; 5763 7C 00                ADCI    0
+; 5765 B8                   PHI     R8
+; 5766 2B                   DEC     R11
+; 5767 8B                   GLO     R11
+; 5768 3A 4A                BNZ     RROW
+; 576A E2                   SEX     R2
+; 576B D5                   SEP     R5
+
+; --------------------------------------------------------------------------
+; CODE  -  download this block (VM1, then VM2 with its native engine)
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 11 0B 00 00
+D 4005 11 0C 00 00
+D 4009 11 0F 00 0A
+D 400D D0 12
+D 400F 11 0E 0E 80
+D 4013 C1 0E
+D 4015 11 0E 0E D9
+D 4019 C1 0E
+D 401B 11 03 0B 00
+D 401F 11 04 0E 37
+D 4023 FB 34 00
+D 4026 11 03 00 00
+D 402A 10 00 01
+D 402D 2F 03 0B 72
+D 4031 2F 03 0B 8E
+D 4035 2F 03 0B A5
+D 4039 2F 03 0B A6
+D 403D 2F 03 0B A9
+D 4041 2F 03 0B AA
+D 4045 2F 03 0B AB
+D 4049 11 03 00 1B
+D 404D 11 04 00 08
+D 4051 11 0A 00 0A
+D 4055 11 09 00 18
+D 4059 2E 03 0B 00
+D 405D 21 07
+D 405F 2E 07 0A 60
+D 4063 2F 04 08 00
+D 4067 42 03
+D 4069 42 04
+D 406B 43 09
+D 406D 8C 09
+D 406F A1 00 59
+D 4072 52 03 00 02
+D 4076 52 04 00 09
+D 407A 43 0A
+D 407C 8C 0A
+D 407E A1 00 55
+D 4081 11 01 00 00
+D 4085 23 00 17
+D 4088 11 0E 00 00
+D 408C 11 08 03 E8
+D 4090 4D 78
+D 4092 25
+D 4093 4E 00 30
+D 4096 2F 0E 0A 13
+D 409A 27
+D 409B 21 07
+D 409D 11 08 00 64
+D 40A1 4D 78
+D 40A3 25
+D 40A4 4E 00 30
+D 40A7 2F 0E 0A 14
+D 40AB 27
+D 40AC 21 07
+D 40AE 11 08 00 0A
+D 40B2 4D 78
+D 40B4 25
+D 40B5 4E 00 30
+D 40B8 2F 0E 0A 15
+D 40BC 27
+D 40BD 21 07
+D 40BF 22 07
+D 40C1 4E 00 30
+D 40C4 2F 0E 0A 16
+D 40C8 11 0E 08 00
+D 40CC 11 09 00 0A
+D 40D0 C1 0E
+D 40D2 52 0E 00 21
+D 40D6 43 09
+D 40D8 8C 09
+D 40DA A1 00 D0
+D 40DD 11 0E 0A 00
+D 40E1 C1 0E
+D 40E3 11 0B 00 01
+D 40E7 11 03 00 1B
+D 40EB 11 04 00 08
+D 40EF 11 09 00 33
+D 40F3 11 0A 00 0A
+D 40F7 BD 03 35
+D 40FA 11 05 00 00
+D 40FE 2E 03 0A E6
+D 4102 21 06
+D 4104 2E 03 0B 00
+D 4108 46 06
+D 410A 21 16
+D 410C 2E 03 0B 1A
+D 4110 46 06
+D 4112 21 16
+D 4114 2E 03 0A E7
+D 4118 21 07
+D 411A 2E 03 0B 01
+D 411E 46 07
+D 4120 21 17
+D 4122 2E 03 0B 1B
+D 4126 46 07
+D 4128 21 17
+D 412A 50 56 08
+D 412D 50 87 08
+D 4130 86 08 00 03
+D 4134 A0 01 48
+D 4137 86 08 00 04
+D 413B A1 01 59
+D 413E 2E 03 0B 00
+D 4142 81 00 01
+D 4145 A1 01 59
+D 4148 10 00 01
+D 414B 2F 03 0D 00
+D 414F 10 00 23
+D 4152 2F 04 08 00
+D 4156 B0 01 67
+D 4159 10 00 00
+D 415C 2F 03 0D 00
+D 4160 10 00 2E
+D 4163 2F 04 08 00
+D 4167 23 00 65
+D 416A 23 00 76
+D 416D 42 03
+D 416F 42 04
+D 4171 87 39
+D 4173 A1 01 14
+D 4176 52 03 00 02
+D 417A 52 04 00 09
+D 417E 52 09 00 1A
+D 4182 43 0A
+D 4184 8C 0A
+D 4186 A1 00 F7
+D 4189 42 01
+D 418B 23 00 17
+D 418E 11 0E 00 00
+D 4192 11 08 03 E8
+D 4196 4D 78
+D 4198 25
+D 4199 4E 00 30
+D 419C 2F 0E 0A 13
+D 41A0 27
+D 41A1 21 07
+D 41A3 11 08 00 64
+D 41A7 4D 78
+D 41A9 25
+D 41AA 4E 00 30
+D 41AD 2F 0E 0A 14
+D 41B1 27
+D 41B2 21 07
+D 41B4 11 08 00 0A
+D 41B8 4D 78
+D 41BA 25
+D 41BB 4E 00 30
+D 41BE 2F 0E 0A 15
+D 41C2 27
+D 41C3 21 07
+D 41C5 22 07
+D 41C7 4E 00 30
+D 41CA 2F 0E 0A 16
+D 41CE 11 0E 08 00
+D 41D2 11 09 00 0A
+D 41D6 C1 0E
+D 41D8 52 0E 00 21
+D 41DC 43 09
+D 41DE 8C 09
+D 41E0 A1 01 D6
+D 41E3 11 0E 0A 00
+D 41E7 C1 0E
+D 41E9 86 01 00 08
+D 41ED A0 02 FC
+D 41F0 11 03 00 1B
+D 41F4 11 04 00 08
+D 41F8 11 09 00 33
+D 41FC 11 0A 00 0A
+D 4200 BD 03 35
+D 4203 11 05 00 00
+D 4207 2E 03 0C E6
+D 420B 21 06
+D 420D 2E 03 0D 00
+D 4211 46 06
+D 4213 21 16
+D 4215 2E 03 0D 1A
+D 4219 46 06
+D 421B 21 16
+D 421D 2E 03 0C E7
+D 4221 21 07
+D 4223 2E 03 0D 01
+D 4227 46 07
+D 4229 21 17
+D 422B 2E 03 0D 1B
+D 422F 46 07
+D 4231 21 17
+D 4233 50 56 08
+D 4236 50 87 08
+D 4239 86 08 00 03
+D 423D A0 02 51
+D 4240 86 08 00 04
+D 4244 A1 02 62
+D 4247 2E 03 0D 00
+D 424B 81 00 01
+D 424E A1 02 62
+D 4251 10 00 01
+D 4254 2F 03 0B 00
+D 4258 10 00 23
+D 425B 2F 04 08 00
+D 425F B0 02 70
+D 4262 10 00 00
+D 4265 2F 03 0B 00
+D 4269 10 00 2E
+D 426C 2F 04 08 00
+D 4270 23 00 65
+D 4273 23 00 76
+D 4276 42 03
+D 4278 42 04
+D 427A 87 39
+D 427C A1 02 1D
+D 427F 52 03 00 02
+D 4283 52 04 00 09
+D 4287 52 09 00 1A
+D 428B 43 0A
+D 428D 8C 0A
+D 428F A1 02 00
+D 4292 42 01
+D 4294 23 00 17
+D 4297 11 0E 00 00
+D 429B 11 08 03 E8
+D 429F 4D 78
+D 42A1 25
+D 42A2 4E 00 30
+D 42A5 2F 0E 0A 13
+D 42A9 27
+D 42AA 21 07
+D 42AC 11 08 00 64
+D 42B0 4D 78
+D 42B2 25
+D 42B3 4E 00 30
+D 42B6 2F 0E 0A 14
+D 42BA 27
+D 42BB 21 07
+D 42BD 11 08 00 0A
+D 42C1 4D 78
+D 42C3 25
+D 42C4 4E 00 30
+D 42C7 2F 0E 0A 15
+D 42CB 27
+D 42CC 21 07
+D 42CE 22 07
+D 42D0 4E 00 30
+D 42D3 2F 0E 0A 16
+D 42D7 11 0E 08 00
+D 42DB 11 09 00 0A
+D 42DF C1 0E
+D 42E1 52 0E 00 21
+D 42E5 43 09
+D 42E7 8C 09
+D 42E9 A1 02 DF
+D 42EC 11 0E 0A 00
+D 42F0 C1 0E
+D 42F2 86 01 00 08
+D 42F6 A0 02 FC
+D 42F9 B0 00 E7
+D 42FC 11 0B 00 02
+D 4300 86 0C 00 01
+D 4304 A1 03 00
+D 4307 11 0E 0F 19
+D 430B C1 0E
+D 430D 11 0E 0F 50
+D 4311 C1 0E
+D 4313 23 00 54
+D 4316 BD 03 54
+D 4319 11 0E 0F 61
+D 431D C1 0E
+D 431F 11 07 00 08
+D 4323 4D 57
+D 4325 25
+D 4326 21 04
+D 4328 BD 03 54
+D 432B 11 0E 0F 7A
+D 432F C1 0E
+D 4331 00
+D 4332 F0 00 00
+D 4335 CC
+D 4336 A1 03 40
+D 4339 CB
+D 433A 81 00 1B
+D 433D A0 03 42
+D 4340 BE 00
+D 4342 11 0B 00 02
+D 4346 86 0C 00 01
+D 434A A1 03 46
+D 434D 11 0E 0F 98
+D 4351 C1 0E
+D 4353 00
+D 4354 11 08 00 00
+D 4358 4D 4F
+D 435A 27
+D 435B 70 00
+D 435D 42 08
+D 435F 25
+D 4360 21 04
+D 4362 8C 04
+D 4364 A1 03 58
+D 4367 71 00
+D 4369 4E 00 30
+D 436C C9
+D 436D 43 08
+D 436F 8C 08
+D 4371 A1 03 67
+D 4374 BE 00
+
+D 4800 1B 5B 30 35 3B 30 34 48 2E 2E 2E 2E 2E 2E 2E 2E
+D 4810 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4820 00 1B 5B 30 36 3B 30 34 48 2E 2E 2E 2E 2E 2E 2E
+D 4830 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4840 2E 00 1B 5B 30 37 3B 30 34 48 2E 2E 2E 2E 2E 2E
+D 4850 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4860 2E 2E 00 1B 5B 30 38 3B 30 34 48 2E 2E 2E 2E 2E
+D 4870 2E 2E 2E 2E 23 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4880 2E 2E 2E 00 1B 5B 30 39 3B 30 34 48 2E 2E 2E 2E
+D 4890 2E 2E 2E 2E 2E 2E 2E 23 2E 2E 2E 2E 2E 2E 2E 2E
+D 48A0 2E 2E 2E 2E 00 1B 5B 31 30 3B 30 34 48 2E 2E 2E
+D 48B0 2E 2E 2E 2E 2E 23 23 2E 2E 23 23 23 2E 2E 2E 2E
+D 48C0 2E 2E 2E 2E 2E 00 1B 5B 31 31 3B 30 34 48 2E 2E
+D 48D0 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 48E0 2E 2E 2E 2E 2E 2E 00 1B 5B 31 32 3B 30 34 48 2E
+D 48F0 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4900 2E 2E 2E 2E 2E 2E 2E 00 1B 5B 31 33 3B 30 34 48
+D 4910 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4920 2E 2E 2E 2E 2E 2E 2E 2E 00 1B 5B 31 34 3B 30 34
+D 4930 48 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4940 2E 2E 2E 2E 2E 2E 2E 2E 2E 00
+
+D 4A00 1B 5B 31 36 3B 30 34 48 67 65 6E 65 72 61 74 69
+D 4A10 6F 6E 20 30 30 30 30 00
+
+D 4A60 2E 23
+
+D 4E80 1B 5B 30 6D 1B 5B 32 4A 1B 5B 3F 32 35 6C 1B 5B
+D 4E90 30 31 3B 30 34 48 47 41 4D 45 20 4F 46 20 4C 49
+D 4EA0 46 45 20 52 41 43 45 20 20 2D 20 20 74 68 65 20
+D 4EB0 73 61 6D 65 20 62 6F 61 72 64 2C 20 74 68 65 20
+D 4EC0 73 61 6D 65 20 73 63 68 65 64 75 6C 65 72 2C 20
+D 4ED0 74 77 6F 20 77 61 79 73 00 1B 5B 30 33 3B 30 34
+D 4EE0 48 56 4D 31 3A 20 53 54 45 4C 4C 41 52 20 62 79
+D 4EF0 74 65 63 6F 64 65 1B 5B 30 33 3B 34 36 48 56 4D
+D 4F00 32 3A 20 6E 61 74 69 76 65 20 31 38 30 32 20 76
+D 4F10 69 61 20 52 55 4E 4D 43 00 1B 5B 31 38 3B 30 34
+D 4F20 48 49 6E 20 74 68 65 20 74 69 6D 65 20 56 4D 31
+D 4F30 20 64 69 64 20 38 20 67 65 6E 65 72 61 74 69 6F
+D 4F40 6E 73 20 69 6E 20 62 79 74 65 63 6F 64 65 2C 00
+D 4F50 1B 5B 31 39 3B 30 34 48 56 4D 32 20 64 69 64 20
+D 4F60 00 20 69 6E 20 6E 61 74 69 76 65 20 63 6F 64 65
+D 4F70 20 2D 20 61 62 6F 75 74 20 00 20 74 69 6D 65 73
+D 4F80 20 61 73 20 6D 61 6E 79 2E 1B 5B 32 31 3B 30 31
+D 4F90 48 1B 5B 3F 32 35 68 00 1B 5B 31 38 3B 30 34 48
+D 4FA0 53 74 6F 70 70 65 64 20 77 69 74 68 20 45 53 43
+D 4FB0 2E 1B 5B 4B 1B 5B 32 30 3B 30 31 48 1B 5B 3F 32
+D 4FC0 35 68 00
+
+D 5000 CD
+D 5001 D0 11
+D 5003 11 01 00 00
+D 5007 11 03 0B 00
+D 500B 11 04 0E 37
+D 500F FB 34 00
+D 5012 11 03 00 00
+D 5016 10 00 01
+D 5019 2F 03 0B 72
+D 501D 2F 03 0B 8E
+D 5021 2F 03 0B A5
+D 5025 2F 03 0B A6
+D 5029 2F 03 0B A9
+D 502D 2F 03 0B AA
+D 5031 2F 03 0B AB
+D 5035 D3 10 B4
+D 5038 86 04 00 01
+D 503C A1 00 35
+D 503F F1 56 60
+D 5042 23 00 17
+D 5045 11 0E 00 00
+D 5049 11 08 03 E8
+D 504D 4D 78
+D 504F 25
+D 5050 4E 00 30
+D 5053 2F 0E 0A 13
+D 5057 27
+D 5058 21 07
+D 505A 11 08 00 64
+D 505E 4D 78
+D 5060 25
+D 5061 4E 00 30
+D 5064 2F 0E 0A 14
+D 5068 27
+D 5069 21 07
+D 506B 11 08 00 0A
+D 506F 4D 78
+D 5071 25
+D 5072 4E 00 30
+D 5075 2F 0E 0A 15
+D 5079 27
+D 507A 21 07
+D 507C 22 07
+D 507E 4E 00 30
+D 5081 2F 0E 0A 16
+D 5085 11 0E 08 00
+D 5089 11 09 00 0A
+D 508D C1 0E
+D 508F 52 0E 00 21
+D 5093 43 09
+D 5095 8C 09
+D 5097 A1 00 8D
+D 509A 11 0E 0A 00
+D 509E C1 0E
+D 50A0 F1 56 00
+D 50A3 42 01
+D 50A5 F1 56 80
+D 50A8 23 00 17
+D 50AB 11 0E 00 00
+D 50AF 11 08 03 E8
+D 50B3 4D 78
+D 50B5 25
+D 50B6 4E 00 30
+D 50B9 2F 0E 0A 13
+D 50BD 27
+D 50BE 21 07
+D 50C0 11 08 00 64
+D 50C4 4D 78
+D 50C6 25
+D 50C7 4E 00 30
+D 50CA 2F 0E 0A 14
+D 50CE 27
+D 50CF 21 07
+D 50D1 11 08 00 0A
+D 50D5 4D 78
+D 50D7 25
+D 50D8 4E 00 30
+D 50DB 2F 0E 0A 15
+D 50DF 27
+D 50E0 21 07
+D 50E2 22 07
+D 50E4 4E 00 30
+D 50E7 2F 0E 0A 16
+D 50EB 11 0E 08 00
+D 50EF 11 09 00 0A
+D 50F3 C1 0E
+D 50F5 52 0E 00 21
+D 50F9 43 09
+D 50FB 8C 09
+D 50FD A1 00 F3
+D 5100 11 0E 0A 00
+D 5104 C1 0E
+D 5106 F1 56 30
+D 5109 42 01
+D 510B F1 56 60
+D 510E 23 00 17
+D 5111 11 0E 00 00
+D 5115 11 08 03 E8
+D 5119 4D 78
+D 511B 25
+D 511C 4E 00 30
+D 511F 2F 0E 0A 13
+D 5123 27
+D 5124 21 07
+D 5126 11 08 00 64
+D 512A 4D 78
+D 512C 25
+D 512D 4E 00 30
+D 5130 2F 0E 0A 14
+D 5134 27
+D 5135 21 07
+D 5137 11 08 00 0A
+D 513B 4D 78
+D 513D 25
+D 513E 4E 00 30
+D 5141 2F 0E 0A 15
+D 5145 27
+D 5146 21 07
+D 5148 22 07
+D 514A 4E 00 30
+D 514D 2F 0E 0A 16
+D 5151 11 0E 08 00
+D 5155 11 09 00 0A
+D 5159 C1 0E
+D 515B 52 0E 00 21
+D 515F 43 09
+D 5161 8C 09
+D 5163 A1 01 59
+D 5166 11 0E 0A 00
+D 516A C1 0E
+D 516C D3 10 B4
+D 516F 86 04 00 02
+D 5173 A1 00 A0
+D 5176 D3 11 51
+D 5179 11 04 00 01
+D 517D D3 11 C4
+D 5180 00
+D 5181 F0 00 00
+
+D 5600 F8 5B B7 F8 00 A7 F8 5B B8 F8 1A A8 F8 5B B9 F8
+D 5610 34 A9 F8 5D BE F8 1B AE C0 57 00 00 00 00 00 00
+D 5620 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 5630 F8 5D B7 F8 00 A7 F8 5D B8 F8 1A A8 F8 5D B9 F8
+D 5640 34 A9 F8 5B BE F8 1B AE C0 57 00 00 00 00 00 00
+D 5650 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 5660 F8 5B B7 F8 1B A7 C0 57 41 00 00 00 00 00 00 00
+D 5670 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 5680 F8 5D B7 F8 1B A7 C0 57 41 00 00 00 00 00 00 00
+D 5690 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 56A0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 56B0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 56C0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 56D0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 56E0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 56F0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 5700 F8 0A AB F8 18 AF F8 00 E7 F4 60 F4 60 F4 60 27
+D 5710 27 E9 F4 60 F4 60 F4 60 29 29 E8 F4 60 60 F4 60
+D 5720 28 28 F1 FF 03 3A 2B F8 01 30 2D F8 00 5E 1E 2F
+D 5730 8F 3A 06 17 17 18 18 19 19 1E 1E 2B 8B 3A 03 E2
+D 5740 D5 F8 58 B8 F8 08 A8 F8 0A AB F8 18 AF 47 32 54
+D 5750 F8 23 30 56 F8 2E 58 18 2F 8F 3A 4D 17 17 88 FC
+D 5760 09 A8 98 7C 00 B8 2B 8B 3A 4A E2 D5
+
+D 5800 1B 5B 30 35 3B 34 36 48 2E 2E 2E 2E 2E 2E 2E 2E
+D 5810 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 5820 00 1B 5B 30 36 3B 34 36 48 2E 2E 2E 2E 2E 2E 2E
+D 5830 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 5840 2E 00 1B 5B 30 37 3B 34 36 48 2E 2E 2E 2E 2E 2E
+D 5850 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 5860 2E 2E 00 1B 5B 30 38 3B 34 36 48 2E 2E 2E 2E 2E
+D 5870 2E 2E 2E 2E 23 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 5880 2E 2E 2E 00 1B 5B 30 39 3B 34 36 48 2E 2E 2E 2E
+D 5890 2E 2E 2E 2E 2E 2E 2E 23 2E 2E 2E 2E 2E 2E 2E 2E
+D 58A0 2E 2E 2E 2E 00 1B 5B 31 30 3B 34 36 48 2E 2E 2E
+D 58B0 2E 2E 2E 2E 2E 23 23 2E 2E 23 23 23 2E 2E 2E 2E
+D 58C0 2E 2E 2E 2E 2E 00 1B 5B 31 31 3B 34 36 48 2E 2E
+D 58D0 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 58E0 2E 2E 2E 2E 2E 2E 00 1B 5B 31 32 3B 34 36 48 2E
+D 58F0 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 5900 2E 2E 2E 2E 2E 2E 2E 00 1B 5B 31 33 3B 34 36 48
+D 5910 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 5920 2E 2E 2E 2E 2E 2E 2E 2E 00 1B 5B 31 34 3B 34 36
+D 5930 48 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 5940 2E 2E 2E 2E 2E 2E 2E 2E 2E 00
+
+D 5A00 1B 5B 31 36 3B 34 36 48 67 65 6E 65 72 61 74 69
+D 5A10 6F 6E 20 30 30 30 30 00
+
+D 5A60 2E 23
+D 6000 00
+D 7000 00
