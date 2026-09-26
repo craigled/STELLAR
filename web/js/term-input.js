@@ -47,6 +47,10 @@
         uart.buf.push(0x1B); uart.buf.push(0x5B); uart.buf.push(ARROWS[e.key]);
         return;
       }
+      // Home / End / PgUp / PgDn / Delete as a VT220 keyboard sends them (Lite-Writer uses them)
+      var SEQ = { Home: [0x1B, 0x5B, 0x48], End: [0x1B, 0x5B, 0x46], PageUp: [0x1B, 0x5B, 0x35, 0x7E],
+                  PageDown: [0x1B, 0x5B, 0x36, 0x7E], Delete: [0x1B, 0x5B, 0x33, 0x7E] }[e.key];
+      if (SEQ) { e.preventDefault(); for (var q = 0; q < SEQ.length; q++) uart.buf.push(SEQ[q]); return; }
       var code = keyToByte(e);
       if (code === null) return;
       e.preventDefault();

@@ -27,7 +27,7 @@
     "name": "Prime-Gen v07",
     "file": "Prime-Gen-v07.lst",
     "input": "3\r60\r",
-    "blurb": "Prime generator using the native OUTDEC opcode ($6E) for decimal print — CVT2DEC + OUTDEC, ~6x faster and smaller than the hand-rolled printer.",
+    "blurb": "Prime generator using the native OUTDEC opcode ($6E) for decimal print \u2014 CVT2DEC + OUTDEC, ~6x faster and smaller than the hand-rolled printer.",
     "maxSteps": 40000000,
     "halts": true
   },
@@ -75,6 +75,15 @@
     "speed": "flat out"
   },
   {
+    "name": "Lite-Writer 2 (word processor)",
+    "file": "Lite-Writer-2.lst",
+    "input": " Welcome to Lite-Writer 2, a word processor for the RCA 1802.",
+    "blurb": "A full-screen word processor. Click the terminal and type: words wrap at column 72, and the status bar on line 24 shows the slot, line, column, bytes free and MODIFIED. Arrows move; Home/End, PgUp/PgDn and Delete work; Backspace and ^D delete; ^K cuts a line and ^U pastes it; ^F finds text; ^S and ^L save to and load from four slots; ^N starts a new document; ^G shows all the keys; ^X leaves. (On Windows and Linux the browser keeps Ctrl-N and Ctrl-T for itself.) The editor is STELLAR bytecode; a native 1802 engine called through RUNMC runs the terminal and the text buffer, and reads the keyboard while it writes to the screen, so no key is lost. Uses SETSIZE and VM4's memory. Verified on the Elf2K.",
+    "maxSteps": 6000000,
+    "halts": false,
+    "speed": "flat out"
+  },
+  {
     "name": "Tic-Tac-Toe",
     "file": "Tic-Tac-Toe.lst",
     "input": "",
@@ -87,7 +96,7 @@
     "name": "Mandelbrot",
     "file": "Mandelbrot.lst",
     "input": "",
-    "blurb": "ASCII Mandelbrot, 40 x 24, in Q8.8 sign-magnitude fixed point. v09, rewritten for V0061.33: MULTXY + COPYAX MA make a multiply three opcodes, and the escape loop is all inline - 2.5x faster than the July version, with byte-identical output. Try 10x or flat out; at Elf2K speed it takes about 4½ minutes.",
+    "blurb": "ASCII Mandelbrot, 40 x 24, in Q8.8 sign-magnitude fixed point. v09, rewritten for V0061.33: MULTXY + COPYAX MA make a multiply three opcodes, and the escape loop is all inline - 2.5x faster than the July version, with byte-identical output. Try 10x or flat out; at Elf2K speed it takes about 4\u00bd minutes.",
     "maxSteps": 60000000,
     "halts": false
   },
@@ -95,7 +104,7 @@
     "name": "Front panel (Q + hex display)",
     "file": "Front-Panel.lst",
     "input": "",
-    "blurb": "Drives the Elf2K front panel instead of the terminal: lights the Q lamp and counts $00-$1F on the two-digit output display, then clears Q and halts. Serial output stays empty — watch the panel.",
+    "blurb": "Drives the Elf2K front panel instead of the terminal: lights the Q lamp and counts $00-$1F on the two-digit output display, then clears Q and halts. Serial output stays empty \u2014 watch the panel.",
     "maxSteps": 3000000,
     "halts": true
   },
