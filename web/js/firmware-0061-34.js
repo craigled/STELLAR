@@ -3,7 +3,7 @@
 (function(){
   var segs = [
     [0x0000, "MBA="],
-    [0x0003, "YSQBLwIDBBA/AQ=="],
+    [0x0003, "YTQBLwIDBBA/AQ=="],
     [0x0010, "+AO0tfhApPhgpXr4"],
     [0x001D, "9vg="],
     [0x0020, "s/glo9P4"],

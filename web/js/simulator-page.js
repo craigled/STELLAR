@@ -48,7 +48,7 @@
   function btn(id) { return document.getElementById(id); }
   var samples = [];
 
-  fetch('samples/manifest.json?v=57')
+  fetch('samples/manifest.json?v=58')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       samples = list;
@@ -75,6 +75,7 @@
     var s = samples[i];
     btn('input').value = (s.input || '').replace(/\r/g, '\\r');
     btn('blurb').textContent = s.blurb || '';
+    labelAppButton();
     // A sample can ask for a speed by its label ("flat out", "Elf2K", ...). ELIZA
     // wants flat out (slower, its start-up outlasts a visitor's first keystrokes);
     // Pong wants Elf2K, the hardware's real pace - flat out a game is over in seconds.
@@ -84,7 +85,7 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=57')
+    fetch('samples/' + s.file + '?v=58')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
@@ -161,6 +162,60 @@
   bodyEl.addEventListener('drop', function (e) {
     readFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
   });
+
+  // ---- downloads for the real machine ----
+  // The firmware goes out as Intel HEX: 16-byte data records covering the whole
+  // image $0000 up to the end of the firmware, gaps included as $00, so it loads the
+  // same over RAM that is not clean. Built here from the baked image, so it is always
+  // exactly what the simulator runs.
+  function hex2(n) { return (n < 16 ? '0' : '') + n.toString(16).toUpperCase(); }
+  function firmwareHex() {
+    var fw = window.STELLAR_FIRMWARE, end = 0, mem = new Uint8Array(0x10000);
+    fw.segments.forEach(function (sg) {
+      var b = atob(sg[1]);
+      for (var i = 0; i < b.length; i++) mem[sg[0] + i] = b.charCodeAt(i);
+      end = Math.max(end, sg[0] + b.length);
+    });
+    end = (end + 15) & ~15;
+    var out = [];
+    for (var a = 0; a < end; a += 16) {
+      var n = Math.min(16, end - a), rec = [n, a >> 8, a & 0xFF, 0], line = ':';
+      for (var i = 0; i < n; i++) rec.push(mem[a + i]);
+      var sum = 0;
+      rec.forEach(function (x) { sum += x; line += hex2(x); });
+      out.push(line + hex2((-sum) & 0xFF));
+    }
+    out.push(':00000001FF');
+    return { text: out.join('\r\n') + '\r\n', end: end };
+  }
+  function saveFile(name, text) {
+    var url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    var a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  btn('dlFw').addEventListener('click', function () {
+    var h = firmwareHex(), v = window.STELLAR_FIRMWARE.version;
+    saveFile('STELLAR-V' + v + '.hex', h.text);
+    btn('dlNote').textContent = 'STELLAR-V' + v + '.hex: $0000-$' +
+      (h.end - 1).toString(16).toUpperCase() + ', Intel HEX. Send it to the monitor as a text upload.';
+  });
+  btn('dlApp').addEventListener('click', function () {
+    var s = samples[+btn('sample').value];
+    if (!s) return;
+    fetch('samples/' + s.file + '?v=58')
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (text) {
+        saveFile(s.file, text);
+        btn('dlNote').textContent = s.file + ': load the D-lines into the Elf2K monitor, then run STELLAR.';
+      })
+      .catch(function (e) { btn('dlNote').textContent = 'could not fetch ' + s.file + ': ' + e; });
+  });
+  function labelAppButton() {
+    var s = samples[+btn('sample').value];
+    btn('dlApp').textContent = s ? s.file : 'App (.lst)';
+  }
 
   btn('sample').addEventListener('change', function () { selectSample(+this.value); });
   btn('load').addEventListener('click', function () {

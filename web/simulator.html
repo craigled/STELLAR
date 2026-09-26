@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Simulator</title>
 <meta name="description" content="Run STELLAR programs in the browser on the real firmware — step through the disassembly and watch the core update live.">
-<link rel="stylesheet" href="css/site.css?v=57">
+<link rel="stylesheet" href="css/site.css?v=58">
 </head>
 <body>
 <main class="wrap">
@@ -25,6 +25,12 @@
     <button id="toggleSide" title="Show/hide the disassembly panel">Side panel</button>
   </div>
   <p class="sim-blurb" id="blurb"></p>
+  <div class="sim-controls dl-row">
+    <span class="mono small" style="color:var(--ink-soft)">download for the Elf2K</span>
+    <button id="dlApp" title="Save the selected program's .lst - the D-lines load straight into the Elf2K monitor">App (.lst)</button>
+    <button id="dlFw" title="Save the STELLAR firmware as an Intel HEX file for the Elf2K">STELLAR firmware (.hex)</button>
+    <span class="small muted" id="dlNote"></span>
+  </div>
 
   <div class="sim-controls">
     <button id="step" class="primary">Step ▸</button>
@@ -74,18 +80,18 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=57"></script>
-<script src="js/firmware-0061-34.js?v=57"></script>
-<script src="js/stellar-vm.js?v=57"></script>
-<script src="js/disasm.js?v=57"></script>
-<script src="js/core-view.js?v=57"></script>
-<script src="js/mem-view.js?v=57"></script>
-<script src="js/front-panel.js?v=57"></script>
-<script src="js/vt100.js?v=57"></script>
-<script src="js/term-input.js?v=57"></script>
-<script src="js/sim-app.js?v=57"></script>
-<script src="js/clock-row.js?v=57"></script>
-<script src="js/simulator-page.js?v=57"></script>
-<script src="js/nav.js?v=57"></script>
+<script src="js/opcodes.js?v=58"></script>
+<script src="js/firmware-0061-34.js?v=58"></script>
+<script src="js/stellar-vm.js?v=58"></script>
+<script src="js/disasm.js?v=58"></script>
+<script src="js/core-view.js?v=58"></script>
+<script src="js/mem-view.js?v=58"></script>
+<script src="js/front-panel.js?v=58"></script>
+<script src="js/vt100.js?v=58"></script>
+<script src="js/term-input.js?v=58"></script>
+<script src="js/sim-app.js?v=58"></script>
+<script src="js/clock-row.js?v=58"></script>
+<script src="js/simulator-page.js?v=58"></script>
+<script src="js/nav.js?v=58"></script>
 </body>
 </html>
