@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Simulator</title>
 <meta name="description" content="Run STELLAR programs in the browser on the real firmware — step through the disassembly and watch the core update live.">
-<link rel="stylesheet" href="css/site.css?v=59">
+<link rel="stylesheet" href="css/site.css?v=60">
 </head>
 <body>
 <main class="wrap">
@@ -27,17 +27,11 @@
   <p class="sim-blurb" id="blurb"></p>
   <div class="sim-controls dl-row">
     <span class="mono small" style="color:var(--ink-soft)">download for the Elf2K</span>
-    <button id="dlApp" title="Save the selected program's .lst - the D-lines load straight into the Elf2K monitor">App (.lst)</button>
+    <select id="dlPick" title="Any app, as a .lst file for the Elf2K"><option>loading the app list…</option></select>
+    <button id="dlGo" title="Save the chosen app's .lst - load its D-lines into the Elf2K monitor">Download app</button>
     <button id="dlFw" title="Save the STELLAR firmware as an Intel HEX file for the Elf2K">STELLAR firmware (.hex)</button>
-    <span class="small muted" id="dlNote"></span>
   </div>
-  <details class="dl-list" id="dlList">
-    <summary>Download any app for the Elf2K <span class="muted" id="dlCount"></span></summary>
-    <p class="small muted">Each file is a <span class="mono">.lst</span>: load its D-lines into the Elf2K monitor
-      over the serial port, then start STELLAR. Everything here is hardware-verified on the Elf2K unless it says
-      otherwise, and needs firmware V0061.34 (the <b>STELLAR firmware (.hex)</b> button above).</p>
-    <div id="dlGroups"></div>
-  </details>
+  <p class="small muted" id="dlNote" style="margin:-6px 0 8px"></p>
 
   <div class="sim-controls">
     <button id="step" class="primary">Step ▸</button>
@@ -87,18 +81,18 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=59"></script>
-<script src="js/firmware-0061-34.js?v=59"></script>
-<script src="js/stellar-vm.js?v=59"></script>
-<script src="js/disasm.js?v=59"></script>
-<script src="js/core-view.js?v=59"></script>
-<script src="js/mem-view.js?v=59"></script>
-<script src="js/front-panel.js?v=59"></script>
-<script src="js/vt100.js?v=59"></script>
-<script src="js/term-input.js?v=59"></script>
-<script src="js/sim-app.js?v=59"></script>
-<script src="js/clock-row.js?v=59"></script>
-<script src="js/simulator-page.js?v=59"></script>
-<script src="js/nav.js?v=59"></script>
+<script src="js/opcodes.js?v=60"></script>
+<script src="js/firmware-0061-34.js?v=60"></script>
+<script src="js/stellar-vm.js?v=60"></script>
+<script src="js/disasm.js?v=60"></script>
+<script src="js/core-view.js?v=60"></script>
+<script src="js/mem-view.js?v=60"></script>
+<script src="js/front-panel.js?v=60"></script>
+<script src="js/vt100.js?v=60"></script>
+<script src="js/term-input.js?v=60"></script>
+<script src="js/sim-app.js?v=60"></script>
+<script src="js/clock-row.js?v=60"></script>
+<script src="js/simulator-page.js?v=60"></script>
+<script src="js/nav.js?v=60"></script>
 </body>
 </html>

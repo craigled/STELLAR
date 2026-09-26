@@ -48,7 +48,7 @@
   function btn(id) { return document.getElementById(id); }
   var samples = [];
 
-  fetch('samples/manifest.json?v=59')
+  fetch('samples/manifest.json?v=60')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       samples = list;
@@ -75,7 +75,6 @@
     var s = samples[i];
     btn('input').value = (s.input || '').replace(/\r/g, '\\r');
     btn('blurb').textContent = s.blurb || '';
-    labelAppButton();
     // A sample can ask for a speed by its label ("flat out", "Elf2K", ...). ELIZA
     // wants flat out (slower, its start-up outlasts a visitor's first keystrokes);
     // Pong wants Elf2K, the hardware's real pace - flat out a game is over in seconds.
@@ -85,7 +84,7 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=59')
+    fetch('samples/' + s.file + '?v=60')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
@@ -201,46 +200,45 @@
     btn('dlNote').textContent = 'STELLAR-V' + v + '.hex: $0000-$' +
       (h.end - 1).toString(16).toUpperCase() + ', Intel HEX. Send it to the monitor as a text upload.';
   });
-  btn('dlApp').addEventListener('click', function () {
-    var s = samples[+btn('sample').value];
-    if (!s) return;
-    fetch('samples/' + s.file + '?v=59')
-      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
-      .then(function (text) {
-        saveFile(s.file, text);
-        btn('dlNote').textContent = s.file + ': load the D-lines into the Elf2K monitor, then run STELLAR.';
-      })
-      .catch(function (e) { btn('dlNote').textContent = 'could not fetch ' + s.file + ': ' + e; });
-  });
-  // The full catalogue (web/build/gen_downloads.py): every finished app, one link each.
-  fetch('downloads/catalog.json?v=59')
+
+  // The full catalogue (web/build/gen_downloads.py): every finished app, grouped.
+  var catalog = [];
+  fetch('downloads/catalog.json?v=60')
     .then(function (r) { return r.json(); })
     .then(function (list) {
-      var box = btn('dlGroups'), groups = {};
-      btn('dlCount').textContent = '(' + list.length + ' programs)';
-      list.forEach(function (a) {
+      catalog = list;
+      var sel = btn('dlPick'), groups = {};
+      sel.innerHTML = '';
+      list.forEach(function (a, i) {
         if (!groups[a.group]) {
-          var h = document.createElement('h4'); h.textContent = a.group; box.appendChild(h);
-          groups[a.group] = document.createElement('ul'); box.appendChild(groups[a.group]);
+          groups[a.group] = document.createElement('optgroup');
+          groups[a.group].label = a.group; sel.appendChild(groups[a.group]);
         }
-        var li = document.createElement('li'), link = document.createElement('a');
-        var fn = a.href.split('/').pop();
-        link.href = a.href; link.download = fn; link.textContent = fn; link.className = 'mono';
-        var name = document.createElement('b'); name.textContent = a.name;
-        li.appendChild(name); li.appendChild(document.createTextNode(' \u2014 ' + a.what + ' '));
-        if (a.note) {
-          var n = document.createElement('em'); n.textContent = '(' + a.note + ') '; li.appendChild(n);
-        }
-        li.appendChild(link);
-        groups[a.group].appendChild(li);
+        var o = document.createElement('option');
+        o.value = i; o.textContent = a.name + (a.note ? ' (not yet on hardware)' : '');
+        groups[a.group].appendChild(o);
       });
+      describePick();
     })
-    .catch(function () { btn('dlList').hidden = true; });
-
-  function labelAppButton() {
-    var s = samples[+btn('sample').value];
-    btn('dlApp').textContent = s ? s.file : 'App (.lst)';
+    .catch(function () { btn('dlPick').innerHTML = '<option>app list unavailable</option>'; btn('dlGo').disabled = true; });
+  function describePick() {
+    var a = catalog[+btn('dlPick').value];
+    if (a) btn('dlNote').textContent = a.href.split('/').pop() + ' \u2014 ' + a.what + (a.note ? ' (' + a.note + ')' : '');
   }
+  btn('dlPick').addEventListener('change', describePick);
+  btn('dlGo').addEventListener('click', function () {
+    var a = catalog[+btn('dlPick').value];
+    if (!a) return;
+    var fn = a.href.split('/').pop();
+    fetch(a.href + '?v=60')
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (text) {
+        saveFile(fn, text);
+        btn('dlNote').textContent = fn + ' saved: load its D-lines into the Elf2K monitor, then run STELLAR.';
+      })
+      .catch(function (e) { btn('dlNote').textContent = 'could not fetch ' + fn + ': ' + e; });
+  });
+
 
   btn('sample').addEventListener('change', function () { selectSample(+this.value); });
   btn('load').addEventListener('click', function () {
