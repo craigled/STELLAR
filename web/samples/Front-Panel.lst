@@ -4,3 +4,6 @@
 ;Step it, or run it slowly, to watch the digits climb.
 D 4000 CD 0A 01 11 03 00 00 B3 01 06 03 42 03 86 03 00
 D 4010 20 A3 01 0A 00 00 F0 00 00
+D 5000 00
+D 6000 00
+D 7000 00
