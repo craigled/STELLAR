@@ -75,6 +75,14 @@
     "speed": "flat out"
   },
   {
+    "name": "MOONBASE (text adventure)",
+    "file": "Moonbase.lst",
+    "input": "",
+    "blurb": "A text adventure: a moonquake has wrecked the base and the air is running out - get to the lander and off the ground. Type one- or two-word commands (N, S, E, W, IN, OUT, LOOK, TAKE WRENCH, OPEN LOCKER, READ LOG, HELP...). Every game is shuffled: the moment you press the start key decides where things are, the airlock code and more. Click the terminal and press a key to begin. A native 1802 parser (RUNMC) reads each line; the game itself is STELLAR bytecode.",
+    "maxSteps": 20000000,
+    "halts": false
+  },
+  {
     "name": "Lite-Writer 2 (word processor)",
     "file": "Lite-Writer-2.lst",
     "input": " Welcome to Lite-Writer 2, a word processor for the RCA 1802.",
