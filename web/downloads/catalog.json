@@ -2,7 +2,7 @@
  {
   "group": "Games",
   "name": "MOONBASE",
-  "what": "Text adventure: escape the damaged moon base. Two-word commands, 10 rooms.",
+  "what": "Text adventure: escape the damaged moon base. Two-word commands, 10 rooms; every game is shuffled.",
   "href": "downloads/Moonbase.lst",
   "note": null
  },

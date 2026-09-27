@@ -16,7 +16,7 @@ OUT = os.path.join(WEB, 'downloads')
 # (group, name, what, source) - source 'samples/X.lst', or a work-repo path to copy.
 # A note of None means HW-verified on the Elf2K.
 CATALOG = [
- ('Games', 'MOONBASE', 'Text adventure: escape the damaged moon base. Two-word commands, 10 rooms.',
+ ('Games', 'MOONBASE', 'Text adventure: escape the damaged moon base. Two-word commands, 10 rooms; every game is shuffled.',
   'APPLICATIONS/MOONBASE/Moonbase.lst', None),
  ('Games', 'Lunar Lander', 'Land on the pad before the fuel runs out. Easy and Hard. VT100, arrow keys.',
   'samples/Lunar-Lander.lst', None),
