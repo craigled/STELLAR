@@ -120,7 +120,7 @@
     "name": "Bouncing Ball (VT100)",
     "file": "Bouncing-Ball.lst",
     "input": " ",
-    "blurb": "Two 3x3 reverse-video balls bouncing off the walls and off each other. Equal masses in an elastic collision exchange velocities, so the balls simply swap direction flags. Only the stale edge of each ball is erased, which is what keeps it flicker-free. Press a key to launch, ESC stops it.",
+    "blurb": "Two 3x3 reverse-video balls bouncing off the walls and off each other. Equal masses in an elastic collision exchange velocities, so the balls simply swap direction flags, and only the stale edge of each ball is erased, which keeps it flicker-free. v05 is 3.1x faster than v04: cursor digits come from lookup tables instead of DIVXY, and each ball is drawn with one cursor move and one PRINTSTR. Press a key to launch, ESC stops it.",
     "maxSteps": 14000000,
     "halts": false
   },
