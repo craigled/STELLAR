@@ -168,6 +168,15 @@
     "speed": "Elf2K"
   },
   {
+    "name": "Snake (VT100, arrow keys)",
+    "file": "Snake.lst",
+    "input": "",
+    "blurb": "Steer the snake to the food '*'. Click the terminal and press SPACE; the arrow keys (or w a s d) steer. Each food scores 1 and makes the snake 3 longer, and every 4 it gets faster (levels 0-9). Hit a wall or yourself and the game is over - SPACE plays again, P pauses, a lone ESC quits. The body is the grid itself: each cell remembers which way the snake left it, and the tail follows those arrows. Opens at Elf2K speed - the real hardware's pace. Verified on the Elf2K.",
+    "maxSteps": 14000000,
+    "halts": false,
+    "speed": "Elf2K"
+  },
+  {
     "name": "Starship (VT100)",
     "file": "Starship.lst",
     "input": "",

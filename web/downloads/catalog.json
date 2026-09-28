@@ -15,6 +15,13 @@
  },
  {
   "group": "Games",
+  "name": "Snake",
+  "what": "Eat the food, grow, and do not hit the wall or yourself. Ten speed levels. VT100, arrow keys.",
+  "href": "samples/Snake.lst",
+  "note": null
+ },
+ {
+  "group": "Games",
   "name": "Pong",
   "what": "You on the right against the computer. VT100, arrow keys.",
   "href": "samples/Pong.lst",
