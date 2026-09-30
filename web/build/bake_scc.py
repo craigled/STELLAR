@@ -37,6 +37,10 @@ EXAMPLES = [
      'Hand-written STELLAR opcodes inside a C function: MULTXY on register variables, an array '
      'address, @break out of a loop, a hand-made CALL, and a SERST poll loop that counts the keys '
      'waiting (the three pre-loaded in the input box).'),
+    ('frontpanel', 'Front panel (Q + hex display)', '', 'Elf2K',
+     'Counts $00 to $3F on the Elf2K front panel\'s two-digit display while the Q lamp blinks, '
+     'using one line of asm { } for each - Stellar C has no built-in for them yet. Watch the panel '
+     'beside the terminal.'),
     ('nativedemo', 'Native 1802: native { }', '', 'flat out',
      'Raw 1802 machine code run by $F1 RUNMC: sums a 200-byte array (71x faster than the compiled '
      'loop), formats the total as hex, and copies a string kept inside the native block.'),

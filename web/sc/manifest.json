@@ -36,6 +36,13 @@
    "blurb": "Hand-written STELLAR opcodes inside a C function: MULTXY on register variables, an array address, @break out of a loop, a hand-made CALL, and a SERST poll loop that counts the keys waiting (the three pre-loaded in the input box)."
   },
   {
+   "name": "Front panel (Q + hex display)",
+   "file": "frontpanel.sc",
+   "input": "",
+   "speed": "Elf2K",
+   "blurb": "Counts $00 to $3F on the Elf2K front panel's two-digit display while the Q lamp blinks, using one line of asm { } for each - Stellar C has no built-in for them yet. Watch the panel beside the terminal."
+  },
+  {
    "name": "Native 1802: native { }",
    "file": "nativedemo.sc",
    "input": "",

@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=68';
+  var V = '?v=69';
   var PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/';
   var DRAFT = 'stellarc-draft';
 
@@ -143,11 +143,28 @@
   }
 
   // ---------------------------------------------------------------- the runner
+  // The Elf2K front panel: Q lamp and the two-digit display of the last byte sent to
+  // the output port (core $x039, DEFOUT; the Elf2K's default is 4), read off the CPU
+  // as the Simulator page does.
+  var panel = new window.FrontPanel($('frontpanel'));
+  function panelState(s) {
+    var cpu = app.vm && app.vm.cpu;
+    if (!cpu) return s;
+    var CORE = (window.StellarVMLib && window.StellarVMLib.CORE) || 0x3000;
+    var port = cpu.M[CORE + 0x39] || 4;
+    var log = cpu.io_out[port];
+    s.q = cpu.Q ? 1 : 0;
+    s.outPort = port;
+    s.outByte = (log && log.length) ? log[log.length - 1] : null;
+    return s;
+  }
+
   var app = new window.SimApp({
     terminalEl: $('term'),
     statusEl: $('status'),
     coldBoot: true,
     onState: function (s) {
+      panel.render(panelState(s));
       $('pause').disabled = !app.running;
       $('reset').disabled = !app.vm;
       halted = !!s.halted;

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stellar C</title>
 <meta name="description" content="Stellar C: a small C-like language that compiles to STELLAR bytecode. Write a program, compile it in your browser, and run it on the real firmware.">
-<link rel="stylesheet" href="css/site.css?v=68">
+<link rel="stylesheet" href="css/site.css?v=69">
 </head>
 <body>
 <main class="wrap">
@@ -57,10 +57,16 @@
     <span id="speedLabel" class="mono clock-now"></span>
   </div>
   <div class="status-line" id="status">not loaded</div>
-  <div class="term-wrap" style="margin-top:8px">
-    <h4>Serial terminal</h4>
-    <div class="term" id="term" tabindex="0" role="textbox" aria-label="Serial terminal — click to type"></div>
-    <p class="arrow-note">Click the terminal and type to send keys to the running program; on a phone or tablet, tap it for the keyboard, with the arrow keys, Esc and Enter in the row underneath. The <b>input</b> box pre-loads keystrokes before it starts.</p>
+  <div class="io-row" style="margin-top:8px">
+    <div class="term-wrap">
+      <h4>Serial terminal</h4>
+      <div class="term" id="term" tabindex="0" role="textbox" aria-label="Serial terminal — click to type"></div>
+      <p class="arrow-note">Click the terminal and type to send keys to the running program; on a phone or tablet, tap it for the keyboard, with the arrow keys, Esc and Enter in the row underneath. The <b>input</b> box pre-loads keystrokes before it starts.</p>
+    </div>
+    <div class="fp-wrap">
+      <h4>Front panel</h4>
+      <div class="fp" id="frontpanel"></div>
+    </div>
   </div>
 
   <h2 id="language">The language</h2>
@@ -106,15 +112,16 @@ done:
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=68"></script>
-<script src="js/firmware-0061-34.js?v=68"></script>
-<script src="js/stellar-vm.js?v=68"></script>
-<script src="js/disasm.js?v=68"></script>
-<script src="js/vt100.js?v=68"></script>
-<script src="js/term-input.js?v=68"></script>
-<script src="js/sim-app.js?v=68"></script>
-<script src="js/clock-row.js?v=68"></script>
-<script src="js/stellarc-page.js?v=68"></script>
-<script src="js/nav.js?v=68"></script>
+<script src="js/opcodes.js?v=69"></script>
+<script src="js/firmware-0061-34.js?v=69"></script>
+<script src="js/stellar-vm.js?v=69"></script>
+<script src="js/disasm.js?v=69"></script>
+<script src="js/front-panel.js?v=69"></script>
+<script src="js/vt100.js?v=69"></script>
+<script src="js/term-input.js?v=69"></script>
+<script src="js/sim-app.js?v=69"></script>
+<script src="js/clock-row.js?v=69"></script>
+<script src="js/stellarc-page.js?v=69"></script>
+<script src="js/nav.js?v=69"></script>
 </body>
 </html>
