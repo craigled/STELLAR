@@ -48,7 +48,7 @@
   function btn(id) { return document.getElementById(id); }
   var samples = [];
 
-  fetch('samples/manifest.json?v=74')
+  fetch('samples/manifest.json?v=75')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       samples = list;
@@ -84,7 +84,7 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=74')
+    fetch('samples/' + s.file + '?v=75')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
@@ -205,7 +205,7 @@
 
   // The full catalogue (web/build/gen_downloads.py): every finished app, grouped.
   var catalog = [];
-  fetch('downloads/catalog.json?v=74')
+  fetch('downloads/catalog.json?v=75')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       catalog = list;
@@ -232,7 +232,7 @@
     var a = catalog[+btn('dlPick').value];
     if (!a) return;
     var fn = a.href.split('/').pop();
-    fetch(a.href + '?v=74')
+    fetch(a.href + '?v=75')
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         saveFile(fn, text);

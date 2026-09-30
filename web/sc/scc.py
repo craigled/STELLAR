@@ -301,10 +301,10 @@ RV = 0xD                          # return values
 ZERO = 0xC                        # holds 0 when the program needs it: a[k], u8 variables
 BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'halt', 'fill', 'copy',
             'out', 'outmem', 'outport', 'inport', 'getin', 'scanin', 'ef', 'efsource', 'waitef', 'q'}
-# The Elf2K I/O group, $01-$0F, as measured on V0061.34 + the DEFEF DZ patch (HW-verified 2026-09-30):
+# The Elf2K I/O group, $01-$0F, on V0061.34 + the DEFEF DZ and WIP patches (both HW-verified 2026-09-30):
 #   outport(p)  $01 DEFOUT 0p   output port 1-7; 2 and 3 are the serial chip, so refused
 #   inport(p)   $02 DEFIN 0Z    input port 1-7 (Z = p + 8)
-#   efsource(n) $03 DEFEF n0    the EF line getin() waits on, 1-4 (default 4, the INPUT button);
+#   efsource(n) $03 DEFEF n0    the EF line getin() and waitef() wait on, 1-4 (default 4, INPUT);
 #   efsource(n, 1)  DEFEF n1    ... inverted (active low). Needs the DEFEF DZ patch: unpatched
 #                               V0061.34 read n from the low nibble and stopped with error $0E
 #   out(e)      $04 OUTI / $06 OUTX / $05 OUTA 00   a byte to the output port (the hex display)
@@ -314,7 +314,8 @@ BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'hal
 #   scanin()    $0C SIPA        read the input port now
 #   getin()     $0D GIPA / $0E GIPX   wait for the EF line (the INPUT button) to go high then low,
 #                               then read the input port
-#   waitef()    $0F WIP 00      wait for EF4 to go high then low (WIP always uses EF4)
+#   waitef()    $0F WIP 00      wait for the efsource() line to go active then inactive, yielding
+#                               to the other VMs meanwhile (unpatched: the output port's number!)
 ARITY = {'out': 1, 'outmem': 1, 'outport': 1, 'inport': 1, 'getin': 0, 'scanin': 0, 'ef': 0,
          'efsource': (1, 2), 'waitef': 0, 'q': 1}
 # ops after which a DIVXY's quotient/remainder are still in the MA
@@ -820,7 +821,7 @@ class Compiler:
                 inv = s.const(args[1], s.ln)
             return s.emit(('03 %X%X' % (n, inv), 'DEFEF %X%X' % (n, inv),
                            'getin() waits on EF%d%s' % (n, ', inverted' if inv else '')))
-        if name == 'waitef': return s.emit(('0F 00', 'WIP 00', 'wait for EF4 high, then low'))
+        if name == 'waitef': return s.emit(('0F 00', 'WIP 00', 'wait for the EF line: active, then inactive'))
         if name == 'q':
             e = args[0]
             if s.isconst(e):
