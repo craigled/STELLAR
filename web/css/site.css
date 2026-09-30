@@ -433,3 +433,7 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .term-kbd{position:absolute; left:0; top:0; width:1px; height:1px; opacity:0; border:0; padding:0;
   margin:0; resize:none; font-size:16px; caret-color:transparent; pointer-events:none}
 .term.term-typing{box-shadow:inset 0 0 0 1px var(--accent), 0 0 0 3px rgba(198,93,42,.18)}
+/* while the phone keyboard is up the key row floats just above it (js/term-input.js) */
+.term-keys.term-keys-float{position:fixed; z-index:60; margin:0; padding:6px 8px; flex-wrap:nowrap;
+  background:var(--bg-panel); border-top:1px solid var(--line); box-shadow:0 -4px 14px rgba(0,0,0,.25)}
+.term-keys.term-keys-float button{flex:1 1 0; min-width:0; padding:6px 0; font-size:14px; overflow:hidden}

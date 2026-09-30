@@ -86,7 +86,7 @@
     bar.appendChild(ta);
 
     function reset() { ta.value = SENT; ta.setSelectionRange(SENT.length, SENT.length); }
-    function openKeyboard() { ta.focus({ preventScroll: true }); reset(); }
+    function openKeyboard() { ta.focus({ preventScroll: true }); reset(); fitTerminal = true; place(); }
     function takeText() {
       var v = ta.value;
       if (v.length < SENT.length) {
@@ -112,8 +112,8 @@
       var b = keyBytes(e);
       if (b && send(b)) e.preventDefault();
     });
-    ta.addEventListener('focus', function () { termEl.classList.add('term-typing'); });
-    ta.addEventListener('blur', function () { termEl.classList.remove('term-typing'); });
+    ta.addEventListener('focus', function () { termEl.classList.add('term-typing'); fitTerminal = true; place(); });
+    ta.addEventListener('blur', function () { termEl.classList.remove('term-typing'); place(); });
     termEl.addEventListener('click', openKeyboard);
 
     [['\u2328', null, 'Show the keyboard'], ['\u2190', 'ArrowLeft'], ['\u2191', 'ArrowUp'],
@@ -132,6 +132,45 @@
         btn.addEventListener('click', function (e) { e.preventDefault(); });
         bar.appendChild(btn);
       });
-    termEl.insertAdjacentElement('afterend', bar);
+    // The row sits in a slot under the terminal. While the keyboard is up it would be
+    // hidden behind it, so it floats instead: pinned to the bottom of the VISUAL
+    // viewport (the part of the page the keyboard leaves showing), with the slot
+    // keeping its place so the page does not jump. When the keyboard first opens the
+    // page scrolls so the terminal ends just above the row.
+    var slot = document.createElement('div');
+    slot.className = 'term-keys-slot';
+    slot.appendChild(bar);
+    termEl.insertAdjacentElement('afterend', slot);
+    var fitTerminal = false;
+    function place() {
+      var vv = window.visualViewport;
+      if (document.activeElement !== ta || !vv) {
+        bar.classList.remove('term-keys-float');
+        bar.style.top = bar.style.left = bar.style.width = '';
+        slot.style.height = '';
+        return;
+      }
+      if (!bar.classList.contains('term-keys-float')) {
+        slot.style.height = slot.offsetHeight + 'px';
+        bar.classList.add('term-keys-float');
+      }
+      var h = bar.offsetHeight;
+      bar.style.left = vv.offsetLeft + 'px';
+      bar.style.width = vv.width + 'px';
+      bar.style.top = (vv.offsetTop + vv.height - h) + 'px';
+      if (fitTerminal && vv.height < window.innerHeight * 0.85) {   // the keyboard is up now
+        fitTerminal = false;
+        var r = termEl.getBoundingClientRect();
+        var room = vv.height - h - 8;                                 // visible height above the row
+        var want = r.height <= room ? r.bottom - vv.offsetTop - room  // terminal's bottom at the row
+                                    : r.top - vv.offsetTop - 8;       // too tall: show its top
+        if (Math.abs(want) > 4) window.scrollBy(0, want);
+      }
+    }
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', place);
+      window.visualViewport.addEventListener('scroll', place);
+    }
+    window.addEventListener('scroll', place, { passive: true });
   };
 });
