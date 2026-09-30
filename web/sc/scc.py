@@ -301,7 +301,7 @@ RV = 0xD                          # return values
 ZERO = 0xC                        # holds 0 when the program needs it: a[k], u8 variables
 BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'halt', 'fill', 'copy',
             'out', 'outmem', 'outport', 'inport', 'getin', 'scanin', 'ef', 'efsource', 'waitef', 'q'}
-# The Elf2K I/O group, $01-$0F, on V0061.34 + the DEFEF DZ and WIP patches (both HW-verified 2026-09-30):
+# The Elf2K I/O group, $01-$0F, on V0061.34 + the DEFEF DZ, WIP and WIP Z patches (HW-verified 2026-09-30):
 #   outport(p)  $01 DEFOUT 0p   output port 1-7; 2 and 3 are the serial chip, so refused
 #   inport(p)   $02 DEFIN 0Z    input port 1-7 (Z = p + 8)
 #   efsource(n) $03 DEFEF n0    the EF line getin() and waitef() wait on, 1-4 (default 4, INPUT);
@@ -316,8 +316,9 @@ BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'hal
 #                               then read the input port
 #   waitef()    $0F WIP 00      wait for the efsource() line to go active then inactive, yielding
 #                               to the other VMs meanwhile (unpatched: the output port's number!)
+#   waitef(n)   $0F WIP 0n      ... on EF line n, 1-4, normal, whatever efsource() says
 ARITY = {'out': 1, 'outmem': 1, 'outport': 1, 'inport': 1, 'getin': 0, 'scanin': 0, 'ef': 0,
-         'efsource': (1, 2), 'waitef': 0, 'q': 1}
+         'efsource': (1, 2), 'waitef': (0, 1), 'q': 1}
 # ops after which a DIVXY's quotient/remainder are still in the MA
 KEEPS_MA = {'COPYAX', 'TESTREMZ', 'IFTRUEI', 'IFFALSEI', 'TESTXY', 'TESTXI', 'TESTXZ',
             'TESTLXY', 'TESTGXY', 'COPYXY', 'LOADXI'}
@@ -821,7 +822,10 @@ class Compiler:
                 inv = s.const(args[1], s.ln)
             return s.emit(('03 %X%X' % (n, inv), 'DEFEF %X%X' % (n, inv),
                            'getin() waits on EF%d%s' % (n, ', inverted' if inv else '')))
-        if name == 'waitef': return s.emit(('0F 00', 'WIP 00', 'wait for the EF line: active, then inactive'))
+        if name == 'waitef':
+            if not args: return s.emit(('0F 00', 'WIP 00', 'wait for the EF line: active, then inactive'))
+            n = const(1, 4, 'EF line')
+            return s.emit(('0F 0%X' % n, 'WIP 0%X' % n, 'wait for EF%d: high, then low' % n))
         if name == 'q':
             e = args[0]
             if s.isconst(e):
