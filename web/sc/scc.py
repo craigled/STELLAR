@@ -309,7 +309,8 @@ BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'hal
 #                               V0061.34 read n from the low nibble and stopped with error $0E
 #   out(e)      $04 OUTI / $06 OUTX / $05 OUTA 00   a byte to the output port (the hex display)
 #   outmem(a)   $08 OUTMX       the byte at address a to the output port
-#   ef()        $09 GETEFA      the highest-numbered EF line that is on, 1-4, or 0 if none
+#   ef()        $09 GETEFA      all four EF lines as a mask: bit 0 = EF1 ... bit 3 = EF4 (GETEFA mask patch)
+#   ef(n)       GETEFA + $1A TESTBITI   1 if EF line n (1-4) is on, else 0
 #   q(e)        $0A SETQ        0 off, 1 on (any non-constant: on if non-zero), 2 one blink, 3 two
 #   scanin()    $0C SIPA        read the input port now
 #   getin()     $0D GIPA / $0E GIPX   wait for the EF line (the INPUT button) to go high then low,
@@ -317,7 +318,7 @@ BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'hal
 #   waitef()    $0F WIP 00      wait for the efsource() line to go active then inactive, yielding
 #                               to the other VMs meanwhile (unpatched: the output port's number!)
 #   waitef(n)   $0F WIP 0n      ... on EF line n, 1-4, normal, whatever efsource() says
-ARITY = {'out': 1, 'outmem': 1, 'outport': 1, 'inport': 1, 'getin': 0, 'scanin': 0, 'ef': 0,
+ARITY = {'out': 1, 'outmem': 1, 'outport': 1, 'inport': 1, 'getin': 0, 'scanin': 0, 'ef': (0, 1),
          'efsource': (1, 2), 'waitef': (0, 1), 'q': 1}
 # ops after which a DIVXY's quotient/remainder are still in the MA
 KEEPS_MA = {'COPYAX', 'TESTREMZ', 'IFTRUEI', 'IFFALSEI', 'TESTXY', 'TESTXI', 'TESTXZ',
@@ -727,7 +728,7 @@ class Compiler:
         if e[0] == 'call' and e[1] in ('scanin', 'getin'):          # the port byte, high byte 0
             s.emit(ldai(0)); return s.emit(('0C 00', 'SIPA', 'scan the input port') if e[1] == 'scanin'
                                            else ('0D 00', 'GIPA', 'wait for EF, then read the input port'))
-        if e[0] == 'call' and e[1] == 'ef': return s.emit(('09', 'GETEFA', 'the highest EF line that is on'))
+        if e[0] == 'call' and e[1] == 'ef' and not e[2]: return s.emit(('09', 'GETEFA', 'EF1-4 as a mask'))
         if e[0] == 'bin' and e[1] in ('%', '/'):
             ra, rb = s.reg(e[2]), s.reg(e[3]); s.divide(ra, rb)
             s.emit(rema() if e[1] == '%' else maa()); s.untemp(ra); s.untemp(rb); return
@@ -852,7 +853,15 @@ class Compiler:
             else: s.emit(ldx(t, a))
             s.emit(('08 0%X' % t, 'OUTMX R%d' % t, 'the byte it points at')); s.untemp(t); return
         if name == 'ef':
-            s.emit(('09', 'GETEFA', 'the highest EF line that is on'))
+            if args:                                          # ef(n): 0 / 1
+                n = const(1, 4, 'EF line')
+                s.emit(('09', 'GETEFA', 'EF1-4 as a mask'))
+                s.emit(('1A %02X' % (1 << (n - 1)), 'TESTBITI %02X' % (1 << (n - 1)), 'EF%d on?' % n))
+                if d is None: return
+                off = s.new()
+                s.emit(ldx(d, 0)); s.emit(iff(off)); s.emit(ldx(d, 1)); s.label(off)
+                return
+            s.emit(('09', 'GETEFA', 'EF1-4 as a mask'))
             if d is not None: s.emit(acc2x(d))
             return
         if name in ('scanin', 'getin'):
@@ -883,6 +892,10 @@ class Compiler:
         k = c[0]
         if k == 'not': return s.cond(c[1], target, not sense)
         if k == 'call' and c[1] == 'keyready': s.emit(('CC', 'SERST', '')); return br()
+        if k == 'call' and c[1] == 'ef' and len(c[2]) == 1 and s.isconst(c[2][0]) and 1 <= s.const(c[2][0], s.ln) <= 4:
+            n = s.const(c[2][0], s.ln)                       # if (ef(n)): one test, one branch
+            s.emit(('09', 'GETEFA', 'EF1-4 as a mask'))
+            s.emit(('1A %02X' % (1 << (n - 1)), 'TESTBITI %02X' % (1 << (n - 1)), 'EF%d on?' % n)); return br()
         if k == 'bin' and c[1] == '&&':
             if sense:
                 skip = s.new(); s.cond(c[2], skip, False); s.cond(c[3], target, True); s.label(skip)

@@ -17,7 +17,10 @@
 ; the first letter or two may come out wrong while it learns; a very uneven hand at
 ; 18+ WPM can split a letter now and then. Best at 5-20 WPM.
 ;
-; VERIFICATION (Firmware-Math/morse_rx_verify.py, V0061.34): simulated operators on the Input switch: 12 WPM exact 'CQ CQ DE STELLAR K'; 20 WPM with +-15%% jitter; a sloppy 8 WPM hand; a hand drifting 12 -> 18 -> 8 WPM; told 12 but keying at 15; digits and punctuation at 15; a long message at 20 WPM with line wrap; a rerun without reloading - all decoded exactly, each letter also on the hex display, Q following the key, quitting on q. Stress: 34 of 36 random operators (sloppy, jittery, drifting, wrongly-told speeds, 6-20 WPM) decoded exactly; the native learning step matches a Python model on every element checked.
+; NEEDS the GETEFA mask patch (Firmware-Math/GETEFA-mask-fix.dlines.txt): the key is read as
+; bit 3 of GETEFA's EF mask (TESTBITI 08). On firmware without it, use the July receivers.
+;
+; VERIFICATION (Firmware-Math/morse_rx_verify.py, V0061.34 + GETEFA mask): 8/8 PASS (12/20/8 WPM, jitter, a sloppy hand, drift, digits+punctuation, a long message, rerun)
 ; NOT YET RUN ON HARDWARE.
 ;
 ; 194 STELLAR commands (+ the native learning step).
@@ -132,14 +135,15 @@
 ; D 4116 11 04 00 00    LOADXI R4 0000
 ; UL:
 ; D 411A CC             SERST                              a key on the terminal?
-; D 411B A0 01 8D       IFTRUEI TKEY
+; D 411B A0 01 8B       IFTRUEI TKEY
 ; D 411E 10 00 00       LOADAI 0000
-; D 4121 09             GETEFA                             the EF line that is set
-; D 4122 81 00 04       TESTAI 0004                        EF4: the Input switch
-; D 4125 A0 01 5F       IFTRUEI DOWN                       the key went down
-; D 4128 52 04 00 02    ADDXI R4 0002                      the gap loop counts in TWOS: R4 = 2 x gap, no doubling needed
-; D 412C 88 4C          TESTGXY R4 >= R12
-; D 412E A0 01 3F       IFTRUEI PAST                       past LETTER: the decisions
+; D 4121 09             GETEFA                             EF1-4 as a mask
+; D 4122 1A 08          TESTBITI 08                        EF4: the Input switch
+; D 4124 A0 01 5E       IFTRUEI DOWN                       the key went down
+; D 4127 52 04 00 02    ADDXI R4 0002                      the gap loop counts in TWOS: R4 = 2 x gap, no doubling needed
+; D 412B 88 4C          TESTGXY R4 >= R12
+; D 412D A0 01 3E       IFTRUEI PAST                       past LETTER: the decisions
+; D 4130 C4             NOP                                pad: evens the two sampling loops
 ; D 4131 C4             NOP                                pad: evens the two sampling loops
 ; D 4132 C4             NOP                                pad: evens the two sampling loops
 ; D 4133 C4             NOP                                pad: evens the two sampling loops
@@ -148,31 +152,31 @@
 ; D 4136 C4             NOP                                pad: evens the two sampling loops
 ; D 4137 C4             NOP                                pad: evens the two sampling loops
 ; D 4138 C4             NOP                                pad: evens the two sampling loops
-; D 4139 C4             NOP                                pad: evens the two sampling loops
-; D 413A C0 01          DLYI 01                            one sample
-; D 413C B0 01 1A       GAL UL
+; D 4139 C0 01          DLYI 01                            one sample
+; D 413B B0 01 1A       GAL UL
 ; PAST:
-; D 413F 86 05 00 01    TESTXI R5 0001
-; D 4143 A0 01 49       IFTRUEI P1                         nothing keyed, or done already
-; D 4146 BD 01 B4       CALL LETTER                        the letter is complete
+; D 413E 86 05 00 01    TESTXI R5 0001
+; D 4142 A0 01 48       IFTRUEI P1                         nothing keyed, or done already
+; D 4145 BD 01 B2       CALL LETTER                        the letter is complete
 ; P1:
-; D 4149 88 49          TESTGXY R4 >= R9
-; D 414B A1 01 5B       IFFALSEI P1X                       past WORD:
-; D 414E 8C 06          TESTXZ R6
-; D 4150 A0 01 56       IFTRUEI P2
-; D 4153 BD 01 DC       CALL SPACE                           a word gap
+; D 4148 88 49          TESTGXY R4 >= R9
+; D 414A A1 01 5A       IFFALSEI P1X                       past WORD:
+; D 414D 8C 06          TESTXZ R6
+; D 414F A0 01 55       IFTRUEI P2
+; D 4152 BD 01 DA       CALL SPACE                           a word gap
 ; P2:
-; D 4156 C0 01          DLYI 01                            one sample
-; D 4158 B0 01 1A       GAL UL
+; D 4155 C0 01          DLYI 01                            one sample
+; D 4157 B0 01 1A       GAL UL
 ; P1X:
-; D 415B C4             NOP                                pad: evens the two sampling loops
-; D 415C B0 01 56       GAL P2                             padded: every sample of a gap is the same length
+; D 415A C4             NOP                                pad: evens the two sampling loops
+; D 415B B0 01 55       GAL P2                             padded: every sample of a gap is the same length
 ; DOWN:
-; D 415F 0A 01          SETQ 01                            Q follows the key
-; D 4161 23 00 4D       COPYXY R4 -> R13                   RD = the gap that just ended - learned from after this mark
-; D 4164 11 04 00 00    LOADXI R4 0000
+; D 415E 0A 01          SETQ 01                            Q follows the key
+; D 4160 23 00 4D       COPYXY R4 -> R13                   RD = the gap that just ended - learned from after this mark
+; D 4163 11 04 00 00    LOADXI R4 0000
 ; DL:
-; D 4168 42 04          INCX R4
+; D 4167 42 04          INCX R4
+; D 4169 C4             NOP                                pad: evens the two sampling loops
 ; D 416A C4             NOP                                pad: evens the two sampling loops
 ; D 416B C4             NOP                                pad: evens the two sampling loops
 ; D 416C C4             NOP                                pad: evens the two sampling loops
@@ -187,60 +191,59 @@
 ; D 4175 C4             NOP                                pad: evens the two sampling loops
 ; D 4176 C4             NOP                                pad: evens the two sampling loops
 ; D 4177 C4             NOP                                pad: evens the two sampling loops
-; D 4178 C4             NOP                                pad: evens the two sampling loops
-; D 4179 C0 01          DLYI 01                            one sample
-; D 417B 10 00 00       LOADAI 0000
-; D 417E 09             GETEFA                             the EF line that is set
-; D 417F 81 00 04       TESTAI 0004                        EF4: the Input switch
-; D 4182 A0 01 68       IFTRUEI DL
-; D 4185 0A 00          SETQ 00                            key up
-; D 4187 F1 43 00       RUNMC 4300                         learn: the element, dot/dash, the averages, the thresholds
-; D 418A B0 01 16       GAL UP
+; D 4178 C0 01          DLYI 01                            one sample
+; D 417A 10 00 00       LOADAI 0000
+; D 417D 09             GETEFA                             EF1-4 as a mask
+; D 417E 1A 08          TESTBITI 08                        EF4: the Input switch
+; D 4180 A0 01 67       IFTRUEI DL
+; D 4183 0A 00          SETQ 00                            key up
+; D 4185 F1 43 00       RUNMC 4300                         learn: the element, dot/dash, the averages, the thresholds
+; D 4188 B0 01 16       GAL UP
 ; TKEY:
-; D 418D CB             SERIN
-; D 418E 21 07          COPYAX Acc -> R7
-; D 4190 86 07 00 71    TESTXI R7 0071
-; D 4194 A0 01 A8       IFTRUEI QUIT
-; D 4197 86 07 00 51    TESTXI R7 0051
-; D 419B A0 01 A8       IFTRUEI QUIT
-; D 419E 86 07 00 1B    TESTXI R7 001B
-; D 41A2 A0 01 A8       IFTRUEI QUIT
-; D 41A5 B0 01 1A       GAL UL                             anything else: ignored
+; D 418B CB             SERIN
+; D 418C 21 07          COPYAX Acc -> R7
+; D 418E 86 07 00 71    TESTXI R7 0071
+; D 4192 A0 01 A6       IFTRUEI QUIT
+; D 4195 86 07 00 51    TESTXI R7 0051
+; D 4199 A0 01 A6       IFTRUEI QUIT
+; D 419C 86 07 00 1B    TESTXI R7 001B
+; D 41A0 A0 01 A6       IFTRUEI QUIT
+; D 41A3 B0 01 1A       GAL UL                             anything else: ignored
 ; QUIT:
-; D 41A8 11 0E 08 2F    LOADXI R14 082F
-; D 41AC C1 0E          PRINTSTR R14
-; D 41AE 0A 00          SETQ 00
-; D 41B0 00             HALT
-; D 41B1 F0 00 00       BREAK
+; D 41A6 11 0E 08 2F    LOADXI R14 082F
+; D 41AA C1 0E          PRINTSTR R14
+; D 41AC 0A 00          SETQ 00
+; D 41AE 00             HALT
+; D 41AF F0 00 00       BREAK
 ; LETTER:
-; D 41B4 10 00 2A       LOADAI 002A
-; D 41B7 11 07 00 80    LOADXI R7 0080
-; D 41BB 89 57          TESTLXY R5 < R7
-; D 41BD A1 01 CD       IFFALSEI LP                        too long: *
-; D 41C0 2E 05 0C 00    READIDX R5 0C00                    the leading-1 code -> the character
-; D 41C4 81 00 00       TESTAI 0000
-; D 41C7 A1 01 CD       IFFALSEI LP
-; D 41CA 10 00 2A       LOADAI 002A
+; D 41B2 10 00 2A       LOADAI 002A
+; D 41B5 11 07 00 80    LOADXI R7 0080
+; D 41B9 89 57          TESTLXY R5 < R7
+; D 41BB A1 01 CB       IFFALSEI LP                        too long: *
+; D 41BE 2E 05 0C 00    READIDX R5 0C00                    the leading-1 code -> the character
+; D 41C2 81 00 00       TESTAI 0000
+; D 41C5 A1 01 CB       IFFALSEI LP
+; D 41C8 10 00 2A       LOADAI 002A
 ; LP:
-; D 41CD C9             SEROUT
-; D 41CE 05 00          OUTA 00                            and on the hex display
-; D 41D0 42 08          INCX R8
-; D 41D2 11 05 00 01    LOADXI R5 0001
-; D 41D6 11 06 00 01    LOADXI R6 0001
-; D 41DA BE 00          RETURN
+; D 41CB C9             SEROUT
+; D 41CC 05 00          OUTA 00                            and on the hex display
+; D 41CE 42 08          INCX R8
+; D 41D0 11 05 00 01    LOADXI R5 0001
+; D 41D4 11 06 00 01    LOADXI R6 0001
+; D 41D8 BE 00          RETURN
 ; SPACE:
-; D 41DC 11 06 00 00    LOADXI R6 0000
-; D 41E0 11 07 00 40    LOADXI R7 0040
-; D 41E4 89 87          TESTLXY R8 < R7
-; D 41E6 A1 01 EF       IFFALSEI SNL
-; D 41E9 CA 20          SEROUTI 20
-; D 41EB 42 08          INCX R8
-; D 41ED BE 00          RETURN
+; D 41DA 11 06 00 00    LOADXI R6 0000
+; D 41DE 11 07 00 40    LOADXI R7 0040
+; D 41E2 89 87          TESTLXY R8 < R7
+; D 41E4 A1 01 ED       IFFALSEI SNL
+; D 41E7 CA 20          SEROUTI 20
+; D 41E9 42 08          INCX R8
+; D 41EB BE 00          RETURN
 ; SNL:
-; D 41EF 11 08 00 00    LOADXI R8 0000
-; D 41F3 CA 0D          SEROUTI 0D
-; D 41F5 CA 0A          SEROUTI 0A                         a new line (RE holds a gap average)
-; D 41F7 BE 00          RETURN
+; D 41ED 11 08 00 00    LOADXI R8 0000
+; D 41F1 CA 0D          SEROUTI 0D
+; D 41F3 CA 0A          SEROUTI 0A                         a new line (RE holds a gap average)
+; D 41F5 BE 00          RETURN
 
 ; --------------------------------------------------------------------------
 ; CODE  -  download this block
@@ -343,14 +346,15 @@ D 410E 11 06 00 00
 D 4112 11 08 00 00
 D 4116 11 04 00 00
 D 411A CC
-D 411B A0 01 8D
+D 411B A0 01 8B
 D 411E 10 00 00
 D 4121 09
-D 4122 81 00 04
-D 4125 A0 01 5F
-D 4128 52 04 00 02
-D 412C 88 4C
-D 412E A0 01 3F
+D 4122 1A 08
+D 4124 A0 01 5E
+D 4127 52 04 00 02
+D 412B 88 4C
+D 412D A0 01 3E
+D 4130 C4
 D 4131 C4
 D 4132 C4
 D 4133 C4
@@ -359,25 +363,25 @@ D 4135 C4
 D 4136 C4
 D 4137 C4
 D 4138 C4
-D 4139 C4
-D 413A C0 01
-D 413C B0 01 1A
-D 413F 86 05 00 01
-D 4143 A0 01 49
-D 4146 BD 01 B4
-D 4149 88 49
-D 414B A1 01 5B
-D 414E 8C 06
-D 4150 A0 01 56
-D 4153 BD 01 DC
-D 4156 C0 01
-D 4158 B0 01 1A
-D 415B C4
-D 415C B0 01 56
-D 415F 0A 01
-D 4161 23 00 4D
-D 4164 11 04 00 00
-D 4168 42 04
+D 4139 C0 01
+D 413B B0 01 1A
+D 413E 86 05 00 01
+D 4142 A0 01 48
+D 4145 BD 01 B2
+D 4148 88 49
+D 414A A1 01 5A
+D 414D 8C 06
+D 414F A0 01 55
+D 4152 BD 01 DA
+D 4155 C0 01
+D 4157 B0 01 1A
+D 415A C4
+D 415B B0 01 55
+D 415E 0A 01
+D 4160 23 00 4D
+D 4163 11 04 00 00
+D 4167 42 04
+D 4169 C4
 D 416A C4
 D 416B C4
 D 416C C4
@@ -392,54 +396,53 @@ D 4174 C4
 D 4175 C4
 D 4176 C4
 D 4177 C4
-D 4178 C4
-D 4179 C0 01
-D 417B 10 00 00
-D 417E 09
-D 417F 81 00 04
-D 4182 A0 01 68
-D 4185 0A 00
-D 4187 F1 43 00
-D 418A B0 01 16
-D 418D CB
-D 418E 21 07
-D 4190 86 07 00 71
-D 4194 A0 01 A8
-D 4197 86 07 00 51
-D 419B A0 01 A8
-D 419E 86 07 00 1B
-D 41A2 A0 01 A8
-D 41A5 B0 01 1A
-D 41A8 11 0E 08 2F
-D 41AC C1 0E
-D 41AE 0A 00
-D 41B0 00
-D 41B1 F0 00 00
-D 41B4 10 00 2A
-D 41B7 11 07 00 80
-D 41BB 89 57
-D 41BD A1 01 CD
-D 41C0 2E 05 0C 00
-D 41C4 81 00 00
-D 41C7 A1 01 CD
-D 41CA 10 00 2A
-D 41CD C9
-D 41CE 05 00
-D 41D0 42 08
-D 41D2 11 05 00 01
-D 41D6 11 06 00 01
-D 41DA BE 00
-D 41DC 11 06 00 00
-D 41E0 11 07 00 40
-D 41E4 89 87
-D 41E6 A1 01 EF
-D 41E9 CA 20
-D 41EB 42 08
-D 41ED BE 00
-D 41EF 11 08 00 00
-D 41F3 CA 0D
-D 41F5 CA 0A
-D 41F7 BE 00
+D 4178 C0 01
+D 417A 10 00 00
+D 417D 09
+D 417E 1A 08
+D 4180 A0 01 67
+D 4183 0A 00
+D 4185 F1 43 00
+D 4188 B0 01 16
+D 418B CB
+D 418C 21 07
+D 418E 86 07 00 71
+D 4192 A0 01 A6
+D 4195 86 07 00 51
+D 4199 A0 01 A6
+D 419C 86 07 00 1B
+D 41A0 A0 01 A6
+D 41A3 B0 01 1A
+D 41A6 11 0E 08 2F
+D 41AA C1 0E
+D 41AC 0A 00
+D 41AE 00
+D 41AF F0 00 00
+D 41B2 10 00 2A
+D 41B5 11 07 00 80
+D 41B9 89 57
+D 41BB A1 01 CB
+D 41BE 2E 05 0C 00
+D 41C2 81 00 00
+D 41C5 A1 01 CB
+D 41C8 10 00 2A
+D 41CB C9
+D 41CC 05 00
+D 41CE 42 08
+D 41D0 11 05 00 01
+D 41D4 11 06 00 01
+D 41D8 BE 00
+D 41DA 11 06 00 00
+D 41DE 11 07 00 40
+D 41E2 89 87
+D 41E4 A1 01 ED
+D 41E7 CA 20
+D 41E9 42 08
+D 41EB BE 00
+D 41ED 11 08 00 00
+D 41F1 CA 0D
+D 41F3 CA 0A
+D 41F5 BE 00
 
 D 4300 E2 F8 4B B8 F8 02 A8 08 FB 06 C2 43 18 08 FC 01
 D 4310 58 18 F8 01 58 C0 43 1C 18 F8 00 58 F8 30 B8 F8
