@@ -399,3 +399,25 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .st-error{background:#8a2f22}
 .st-unk{background:#555}
 
+
+/* ---- Stellar C page (stellarc.html) ---- */
+.sc-badge{display:inline-block; margin-left:8px; padding:1px 7px; border-radius:999px;
+  border:1px solid var(--accent); color:var(--accent); font-size:10.5px; letter-spacing:.12em}
+.sc-grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; margin-top:10px}
+@media(max-width:900px){ .sc-grid{grid-template-columns:1fr} }
+.sc-pane{min-width:0}
+.sc-pane h4{margin:0 0 6px; font-family:var(--mono); font-size:12px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-soft)}
+.sc-h4note{text-transform:none; letter-spacing:0; font-weight:400}
+.sc-editor{display:flex; background:var(--code-bg); border-radius:10px; height:540px; overflow:hidden;
+  border:1px solid transparent}
+.sc-editor:focus-within{border-color:var(--accent)}
+.sc-gutter{font-family:var(--mono); font-size:13px; line-height:1.5; padding:12px 8px 12px 10px;
+  color:var(--code-ink); opacity:.4; text-align:right; white-space:pre; user-select:none;
+  overflow:hidden; min-width:3.4em}
+.sc-errline{background:#b3261e; color:#fff; border-radius:3px; padding:0 3px; opacity:1}
+.sc-src{flex:1; min-width:0; border:0; resize:none; margin:0; background:transparent; color:var(--code-ink);
+  font-family:var(--mono); font-size:13px; line-height:1.5; padding:12px 12px 12px 6px; white-space:pre;
+  overflow:auto; outline:none; tab-size:4}
+.sc-out{height:540px; overflow:auto; margin:0; font-size:12px; line-height:1.5; white-space:pre}
+.sc-err{color:#ff8a7a; white-space:pre-wrap}

@@ -1,0 +1,46 @@
+{
+ "files": [
+  "scc.py",
+  "asm1802.py",
+  "mini.py",
+  "stellar_ops.py",
+  "stellar_disasm.py"
+ ],
+ "examples": [
+  {
+   "name": "Prime generator",
+   "file": "primes.sc",
+   "input": "3\r60\r",
+   "speed": "Elf2K",
+   "blurb": "Asks for a low and a high limit and prints the primes between them - the same program as the hand-written Prime-Gen v07, and 35% smaller. The input box answers 3 and 60; empty it to type your own limits in the terminal."
+  },
+  {
+   "name": "Sieve of Eratosthenes",
+   "file": "sieve.sc",
+   "input": "",
+   "speed": "flat out",
+   "blurb": "Every prime below 2000, ten to a line, then a count. Byte arrays, arguments, && and ||, nested calls."
+  },
+  {
+   "name": "Snake",
+   "file": "snake.sc",
+   "input": "",
+   "speed": "Elf2K",
+   "blurb": "The full arrow-key game: steer to the food, grow, avoid the walls and yourself. Click the terminal, press Space to start and steer with the arrow keys; P pauses, Esc quits. Within a few percent of the hand-written version."
+  },
+  {
+   "name": "Inline STELLAR: asm { }",
+   "file": "asmdemo.sc",
+   "input": "abc",
+   "speed": "flat out",
+   "blurb": "Hand-written STELLAR opcodes inside a C function: MULTXY on register variables, an array address, @break out of a loop, a hand-made CALL, and a SERST poll loop that counts the keys waiting (the three pre-loaded in the input box)."
+  },
+  {
+   "name": "Native 1802: native { }",
+   "file": "nativedemo.sc",
+   "input": "",
+   "speed": "flat out",
+   "blurb": "Raw 1802 machine code run by $F1 RUNMC: sums a 200-byte array (71x faster than the compiled loop), formats the total as hex, and copies a string kept inside the native block."
+  }
+ ]
+}

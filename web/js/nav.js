@@ -7,8 +7,10 @@
     ['scheduler.html',    'Multitasking'],
     ['opcodes.html',      'Opcodes'],
     ['simulator.html',    'Simulator'],
+    ['stellarc.html',     'Stellar C'],
   ];
-  var here = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+  // Cloudflare Pages serves /simulator.html as /simulator, so compare without .html
+  var here = (location.pathname.split('/').pop() || 'index').toLowerCase().replace(/\.html$/, '');
 
   // theme: persist choice; default = system
   // A page can pin its theme (the home page is a console of screens: always dark).
@@ -24,7 +26,7 @@
   inner.innerHTML = '<a class="brand" href="index.html">STELLAR<span class="dot">·</span>VM</a>';
   TABS.forEach(function (t) {
     var a = document.createElement('a');
-    a.className = 'tab' + (t[0] === here ? ' active' : '');
+    a.className = 'tab' + (t[0].replace(/\.html$/, '') === here ? ' active' : '');
     a.href = t[0]; a.textContent = t[1];
     inner.appendChild(a);
   });

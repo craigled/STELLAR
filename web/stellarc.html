@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stellar C</title>
+<meta name="description" content="Stellar C: a small C-like language that compiles to STELLAR bytecode. Write a program, compile it in your browser, and run it on the real firmware.">
+<link rel="stylesheet" href="css/site.css?v=65">
+</head>
+<body>
+<main class="wrap">
+  <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Language <span class="sc-badge">experimental</span></div>
+  <h1 style="margin:.1em 0 .1em">Stellar C</h1>
+  <p class="muted" style="max-width:74ch">A small C-like language that compiles straight to STELLAR bytecode. Write a program, compile it, and run it here on the real V0061.34 firmware &mdash; or download the <span class="mono">.lst</span> for an Elf2K. The compiler is the real one, written in Python, running in your browser.</p>
+
+  <div class="note" style="max-width:86ch">
+    <div class="lbl">Experimental</div>
+    Stellar C is a prototype and the language is still growing: 16-bit arrays and signed arithmetic are not in yet. Everything here compiles and runs in this simulator; not every compiled program has been run on the hardware.
+  </div>
+
+  <div class="sim-controls">
+    <select id="example" title="Example program"></select>
+    <button id="revert" title="Throw away your edits and reload this example">Revert</button>
+    <span class="grow"></span>
+    <button id="compile" class="primary" title="Compile (Ctrl/Cmd+Enter compiles and runs)">Compile</button>
+    <button id="download" disabled title="Save the compiled program as a .lst for the Elf2K">Download .lst</button>
+  </div>
+  <p class="sim-blurb" id="blurb"></p>
+  <div class="status-line" id="ccStatus">loading the compiler…</div>
+
+  <div class="sc-grid">
+    <div class="sc-pane">
+      <h4>Source</h4>
+      <div class="sc-editor">
+        <div class="sc-gutter" id="gutter" aria-hidden="true"></div>
+        <textarea class="sc-src" id="src" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Stellar C source"></textarea>
+      </div>
+    </div>
+    <div class="sc-pane">
+      <h4>Compiled <span id="outTitle" class="sc-h4note"></span></h4>
+      <pre class="sc-out" id="out">Compile to see the STELLAR bytecode here, each opcode next to the source line it came from.</pre>
+    </div>
+  </div>
+
+  <h2 style="margin-top:34px">Run it</h2>
+  <div class="sim-controls">
+    <button id="run" class="primary" title="Compile if needed, then run">Run ▶</button>
+    <button id="pause" disabled>Pause ⏸</button>
+    <button id="reset" disabled>Reset ↺</button>
+    <label class="mono small" style="color:var(--ink-soft)">input
+      <input type="text" id="input" value="" size="12" placeholder="e.g. 3&#92;r60&#92;r" title="Keys pre-loaded before the program starts; use \r for Enter">
+    </label>
+  </div>
+  <div class="clock-row" role="radiogroup" aria-label="Clock speed">
+    <span class="clock-lbl">clock</span>
+    <span id="clockBtns"></span>
+    <span id="speedLabel" class="mono clock-now"></span>
+  </div>
+  <div class="status-line" id="status">not loaded</div>
+  <div class="term-wrap" style="margin-top:8px">
+    <h4>Serial terminal</h4>
+    <div class="term" id="term" tabindex="0" role="textbox" aria-label="Serial terminal — click to type"></div>
+    <p class="arrow-note">Click the terminal and type to send keys to the running program. The <b>input</b> box pre-loads keystrokes before it starts.</p>
+  </div>
+
+  <h2 id="language">The language</h2>
+  <p class="muted" style="max-width:76ch">STELLAR has sixteen fast registers and no stack frames, so Stellar C works like PL/M or Atari Action!: every variable has one fixed home, most of them in registers, and there is no recursion (the compiler refuses it). Two functions that are never active at the same time share registers. Everything is unsigned.</p>
+
+  <div class="tblwrap"><table>
+    <thead><tr><th style="width:34%">Write</th><th>Means</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">const W = 80;</td><td>a compile-time constant</td></tr>
+      <tr><td class="mono">u16 score, best;</td><td>16-bit unsigned variables &mdash; registers where possible</td></tr>
+      <tr><td class="mono">u8 lvl;</td><td>one byte of memory</td></tr>
+      <tr><td class="mono">u8 grid[1680];</td><td>a byte array (set to zero at every start if the program writes it)</td></tr>
+      <tr><td class="mono">u8 rev[] = { 0, 2, 1 };<br>u8 msg[] = "hello";</td><td>initialised arrays; a string is one, with a 0 on the end</td></tr>
+      <tr><td class="mono">u16 f(u16 a, u16 b) { … }</td><td>functions with parameters, locals and a return value; <span class="mono">void main()</span> is where it starts</td></tr>
+      <tr><td class="mono">if else while for break continue return</td><td>as in C</td></tr>
+      <tr><td class="mono">= += -= *= /= %= &amp;= |= ^= ++ --</td><td>assignment</td></tr>
+      <tr><td class="mono">+ - * / % &amp; | ^ &lt;&lt; &gt;&gt;</td><td>arithmetic (shifts by a constant); <span class="mono">a[i]</span>, <span class="mono">&amp;a[i]</span>, calls</td></tr>
+      <tr><td class="mono">== != &lt; &lt;= &gt; &gt;= &amp;&amp; || !</td><td>conditions</td></tr>
+      <tr><td class="mono">putc(c) print("text") printu(n)</td><td>a character, a string or array, a number in decimal</td></tr>
+      <tr><td class="mono">getc() keyready()</td><td>wait for a key; is a key waiting?</td></tr>
+      <tr><td class="mono">rand() delay(k) halt()</td><td>a random number, a pause, stop the program</td></tr>
+      <tr><td class="mono">fill(&amp;a[i], v, n) copy(&amp;dst, &amp;src, n)</td><td>fill or copy a run of bytes</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Inline STELLAR: <span class="mono">asm { }</span></h3>
+  <p style="max-width:76ch">One STELLAR command per line &mdash; the mnemonic, then its operand bytes in hex, as the <a href="opcodes.html">opcode reference</a> lays them out. <span class="mono">{x}</span> is the register variable <span class="mono">x</span> lives in, <span class="mono">#e</span> two bytes (a constant or <span class="mono">&amp;array</span>), <span class="mono">%e</span> one byte, <span class="mono">@name</span> an address (a label, a function, or <span class="mono">@break</span> <span class="mono">@continue</span> <span class="mono">@return</span>), and <span class="mono">name:</span> a label. Each command's length is checked. The asm may use RD, RE and RF, and must leave RC alone.</p>
+<pre>asm {
+poll:
+    SERST              // a key waiting?
+    IFFALSEI @done
+    SERIN
+    INCX 0{k}          // {k} = the register k lives in
+    GAL @poll
+done:
+}</pre>
+
+  <h3>Native 1802: <span class="mono">native { }</span></h3>
+  <p style="max-width:76ch">Raw 1802 machine code, assembled by the compiler and run in place by <span class="mono">$F1 RUNMC</span> &mdash; for the inner loop that must be fast. <span class="mono">{x}</span> is the address of variable <span class="mono">x</span>'s VM register (high byte first), <span class="mono">&amp;a</span> an array's address, <span class="mono">hi(e)</span> and <span class="mono">lo(e)</span> its two bytes. The block returns by itself at the end (or <span class="mono">BR exit</span>). Free registers are R7 R8 R9 RB RD RE RF; the compiler refuses writes to the others. Set X with <span class="mono">SEX</span> before any <span class="mono">STR</span>, and remember the other VMs wait while native code runs.</p>
+
+  <p class="small muted" style="margin-top:22px">The compiler's Python source is served with this page, in <a href="sc/scc.py">sc/</a>. Look up any opcode in the <a href="opcodes.html">reference</a>; load other programs on the <a href="simulator.html">Simulator</a>.</p>
+</main>
+
+<footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
+
+<script src="js/opcodes.js?v=65"></script>
+<script src="js/firmware-0061-34.js?v=65"></script>
+<script src="js/stellar-vm.js?v=65"></script>
+<script src="js/disasm.js?v=65"></script>
+<script src="js/vt100.js?v=65"></script>
+<script src="js/term-input.js?v=65"></script>
+<script src="js/sim-app.js?v=65"></script>
+<script src="js/clock-row.js?v=65"></script>
+<script src="js/stellarc-page.js?v=65"></script>
+<script src="js/nav.js?v=65"></script>
+</body>
+</html>

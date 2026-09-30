@@ -1,0 +1,1186 @@
+"""scc - the Stellar C compiler (prototype).
+
+Stellar C is a small C-like language shaped to what STELLAR does in one opcode:
+
+    const N = 10;                 compile-time constants
+    u16 score = 0;                16-bit unsigned scalars -> VM registers
+    u8  grid[800];                byte arrays -> memory, READIDX / WRITEIDX
+    u8  msg[] = "hello";          initialised byte arrays (a string is one)
+    patched u8 pos[] = "\e[rr;ccH";   an array whose written bytes are always set before
+                                  they are read: it is not restored at start
+    u16 f(u16 a, u16 b) { ... }   functions; parameters and locals are registers
+    void g() { ... }
+
+    statements  if / else, while, for, break, continue, return, x = e,
+                x += e (-= *= /= %= &= |= ^=), x++, x--, a[i] = e, calls
+    conditions  == != < <= > >= && || !   (all unsigned)
+    expressions + - * / % & | ^ << >> (by a constant), unary -, a[i], calls
+    builtins    putc(e)  print("text")  printu(e)  getc()  keyready()
+                rand()   delay(k)       halt()
+    asm { }     inline STELLAR, one command per line (see ASM below)
+    native { }  raw 1802, run by $F1 RUNMC (see NATIVE below)
+
+WHAT IT BUYS OVER HAND-ASSEMBLY: every hard-won STELLAR rule is in the compiler, not in
+the programmer's head - address branches only (no label machinery),
+relative addressing, $89 TESTLXY is strictly <, the F0 00 00 end marker, every array a
+program writes is (re)initialised in code at start (rerun without reloading), SETSIZE
+and the VM claims when the program outgrows 4 KB, and the .lst house format with the
+source line on every opcode.
+
+THE MODEL: no recursion and no stack frames - STELLAR has 15 fast registers and no
+indexed stack, so every variable gets a REGISTER for the whole run, and two functions
+that are never active at the same time share registers (the call graph decides).
+Recursion is refused at compile time. RD-RF are expression temporaries and RD also
+carries return values; R0-RC hold variables (RC is 0 when the program needs a zero).
+
+    python3 scc.py prog.sc [-o prog.lst]
+"""
+import os, re, sys
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', 'Firmware-Math'))
+from mini import assemble, claim_vms_text
+from stellar_ops import *
+
+
+class Error(Exception): pass
+
+# ====================================================================== lexer
+TOK = re.compile(r'''
+    (?P<ws>\s+|//[^\n]*|/\*.*?\*/)
+  | (?P<num>0[xX][0-9a-fA-F]+|\d+)
+  | (?P<chr>'(?:\\.|[^\\'])')
+  | (?P<str>"(?:\\.|[^\\"])*")
+  | (?P<id>[A-Za-z_]\w*)
+  | (?P<op><<=|>>=|==|!=|<=|>=|&&|\|\||\+\+|--|\+=|-=|\*=|/=|%=|&=|\|=|\^=|<<|>>|[-+*/%&|^!<>=(){}\[\];,~])
+''', re.S | re.X)
+ESCAPES = {'n': 10, 'r': 13, 't': 9, 'b': 8, 'e': 27, '0': 0, '\\': 92, "'": 39, '"': 34}
+
+def unescape(s):
+    out, i = [], 0
+    while i < len(s):
+        if s[i] == '\\':
+            if s[i + 1] == 'x': out.append(int(s[i + 2:i + 4], 16)); i += 4; continue
+            out.append(ESCAPES[s[i + 1]]); i += 2
+        else: out.append(ord(s[i])); i += 1
+    return out
+
+ASM = re.compile(r'(asm|native)\s*\{')
+
+def lex(src):
+    toks, pos, line = [], 0, 1
+    while pos < len(src):
+        m = ASM.match(src, pos)
+        if m and (pos == 0 or not (src[pos - 1].isalnum() or src[pos - 1] == '_')):
+            depth, j = 1, m.end()                   # the body is kept raw: {x} nests
+            while depth:
+                if j == len(src): raise Error('line %d: asm { is never closed' % line)
+                depth += {'{': 1, '}': -1}.get(src[j], 0); j += 1
+            first = line + src[pos:m.end()].count('\n')
+            toks.append(('asm', (m.group(1), first, src[m.end():j - 1]), line))
+            line += src[pos:j].count('\n'); pos = j; continue
+        m = TOK.match(src, pos)
+        if not m: raise Error('line %d: cannot read %r' % (line, src[pos:pos + 10]))
+        k, v = m.lastgroup, m.group()
+        if k == 'num': toks.append(('num', int(v, 0), line))
+        elif k == 'chr': toks.append(('num', unescape(v[1:-1])[0], line))
+        elif k == 'str': toks.append(('str', unescape(v[1:-1]), line))
+        elif k != 'ws': toks.append((k, v, line))
+        line += v.count('\n'); pos = m.end()
+    toks.append(('eof', None, line))
+    return toks
+
+# ====================================================================== asm { }
+# One STELLAR command per line, written as the mnemonic (or its opcode byte) and then its
+# operand bytes in hex. Inside an operand:
+#     {x}      the register variable x lives in, as one hex digit:  COPYXY 00 {a}{b}
+#     {f.x}    function f's variable x (to set up a CALL @f by hand)
+#     #e       two bytes: a constant, &array or &array+k             LOADXI 0{p} #&buf
+#     %e       one byte: a constant                                  SEROUTI %'*'
+#     'c'      one byte: a character
+#     @name    a label: one in this function's asm, a function, or break / continue / return
+#     name:    defines a label
+# Comments start with // or ;. Each command's length is checked against the opcode table.
+# The asm may use RD, RE and RF freely; it must leave RC as it found it.
+sys.path.insert(0, os.path.join(HERE, '..', 'tools'))
+from stellar_disasm import OPLEN, NAMES, vlen
+OPCODE = {v: k for k, v in NAMES.items()}
+ATOK = re.compile(r"'(?:\\.|[^\\'])'|\S+")
+
+def asm_parse(first, text):
+    """-> (lines, refs): lines are (line, label, words); refs are ('var', x) and
+    ('call', f, []) nodes, so the liveness, allocation and call-graph passes see them."""
+    lines, refs = [], []
+    for i, raw in enumerate(text.split('\n')):
+        body = re.split(r'//|;', raw, 1)[0]
+        m = re.match(r'\s*([A-Za-z_]\w*):', body)
+        label = m.group(1) if m else None
+        words = ATOK.findall(body[m.end():] if m else body)
+        if label or words: lines.append((first + i, label, words))
+        for w in words[1:]:
+            refs += [('var', v) for v in re.findall(r'\{(\w+)\}', w)]
+            if w.startswith('@'): refs.append(('call', w[1:], []))
+    return lines, refs
+
+# ====================================================================== native { }
+# Raw 1802, run in place by $F1 RUNMC. The compiler puts the code after the program's
+# data, where the STELLAR pre-pass never looks, and emits RUNMC <its absolute address>
+# where the block stands. Operands are expressions:
+#     {x}      the ABSOLUTE address of variable x's VM register (high byte; {x}+1 is the
+#              low byte): VM1's registers live in its core at $3000 + 2n
+#     &a, a    the absolute address of array a (&a+k, &a[k])
+#     hi(e) lo(e)   the two halves of an address
+#     $41 0x41 65 'A'   numbers; const names; labels (local to the block)
+# The block ends with SEX R2 / RETN (label exit:), so BR exit or falling off the end
+# goes home. Free registers: R7 R8 R9 RB RD RE RF (the RUNMC handler saves them), and R2
+# as the stack. R3 is the PC, R6 the way home, RA's low byte is not restored by
+# V0061.34 - writing any register but those is refused. X is unknown on entry: SEX
+# before any STR, OUT or ALU-with-memory. RUNMC does not yield: other VMs wait.
+from asm1802 import assemble as assemble1802, register, AsmError
+NATIVE_FREE = {7, 8, 9, 0xB, 0xD, 0xE, 0xF}
+VM1_REGS = 0x3000
+
+def strip_comment(line):
+    q = None
+    for i, ch in enumerate(line):
+        if q:
+            if ch == q and line[i - 1] != '\\': q = None
+        elif ch in '"\'': q = ch
+        elif ch == ';' or line.startswith('//', i): return line[:i]
+    return line
+
+def native_parse(first, text):
+    lines, refs = [], []
+    for i, raw in enumerate(text.split('\n')):
+        body = strip_comment(raw)
+        m = re.match(r'\s*([A-Za-z_]\w*):', body)
+        label = m.group(1) if m else None
+        rest = (body[m.end():] if m else body).strip()
+        mn, _, arg = rest.partition(' ') if ' ' in rest else rest.partition('\t')
+        if label or mn: lines.append((first + i, label, mn.upper() or None, arg.strip()))
+        refs += [('var', v) for v in re.findall(r'\{(\w+)\}', arg)]
+    return lines, refs
+
+# ====================================================================== parser
+# expressions: ('num', v) ('var', name) ('idx', name, e) ('call', name, [args])
+#              ('bin', op, a, b) ('neg', e) ('not', e) ('addr', name, e) ('str', bytes)
+# statements carry their source line: (kind, line, ...)
+PREC = [('||',), ('&&',), ('==', '!='), ('<', '<=', '>', '>='), ('|',), ('^',), ('&',),
+        ('<<', '>>'), ('+', '-'), ('*', '/', '%')]
+
+class Parser:
+    def __init__(s, toks): s.t = toks; s.i = 0
+    def peek(s, k=0): return s.t[s.i + k]
+    def line(s): return s.t[s.i][2]
+    def take(s, v=None, kind=None):
+        t = s.t[s.i]
+        if (v is not None and t[1] != v) or (kind and t[0] != kind):
+            raise Error('line %d: expected %s, found %r' % (t[2], v or kind, t[1]))
+        s.i += 1; return t
+    def accept(s, v):
+        if s.t[s.i][1] == v and s.t[s.i][0] == 'op': s.i += 1; return True
+        return False
+
+    def program(s):
+        items = []
+        while s.peek()[0] != 'eof':
+            ln = s.line()
+            if s.peek()[1] == 'const':
+                s.take(); n = s.take(kind='id')[1]; s.take('='); e = s.expr(); s.take(';')
+                items.append(('const', ln, n, e)); continue
+            patched = s.peek()[1] == 'patched' and s.take()
+            ty = s.take(kind='id')[1]
+            if ty not in ('u16', 'u8', 'void'): raise Error('line %d: unknown type %r' % (ln, ty))
+            name = s.take(kind='id')[1]
+            if patched:
+                d = s.decl_rest(ty, name, ln, top=True)
+                items += [x + ('patched',) for x in d]; continue
+            if s.accept('('):
+                params = []
+                while not s.accept(')'):
+                    s.take(kind='id'); params.append(s.take(kind='id')[1]); s.accept(',')
+                items.append(('func', ln, ty, name, params, s.block())); continue
+            items += s.decl_rest(ty, name, ln, top=True)
+        return items
+
+    def decl_rest(s, ty, name, ln, top=False):
+        out = []
+        while True:
+            if s.accept('['):
+                size = None if s.peek()[1] == ']' else s.expr()
+                s.take(']')
+                init = None
+                if s.accept('='):
+                    if s.peek()[0] == 'str': init = s.take()[1] + [0]
+                    else:
+                        s.take('{'); init = []
+                        while not s.accept('}'): init.append(s.expr()); s.accept(',')
+                if ty != 'u8': raise Error('line %d: arrays are u8 in this prototype' % ln)
+                out.append(('array', ln, name, size, init))
+            else:
+                init = s.expr() if s.accept('=') else None
+                out.append(('scalar', ln, name, init, ty))
+            if s.accept(';'): return out
+            s.take(','); name = s.take(kind='id')[1]
+
+    def block(s):
+        s.take('{'); body = []
+        while not s.accept('}'): body.append(s.stmt())
+        return ('block', body)
+
+    def stmt(s):
+        ln = s.line(); t = s.peek()
+        if t[1] == '{': return s.block()
+        if t[0] == 'id' and t[1] in ('u16', 'u8'):
+            s.take(); name = s.take(kind='id')[1]
+            decls = s.decl_rest(t[1], name, ln)
+            return ('block', [('local', d[1], d[2], d[3]) for d in decls])
+        if t[1] == 'if':
+            s.take(); s.take('('); c = s.expr(); s.take(')'); a = s.stmt()
+            b = s.stmt() if s.peek()[1] == 'else' and s.take() else None
+            return ('if', ln, c, a, b)
+        if t[1] == 'while':
+            s.take(); s.take('('); c = s.expr(); s.take(')'); return ('while', ln, c, s.stmt(), None)
+        if t[1] == 'for':
+            s.take(); s.take('(')
+            init = None if s.peek()[1] == ';' else s.simple()
+            s.take(';'); c = ('num', 1) if s.peek()[1] == ';' else s.expr(); s.take(';')
+            step = None if s.peek()[1] == ')' else s.simple()
+            s.take(')')
+            return ('block', ([init] if init else []) + [('while', ln, c, s.stmt(), step)])
+        if t[1] in ('break', 'continue'): s.take(); s.take(';'); return (t[1], ln)
+        if t[0] == 'asm':
+            s.take(); kind, first, text = t[1]
+            return (kind, ln) + (asm_parse if kind == 'asm' else native_parse)(first, text)
+        if t[1] == 'return':
+            s.take(); e = None if s.peek()[1] == ';' else s.expr(); s.take(';'); return ('return', ln, e)
+        st = s.simple(); s.take(';'); return st
+
+    def simple(s):
+        ln = s.line(); target = s.unary()
+        t = s.peek()[1]
+        if t in ('=', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '<<=', '>>='):
+            s.take(); e = s.expr()
+            if t != '=': e = ('bin', t[:-1], target, e)
+            return ('assign', ln, target, e)
+        if t in ('++', '--'): s.take(); return ('assign', ln, target, ('bin', t[0], target, ('num', 1)))
+        if target[0] != 'call': raise Error('line %d: a statement must assign or call' % ln)
+        return ('expr', ln, target)
+
+    def expr(s, lvl=0):
+        if lvl == len(PREC): return s.unary()
+        a = s.expr(lvl + 1)
+        while s.peek()[0] == 'op' and s.peek()[1] in PREC[lvl]:
+            op = s.take()[1]; a = ('bin', op, a, s.expr(lvl + 1))
+        return a
+
+    def unary(s):
+        if s.accept('-'): return ('neg', s.unary())
+        if s.accept('!'): return ('not', s.unary())
+        if s.accept('~'): return ('bin', '^', s.unary(), ('num', 0xFFFF))
+        if s.accept('&'):                                   # &a[i] or &a: an address
+            n = s.take(kind='id')[1]
+            if s.accept('['): e = s.expr(); s.take(']'); return ('addr', n, e)
+            return ('addr', n, ('num', 0))
+        if s.accept('('): e = s.expr(); s.take(')'); return e
+        t = s.take()
+        if t[0] == 'num': return ('num', t[1] & 0xFFFF)
+        if t[0] == 'str': return ('str', t[1])
+        if t[0] != 'id': raise Error('line %d: unexpected %r' % (t[2], t[1]))
+        if s.accept('('):
+            args = []
+            while not s.accept(')'): args.append(s.expr()); s.accept(',')
+            return ('call', t[1], args)
+        if s.accept('['): e = s.expr(); s.take(']'); return ('idx', t[1], e)
+        return ('var', t[1])
+
+# ====================================================================== compiler
+TEMPS = [0xF, 0xE, 0xD]           # expression temporaries
+RV = 0xD                          # return values
+ZERO = 0xC                        # holds 0 when the program needs it: a[k], u8 variables
+BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'halt', 'fill', 'copy'}
+# ops after which a DIVXY's quotient/remainder are still in the MA
+KEEPS_MA = {'COPYAX', 'TESTREMZ', 'IFTRUEI', 'IFFALSEI', 'TESTXY', 'TESTXI', 'TESTXZ',
+            'TESTLXY', 'TESTGXY', 'COPYXY', 'LOADXI'}
+WRITES_REG = re.compile(r'-> R(\d+)$|^(?:LOADXI|INCX|DECX|ADDXI|SUBXI) R(\d+)')
+EXPRS = ('num', 'var', 'idx', 'call', 'bin', 'neg', 'not', 'addr', 'str')
+
+
+class Compiler:
+    def __init__(s, items, name):
+        s.name = name
+        s.consts, s.globals, s.arrays, s.funcs, s.bytevars = {}, {}, {}, {}, {}
+        for it in items:
+            if it[0] == 'const': s.consts[it[2]] = s.const(it[3], it[1])
+            elif it[0] == 'scalar' and it[4] == 'u8':           # a u8 variable: one byte of memory
+                s.bytevars[it[2]] = it; s.arrays[it[2]] = ('array', it[1], it[2], ('num', 1), None)
+            elif it[0] == 'scalar': s.globals[it[2]] = it
+            elif it[0] == 'array': s.arrays[it[2]] = it
+            elif it[0] == 'func': s.funcs[it[3]] = it
+        if 'main' not in s.funcs: raise Error('no main()')
+        for n, fn in list(s.funcs.items()):                     # u8 variable x  ->  x[0]
+            s.funcs[n] = fn[:5] + (s.desugar(fn[5]),)
+        s.written = set()
+        s.scan_writes()
+        s.patched = {n for n, it in s.arrays.items() if it[-1] == 'patched'}
+        s.need_zero = bool(s.bytevars) or s.uses_const_index()
+        s.setsize = 1
+        s.allocate()
+
+    def desugar(s, node):
+        if isinstance(node, list): return [s.desugar(x) for x in node]
+        if not isinstance(node, tuple): return node
+        if node[0] == 'var' and node[1] in s.bytevars: return ('idx', node[1], ('num', 0))
+        return tuple(s.desugar(x) if isinstance(x, (tuple, list)) else x for x in node)
+
+    def const(s, e, ln):
+        if e[0] == 'num': return e[1]
+        if e[0] == 'var' and e[1] in getattr(s, 'consts', {}): return s.consts[e[1]]
+        if e[0] == 'neg': return (-s.const(e[1], ln)) & 0xFFFF
+        if e[0] == 'bin' and e[1] in '+-*/%&|^<<>>':
+            a, b = s.const(e[2], ln), s.const(e[3], ln)
+            return {'+': a + b, '-': a - b, '*': a * b, '/': a // max(b, 1), '%': a % max(b, 1),
+                    '&': a & b, '|': a | b, '^': a ^ b, '<<': a << b, '>>': a >> b}[e[1]] & 0xFFFF
+        raise Error('line %d: not a constant' % ln)
+
+    def isconst(s, e):
+        try: s.const(e, 0); return True
+        except (Error, KeyError, TypeError, IndexError): return False
+
+    # ---------------------------------------------------------- analysis
+    def walk(s, node, fn):
+        if isinstance(node, tuple):
+            fn(node)
+            for x in node[1:]:
+                if isinstance(x, (tuple, list)): s.walk(x, fn)
+        elif isinstance(node, list):
+            for x in node: s.walk(x, fn)
+
+    def scan_writes(s):
+        def f(n):
+            if n[0] == 'assign' and n[2][0] == 'idx': s.written.add(n[2][1])
+            if n[0] == 'call' and n[1] in ('fill', 'copy') and n[2] and n[2][0][0] == 'addr':
+                s.written.add(n[2][0][1])
+        for fn in s.funcs.values(): s.walk(fn[5], f)
+
+    def uses_const_index(s):
+        found = []
+        def f(n):
+            if n[0] == 'idx' and s.isconst(n[2]): found.append(n)
+        for fn in s.funcs.values(): s.walk(fn[5], f)
+        return bool(found)
+
+    def vars_in(s, e):
+        """The u16 variables an expression reads."""
+        out = set()
+        def f(x):
+            if x[0] == 'var' and x[1] not in s.consts and x[1] not in s.arrays: out.add(x[1])
+        s.walk(e, f)
+        return out
+
+    def usage(s, n, fn):
+        """For one function: each variable's weight (uses x 10 per loop level), and whether
+        its value is LIVE across a call to another function (then it cannot share a register
+        with anything that function might use). Liveness is the usual backward dataflow over
+        the statements, loops iterated to a fixed point."""
+        weight, loops = {}, [0]
+        def count(e):
+            for v in s.vars_in(e): weight[v] = weight.get(v, 0) + 10 ** min(loops[0], 3)
+        def cnt(st):
+            k = st[0]
+            if k == 'block':
+                for x in st[1]: cnt(x)
+            elif k == 'while':
+                loops[0] += 1; count(st[2]); cnt(st[3])
+                if st[4]: cnt(st[4])
+                loops[0] -= 1
+            elif k == 'if':
+                count(st[2]); cnt(st[3])
+                if st[4]: cnt(st[4])
+            elif k == 'local':
+                weight[st[2]] = weight.get(st[2], 0) + 10 ** min(loops[0], 3)
+                if st[3]: count(st[3])
+            elif k in ('assign', 'expr', 'return'):
+                for x in st[2:]:
+                    if isinstance(x, tuple): count(x)
+            elif k in ('asm', 'native'):                # these name registers: keep them there
+                for v in s.vars_in(st[3]): weight[v] = weight.get(v, 0) + 10 ** 6
+        for p in fn[4]: weight[p] = weight.get(p, 0) + 1
+        cnt(fn[5])
+
+        across = {}                                     # var -> the functions it must survive
+        def mark(vs, e):
+            gs = set()
+            s.walk(e, lambda x: gs.add(x[1]) if x[0] == 'call' and x[1] in s.funcs else None)
+            for g in list(gs): gs |= s.desc[g]
+            for v in vs: across.setdefault(v, set()).update(gs)
+        def has_call(e):
+            found = []
+            s.walk(e, lambda x: found.append(1) if x[0] == 'call' and x[1] in s.funcs else None)
+            return bool(found)
+        def live(st, out, ctx):
+            k = st[0]
+            if k == 'block':
+                for x in reversed(st[1]): out = live(x, out, ctx)
+                return out
+            if k in ('assign', 'local'):
+                tgt, e = (st[2], st[3]) if k == 'assign' else (('var', st[2]), st[3])
+                if e is None: return out - {st[2]}
+                kill = {tgt[1]} if tgt[0] == 'var' else set()
+                use = s.vars_in(e) | (s.vars_in(tgt[2]) if tgt[0] == 'idx' else set())
+                if has_call(e):
+                    rest = s.vars_in(e[2]) if e[0] == 'call' and e[1] in s.funcs else set()
+                    mark(((out - kill) | use) - rest if e[0] == 'call' else (out - kill) | use, e)
+                return (out - kill) | use
+            if k == 'expr':
+                if st[2][1] in s.funcs: mark(out, st[2])
+                elif has_call(st[2]): mark(out | s.vars_in(st[2]), st[2])
+                if st[2][1] == 'halt': return set()
+                return out | s.vars_in(st[2])
+            if k in ('asm', 'native'):                  # reads (and may write) what it names
+                if has_call(st[3]): mark(out | s.vars_in(st[3]), st[3])
+                return out | s.vars_in(st[3])
+            if k == 'return':
+                if st[2] is not None and has_call(st[2]): mark(s.vars_in(st[2]), st[2])
+                return s.vars_in(st[2]) if st[2] is not None else set()
+            if k == 'if':
+                i = live(st[3], out, ctx) | (live(st[4], out, ctx) if st[4] else out)
+                if has_call(st[2]): mark(i | out, st[2])
+                return s.vars_in(st[2]) | i
+            if k == 'while':
+                head = set(out)
+                for _ in range(50):
+                    cond_in = s.vars_in(st[2]) | head | out
+                    step_in = live(st[4], cond_in, ctx) if st[4] else cond_in
+                    body_in = live(st[3], step_in, ctx + [(out, step_in)])
+                    new = s.vars_in(st[2]) | body_in | out
+                    if has_call(st[2]): mark(new, st[2])
+                    if new == head: break
+                    head = new
+                return head
+            if k == 'break': return set(ctx[-1][0]) if ctx else out
+            if k == 'continue': return set(ctx[-1][1]) if ctx else out
+            return out
+        live(fn[5], set(), [])
+        return {v: (w, across.get(v, set())) for v, w in weight.items()}
+
+    def allocate(s):
+        """Every u16 variable gets a register if one is free of conflicts, else two bytes of
+        memory. Most-used first. Two variables conflict when both could hold a live value
+        at once: globals with everything; a function's own variables with each other; and a
+        variable that must survive a call with everything the called functions use."""
+        calls = {n: set() for n in s.funcs}
+        for n, fn in s.funcs.items():
+            def f(x, n=n):
+                if x[0] == 'call' and x[1] in s.funcs: calls[n].add(x[1])
+            s.walk(fn[5], f)
+        def reach(n, path, seen):
+            for m in calls[n]:
+                if m in path: raise Error('%s() is recursive: Stellar C has no stack frames' % m)
+                if m not in seen: seen.add(m); reach(m, path | {m}, seen)
+            return seen
+        s.desc = {n: reach(n, {n}, set()) for n in s.funcs}
+        items = {}                                   # (fn, var) -> [weight, functions it must survive]                                   # (fn, var) -> [weight, crossing]
+        for n, fn in s.funcs.items():
+            info = s.usage(n, fn)
+            for v, (w, cross) in info.items():
+                if v in s.globals and (n, v) not in items and v not in s.fvars_of(n):
+                    g = items.setdefault((None, v), [0, None]); g[0] += w
+                else: items[(n, v)] = [w, cross]
+            for i in range(s.nested(fn)): items[(n, '.h%d' % i)] = [10 ** 4, set(s.desc[n])]
+        for g in s.globals: items.setdefault((None, g), [0, None])
+        regs = [r for r in range(0, 0xD) if not (s.need_zero and r == ZERO)]   # R0 works (V0061.34)
+        def conflict(a, b):
+            if a[0] is None or b[0] is None or a[0] == b[0]: return True
+            (fa, _), (fb, _) = a, b
+            return fb in items[a][1] or fa in items[b][1]
+        s.loc = {}
+        order = sorted(items, key=lambda k: (-items[k][0], str(k)))
+        for k in order:
+            taken = {s.loc[o][1] for o in s.loc if s.loc[o][0] == 'r' and conflict(k, o)}
+            r = next((r for r in regs if r not in taken), None)
+            s.loc[k] = ('r', r) if r is not None else ('m', '.v_%s_%s' % (k[0] or '', k[1]))
+        s.hidden = {n: 0 for n in s.funcs}
+
+    def fvars_of(s, n):
+        fn = s.funcs[n]; names = set(fn[4])
+        def f(x):
+            if x[0] == 'local': names.add(x[2])
+        s.walk(fn[5], f)
+        return names
+
+    def nested(s, fn):
+        """How many hidden registers a function needs: calls inside expressions."""
+        most = [0]
+        def count(e, top):
+            if not isinstance(e, tuple): return 0
+            n = 1 if e[0] == 'call' and e[1] in s.funcs and not top else 0
+            if e[0] == 'call': return n + sum(count(a, False) for a in e[2])
+            return n + sum(count(x, False) for x in e[1:] if isinstance(x, tuple))
+        def f(st):
+            if st[0] in ('assign', 'expr', 'return', 'local', 'if', 'while'):
+                for x in st[2:]:
+                    if isinstance(x, tuple) and x[0] in EXPRS:
+                        most[0] = max(most[0], count(x, st[0] not in ('if', 'while')))
+        s.walk(fn[5], f)
+        return most[0]
+
+    def where(s, name, fn=None):
+        fn = s.fn if fn is None else fn
+        if (fn, name) in s.loc: return s.loc[(fn, name)]
+        if (None, name) in s.loc: return s.loc[(None, name)]
+        raise Error('line %d: unknown variable %r' % (s.ln, name))
+    def maddr(s, loc): return s.layout.get(loc[1], 0)
+
+    # ---------------------------------------------------------- emitting
+    def new(s, tag='L'): s.n += 1; return '%s%d' % (tag, s.n)
+    def emit(s, row):
+        if isinstance(row[0], str) and row[0].startswith('11 '):           # LOADXI of a known value
+            b = [int(x, 16) for x in row[0].split()]
+            if s.kreg.get(b[1] & 15) == (b[2] << 8 | b[3]): return
+        mn0 = row[1].split()[0] if row[1] else ''
+        if mn0 == 'READIDX' and s.acc == row[0]: return                  # the Acc holds that byte already
+        s.acc = row[0] if mn0 == 'READIDX' else s.acc if mn0 in ('TESTAI', 'IFTRUEI', 'IFFALSEI', 'WRITEIDX',
+                                                                   'COPYAX') else None
+        note = s.src_note()
+        row = (row[0], row[1], (note + '   ' + row[2]).strip() if row[2] else note)
+        s.rows.append(row)
+        mn = row[1].split()[0] if row[1] else ''
+        if mn not in KEEPS_MA: s.ma = None
+        if mn in ('CALL', 'RETURN'): s.kreg = {}
+        m = WRITES_REG.search(row[1])
+        if m:
+            r = int(m.group(1) or m.group(2))
+            if s.ma and r in s.ma: s.ma = None
+            if s.acc and int(s.acc.split()[1], 16) & 15 == r: s.acc = None
+            if mn == 'LOADXI': b = [int(x, 16) for x in row[0].split()]; s.kreg[r] = b[2] << 8 | b[3]
+            else: s.kreg.pop(r, None)
+    def label(s, name): s.rows.append(lbl(name)); s.ma = None; s.kreg = {}; s.acc = None
+    def src_note(s):
+        if s.ln != s.noted: s.noted = s.ln; return s.lines[s.ln - 1].strip()[:60]
+        return ''
+
+    def temp(s):
+        for t in TEMPS:
+            if t not in s.tbusy: s.tbusy.add(t); return t
+        raise Error('line %d: expression too deep (3 temporaries)' % s.ln)
+    def untemp(s, r):
+        if r in TEMPS: s.tbusy.discard(r)
+
+    # ---------------------------------------------------------- variables
+    def load(s, name, d):
+        loc = s.where(name)
+        if loc[0] == 'r':
+            if loc[1] != d: s.emit(cpxy(loc[1], d))
+        else: s.emit(ldx(d, s.maddr(loc), name)); s.emit(mxy2(d, d))
+
+    def store_reg(s, name, r, fn=None):
+        """Variable <- register r."""
+        loc = s.where(name, fn)
+        if loc[0] == 'r':
+            if loc[1] != r: s.emit(cpxy(r, loc[1]))
+        else:
+            p = s.temp(); s.emit(ldx(p, s.maddr(loc), name)); s.emit(xmy2(r, p)); s.untemp(p)
+
+    def store(s, name, e, fn=None):
+        """Variable <- expression."""
+        loc = s.where(name, fn)
+        if loc[0] == 'r': return s.value(e, loc[1])
+        if e[0] == 'var' and e[1] not in s.consts and s.where(e[1])[0] == 'r':
+            return s.store_reg(name, s.where(e[1])[1], fn)
+        t = s.temp(); s.value(e, t); s.store_reg(name, t, fn); s.untemp(t)
+
+    # ---------------------------------------------------------- expressions
+    def hoist(s, e, top=True):
+        """Calls inside an expression are made first, each into a hidden variable."""
+        if e[0] == 'call' and not top and e[1] not in BUILTINS:
+            k = s.hidden[s.fn]; s.hidden[s.fn] += 1
+            h = '.h%d' % k
+            if (s.fn, h) not in s.loc: raise Error('line %d: too many calls in one expression' % s.ln)
+            s.store(h, e)
+            return ('var', h)
+        if e[0] == 'bin': return ('bin', e[1], s.hoist(e[2], False), s.hoist(e[3], False))
+        if e[0] in ('neg', 'not'): return (e[0], s.hoist(e[1], False))
+        if e[0] in ('idx', 'addr'): return (e[0], e[1], s.hoist(e[2], False))
+        if e[0] == 'call': return ('call', e[1], [s.hoist(a, False) for a in e[2]])
+        return e
+
+    def reg(s, e):
+        """A register holding e: the variable's own, or a temporary (free it with untemp)."""
+        if e[0] == 'var' and e[1] not in s.consts and e[1] not in s.arrays:
+            loc = s.where(e[1])
+            if loc[0] == 'r': return loc[1]
+        if s.isconst(e):
+            v = s.const(e, s.ln)
+            if v == 0 and s.need_zero: return ZERO
+            for t in TEMPS:
+                if t not in s.tbusy and s.kreg.get(t) == v: s.tbusy.add(t); return t
+        t = s.temp(); s.value(e, t); return t
+
+    def index(s, name, e):
+        """(index register, base) for a[e]: a constant offset goes into the base."""
+        base = s.addr(name)
+        if s.isconst(e): return ZERO, (base + s.const(e, s.ln)) & 0xFFFF
+        if e[0] == 'bin' and e[1] in ('+', '-') and s.isconst(e[3]):
+            k = s.const(e[3], s.ln)
+            return s.reg(e[2]), (base + (k if e[1] == '+' else -k)) & 0xFFFF
+        if e[0] == 'bin' and e[1] == '+' and s.isconst(e[2]):
+            return s.reg(e[3]), (base + s.const(e[2], s.ln)) & 0xFFFF
+        return s.reg(e), base
+
+    def value(s, e, d):
+        """Code that leaves e in register d."""
+        if s.isconst(e): return s.emit(ldx(d, s.const(e, s.ln)))
+        k = e[0]
+        if k == 'var': return s.load(e[1], d)
+        if k == 'idx':
+            ri, base = s.index(e[1], e[2]); s.emit(rdidx(ri, base)); s.untemp(ri); return s.emit(acc2x(d))
+        if k == 'addr':
+            if s.isconst(e[2]): return s.emit(ldx(d, (s.addr(e[1]) + s.const(e[2], s.ln)) & 0xFFFF, '&' + e[1]))
+            s.value(e[2], d); return s.emit(addxi(d, s.addr(e[1])))
+        if k == 'call': return s.call(e, d)
+        if k == 'neg':
+            r = s.reg(e[1]); t = s.temp(); s.emit(ldx(t, 0)); s.emit(subxyz(t, r, d)); s.untemp(t); s.untemp(r); return
+        if k == 'not' or (k == 'bin' and e[1] in ('==', '!=', '<', '<=', '>', '>=', '&&', '||')):
+            yes, end = s.new(), s.new()
+            s.cond(e, yes, True); s.emit(ldx(d, 0)); s.emit(gal(end)); s.label(yes); s.emit(ldx(d, 1)); s.label(end)
+            return
+        op, a, b = e[1], e[2], e[3]
+        if op in ('+', '*', '&', '|', '^') and s.isconst(a) and not s.isconst(b): a, b = b, a
+        if op in ('+', '-') and s.isconst(b):
+            v = s.const(b, s.ln)
+            if s.uses(a, d) and not (a[0] == 'var' and s.where(a[1]) == ('r', d)):
+                t = s.temp(); s.value(a, t); a2 = t
+            else: s.value(a, d); a2 = None
+            if a2 is not None:
+                s.emit(cpxy(a2, d)); s.untemp(a2)
+            if v == 0: return
+            if v == 1: return s.emit(incx(d) if op == '+' else decx(d))
+            return s.emit(addxi(d, v) if op == '+' else subxi(d, v))
+        if op in ('<<',) and s.isconst(b) or (op == '*' and s.isconst(b) and s.const(b, s.ln) in (2, 4)):
+            n = s.const(b, s.ln) if op == '<<' else {2: 1, 4: 2}[s.const(b, s.ln)]
+            s.value(a, d)
+            for _ in range(n): s.emit(addxyz(d, d, d))
+            return
+        if op == '>>' and s.isconst(b): op, b = '/', ('num', 1 << s.const(b, s.ln))
+        if op in ('&', '|', '^'):
+            code = {'|': '63', '^': '64', '&': '65'}[op]; name = {'|': 'OR', '^': 'XOR', '&': 'AND'}[op]
+            ra = s.reg(a)
+            if s.isconst(b):
+                v = s.const(b, s.ln)
+                s.emit(('%s 1%X %02X %02X' % (code, ra, v >> 8, v & 255), '%s R%d %04X' % (name, ra, v), ''))
+            else:
+                rb = s.reg(b); s.emit(x2acc(rb)); s.untemp(rb)
+                s.emit(('%s 0%X' % (code, ra), '%s R%d Acc' % (name, ra), ''))
+            s.untemp(ra); return s.emit(ma2x(d))
+        ra = s.reg(a); rb = s.reg(b)
+        if op == '+': s.emit(addxyz(ra, rb, d))
+        elif op == '-': s.emit(subxyz(ra, rb, d))
+        elif op == '*': s.emit(multxy(ra, rb)); s.emit(ma2x(d))
+        elif op in ('/', '%'):
+            s.divide(ra, rb)
+            if op == '/': s.emit(ma2x(d))
+            else: s.emit(rema()); s.emit(acc2x(d))
+        else: raise Error('line %d: operator %s' % (s.ln, op))
+        s.untemp(ra); s.untemp(rb)
+
+    def uses(s, e, r):
+        """Does evaluating e read register r (so r must not be written first)?"""
+        found = []
+        def f(x):
+            if x[0] == 'var' and x[1] not in s.consts and x[1] not in s.arrays and s.where(x[1]) == ('r', r): found.append(x)
+        s.walk(e, f)
+        return bool(found)
+
+    def divide(s, ra, rb):
+        if s.ma == (ra, rb): return                  # the MA already holds ra / rb
+        s.emit(divxy(ra, rb)); s.ma = (ra, rb)
+
+    def to_acc(s, e):
+        """Code that leaves e in the Acc (for WRITEIDX, SEROUT, printu, TESTAI)."""
+        if s.isconst(e): return s.emit(ldai(s.const(e, s.ln)))
+        if e[0] == 'var' and s.where(e[1])[0] == 'r': return s.emit(x2acc(s.where(e[1])[1]))
+        if e[0] == 'idx':
+            ri, base = s.index(e[1], e[2]); s.emit(rdidx(ri, base)); s.untemp(ri); return
+        if e[0] == 'call' and e[1] == 'getc': return s.emit(('CB', 'SERIN', ''))
+        if e[0] == 'call' and e[1] == 'rand': return s.emit(('C3', 'RAND', ''))
+        if e[0] == 'bin' and e[1] in ('%', '/'):
+            ra, rb = s.reg(e[2]), s.reg(e[3]); s.divide(ra, rb)
+            s.emit(rema() if e[1] == '%' else maa()); s.untemp(ra); s.untemp(rb); return
+        if e[0] == 'bin' and e[1] in ('+', '-') and s.isconst(e[3]):
+            s.to_acc(e[2]); v = s.const(e[3], s.ln)
+            return s.emit(addai(v if e[1] == '+' else (-v) & 0xFFFF))
+        t = s.temp(); s.value(e, t); s.emit(x2acc(t)); s.untemp(t)
+
+    def call(s, e, d=None):
+        name, args = e[1], e[2]
+        if name in BUILTINS: return s.builtin(name, args, d)
+        if name not in s.funcs: raise Error('line %d: no function %s()' % (s.ln, name))
+        params = s.funcs[name][4]
+        if len(args) != len(params): raise Error('line %d: %s() takes %d arguments' % (s.ln, name, len(params)))
+        for a, p in zip(args, params): s.store(p, a, name)
+        s.emit(call('F_' + name))
+        if d is not None and d != RV: s.emit(cpxy(RV, d))
+
+    def address(s, e):
+        """A constant address from &a[k], a, or a string literal (else None)."""
+        if e[0] == 'addr' and s.isconst(e[2]): return (s.addr(e[1]) + s.const(e[2], s.ln)) & 0xFFFF
+        if e[0] == 'var' and e[1] in s.arrays: return s.addr(e[1])
+        if e[0] == 'str': return s.layout.get(s.string(e), 0)
+        return None
+
+    def builtin(s, name, args, d):
+        if name == 'putc':
+            if s.isconst(args[0]): return s.emit(serouti(s.const(args[0], s.ln)))
+            s.to_acc(args[0]); return s.emit(serout())
+        if name == 'print':
+            t = s.temp(); a = s.address(args[0])
+            note = '"%s"' % bytes(args[0][1]).decode('latin1').encode('unicode_escape').decode()[:40] \
+                if args[0][0] == 'str' else ''
+            if a is None: s.value(args[0], t)
+            else: s.emit(ldx(t, a, note))
+            s.emit(printstr(t)); s.untemp(t); return
+        if name == 'printu':
+            s.to_acc(args[0]); s.emit(('24', 'COPYAMA', '')); s.emit(('6B 00', 'CVT2DEC Acc', ''))
+            return s.emit(('6E', 'OUTDEC', ''))
+        if name == 'delay': return s.emit(('C0 %02X' % s.const(args[0], s.ln), 'DLYI %02X' % s.const(args[0], s.ln), ''))
+        if name == 'halt': return s.emit(gal('QUIT'))
+        if name in ('getc', 'rand'):
+            s.emit(('CB', 'SERIN', '') if name == 'getc' else ('C3', 'RAND', ''))
+            if d is not None: s.emit(acc2x(d))
+            return
+        if name == 'keyready':
+            if d is None: return
+            return s.value(('bin', '!=', ('call', 'keyready', []), ('num', 0)), d)
+        if name == 'fill':                           # fill(&a[k], value, count)
+            n, v = s.const(args[2], s.ln), s.const(args[1], s.ln)
+            x, y = s.temp(), s.temp()
+            s.value(args[0], x); s.value(args[0], y) if s.address(args[0]) is None else \
+                s.emit(ldx(y, (s.address(args[0]) + n - 1) & 0xFFFF))
+            if s.address(args[0]) is None: s.emit(addxi(y, n - 1))
+            s.emit(('FB %X%X %02X' % (x, y, v), 'FILLMEMXY R%d..R%d %02X' % (x, y, v), ''))
+            s.untemp(x); s.untemp(y); return
+        if name == 'copy':                           # copy(&dst, &src, count): COPYMXMY
+            n = s.const(args[2], s.ln)
+            if not 0 < n < 256: raise Error('line %d: copy() of 1-255 bytes' % s.ln)
+            x, y = s.temp(), s.temp()
+            s.value(args[1], x); s.value(args[0], y)
+            s.emit(('3B %X%X %02X' % (x, y, n), 'COPYMXMY R%d -> R%d %d' % (x, y, n), ''))
+            s.untemp(x); s.untemp(y); return
+        raise Error(name)
+
+    def string(s, e):
+        if e[0] != 'str': raise Error('line %d: a string is needed' % s.ln)
+        b = bytes(e[1]) + b'\0'
+        if b not in s.strings: s.strings[b] = 'S%d' % len(s.strings)
+        return s.strings[b]
+
+    def addr(s, name):
+        if name not in s.arrays: raise Error('line %d: %s is not an array' % (s.ln, name))
+        return s.layout.get(name, 0)
+
+    # ---------------------------------------------------------- conditions
+    def cond(s, c, target, sense):
+        """Branch to target when c is `sense` (True/False); fall through otherwise."""
+        br = lambda: s.emit(ift(target) if sense else iff(target))
+        if s.isconst(c):
+            if bool(s.const(c, s.ln)) == sense: s.emit(gal(target))
+            return
+        k = c[0]
+        if k == 'not': return s.cond(c[1], target, not sense)
+        if k == 'call' and c[1] == 'keyready': s.emit(('CC', 'SERST', '')); return br()
+        if k == 'bin' and c[1] == '&&':
+            if sense:
+                skip = s.new(); s.cond(c[2], skip, False); s.cond(c[3], target, True); s.label(skip)
+            else: s.cond(c[2], target, False); s.cond(c[3], target, False)
+            return
+        if k == 'bin' and c[1] == '||':
+            if sense: s.cond(c[2], target, True); s.cond(c[3], target, True)
+            else:
+                skip = s.new(); s.cond(c[2], skip, True); s.cond(c[3], target, False); s.label(skip)
+            return
+        if k != 'bin' or c[1] not in ('==', '!=', '<', '<=', '>', '>='):
+            return s.cond(('bin', '!=', c, ('num', 0)), target, sense)
+        op, a, b = c[1], c[2], c[3]
+        if s.isconst(a) and not s.isconst(b):
+            a, b = b, a; op = {'<': '>', '>': '<', '<=': '>=', '>=': '<='}.get(op, op)
+        if op in ('==', '!='):
+            if op == '!=': sense = not sense
+            br = lambda: s.emit(ift(target) if sense else iff(target))
+            if a[0] == 'bin' and a[1] == '%' and s.isconst(b) and s.const(b, s.ln) == 0:
+                ra, rb = s.reg(a[2]), s.reg(a[3]); s.divide(ra, rb); s.untemp(ra); s.untemp(rb)
+                s.emit(('8E', 'TESTREMZ', '')); return br()
+            if s.isconst(b) and (a[0] == 'idx' or (a[0] == 'call' and a[1] in ('getc', 'rand'))):
+                s.to_acc(a); s.emit(testai(s.const(b, s.ln))); return br()
+            ra = s.reg(a)
+            if s.isconst(b):
+                v = s.const(b, s.ln)
+                s.emit(testxz(ra) if v == 0 else testxi(ra, v))
+            else:
+                rb = s.reg(b); s.emit(testxy(ra, rb)); s.untemp(rb)
+            s.untemp(ra); return br()
+        ra, rb = s.reg(a), s.reg(b)
+        # $88 TESTGXY: RX >= RY.  $89 TESTLXY: RX < RY (strictly - the COMMANDS row says <=)
+        s.emit({'<': testlt(ra, rb), '>=': testge(ra, rb), '>': testlt(rb, ra), '<=': testge(rb, ra)}[op])
+        s.untemp(ra); s.untemp(rb); br()
+
+    # ---------------------------------------------------------- statements
+    def stmt(s, st):
+        k = st[0]
+        if k == 'block':
+            for x in st[1]: s.stmt(x)
+            return
+        s.ln = st[1]; s.tbusy = set(); s.hidden[s.fn] = 0
+        if k == 'local':
+            if st[3] is not None: s.store(st[2], s.hoist(st[3]))
+            return
+        if k == 'assign': return s.assign(st[2], st[3])
+        if k == 'expr': return s.call(s.hoist(st[2]))
+        if k == 'asm': return s.asm(st[2])
+        if k == 'native': return s.native(st[2])
+        if k == 'if':
+            _, _, c, a, b = st
+            one = a[1][0] if a[0] == 'block' and len(a[1]) == 1 else a
+            if b is None and one[0] in ('break', 'continue') and s.loops:
+                # if (c) break;  ->  one conditional branch straight out of the loop
+                return s.cond(s.hoist(c, False), s.loops[-1][0 if one[0] == 'break' else 1], True)
+            if b is None and one[0] == 'return' and one[2] is None:
+                return s.cond(s.hoist(c, False), 'R_' + s.fn, True)    # if (c) return;
+            els, end = s.new(), s.new()
+            s.cond(s.hoist(c, False), els if b else end, False)
+            s.stmt(a)
+            if b:
+                if not (s.rows and s.rows[-1][1].split()[:1] in (['GAL'], ['RETURN'])): s.emit(gal(end))
+                s.label(els); s.stmt(b)
+            s.label(end); return
+        if k == 'while':
+            _, ln, c, body, step = st
+            top, test, end, cont = s.new(), s.new(), s.new(), s.new()
+            forever = s.isconst(c) and s.const(c, ln)
+            if not forever: s.emit(gal(test))
+            s.label(top)
+            s.loops.append((end, cont))
+            s.stmt(body)
+            s.loops.pop()
+            s.label(cont)
+            if step: s.stmt(step)
+            s.ln = ln; s.tbusy = set()
+            if forever: s.emit(gal(top))
+            else: s.label(test); s.hidden[s.fn] = 0; s.cond(s.hoist(c, False), top, True)
+            s.label(end); return
+        if k in ('break', 'continue'):
+            if not s.loops: raise Error('line %d: %s outside a loop' % (st[1], k))
+            return s.emit(gal(s.loops[-1][0 if k == 'break' else 1]))
+        if k == 'return':
+            if st[2] is not None: s.value(s.hoist(st[2]), RV)
+            return s.emit(ret())
+        raise Error('line %d: %s' % (st[1], k))
+
+    def asm_value(s, e, n):
+        """#e / %e: a constant or an array address, as n bytes."""
+        try: x = Parser(lex(e)).expr()
+        except Error: raise Error('line %d: cannot read %r' % (s.ln, e))
+        v = s.address(x) if x[0] in ('addr', 'str') else s.const(x, s.ln) if s.isconst(x) else None
+        if v is None: raise Error('line %d: %r is not a constant or an address' % (s.ln, e))
+        if n == 1 and v > 255: raise Error('line %d: %%%s is %d: more than a byte' % (s.ln, e, v))
+        return [v >> 8, v & 255] if n == 2 else [v]
+
+    def asm_reg(s, m):
+        name = m.group(1)
+        fn, name = name.split('.', 1) if '.' in name else (s.fn, name)
+        if fn not in s.funcs: raise Error('line %d: no function %s()' % (s.ln, fn))
+        if name in s.arrays:
+            raise Error('line %d: %s is in memory, not a register: use #&%s' % (s.ln, name, name))
+        if name not in s.fvars_of(fn) and name not in s.globals:
+            raise Error('line %d: unknown variable %r' % (s.ln, m.group(1)))
+        loc = s.where(name, fn)
+        if loc[0] != 'r': raise Error('line %d: {%s} did not get a register' % (s.ln, m.group(1)))
+        return '%X' % loc[1]
+
+    def asm_label(s, name):
+        if name in ('break', 'continue'):
+            if not s.loops: raise Error('line %d: @%s outside a loop' % (s.ln, name))
+            return s.loops[-1][0 if name == 'break' else 1]
+        if name == 'return': return 'R_' + s.fn
+        if name in s.funcs and name not in s.asm_defs: return 'F_' + name
+        s.asm_used.setdefault(name, s.ln)
+        return 'A_%s_%s' % (s.fn, name)
+
+    def asm(s, lines):
+        """Inline STELLAR, emitted as written: none of the peephole caches look inside."""
+        for ln, label, words in lines:
+            s.ln = ln
+            if label:
+                if label in s.funcs: raise Error('line %d: label %s: is also a function' % (ln, label))
+                if label in s.asm_defs: raise Error('line %d: label %s: defined twice' % (ln, label))
+                s.asm_defs.add(label); s.rows.append(lbl('A_%s_%s' % (s.fn, label)))
+            if not words: continue
+            op = words[0].upper()
+            if op in OPCODE: op = OPCODE[op]
+            elif re.fullmatch(r'[0-9A-F]{2}', op): op = int(op, 16)
+            else: raise Error('line %d: unknown command %r' % (ln, words[0]))
+            bs, target, text = [op], None, []
+            for w in words[1:]:
+                if w.startswith('@'):
+                    if target or len(words) != 2:
+                        raise Error('line %d: a label must be the only operand' % ln)
+                    target = s.asm_label(w[1:]); text.append(w[1:]); continue
+                if w.startswith('#'): b = s.asm_value(w[1:], 2)
+                elif w.startswith('%'): b = s.asm_value(w[1:], 1)
+                elif w.startswith("'"): b = unescape(w[1:-1])[:1]
+                else:
+                    h = re.sub(r'\{([\w.]+)\}', s.asm_reg, w.lstrip('$'))
+                    if not re.fullmatch(r'([0-9A-Fa-f]{2})+', h):
+                        raise Error('line %d: %r is not whole hex bytes' % (ln, w))
+                    b = list(bytes.fromhex(h))
+                bs += b; text.append(' '.join('%02X' % x for x in b))
+            name = NAMES.get(op, '%02X' % op)
+            if target:
+                if OPLEN.get(op) != 2: raise Error('line %d: %s does not take an address' % (ln, name))
+                row = (('%02X' % op, target), '%s %s' % (name, text[0]), '')
+            else:
+                want = OPLEN.get(op)
+                if want is None: raise Error('line %d: opcode %02X is not a STELLAR command' % (ln, op))
+                want = vlen(dict(enumerate(bs)), 0) if want == 0xFF else want + 1
+                if len(bs) != want:
+                    raise Error('line %d: %s is %d bytes long, not %d' % (ln, name, want, len(bs)))
+                row = (' '.join('%02X' % x for x in bs), ' '.join([name] + text), '')
+            s.rows.append((row[0], row[1], s.src_note()))
+        s.ma = None; s.kreg = {}; s.acc = None                  # the asm may have changed anything
+
+    def native_value(s, text, labels):
+        """An operand of a native block, as a number (0 for a label on the sizing pass)."""
+        t = re.sub(r'\{([\w.]+)\}', lambda m: str(VM1_REGS + 2 * int(s.asm_reg(m), 16)), text)
+        t = re.sub(r'\$([0-9A-Fa-f]+)', r'0x\1', t)
+        try:
+            p = Parser(lex(t)); e = p.expr()
+            if p.peek()[0] != 'eof': raise Error('')
+        except Error: raise Error('line %d: cannot read %r' % (s.ln, text))
+        def ev(e):
+            k = e[0]
+            if k == 'num': return e[1]
+            if k == 'var':
+                if labels is not None and e[1] in labels: return labels[e[1]]
+                if e[1] in s.consts: return s.consts[e[1]]
+                if e[1] in s.arrays: return 0x4000 + s.addr(e[1])
+                if labels is None: return 0
+                raise Error('line %d: unknown name %r' % (s.ln, e[1]))
+            if k == 'addr': return 0x4000 + s.addr(e[1]) + ev(e[2])
+            if k == 'idx' and e[1] in s.arrays: return 0x4000 + s.addr(e[1]) + ev(e[2])
+            if k == 'call' and e[1] in ('hi', 'lo') and len(e[2]) == 1:
+                v = ev(e[2][0]); return (v >> 8) & 255 if e[1] == 'hi' else v & 255
+            if k == 'neg': return -ev(e[1])
+            if k == 'bin' and e[1] in ('+', '-', '*', '/', '&', '|', '^', '<<', '>>'):
+                a, b = ev(e[2]), ev(e[3])
+                return {'+': a + b, '-': a - b, '*': a * b, '/': a // max(b, 1), '&': a & b,
+                        '|': a | b, '^': a ^ b, '<<': a << b, '>>': a >> b}[e[1]]
+            raise Error('line %d: %r is not a native operand' % (s.ln, text))
+        return ev(e)
+
+    def native(s, lines):
+        """Assemble the block for its place after the data; RUNMC it from here."""
+        for ln, label, mn, arg in lines:
+            s.ln = ln
+            if mn == 'SEP': raise Error('line %d: use CALL addr / RETN, not SEP' % ln)
+            if mn in ('PLO', 'PHI', 'INC', 'DEC', 'LDA'):
+                try: r = register(arg, ln)
+                except AsmError as e: raise Error(str(e))
+                ok = r in NATIVE_FREE or (r == 2 and mn in ('INC', 'DEC', 'LDA'))
+                if not ok:
+                    why = {3: 'R3 is the PC', 6: 'R6 is the way home', 2: 'R2 is the stack',
+                           0xA: "RA's low byte is not restored by the RUNMC handler"}.get(r, 'the RUNMC handler does not save it')
+                    raise Error('line %d: %s R%X: %s (free: R7 R8 R9 RB RD RE RF)' % (ln, mn, r, why))
+        end = lines[-1][0] if lines else s.ln
+        body = list(lines) + [(end, 'exit', 'SEX', 'R2'), (end, None, 'RETN', '')]
+        key = '.native_%d' % len(s.natives)
+        base = 0x4000 + s.layout.get(key, 0)
+        try: bs, listing, _, shorts = assemble1802(body, base, lambda t, l: s.native_value(t, l))
+        except AsmError as e: raise Error(str(e))
+        s.natives[key] = (bs, listing, shorts)
+        s.ln = lines[0][0] if lines else s.ln
+        s.emit(runmc(base, 'native block, %d bytes' % len(bs)))
+        s.ma = None; s.kreg = {}; s.acc = None                  # it may have changed anything
+
+    def assign(s, target, e):
+        e = s.hoist(e)
+        if target[0] == 'var':
+            loc = s.where(target[1])
+            if loc[0] == 'r':
+                d = loc[1]
+                if e[0] == 'bin' and e[2] == target and e[1] in ('+', '-') and not s.isconst(e[3]):
+                    rb = s.reg(e[3])
+                    s.emit(addxyz(d, rb, d) if e[1] == '+' else subxyz(d, rb, d)); s.untemp(rb); return
+            return s.store(target[1], e)
+        if target[0] == 'idx':
+            ri, base = s.index(target[1], target[2])
+            s.to_acc(e)
+            s.emit(wridx(ri, base)); s.untemp(ri); return
+        raise Error('line %d: cannot assign to that' % s.ln)
+
+    # ---------------------------------------------------------- the program
+    def compile(s, src):
+        s.lines = src.split('\n')
+        if not hasattr(s, 'layout'): s.layout = {}              # pass 1: addresses are placeholders
+        s.rows = []; s.n = 0; s.strings = {}; s.ma = None; s.kreg = {}; s.acc = None; s.loops = []
+        s.natives = {}
+        s.ln = 1; s.noted = 0; s.fn = None; s.tbusy = set()
+        s.rows.append(start('Stellar C: ' + s.name))
+        if s.setsize > 1: s.rows.append(('F2 %02X' % s.setsize, 'SETSIZE %02X' % s.setsize, 'the program needs %d KB' % (4 * s.setsize)))
+        if s.need_zero: s.emit(ldx(ZERO, 0, 'RC = 0: the index for a[k] and the u8 variables'))
+        for a, it in s.arrays.items():             # arrays the program writes are set up again every run
+            if a not in s.written or a in s.patched: continue
+            s.ln = it[1]; s.noted = 0
+            if a in s.bytevars:
+                if s.bytevars[a][3] is not None:
+                    s.emit(ldai(s.const(s.bytevars[a][3], it[1]))); s.emit(wridx(ZERO, s.addr(a)))
+                continue
+            size = len(s.array_bytes(it))
+            if it[4] is None:
+                s.emit(ldx(0xE, s.addr(a))); s.emit(ldx(0xF, s.addr(a) + size - 1))
+                s.emit(('FB EF 00', 'FILLMEMXY RE..RF 00', ''))
+            else:
+                for off in range(0, size, 255):
+                    n = min(255, size - off)
+                    s.emit(ldx(0xE, s.layout.get('.init_' + a, 0) + off)); s.emit(ldx(0xF, s.addr(a) + off))
+                    s.emit(('3B EF %02X' % n, 'COPYMXMY RE -> RF %d' % n, 'from its pristine copy'))
+        for g, it in s.globals.items():
+            if it[3] is not None: s.ln = it[1]; s.noted = 0; s.fn = None; s.tbusy = set(); s.store(g, it[3])
+        s.rows.append(call('F_main', 'run main()'))
+        s.rows.append(lbl('QUIT')); s.rows.append(('00', 'HALT', ''))
+        for n, fn in s.funcs.items():
+            s.fn = n; s.ln = fn[1]; s.noted = 0; s.kreg = {}; s.ma = None; s.acc = None
+            s.asm_defs, s.asm_used = set(), {}
+            s.rows.append(lbl('F_' + n, '%s()' % n))
+            s.stmt(fn[5])
+            for name, ln in s.asm_used.items():
+                if name not in s.asm_defs: raise Error('line %d: no label %s: in %s()' % (ln, name, n))
+            if s.rows[-1][1].startswith('RETURN') and not s.rows[-1][2].startswith('~'):
+                s.rows.insert(len(s.rows) - 1, lbl('R_' + n))     # the body's own last RETURN
+            else: s.rows.append(lbl('R_' + n)); s.rows.append(ret())
+        s.rows.append(brk('end marker: the pre-pass stops here'))
+        return s.rows
+
+    def array_bytes(s, it):
+        size = s.const(it[3], it[1]) if it[3] is not None else len(it[4])
+        init = it[4] or []
+        vals = [x if isinstance(x, int) else s.const(x, it[1]) for x in init]
+        if len(vals) > size: raise Error('line %d: too many initialisers' % it[1])
+        return bytes(v & 255 for v in vals) + bytes(size - len(vals))
+
+
+def compile_file(path):
+    return compile_source(open(path).read(), os.path.splitext(os.path.basename(path))[0])
+
+
+def compile_source(src, name):
+    c = Compiler(Parser(lex(src)).program(), name)
+    for _ in range(4):
+        # pass 1 sizes the code; pass 2 places the data after it
+        c.compile(src)
+        em, _ = assemble(c.rows, base=0x4000)
+        code_len = em[-1][0] + len(em[-1][1]) - 0x4000
+        data, a = {}, (code_len + 15) & ~15
+        for b, lab in c.strings.items(): c.layout[lab] = a; data[a] = b; a += len(b)
+        for n, it in c.arrays.items():
+            byts = c.array_bytes(it)
+            c.layout[n] = a; data[a] = byts if it[4] else b''; a += len(byts)
+            if n in c.written and it[4] and n not in c.patched: c.layout['.init_' + n] = a; data[a] = byts; a += len(byts)
+        for k, loc in c.loc.items():
+            if loc[0] == 'm': c.layout[loc[1]] = a; a += 2
+        for key, (bs, _, shorts) in c.natives.items():           # raw 1802 for RUNMC
+            if shorts and (a & 255) + len(bs) > 256: a = (a + 255) & ~255   # short branches: one page
+            c.layout[key] = a; data[a] = bytes(bs); a += len(bs)
+        c.data_end = a
+        blocks = (a + 0xFFF) // 0x1000
+        if blocks > 3: raise Error('the program needs %d KB: more than SETSIZE 3 gives' % (4 * blocks))
+        if blocks > c.setsize: c.setsize = blocks; continue
+        c.compile(src)
+        em, labels = assemble(c.rows, base=0x4000)
+        if em[-1][0] + len(em[-1][1]) - 0x4000 == code_len:
+            for key, (bs, _, shorts) in c.natives.items():       # as assembled for the final layout
+                assert len(bs) == len(data[c.layout[key]])
+                data[c.layout[key]] = bytes(bs)
+                for op, t, ln in shorts:
+                    if op >> 8 != t >> 8:
+                        raise Error('line %d: short branch at $%04X to $%04X leaves its page: '
+                                    'use the long form (LBR, LBZ, ...)' % (ln, op - 1, t))
+            return c, em, labels, {k: v for k, v in data.items() if v}
+    raise Error('the layout did not settle')
+
+
+def symbols(c, labels):
+    """Where everything went - for a debugger or a test harness."""
+    out = {'vars': {}, 'arrays': {k: 0x4000 + c.layout[k] for k in c.arrays},
+           'labels': {k: v for k, v in labels.items() if not re.match(r'L\d+$', k)}}
+    for (fn, v), loc in c.loc.items():
+        key = v if fn is None else '%s.%s' % (fn, v)
+        out['vars'][key] = {'reg': loc[1]} if loc[0] == 'r' else {'mem': 0x4000 + c.layout[loc[1]]}
+    if c.natives: out['natives'] = [0x4000 + c.layout[k] for k in c.natives]
+    return out
+
+
+def render_lst(path, c, em, labels, data, extra=''):
+    """The .lst text, VM claims included."""
+    lines = ['; ' + '=' * 74,
+             '; %s  -  compiled from %s by scc (Stellar C, prototype)   loads at $4000%s'
+             % (c.name, os.path.basename(path), '-$%X' % (0x4000 + 0x1000 * c.setsize - 1) if c.setsize > 1 else ''),
+             '; ' + '=' * 74,
+             '; %d STELLAR commands, %d bytes of code, %d bytes of data.'
+             % (len(em), em[-1][0] + len(em[-1][1]) - 0x4000, sum(len(d) for d in data.values())),
+             '; registers: ' + ', '.join('%s R%d' % ((f + '.' if f else '') + v, l[1])
+                                          for (f, v), l in sorted(c.loc.items(), key=lambda x: (x[1][0], str(x[1][1])))
+                                          if l[0] == 'r' and not v.startswith('.')),
+             '; in memory: ' + (', '.join('%s' % ((f + '.' if f else '') + v) for (f, v), l in c.loc.items() if l[0] == 'm') or 'nothing'),
+             ]
+    if extra: lines += ['; ' + x for x in extra.split('\n')]
+    lines += [';', '; DISASSEMBLY  -  commented out; the loader skips it', ';']
+    rev = {}
+    for k, v in labels.items():
+        if not re.match(r'L\d+$', k) and not k.startswith('R_'): rev.setdefault(v, []).append(k)
+    for a, bs, asm, note in em:
+        for k in rev.get(a, []): lines.append('; %s:' % (k[2:] + '()' if k.startswith('F_') else k))
+        lines.append(('; D %04X %-14s %-30s %s' % (a, ' '.join('%02X' % b for b in bs), asm, note)).rstrip())
+    for key, (bs, listing, _) in c.natives.items():
+        lines += [';', '; NATIVE 1802  -  %d bytes at $%04X, run by RUNMC' % (len(bs), 0x4000 + c.layout[key]), ';']
+        for a, b, text, ln in listing:
+            if not b: lines.append('; %s' % text); continue
+            src = c.lines[ln - 1]
+            note = src[len(strip_comment(src)):].lstrip(';/ ').strip()[:44] if text.split()[0] not in ('exit:', 'RETN') else ''
+            lines.append(('; N %04X %-10s %-26s %s' % (a, ' '.join('%02X' % x for x in b), text, note)).rstrip())
+    lines += ['', '; CODE  -  download this block', '']
+    lines += ['D %04X %s' % (a, ' '.join('%02X' % b for b in bs)) for a, bs, _, _ in em]
+    for rel, d in sorted(data.items()):
+        lines.append('')
+        for off in range(0, len(d), 16):
+            lines.append('D %04X %s' % (0x4000 + rel + off, ' '.join('%02X' % b for b in d[off:off + 16])))
+    return claim_vms_text('\n'.join(lines) + '\n')[0]
+
+
+def write_lst(path, out, c, em, labels, data, extra=''):
+    import json
+    open(out, 'w').write(render_lst(path, c, em, labels, data, extra))
+    json.dump(symbols(c, labels), open(os.path.splitext(out)[0] + '.sym.json', 'w'), indent=1)
+
+
+def compile_text(src, name='program'):
+    """For the web page: source text -> {'lst', 'summary'} or {'error'}; no files touched."""
+    try:
+        c, em, labels, data = compile_source(src, name)
+    except Error as e:
+        return {'error': 'scc: %s' % e}
+    except (ValueError, KeyError, IndexError, TypeError, RecursionError) as e:
+        return {'error': 'scc: internal error (%s: %s) - please report this program' % (type(e).__name__, e)}
+    return {'lst': render_lst(name + '.sc', c, em, labels, data),
+            'summary': '%d commands, %d bytes of code, %d in all' % (len(em), em[-1][0] + len(em[-1][1]) - 0x4000, c.data_end)}
+
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2: print(__doc__); sys.exit(1)
+    src = sys.argv[1]
+    out = sys.argv[sys.argv.index('-o') + 1] if '-o' in sys.argv else os.path.splitext(src)[0] + '.lst'
+    try:
+        c, em, labels, data = compile_file(src)
+        write_lst(src, out, c, em, labels, data)
+    except Error as e:
+        print('scc: %s' % e); sys.exit(1)
+    print('%s: %d commands, %d bytes of code, %d in all -> %s'
+          % (src, len(em), em[-1][0] + len(em[-1][1]) - 0x4000, c.data_end, out))
