@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=72';
+  var V = '?v=73';
   var LINEUP = [
     { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
     { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },
@@ -133,9 +133,10 @@
       d.style.top = (mk[0] / 0x8000 * 100) + '%';
       d.style.height = ((mk[1] - mk[0]) / 0x8000 * 100) + '%';
       if (mk[3]) d.style.setProperty('--vm', VMC[mk[3]]);
-      d.innerHTML = '<span>' + mk[2] + '</span><i class="mono">$' + h4(mk[0]) + '</i>';
+      d.innerHTML = '<div class="dlt"><span>' + mk[2] + '</span><i class="mono">$' + h4(mk[0]) + '</i></div>';
       host.appendChild(d);
     });
+    layoutLabels(host);
     cv.addEventListener('mousemove', function (e) {
       var r = cv.getBoundingClientRect();
       var x = Math.floor((e.clientX - r.left) / r.width * 128);
@@ -146,6 +147,24 @@
     });
     cv.addEventListener('mouseleave', function () { read.textContent = idle; });
   }
+
+  // Each region's dividing line sits at its true place, but the CIDP is 2 px of the die and
+  // the dispatch table 4 px, far too thin for their names: a label that would overlap the
+  // one above is pushed down just far enough to be read (it keeps a dotted tick on its line).
+  function layoutLabels(host) {
+    var prev = -1e9, bands = host.children;
+    for (var i = 0; i < bands.length; i++) {
+      var d = bands[i], lab = d.firstChild, top = d.offsetTop;
+      if (!lab) continue;
+      var shift = Math.max(0, prev - top);
+      lab.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+      d.classList.toggle('nudged', shift > 0);
+      prev = top + shift + lab.offsetHeight;
+    }
+  }
+  window.addEventListener('resize', function () {
+    layoutLabels($('dieLabels')); if (zoomOpen) layoutLabels($('dieBigLabels'));
+  });
 
   // Click the die: an enlarged, live copy in an overlay. The machine keeps running; each
   // frame the die draws is put on the big canvas too (Die.mirrorTo), which costs nothing
@@ -161,6 +180,7 @@
       if (!die) return;
       zoomOpen = true; ov.hidden = false;
       die.mirrorTo($('dieBig'));
+      layoutLabels($('dieBigLabels'));            // it had no height while hidden
       document.body.style.overflow = 'hidden';
       $('dieZoomClose').focus({ preventScroll: true });
     }

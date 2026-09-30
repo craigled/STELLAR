@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/site.css?v=72">
-<link rel="stylesheet" href="css/home.css?v=72">
+<link rel="stylesheet" href="css/site.css?v=73">
+<link rel="stylesheet" href="css/home.css?v=73">
 </head>
 <body class="home">
 
@@ -59,6 +59,10 @@
         <div class="die-labels" id="dieLabels"></div>
       </div>
       <div class="die-read mono" id="dieRead">hover the die · click to enlarge</div>
+      <p class="die-key">Every pixel is one byte of RAM. Colour: the chip running code there, for
+        <b style="color:#ffb547">VM1</b> <b style="color:#5fe3d0">VM2</b> <b style="color:#ff7a90">VM3</b>
+        <b style="color:#b8f36a">VM4</b> or <b style="color:#96a0b9">the scheduler</b>.
+        White: a byte just changed. <a href="#die-guide">What each block is&nbsp;↓</a></p>
       <div class="speed speed-copy" data-clock-copy aria-label="Clock speed"></div>
       <div class="cidp">
         <div class="cidp-h"><b>CIDP</b><span class="mono">$2F00</span>
@@ -112,9 +116,43 @@
 
 <main class="h-main">
 
+<!-- ============================================================ THE DIE -->
+<section class="story wide" id="die-guide">
+  <div class="story-num">01</div>
+  <div class="story-body">
+    <h2>Reading the die</h2>
+    <p>The die is the machine's whole memory, all 32&nbsp;KB of it, drawn as a picture: one pixel
+    per byte, 128 bytes to a row, from <code>$0000</code> at the top left to <code>$7FFF</code> at
+    the bottom right. Each byte glows faintly by its value, so code and tables have a texture and
+    empty memory is black. On top of that, every instruction the 1802 fetches lights its byte in
+    the colour of the VM it is working for, and every byte that changes flashes white. Both fade
+    within a few frames, so the picture shows <em>where the chip is working right now</em>.
+    Hover to read any byte; click the die to enlarge it.</p>
+    <p class="dim">The coloured light is almost all in the firmware, because that is the code the
+    1802 actually runs. A program's own STELLAR bytecode, down in its VM block, is <em>data</em> to
+    the chip: the firmware reads it one opcode at a time and runs the handler for it. So the
+    program blocks light up white, where programs write their variables and screens, and the
+    firmware lights up in colour, showing which handlers each program is keeping busy.</p>
+    <div class="die-guide-tbl">
+      <div class="dg-row"><span class="dg-name">kernel</span><span class="dg-addr mono">$0000&ndash;$07FF · 2 KB</span>
+        <span class="dg-what">Start-up, the <b>scheduler</b> that hands the chip from VM to VM every few opcodes, the call-and-return routines, and the error handling. It lights in every VM's colour in turn.</span></div>
+      <div class="dg-row"><span class="dg-name">dispatch</span><span class="dg-addr mono">$0800&ndash;$09FF · 512 B</span>
+        <span class="dg-what">The <b>opcode table</b>: for each of the 256 possible STELLAR opcodes, the two-byte address of the code that carries it out. Looked up once per opcode.</span></div>
+      <div class="dg-row"><span class="dg-name">opcode handlers</span><span class="dg-addr mono">$0A00&ndash;$2EFF · 9.3 KB</span>
+        <span class="dg-what">The 1802 code for every STELLAR command: moves, maths, tests, branches, printing, I/O. Each bright streak is a handler at work; its colour says which program asked for it.</span></div>
+      <div class="dg-row"><span class="dg-name">CIDP</span><span class="dg-addr mono">$2F00&ndash;$2FFF · 256 B</span>
+        <span class="dg-what">The <b>Common Interchange Data Page</b>, shared by everything: one 16-byte entry per VM (its pages, state and command count), the scheduler's own state at <code>$2F50</code> (which VM has the chip, how many there are, multitasking on or off), and the 1802's hardware stack at the top. Only 2 pixels tall on the die, so it is shown <b>byte by byte in the CIDP table under the die</b>: each VM's row in its colour, the running VM's row lit, changes flashing. Hover a byte there to see what it is.</span></div>
+      <div class="dg-row"><span class="dg-name">cores</span><span class="dg-addr mono">$3000&ndash;$3FFF · 4 × 1 KB</span>
+        <span class="dg-what">Each VM's <b>core</b>: its 16 registers, the accumulators, flags, the settings its program has chosen (ports, memory mode), its stacks and labels. They flash white constantly, because every opcode changes a register.</span></div>
+      <div class="dg-row"><span class="dg-name" style="color:#ffb547">VM1</span><span class="dg-addr mono">$4000&ndash;$4FFF · 4 KB</span>
+        <span class="dg-what">VM1's <b>program block</b>: the program's bytecode at the start, then its strings, tables and variables. <b style="color:#5fe3d0">VM2</b> <code>$5000</code>, <b style="color:#ff7a90">VM3</b> <code>$6000</code> and <b style="color:#b8f36a">VM4</b> <code>$7000</code> are laid out the same way. A block that stays dark is code being read, not written; white is the program updating its data, like Mandelbrot's picture or Invaders' positions.</span></div>
+    </div>
+  </div>
+</section>
+
 <!-- ============================================================ FAIRNESS -->
 <section class="story" id="fair">
-  <div class="story-num">01</div>
+  <div class="story-num">02</div>
   <div class="story-body">
     <h2>Fair by opcode, not by time</h2>
     <p>Watch the timeline while Invaders waits at <i>press any key</i>. STELLAR's scheduler
@@ -134,7 +172,7 @@
 
 <!-- ============================================================ DESCENT -->
 <section class="story wide" id="descent">
-  <div class="story-num">02</div>
+  <div class="story-num">03</div>
   <div class="story-body">
     <h2>One opcode, all the way down</h2>
     <p>Choose a VM and follow its most recent instruction through every layer: from the
@@ -175,7 +213,7 @@
 
 <!-- ============================================================ BY HAND -->
 <section class="story" id="byhand">
-  <div class="story-num">03</div>
+  <div class="story-num">04</div>
   <div class="story-body">
     <h2>There is no assembler</h2>
     <p>STELLAR's firmware lives in a Word document with two columns: notes on the left and
@@ -209,14 +247,14 @@
   firmware <span class="mono">V0061.34</span>
 </footer>
 
-<script src="js/opcodes.js?v=72"></script>
-<script src="js/firmware-0061-34.js?v=72"></script>
-<script src="js/stellar-vm.js?v=72"></script>
-<script src="js/cosmac.js?v=72"></script>
-<script src="js/machine.js?v=72"></script>
-<script src="js/die.js?v=72"></script>
-<script src="js/vt100.js?v=72"></script>
-<script src="js/home.js?v=72"></script>
-<script src="js/nav.js?v=72"></script>
+<script src="js/opcodes.js?v=73"></script>
+<script src="js/firmware-0061-34.js?v=73"></script>
+<script src="js/stellar-vm.js?v=73"></script>
+<script src="js/cosmac.js?v=73"></script>
+<script src="js/machine.js?v=73"></script>
+<script src="js/die.js?v=73"></script>
+<script src="js/vt100.js?v=73"></script>
+<script src="js/home.js?v=73"></script>
+<script src="js/nav.js?v=73"></script>
 </body>
 </html>
