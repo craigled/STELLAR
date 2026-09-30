@@ -18,6 +18,7 @@
   --hi-edge:   #e0a92a;
   --code-bg:   #1d1b17;
   --code-ink:  #f3e9d2;
+  --frame:     #a0916f;   /* the bright edge round the terminal and the front panel */
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --wrap: 1120px;
@@ -28,12 +29,14 @@
     --bg:#07080b; --bg-panel:#0d0f14; --bg-sunk:#11141b; --ink:#e9e4d8; --ink-soft:#9097a6;
     --line:#1c212c; --accent:#ffb000; --accent-2:#4fd6c9; --link:#5fd6c9;
     --hi:#5a4a18; --hi-edge:#ffb000; --code-bg:#0a0906; --code-ink:#ffd07a;
+    --frame:#6f7a8f;
   }
 }
 :root[data-theme="dark"]{
   --bg:#07080b; --bg-panel:#0d0f14; --bg-sunk:#11141b; --ink:#e9e4d8; --ink-soft:#9097a6;
   --line:#1c212c; --accent:#ffb000; --accent-2:#4fd6c9; --link:#5fd6c9;
   --hi:#5a4a18; --hi-edge:#ffb000; --code-bg:#0a0906; --code-ink:#ffd07a;
+  --frame:#6f7a8f;
 }
 
 *{box-sizing:border-box}
@@ -246,10 +249,11 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
      why the VM Core page got a 6-line box. 1.35em tracks the font size, which
      vt100.fit() shrinks when the column is too narrow for 80 columns; the 24px is
      the 12px top and bottom padding, since box-sizing is border-box. */
-  height:calc(24 * 1.35em + 24px);
+  height:calc(24 * 1.35em + 28px);   /* + the 2px border, top and bottom */
+  border:2px solid var(--frame);
   /* width, not max-width: the terminal is a block in a flex/grid parent on some
      pages, and a bare max-width let it collapse to zero content width. */
-  width:min(100%, calc(80ch + 28px))}
+  width:min(100%, calc(80ch + 32px))}
 /* reverse video: ESC[7m. STELLAR's full-screen programs paint solid blocks with it
    (a space in reverse video), which is how the ball and the invaders are drawn. */
 .term .rev{background:var(--code-ink); color:var(--code-bg)}
@@ -269,7 +273,7 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 @media(max-width:700px){ .io-row{grid-template-columns:1fr} }
 .term-wrap{min-width:0}
 .fp-wrap{min-width:0}
-.fp{background:var(--code-bg); border-radius:10px; padding:14px 12px 12px;
+.fp{background:var(--code-bg); border-radius:10px; padding:14px 12px 12px; border:2px solid var(--frame);
   display:flex; flex-direction:column; align-items:center; gap:12px;
   min-height:120px; box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
 .fp-qwrap{display:flex; align-items:center; gap:8px; align-self:flex-start}
