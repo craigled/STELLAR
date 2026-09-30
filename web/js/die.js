@@ -21,6 +21,11 @@
     this.m = machine;
   }
   Die.prototype.setMachine = function (m) { this.m = m; };
+  // A second canvas that gets every frame too - the enlarged die. null stops it.
+  Die.prototype.mirrorTo = function (canvas) {
+    this.mirror = canvas ? canvas.getContext('2d') : null;
+    if (canvas) { canvas.width = W; canvas.height = H; this.mirror.putImageData(this.img, 0, 0); }
+  };
 
   Die.prototype.render = function () {
     var m = this.m; if (!m) return;
@@ -46,6 +51,7 @@
       px[p + 2] = bl > 255 ? 255 : bl; px[p + 3] = 255;
     }
     this.ctx.putImageData(this.img, 0, 0);
+    if (this.mirror) this.mirror.putImageData(this.img, 0, 0);
   };
 
   // What lives at an address, for the hover readout.

@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=71';
+  var V = '?v=72';
   var LINEUP = [
     { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
     { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },
@@ -114,7 +114,13 @@
 
   // ---------------------------------------------------------------- die labels
   function buildDieLabels() {
-    var host = $('dieLabels');
+    dieLabels($('dieLabels'), $('die'), $('dieRead'), 'hover the die · click to enlarge');
+    dieLabels($('dieBigLabels'), $('dieBig'), $('dieBigRead'), 'hover the die');
+    dieZoom();
+  }
+
+  // Region labels beside a die canvas, and the hover readout for it.
+  function dieLabels(host, cv, read, idle) {
     // rows are 128 bytes: address / 128 / 256 = fraction of the height
     var marks = [
       [0x0000, 0x0800, 'kernel', 0], [0x0800, 0x0A00, 'dispatch', 0], [0x0A00, 0x2F00, 'opcode handlers', 0],
@@ -130,7 +136,6 @@
       d.innerHTML = '<span>' + mk[2] + '</span><i class="mono">$' + h4(mk[0]) + '</i>';
       host.appendChild(d);
     });
-    var cv = $('die'), read = $('dieRead');
     cv.addEventListener('mousemove', function (e) {
       var r = cv.getBoundingClientRect();
       var x = Math.floor((e.clientX - r.left) / r.width * 128);
@@ -139,7 +144,39 @@
       var a = y * 128 + x;
       read.innerHTML = '<b>$' + h4(a) + '</b> = ' + h2(m.M[a]) + ' · ' + Die.region(a);
     });
-    cv.addEventListener('mouseleave', function () { read.textContent = 'hover the die'; });
+    cv.addEventListener('mouseleave', function () { read.textContent = idle; });
+  }
+
+  // Click the die: an enlarged, live copy in an overlay. The machine keeps running; each
+  // frame the die draws is put on the big canvas too (Die.mirrorTo), which costs nothing
+  // like a second render. Esc, the close button or a click outside the panel closes it.
+  var zoomOpen = false;
+  function dieZoom() {
+    var ov = $('dieZoom'), small = $('die');
+    // lift it out of the console: a transformed/filtered ancestor would turn position:fixed
+    // into "fixed to the console box" and the overlay would only cover that
+    document.body.appendChild(ov);
+    small.title = 'Click to enlarge';
+    function open() {
+      if (!die) return;
+      zoomOpen = true; ov.hidden = false;
+      die.mirrorTo($('dieBig'));
+      document.body.style.overflow = 'hidden';
+      $('dieZoomClose').focus({ preventScroll: true });
+    }
+    function close() {
+      if (!zoomOpen) return;
+      zoomOpen = false; ov.hidden = true;
+      if (die) die.mirrorTo(null);
+      document.body.style.overflow = '';
+      small.focus({ preventScroll: true });
+    }
+    small.addEventListener('click', open);
+    $('dieZoomClose').addEventListener('click', close);
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    document.addEventListener('keydown', function (e) {
+      if (zoomOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+    }, true);
   }
 
   // ---------------------------------------------------------------- CIDP
@@ -454,7 +491,7 @@
     frame++;
     m.sampleWrites();
     // frozen: nothing is moving, so keep the last step's heat on screen instead of fading it
-    if (consoleVisible && !frozen) {
+    if ((consoleVisible || zoomOpen) && !frozen) {
       renderCidp();
       die.render();
       paintScreens();
@@ -548,6 +585,7 @@
       traceVM: m ? m.traceVM : 3
     });
     if (die) die.setMachine(m); else die = new Die($('die'), m);
+    if (zoomOpen) die.mirrorTo($('dieBig'));
     screens.forEach(function (s) { s.reset(); });
     for (var v = 1; v <= 4; v++) { prompted[v] = false; runLine[v] = ''; }
     lastInstr = 0; lastTelT = 0; lastCyc = 0; shownRec = null;
