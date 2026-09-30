@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/site.css?v=79">
-<link rel="stylesheet" href="css/home.css?v=79">
+<link rel="stylesheet" href="css/site.css?v=80">
+<link rel="stylesheet" href="css/home.css?v=80">
 </head>
 <body class="home">
 
@@ -141,7 +141,7 @@
       <div class="dg-row"><span class="dg-name">opcode handlers</span><span class="dg-addr mono">$0A00&ndash;$2EFF · 9.3 KB</span>
         <span class="dg-what">The 1802 code for every STELLAR command: moves, maths, tests, branches, printing, I/O. Each bright streak is a handler at work; its colour says which program asked for it.</span></div>
       <div class="dg-row"><span class="dg-name">CIDP</span><span class="dg-addr mono">$2F00&ndash;$2FFF · 256 B</span>
-        <span class="dg-what">The <b>Common Interchange Data Page</b>, shared by everything: one 16-byte entry per VM (its pages, state and command count), the scheduler's own state at <code>$2F50</code> (which VM has the chip, how many there are, multitasking on or off), and the 1802's hardware stack at the top. Only 2 pixels tall on the die, so beside the die it has its own block just above VM1, joined by a dashed line to its real place, and it is shown <b>byte by byte in the CIDP table under the die</b>: each VM's row in its colour, the running VM's row lit, changes flashing. Hover a byte there to see what it is.</span></div>
+        <span class="dg-what">The <b>Common Interchange Data Page</b>, shared by everything: one 16-byte entry per VM (its pages, state and command count), the scheduler's own state at <code>$2F50</code> (which VM has the chip, how many there are, multitasking on or off), and the 1802's hardware stack at the top. Only 2 pixels tall on the die, so beside the die it has its own block, sitting just above its real (dashed) line, and it is shown <b>byte by byte in the CIDP table under the die</b>: each VM's row in its colour, the running VM's row lit, changes flashing. Hover a byte there to see what it is.</span></div>
       <div class="dg-row"><span class="dg-name">cores</span><span class="dg-addr mono">$3000&ndash;$3FFF · 4 × 1 KB</span>
         <span class="dg-what">Each VM's <b>core</b>: its 16 registers, the accumulators, flags, the settings its program has chosen (ports, memory mode), its stacks and labels. They flash white constantly, because every opcode changes a register.</span></div>
       <div class="dg-row"><span class="dg-name" style="color:#ffb547">VM1</span><span class="dg-addr mono">$4000&ndash;$4FFF · 4 KB</span>
@@ -247,14 +247,14 @@
   firmware <span class="mono">V0061.34</span>
 </footer>
 
-<script src="js/opcodes.js?v=79"></script>
-<script src="js/firmware-0061-34.js?v=79"></script>
-<script src="js/stellar-vm.js?v=79"></script>
-<script src="js/cosmac.js?v=79"></script>
-<script src="js/machine.js?v=79"></script>
-<script src="js/die.js?v=79"></script>
-<script src="js/vt100.js?v=79"></script>
-<script src="js/home.js?v=79"></script>
-<script src="js/nav.js?v=79"></script>
+<script src="js/opcodes.js?v=80"></script>
+<script src="js/firmware-0061-34.js?v=80"></script>
+<script src="js/stellar-vm.js?v=80"></script>
+<script src="js/cosmac.js?v=80"></script>
+<script src="js/machine.js?v=80"></script>
+<script src="js/die.js?v=80"></script>
+<script src="js/vt100.js?v=80"></script>
+<script src="js/home.js?v=80"></script>
+<script src="js/nav.js?v=80"></script>
 </body>
 </html>

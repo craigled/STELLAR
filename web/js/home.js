@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=79';
+  var V = '?v=80';
   var LINEUP = [
     { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
     { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },
@@ -137,7 +137,8 @@
       host.appendChild(d);
     });
     // The CIDP is 256 bytes - 2 px of the die - so it gets its own block in the label column,
-    // just above VM1 (in the lower part of the cores band), with a leader up to its real line.
+    // sitting just above its real line at $2F00 (in the empty lower part of the opcode-handlers
+    // band), joined to that line by a short tick. It never covers the cores band or its label.
     var cb = document.createElement('div');
     cb.className = 'dl-cidp';
     cb.innerHTML = '<div class="dlt"><span>CIDP</span><i class="mono">$2F00</i></div><div class="dl-cidp-sum mono"></div>';
@@ -173,14 +174,15 @@
       prev = top + shift + lab.offsetHeight;
     }
     var cb = host.querySelector('.dl-cidp');
-    if (cb && H) {                                  // below the cores label, above VM1
-      var y = function (a) { return a / 0x8000 * H; };
-      var coresLab = host.children[4].firstChild;
-      var top = y(0x3000) + (coresLab ? coresLab.offsetHeight : 14) + 4, bottom = y(0x4000) - 4;
-      cb.style.top = top + 'px';
-      cb.style.height = Math.max(14, bottom - top) + 'px';
-      cb.style.setProperty('--lead', (top - y(0x2F00)) + 'px');
-      cb.classList.toggle('short', bottom - top < 30);
+    if (cb && H) {                                  // just above its real line, as tall as its text
+      var line = 0x2F00 / 0x8000 * H, gap = 6;
+      var handlers = host.children[2].firstChild;  // never climb into the opcode-handlers label
+      var room = line - gap - (handlers ? handlers.getBoundingClientRect().bottom - host.getBoundingClientRect().top : 0) - 4;
+      cb.classList.toggle('short', room < 44);     // not much room: the name only
+      // anchored by its BOTTOM: the live summary arrives later and may add a line - it must
+      // grow the block upward, away from the cores band, not down across its own line
+      cb.style.top = 'auto';
+      cb.style.bottom = (H - line + gap) + 'px';
     }
   }
   var cidpBlocks = [];
