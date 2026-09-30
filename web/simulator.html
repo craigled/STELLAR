@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Simulator</title>
 <meta name="description" content="Run STELLAR programs in the browser on the real firmware — step through the disassembly and watch the core update live.">
-<link rel="stylesheet" href="css/site.css?v=67">
+<link rel="stylesheet" href="css/site.css?v=68">
 </head>
 <body>
 <main class="wrap">
@@ -22,16 +22,10 @@
     <button id="openFile" title="Open a .lst program from your computer">Open .lst…</button>
     <input type="file" id="fileInput" accept=".lst,.txt" hidden>
     <span class="grow"></span>
+    <a class="dl-jump small" href="#elf2k" title="Download the firmware and the apps for a real Elf2K">⤓ Elf2K downloads</a>
     <button id="toggleSide" title="Show/hide the disassembly panel">Side panel</button>
   </div>
   <p class="sim-blurb" id="blurb"></p>
-  <div class="sim-controls dl-row">
-    <span class="mono small" style="color:var(--ink-soft)">download for the Elf2K</span>
-    <select id="dlPick" title="Any app, as a .lst file for the Elf2K"><option>loading the app list…</option></select>
-    <button id="dlGo" title="Save the chosen app's .lst - load its D-lines into the Elf2K monitor">Download app</button>
-    <button id="dlFw" title="Save the STELLAR firmware as an Intel HEX file for the Elf2K">STELLAR firmware (.hex)</button>
-  </div>
-  <p class="small muted" id="dlNote" style="margin:-6px 0 8px"></p>
 
   <div class="sim-controls">
     <button id="step" class="primary">Step ▸</button>
@@ -76,23 +70,44 @@
     <p class="arrow-note">CIDP page, the four VM cores and the four program blocks. Updates live as the program runs. Click a line in the disassembly to set a breakpoint.</p>
   </div>
 
+  <section class="card dl-card" id="elf2k">
+    <h3>Run it on a real Elf2K</h3>
+    <p>Everything this simulator runs is available for the hardware. Load the firmware once, then any app.</p>
+    <div class="dl-steps">
+      <div class="dl-step">
+        <div class="k">1 · The firmware</div>
+        <p>STELLAR <span class="mono" id="dlFwVer">V0061.34</span> as Intel HEX, built from exactly the image this page runs. Send it to the monitor as a text upload.</p>
+        <div class="sim-controls"><button id="dlFw" title="Save the STELLAR firmware as an Intel HEX file for the Elf2K">STELLAR firmware (.hex)</button></div>
+      </div>
+      <div class="dl-step">
+        <div class="k">2 · An app</div>
+        <p>Every finished app as a <span class="mono">.lst</span>: load its D-lines into the monitor, then run STELLAR.</p>
+        <div class="sim-controls">
+          <select id="dlPick" title="Any app, as a .lst file for the Elf2K"><option>loading the app list…</option></select>
+          <button id="dlGo" title="Save the chosen app's .lst - load its D-lines into the Elf2K monitor">Download app</button>
+        </div>
+      </div>
+    </div>
+    <p class="small" id="dlNote"></p>
+  </section>
+
   <p class="small muted" style="margin-top:18px">The first step runs STELLAR's <code>CD</code> label pre-pass; interactive stepping then begins at the first real instruction. Look up any opcode in the <a href="opcodes.html">reference</a>.</p>
 </main>
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=67"></script>
-<script src="js/firmware-0061-34.js?v=67"></script>
-<script src="js/stellar-vm.js?v=67"></script>
-<script src="js/disasm.js?v=67"></script>
-<script src="js/core-view.js?v=67"></script>
-<script src="js/mem-view.js?v=67"></script>
-<script src="js/front-panel.js?v=67"></script>
-<script src="js/vt100.js?v=67"></script>
-<script src="js/term-input.js?v=67"></script>
-<script src="js/sim-app.js?v=67"></script>
-<script src="js/clock-row.js?v=67"></script>
-<script src="js/simulator-page.js?v=67"></script>
-<script src="js/nav.js?v=67"></script>
+<script src="js/opcodes.js?v=68"></script>
+<script src="js/firmware-0061-34.js?v=68"></script>
+<script src="js/stellar-vm.js?v=68"></script>
+<script src="js/disasm.js?v=68"></script>
+<script src="js/core-view.js?v=68"></script>
+<script src="js/mem-view.js?v=68"></script>
+<script src="js/front-panel.js?v=68"></script>
+<script src="js/vt100.js?v=68"></script>
+<script src="js/term-input.js?v=68"></script>
+<script src="js/sim-app.js?v=68"></script>
+<script src="js/clock-row.js?v=68"></script>
+<script src="js/simulator-page.js?v=68"></script>
+<script src="js/nav.js?v=68"></script>
 </body>
 </html>
