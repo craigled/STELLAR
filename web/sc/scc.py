@@ -17,6 +17,8 @@ Stellar C is a small C-like language shaped to what STELLAR does in one opcode:
     expressions + - * / % & | ^ << >> (by a constant), unary -, a[i], calls
     builtins    putc(e)  print("text")  printu(e)  getc()  keyready()
                 rand()   delay(k)       halt()
+    Elf2K I/O   out(e) outmem(a) outport(p) q(e) scanin() getin() inport(p)
+                efsource(n) ef() waitef()      ($01-$0F, see ARITY below)
     asm { }     inline STELLAR, one command per line (see ASM below)
     native { }  raw 1802, run by $F1 RUNMC (see NATIVE below)
 
@@ -297,7 +299,24 @@ class Parser:
 TEMPS = [0xF, 0xE, 0xD]           # expression temporaries
 RV = 0xD                          # return values
 ZERO = 0xC                        # holds 0 when the program needs it: a[k], u8 variables
-BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'halt', 'fill', 'copy'}
+BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'halt', 'fill', 'copy',
+            'out', 'outmem', 'outport', 'inport', 'getin', 'scanin', 'ef', 'efsource', 'waitef', 'q'}
+# The Elf2K I/O group, $01-$0F, as measured on V0061.34 (the COMMANDS rows differ in places):
+#   outport(p)  $01 DEFOUT 0p   output port 1-7; 2 and 3 are the serial chip, so refused
+#   inport(p)   $02 DEFIN 0Z    input port 1-7 (Z = p + 8)
+#   efsource(n) $03 DEFEF 0n    the EF line getin() waits on, 1-4 (default 4, the INPUT button).
+#                               The firmware reads n from the LOW nibble; `DEFEF 40` as the
+#                               COMMANDS row shows would make the next GIPA/GIPX fail (error $0E)
+#   out(e)      $04 OUTI / $06 OUTX / $05 OUTA 00   a byte to the output port (the hex display)
+#   outmem(a)   $08 OUTMX       the byte at address a to the output port
+#   ef()        $09 GETEFA      the highest-numbered EF line that is on, 1-4, or 0 if none
+#   q(e)        $0A SETQ        0 off, 1 on (any non-constant: on if non-zero), 2 one blink, 3 two
+#   scanin()    $0C SIPA        read the input port now
+#   getin()     $0D GIPA / $0E GIPX   wait for the EF line (the INPUT button) to go high then low,
+#                               then read the input port
+#   waitef()    $0F WIP 00      wait for EF4 to go high then low (WIP always uses EF4)
+ARITY = {'out': 1, 'outmem': 1, 'outport': 1, 'inport': 1, 'getin': 0, 'scanin': 0, 'ef': 0,
+         'efsource': 1, 'waitef': 0, 'q': 1}
 # ops after which a DIVXY's quotient/remainder are still in the MA
 KEEPS_MA = {'COPYAX', 'TESTREMZ', 'IFTRUEI', 'IFFALSEI', 'TESTXY', 'TESTXI', 'TESTXZ',
             'TESTLXY', 'TESTGXY', 'COPYXY', 'LOADXI'}
@@ -703,6 +722,10 @@ class Compiler:
             ri, base = s.index(e[1], e[2]); s.emit(rdidx(ri, base)); s.untemp(ri); return
         if e[0] == 'call' and e[1] == 'getc': return s.emit(('CB', 'SERIN', ''))
         if e[0] == 'call' and e[1] == 'rand': return s.emit(('C3', 'RAND', ''))
+        if e[0] == 'call' and e[1] in ('scanin', 'getin'):          # the port byte, high byte 0
+            s.emit(ldai(0)); return s.emit(('0C 00', 'SIPA', 'scan the input port') if e[1] == 'scanin'
+                                           else ('0D 00', 'GIPA', 'wait for EF, then read the input port'))
+        if e[0] == 'call' and e[1] == 'ef': return s.emit(('09', 'GETEFA', 'the highest EF line that is on'))
         if e[0] == 'bin' and e[1] in ('%', '/'):
             ra, rb = s.reg(e[2]), s.reg(e[3]); s.divide(ra, rb)
             s.emit(rema() if e[1] == '%' else maa()); s.untemp(ra); s.untemp(rb); return
@@ -744,6 +767,7 @@ class Compiler:
             return s.emit(('6E', 'OUTDEC', ''))
         if name == 'delay': return s.emit(('C0 %02X' % s.const(args[0], s.ln), 'DLYI %02X' % s.const(args[0], s.ln), ''))
         if name == 'halt': return s.emit(gal('QUIT'))
+        if name in ARITY: return s.io(name, args, d)
         if name in ('getc', 'rand'):
             s.emit(('CB', 'SERIN', '') if name == 'getc' else ('C3', 'RAND', ''))
             if d is not None: s.emit(acc2x(d))
@@ -766,6 +790,64 @@ class Compiler:
             s.value(args[1], x); s.value(args[0], y)
             s.emit(('3B %X%X %02X' % (x, y, n), 'COPYMXMY R%d -> R%d %d' % (x, y, n), ''))
             s.untemp(x); s.untemp(y); return
+        raise Error(name)
+
+    def io(s, name, args, d):
+        """The Elf2K I/O group, $01-$0F (see ARITY above)."""
+        if len(args) != ARITY[name]:
+            raise Error('line %d: %s() takes %d argument%s' % (s.ln, name, ARITY[name], '' if ARITY[name] == 1 else 's'))
+        def const(lo, hi, what):
+            if not s.isconst(args[0]): raise Error('line %d: %s() needs a constant %s' % (s.ln, name, what))
+            v = s.const(args[0], s.ln)
+            if not lo <= v <= hi: raise Error('line %d: %s(%d): %s must be %d-%d' % (s.ln, name, v, what, lo, hi))
+            return v
+        if name == 'outport':
+            p = const(1, 7, 'port')
+            if p in (2, 3): raise Error('line %d: outport(%d): ports 2 and 3 are the serial chip' % (s.ln, p))
+            return s.emit(('01 0%X' % p, 'DEFOUT %d' % p, 'output port %d' % p))
+        if name == 'inport':
+            p = const(1, 7, 'port')
+            if p in (2, 3): raise Error('line %d: inport(%d): ports 2 and 3 are the serial chip' % (s.ln, p))
+            return s.emit(('02 0%X' % (p + 8), 'DEFIN %X' % (p + 8), 'input port %d' % p))
+        if name == 'efsource':
+            n = const(1, 4, 'EF line')
+            return s.emit(('03 0%X' % n, 'DEFEF 0%X' % n, 'getin() waits on EF%d' % n))
+        if name == 'waitef': return s.emit(('0F 00', 'WIP 00', 'wait for EF4 high, then low'))
+        if name == 'q':
+            e = args[0]
+            if s.isconst(e):
+                v = s.const(e, s.ln)
+                if v > 3: raise Error('line %d: q(%d): 0 off, 1 on, 2 one blink, 3 two blinks' % (s.ln, v))
+                return s.emit(('0A 0%X' % v, 'SETQ %d' % v, ''))
+            off, end = s.new(), s.new()                          # on if non-zero
+            s.cond(s.hoist(e, False), off, False)
+            s.emit(('0A 01', 'SETQ 1', '')); s.emit(gal(end))
+            s.label(off); s.emit(('0A 00', 'SETQ 0', '')); s.label(end); return
+        if name == 'out':
+            e = args[0]
+            if s.isconst(e): return s.emit(('04 %02X' % (s.const(e, s.ln) & 255), 'OUTI %02X' % (s.const(e, s.ln) & 255), ''))
+            if e[0] == 'var' and e[1] not in s.consts and e[1] not in s.arrays and s.where(e[1])[0] == 'r':
+                r = s.where(e[1])[1]; return s.emit(('06 0%X' % r, 'OUTX R%d' % r, 'its low byte'))
+            if (e[0] == 'bin' and e[1] == '>>' and s.isconst(e[3]) and s.const(e[3], s.ln) == 8 and e[2][0] == 'var'
+                    and e[2][1] not in s.consts and e[2][1] not in s.arrays and s.where(e[2][1])[0] == 'r'):
+                r = s.where(e[2][1])[1]; return s.emit(('06 1%X' % r, 'OUTX R%d high' % r, 'its high byte'))
+            s.to_acc(e); return s.emit(('05 00', 'OUTA Acc', 'the Acc\'s low byte'))
+        if name == 'outmem':
+            a = s.address(args[0])
+            t = s.temp()
+            if a is None: s.value(args[0], t)
+            else: s.emit(ldx(t, a))
+            s.emit(('08 0%X' % t, 'OUTMX R%d' % t, 'the byte it points at')); s.untemp(t); return
+        if name == 'ef':
+            s.emit(('09', 'GETEFA', 'the highest EF line that is on'))
+            if d is not None: s.emit(acc2x(d))
+            return
+        if name in ('scanin', 'getin'):
+            if name == 'getin' and d is not None:                 # straight into the register
+                s.emit(ldx(d, 0)); return s.emit(('0E 0%X' % d, 'GIPX -> R%d' % d, 'wait for EF, then read the input port'))
+            s.to_acc(('call', name, []))
+            if d is not None: s.emit(acc2x(d))
+            return
         raise Error(name)
 
     def string(s, e):
@@ -809,7 +891,7 @@ class Compiler:
             if a[0] == 'bin' and a[1] == '%' and s.isconst(b) and s.const(b, s.ln) == 0:
                 ra, rb = s.reg(a[2]), s.reg(a[3]); s.divide(ra, rb); s.untemp(ra); s.untemp(rb)
                 s.emit(('8E', 'TESTREMZ', '')); return br()
-            if s.isconst(b) and (a[0] == 'idx' or (a[0] == 'call' and a[1] in ('getc', 'rand'))):
+            if s.isconst(b) and (a[0] == 'idx' or (a[0] == 'call' and a[1] in ('getc', 'rand', 'ef', 'scanin', 'getin'))):
                 s.to_acc(a); s.emit(testai(s.const(b, s.ln))); return br()
             ra = s.reg(a)
             if s.isconst(b):

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stellar C</title>
 <meta name="description" content="Stellar C: a small C-like language that compiles to STELLAR bytecode. Write a program, compile it in your browser, and run it on the real firmware.">
-<link rel="stylesheet" href="css/site.css?v=69">
+<link rel="stylesheet" href="css/site.css?v=70">
 </head>
 <body>
 <main class="wrap">
@@ -89,6 +89,10 @@
       <tr><td class="mono">getc() keyready()</td><td>wait for a key; is a key waiting?</td></tr>
       <tr><td class="mono">rand() delay(k) halt()</td><td>a random number, a pause, stop the program</td></tr>
       <tr><td class="mono">fill(&amp;a[i], v, n) copy(&amp;dst, &amp;src, n)</td><td>fill or copy a run of bytes</td></tr>
+      <tr><td class="mono">out(e) outmem(&amp;a[i]) outport(p)</td><td>a byte to the output port &mdash; the front panel's hex display on port 4 (choose 1, 4-7)</td></tr>
+      <tr><td class="mono">q(e)</td><td>the Q lamp: <span class="mono">q(0)</span> off, <span class="mono">q(1)</span> on, <span class="mono">q(2)</span> one blink, <span class="mono">q(3)</span> two</td></tr>
+      <tr><td class="mono">scanin() getin() inport(p)</td><td>read the input port now; or wait for the INPUT button (EF4), then read it</td></tr>
+      <tr><td class="mono">ef() efsource(n) waitef()</td><td>the highest EF line that is on (0 if none); the EF line <span class="mono">getin()</span> waits on; wait for EF4</td></tr>
     </tbody>
   </table></div>
 
@@ -112,16 +116,16 @@ done:
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=69"></script>
-<script src="js/firmware-0061-34.js?v=69"></script>
-<script src="js/stellar-vm.js?v=69"></script>
-<script src="js/disasm.js?v=69"></script>
-<script src="js/front-panel.js?v=69"></script>
-<script src="js/vt100.js?v=69"></script>
-<script src="js/term-input.js?v=69"></script>
-<script src="js/sim-app.js?v=69"></script>
-<script src="js/clock-row.js?v=69"></script>
-<script src="js/stellarc-page.js?v=69"></script>
-<script src="js/nav.js?v=69"></script>
+<script src="js/opcodes.js?v=70"></script>
+<script src="js/firmware-0061-34.js?v=70"></script>
+<script src="js/stellar-vm.js?v=70"></script>
+<script src="js/disasm.js?v=70"></script>
+<script src="js/front-panel.js?v=70"></script>
+<script src="js/vt100.js?v=70"></script>
+<script src="js/term-input.js?v=70"></script>
+<script src="js/sim-app.js?v=70"></script>
+<script src="js/clock-row.js?v=70"></script>
+<script src="js/stellarc-page.js?v=70"></script>
+<script src="js/nav.js?v=70"></script>
 </body>
 </html>

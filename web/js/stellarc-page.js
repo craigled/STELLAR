@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=69';
+  var V = '?v=70';
   var PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/';
   var DRAFT = 'stellarc-draft';
 

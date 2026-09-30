@@ -40,7 +40,7 @@
    "file": "frontpanel.sc",
    "input": "",
    "speed": "Elf2K",
-   "blurb": "Counts $00 to $3F on the Elf2K front panel's two-digit display while the Q lamp blinks, using one line of asm { } for each - Stellar C has no built-in for them yet. Watch the panel beside the terminal."
+   "blurb": "Counts $00 to $3F on the Elf2K front panel's two-digit display with out(n) while q() blinks the Q lamp. Watch the panel beside the terminal."
   },
   {
    "name": "Native 1802: native { }",
