@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=80';
+  var V = '?v=81';
   var LINEUP = [
     { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
     { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },
@@ -129,25 +129,22 @@
     ];
     marks.forEach(function (mk) {
       var d = document.createElement('div');
-      d.className = 'dl' + (mk[3] ? ' vm' : '') + (mk[0] === 0x2F00 ? ' dl-cidpline' : '');
+      d.className = 'dl' + (mk[3] ? ' vm' : '');
       d.style.top = (mk[0] / 0x8000 * 100) + '%';
       d.style.height = ((mk[1] - mk[0]) / 0x8000 * 100) + '%';
       if (mk[3]) d.style.setProperty('--vm', VMC[mk[3]]);
-      if (mk[0] !== 0x2F00) d.innerHTML = '<div class="dlt"><span>' + mk[2] + '</span><i class="mono">$' + h4(mk[0]) + '</i></div>';
+      d.innerHTML = '<div class="dlt"><span>' + mk[2] + '</span><i class="mono">$' + h4(mk[0]) + '</i></div>';
+      // the CIDP is 2 px of the die: its label points to the byte-by-byte CIDP table under it
+      if (mk[0] === 0x2F00 && host.id === 'dieLabels') {
+        var lt = d.firstChild;
+        lt.classList.add('dl-link'); lt.title = 'The CIDP, byte by byte - in the table under the die';
+        lt.addEventListener('click', function () {
+          var t = document.querySelector('.cidp');
+          if (t) t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      }
       host.appendChild(d);
     });
-    // The CIDP is 256 bytes - 2 px of the die - so it gets its own block in the label column,
-    // sitting just above its real line at $2F00 (in the empty lower part of the opcode-handlers
-    // band), joined to that line by a short tick. It never covers the cores band or its label.
-    var cb = document.createElement('div');
-    cb.className = 'dl-cidp';
-    cb.innerHTML = '<div class="dlt"><span>CIDP</span><i class="mono">$2F00</i></div><div class="dl-cidp-sum mono"></div>';
-    cb.addEventListener('mouseenter', function () {
-      read.innerHTML = '<b>$2F00-$2FFF</b> · CIDP, the shared page: one entry per VM, the scheduler\'s state, the 1802 stack - byte by byte in the CIDP table';
-    });
-    cb.addEventListener('mouseleave', function () { read.textContent = idle; });
-    host.appendChild(cb);
-    cidpBlocks.push(cb);
     layoutLabels(host);
     cv.addEventListener('mousemove', function (e) {
       var r = cv.getBoundingClientRect();
@@ -164,7 +161,7 @@
   // the dispatch table 4 px, far too thin for their names: a label that would overlap the
   // one above is pushed down just far enough to be read (it keeps a dotted tick on its line).
   function layoutLabels(host) {
-    var prev = -1e9, bands = host.children, H = host.clientHeight;
+    var prev = -1e9, bands = host.children;
     for (var i = 0; i < bands.length; i++) {
       var d = bands[i], lab = d.firstChild, top = d.offsetTop;
       if (!lab || !d.classList.contains('dl')) continue;
@@ -173,19 +170,7 @@
       d.classList.toggle('nudged', shift > 0);
       prev = top + shift + lab.offsetHeight;
     }
-    var cb = host.querySelector('.dl-cidp');
-    if (cb && H) {                                  // just above its real line, as tall as its text
-      var line = 0x2F00 / 0x8000 * H, gap = 6;
-      var handlers = host.children[2].firstChild;  // never climb into the opcode-handlers label
-      var room = line - gap - (handlers ? handlers.getBoundingClientRect().bottom - host.getBoundingClientRect().top : 0) - 4;
-      cb.classList.toggle('short', room < 44);     // not much room: the name only
-      // anchored by its BOTTOM: the live summary arrives later and may add a line - it must
-      // grow the block upward, away from the cores band, not down across its own line
-      cb.style.top = 'auto';
-      cb.style.bottom = (H - line + gap) + 'px';
-    }
   }
-  var cidpBlocks = [];
   window.addEventListener('resize', function () {
     layoutLabels($('dieLabels')); if (zoomOpen) layoutLabels($('dieBigLabels'));
   });
@@ -289,10 +274,7 @@
     st.push(M[0x2F54] + ' VMs');
     st.push('multitasking ' + (M[0x2F55] ? 'on' : 'off'));
     var sum = st.join(' · ');
-    if ($('cidpSum').textContent !== sum) {
-      $('cidpSum').textContent = sum;
-      cidpBlocks.forEach(function (b) { b.lastChild.textContent = sum; });
-    }
+    if ($('cidpSum').textContent !== sum) $('cidpSum').textContent = sum;
   }
 
   // ---------------------------------------------------------------- timeline
