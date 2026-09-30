@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=65';
+  var V = '?v=66';
   var LINEUP = [
     { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
     { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },

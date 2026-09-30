@@ -33,28 +33,105 @@
   // played in the browser at all.
   var ARROWS = { ArrowUp: 0x41, ArrowDown: 0x42, ArrowRight: 0x43, ArrowLeft: 0x44 };
 
+  var SEQS = { Home: [0x1B, 0x5B, 0x48], End: [0x1B, 0x5B, 0x46], PageUp: [0x1B, 0x5B, 0x35, 0x7E],
+              PageDown: [0x1B, 0x5B, 0x36, 0x7E], Delete: [0x1B, 0x5B, 0x33, 0x7E] };
+
+  // The bytes a named key sends, or null. Arrow keys and Home/End/PgUp/PgDn/Delete
+  // go as the escape sequences a VT100/VT220 sends (Invaders and Lite-Writer use them).
+  function keyBytes(e) {
+    if (ARROWS[e.key] !== undefined) return [0x1B, 0x5B, ARROWS[e.key]];
+    if (SEQS[e.key]) return SEQS[e.key];
+    var code = keyToByte(e);
+    return code === null ? null : [code];
+  }
+
   return function attachTerminalInput(termEl, getCpu) {
     if (!termEl) return;
     if (!termEl.hasAttribute('tabindex')) termEl.setAttribute('tabindex', '0');
-    termEl.addEventListener('keydown', function (e) {
+
+    function send(bytes) {
       var cpu = getCpu();
       var uart = cpu && cpu.io_in && cpu.io_in[3];
-      if (!uart || !uart.buf) return;
+      if (!uart || !uart.buf) return false;
+      for (var i = 0; i < bytes.length; i++) uart.buf.push(bytes[i]);
+      return true;
+    }
+
+    termEl.addEventListener('keydown', function (e) {
       // leave browser shortcuts and focus movement alone
       if (e.altKey || e.metaKey || e.key === 'Tab') return;
-      if (ARROWS[e.key] !== undefined) {
-        e.preventDefault();
-        uart.buf.push(0x1B); uart.buf.push(0x5B); uart.buf.push(ARROWS[e.key]);
-        return;
-      }
-      // Home / End / PgUp / PgDn / Delete as a VT220 keyboard sends them (Lite-Writer uses them)
-      var SEQ = { Home: [0x1B, 0x5B, 0x48], End: [0x1B, 0x5B, 0x46], PageUp: [0x1B, 0x5B, 0x35, 0x7E],
-                  PageDown: [0x1B, 0x5B, 0x36, 0x7E], Delete: [0x1B, 0x5B, 0x33, 0x7E] }[e.key];
-      if (SEQ) { e.preventDefault(); for (var q = 0; q < SEQ.length; q++) uart.buf.push(SEQ[q]); return; }
-      var code = keyToByte(e);
-      if (code === null) return;
-      e.preventDefault();
-      uart.buf.push(code);
+      var b = keyBytes(e);
+      if (b && send(b)) e.preventDefault();
     });
+
+    // ---- phones and tablets ----
+    // A touch screen only offers its keyboard for a real text field, and the terminal
+    // is a <div>. So on a touch device a hidden textarea sits with the terminal:
+    // tapping the terminal focuses it, the keyboard comes up, and what is typed is
+    // sent on. Soft keyboards often report every key as "Unidentified" (keyCode 229),
+    // so text is read from the textarea itself: it always holds two spaces, and
+    // anything beyond them is typed text, anything short of them is Backspace. A row
+    // of keys a phone keyboard lacks - the arrows, Esc, Enter - goes underneath.
+    if (!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) return;
+
+    var SENT = '  ';
+    var bar = document.createElement('div');
+    bar.className = 'term-keys';
+    var ta = document.createElement('textarea');
+    ta.className = 'term-kbd';
+    ta.setAttribute('aria-label', 'Type to the terminal');
+    ['autocapitalize', 'autocorrect', 'autocomplete'].forEach(function (k) { ta.setAttribute(k, 'off'); });
+    ta.spellcheck = false;
+    ta.value = SENT;
+    bar.appendChild(ta);
+
+    function reset() { ta.value = SENT; ta.setSelectionRange(SENT.length, SENT.length); }
+    function openKeyboard() { ta.focus({ preventScroll: true }); reset(); }
+    function takeText() {
+      var v = ta.value;
+      if (v.length < SENT.length) {
+        var bs = []; for (var i = v.length; i < SENT.length; i++) bs.push(0x08);
+        send(bs);
+      } else {
+        var t = v.slice(SENT.length), out = [];
+        for (var k = 0; k < t.length; k++) {
+          var c = t.charCodeAt(k);
+          out.push(c === 10 ? 0x0D : c & 0xFF);             // the keyboard's return is CR
+        }
+        if (out.length) send(out);
+      }
+      reset();
+    }
+    ta.addEventListener('input', function (e) { if (!e.isComposing) takeText(); });
+    ta.addEventListener('compositionend', takeText);
+    ta.addEventListener('keydown', function (e) {
+      if (e.isComposing || e.keyCode === 229 || e.altKey || e.metaKey || e.key === 'Tab') return;
+      // named keys from a Bluetooth keyboard: send them here; printable keys come
+      // through the input event instead, so nothing is sent twice
+      if (e.key.length === 1 && !e.ctrlKey) return;
+      var b = keyBytes(e);
+      if (b && send(b)) e.preventDefault();
+    });
+    ta.addEventListener('focus', function () { termEl.classList.add('term-typing'); });
+    ta.addEventListener('blur', function () { termEl.classList.remove('term-typing'); });
+    termEl.addEventListener('click', openKeyboard);
+
+    [['\u2328', null, 'Show the keyboard'], ['\u2190', 'ArrowLeft'], ['\u2191', 'ArrowUp'],
+     ['\u2193', 'ArrowDown'], ['\u2192', 'ArrowRight'], ['Esc', 'Escape'], ['Enter', 'Enter']]
+      .forEach(function (k) {
+        var btn = document.createElement('button');
+        btn.type = 'button'; btn.textContent = k[0];
+        btn.setAttribute('aria-label', k[2] || k[1]);
+        // pointerdown + preventDefault: the tap must not take focus from the textarea,
+        // or the keyboard would close every time an arrow is pressed
+        btn.addEventListener('pointerdown', function (e) {
+          e.preventDefault();
+          if (!k[1]) { openKeyboard(); return; }
+          send(keyBytes({ key: k[1] }));
+        });
+        btn.addEventListener('click', function (e) { e.preventDefault(); });
+        bar.appendChild(btn);
+      });
+    termEl.insertAdjacentElement('afterend', bar);
   };
 });

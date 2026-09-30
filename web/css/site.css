@@ -421,3 +421,15 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
   overflow:auto; outline:none; tab-size:4}
 .sc-out{height:540px; overflow:auto; margin:0; font-size:12px; line-height:1.5; white-space:pre}
 .sc-err{color:#ff8a7a; white-space:pre-wrap}
+
+/* ---- touch screens: keyboard + keys under the terminal (js/term-input.js) ---- */
+.term-keys{position:relative; display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+.term-keys button{min-width:44px; min-height:40px; padding:6px 10px; border:1px solid var(--line);
+  background:var(--bg-panel); color:var(--ink); border-radius:8px; font-family:var(--mono);
+  font-size:15px; touch-action:manipulation; -webkit-user-select:none; user-select:none}
+.term-keys button:active{border-color:var(--accent); color:var(--accent)}
+/* the textarea that makes the phone offer its keyboard: present, focusable, invisible.
+   16px stops iOS zooming the page when it takes focus. */
+.term-kbd{position:absolute; left:0; top:0; width:1px; height:1px; opacity:0; border:0; padding:0;
+  margin:0; resize:none; font-size:16px; caret-color:transparent; pointer-events:none}
+.term.term-typing{box-shadow:inset 0 0 0 1px var(--accent), 0 0 0 3px rgba(198,93,42,.18)}
