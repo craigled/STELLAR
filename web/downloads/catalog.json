@@ -134,6 +134,20 @@
  },
  {
   "group": "Math",
+  "name": "Pi digits",
+  "what": "The digits of pi, up to 1526, by the spigot; the inner loop is raw 1802 (RUNMC).",
+  "href": "samples/Pi-Spigot.lst",
+  "note": null
+ },
+ {
+  "group": "Math",
+  "name": "Pi digits Stellar only",
+  "what": "The same pi spigot in pure STELLAR bytecode, up to 350 digits (18x slower).",
+  "href": "samples/Pi-Stellar-Only.lst",
+  "note": null
+ },
+ {
+  "group": "Math",
   "name": "Prime-Gen v07",
   "what": "Primes in a range you choose, using the native OUTDEC print.",
   "href": "samples/Prime-Gen-v07.lst",

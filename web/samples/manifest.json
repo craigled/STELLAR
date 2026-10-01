@@ -66,6 +66,22 @@
     "speed": "flat out"
   },
   {
+    "name": "Pi digits",
+    "file": "Pi-Spigot.lst",
+    "input": "",
+    "blurb": "The digits of pi, worked out one at a time by the Rabinowitz-Wagon spigot - whole numbers only. Click the terminal, type how many digits (up to 1526; Enter alone = 100) and watch them come: 3. then groups of ten, fifty to a line. The digit logic is STELLAR bytecode; each pass over the array runs as raw 1802 code through RUNMC, with no multiply at all - 18x faster than the bytecode alone (compare 'Pi digits Stellar only'). On the Elf2K 100 digits take about 27 seconds, 1000 about half an hour. Verified on the Elf2K.",
+    "maxSteps": 14000000,
+    "halts": false
+  },
+  {
+    "name": "Pi digits Stellar only",
+    "file": "Pi-Stellar-Only.lst",
+    "input": "",
+    "blurb": "The same pi spigot as 'Pi digits', but every step is STELLAR bytecode - no native code. Type how many digits (up to 350; Enter alone = 50). It shows what the interpreter alone costs: on the Elf2K 100 digits take about 8 minutes here, against 27 seconds with the RUNMC inner loop.",
+    "maxSteps": 14000000,
+    "halts": false
+  },
+  {
     "name": "ELIZA (chatbot)",
     "file": "ELIZA.lst",
     "input": "",
