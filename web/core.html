@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR VM Core</title>
 <meta name="description" content="A live view of a STELLAR VM core — its registers, accumulators, math units, and flags — updating as a program runs.">
-<link rel="stylesheet" href="css/site.css?v=82">
+<link rel="stylesheet" href="css/site.css?v=83">
 </head>
 <body>
 <main class="wrap">
@@ -32,9 +32,15 @@
   <div class="sim-body" id="body">
     <div class="sim-main">
       <div id="core"></div>
-      <div class="term-wrap">
-        <h4>Serial terminal</h4>
-        <div class="term" id="term"></div>
+      <div class="io-row">
+        <div class="term-wrap">
+          <h4>Serial terminal</h4>
+          <div class="term" id="term"></div>
+        </div>
+        <div class="fp-wrap">
+          <h4>Front panel</h4>
+          <div class="fp" id="frontpanel"></div>
+        </div>
       </div>
     </div>
     <div class="sim-side" id="side">
@@ -54,14 +60,15 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=82"></script>
-<script src="js/firmware-0061-34.js?v=82"></script>
-<script src="js/stellar-vm.js?v=82"></script>
-<script src="js/disasm.js?v=82"></script>
-<script src="js/core-view.js?v=82"></script>
-<script src="js/vt100.js?v=82"></script>
-<script src="js/sim-app.js?v=82"></script>
-<script src="js/core-page.js?v=82"></script>
-<script src="js/nav.js?v=82"></script>
+<script src="js/opcodes.js?v=83"></script>
+<script src="js/firmware-0061-34.js?v=83"></script>
+<script src="js/stellar-vm.js?v=83"></script>
+<script src="js/disasm.js?v=83"></script>
+<script src="js/core-view.js?v=83"></script>
+<script src="js/vt100.js?v=83"></script>
+<script src="js/front-panel.js?v=83"></script>
+<script src="js/sim-app.js?v=83"></script>
+<script src="js/core-page.js?v=83"></script>
+<script src="js/nav.js?v=83"></script>
 </body>
 </html>

@@ -13,6 +13,22 @@
   ];
   function byId(id) { return document.getElementById(id); }
 
+  var panel = new window.FrontPanel(byId('frontpanel'));
+
+  // Front-panel inputs come straight off the live CPU, as on the simulator page:
+  // the Q lamp and the last byte written to the DEFOUT port (Elf2K default 4).
+  function panelState(s) {
+    var cpu = app.vm && app.vm.cpu;
+    if (!cpu) return s;
+    var CORE = (window.StellarVMLib && window.StellarVMLib.CORE) || 0x3000;
+    var port = cpu.M[CORE + 0x39] || 4;
+    var log = cpu.io_out[port];
+    s.q = cpu.Q ? 1 : 0;
+    s.outPort = port;
+    s.outByte = (log && log.length) ? log[log.length - 1] : null;
+    return s;
+  }
+
   var app = new window.SimApp({
     coreEl: byId('core'),
     disasmEl: byId('disasm'),
@@ -20,6 +36,7 @@
     coldBoot: true,
     statusEl: byId('status'),
     onState: function (s) {
+      panel.render(panelState(s));
       byId('pause').disabled = !app.running;
       byId('run').disabled = app.running || s.halted;
       byId('step').disabled = app.running || s.halted;
@@ -27,7 +44,7 @@
   });
 
   var samples = [];
-  fetch('samples/manifest.json?v=81').then(function (r) { return r.json(); }).then(function (list) {
+  fetch('samples/manifest.json?v=83').then(function (r) { return r.json(); }).then(function (list) {
     samples = list;
     var sel = byId('sample');
     list.forEach(function (s, i) {
@@ -49,7 +66,7 @@
   function load(i) {
     var s = samples[i];
     byId('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=81').then(function (r) { return r.text(); }).then(function (text) {
+    fetch('samples/' + s.file + '?v=83').then(function (r) { return r.text(); }).then(function (text) {
       var input = (s.input || '').replace(/\\r/g, '\r').replace(/\\n/g, '\n');
       app.load(text, input);
     });
