@@ -177,6 +177,15 @@
     "speed": "Elf2K"
   },
   {
+    "name": "Breakout (VT100, arrow keys)",
+    "file": "Breakout.lst",
+    "input": "",
+    "blurb": "Knock out the wall of bricks with the ball. Click the terminal and press SPACE; the arrow keys (or a / d) move the paddle. Reverse-video bricks score 5, '######' 3, '======' 1. Where the ball strikes the paddle sets its angle: the ends send it out wide, the middle steep. Three balls; each serve's first drop is slower so you can get there. Clear the wall and a faster one comes. P pauses, a lone ESC quits, SPACE plays again. Which brick the ball has reached is three table lookups - no divide. Opens at Elf2K speed - the real hardware's pace. Verified on the Elf2K.",
+    "maxSteps": 14000000,
+    "halts": false,
+    "speed": "Elf2K"
+  },
+  {
     "name": "Starship (VT100)",
     "file": "Starship.lst",
     "input": "",

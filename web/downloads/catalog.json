@@ -22,6 +22,13 @@
  },
  {
   "group": "Games",
+  "name": "Breakout",
+  "what": "Knock out the wall of bricks; three balls, faster each wall. VT100, arrow keys.",
+  "href": "samples/Breakout.lst",
+  "note": null
+ },
+ {
+  "group": "Games",
   "name": "Pong",
   "what": "You on the right against the computer. VT100, arrow keys.",
   "href": "samples/Pong.lst",
