@@ -200,9 +200,14 @@
   // largest font size up to the stylesheet's that shows all 80 columns.
   VT100.prototype.fit = function () {
     if (!this.el) return;
-    var avail = this.el.clientWidth;
-    if (!avail || avail === this._fitFor) return;
-    this._fitFor = avail;
+    // Lifted into the enlarge overlay (js/term-zoom.js): fit the font to the overlay's
+    // width AND height - no cap - and centre the 80 columns. Otherwise as before.
+    var lifted = this.el.closest ? this.el.closest('.tz-lifted') : null;
+    var avail = this.el.clientWidth, availH = lifted ? this.el.clientHeight : 0;
+    var key = avail + 'x' + availH;
+    if (!avail || key === this._fitFor) return;
+    this._fitFor = key;
+    if (this._zoomPad && !lifted) { this.el.style.paddingLeft = ''; this._zoomPad = false; }
     if (!this._baseSize) {
       this.el.style.fontSize = '';
       this._baseSize = parseFloat(getComputedStyle(this.el).fontSize) || 13;
@@ -215,8 +220,22 @@
     var w100 = probe.getBoundingClientRect().width;
     probe.parentNode.removeChild(probe);
     if (!w100) return;
-    var size = Math.floor(avail / w100 * 100 * 10) / 10;      // 0.1px steps
-    this.el.style.fontSize = Math.max(6, Math.min(this._baseSize, size)) + 'px';
+    if (!lifted) {
+      var size = Math.floor(avail / w100 * 100 * 10) / 10;      // 0.1px steps
+      this.el.style.fontSize = Math.max(6, Math.min(this._baseSize, size)) + 'px';
+      return;
+    }
+    var cs = getComputedStyle(this.el);
+    if (this._padL0 === undefined || !this._zoomPad) this._padL0 = parseFloat(cs.paddingLeft) || 0;
+    var padL = this._padL0, padR = parseFloat(cs.paddingRight) || 0;
+    var innerW = avail - padL - padR;
+    var innerH = availH - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+    var lh = (parseFloat(cs.lineHeight) / parseFloat(cs.fontSize)) || 1.3;
+    var z = Math.floor(Math.min(innerW / w100 * 100, innerH / (this.rows * lh)) * 10) / 10;
+    z = Math.max(6, z);
+    this.el.style.fontSize = z + 'px';
+    this.el.style.paddingLeft = (padL + Math.max(0, (innerW - z * w100 / 100) / 2)) + 'px';
+    this._zoomPad = true;
   };
 
   VT100.prototype.render = function () {

@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=86';
+  var V = '?v=87';
   var LINEUP = [
     { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
     { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },
@@ -49,6 +49,7 @@
       q.appendChild(el);
       var scr = el.querySelector('.crt-screen');
       screens.push(window.VT100(el.querySelector('.vt')));
+      if (window.TermZoom) window.TermZoom.attach(el, el.querySelector('.crt-h'), scr);
       scr.addEventListener('focus', function () { focusVM = vm; el.classList.add('focus'); });
       scr.addEventListener('blur', function () { if (focusVM === vm) focusVM = 0; el.classList.remove('focus'); });
       scr.addEventListener('keydown', function (e) {
