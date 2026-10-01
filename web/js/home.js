@@ -124,7 +124,7 @@
     // rows are 128 bytes: address / 128 / 256 = fraction of the height
     var marks = [
       [0x0000, 0x0800, 'kernel', 0], [0x0800, 0x0A00, 'dispatch', 0], [0x0A00, 0x2F00, 'opcode handlers', 0],
-      [0x2F00, 0x3000, 'CIDP', 0], [0x3000, 0x4000, 'cores', 0],
+      [0x2F00, 0x3000, 'CIDP', 0], [0x3000, 0x4000, 'Cores', 0],
       [0x4000, 0x5000, 'VM1', 1], [0x5000, 0x6000, 'VM2', 2], [0x6000, 0x7000, 'VM3', 3], [0x7000, 0x8000, 'VM4', 4]
     ];
     marks.forEach(function (mk) {
@@ -133,7 +133,9 @@
       d.style.top = (mk[0] / 0x8000 * 100) + '%';
       d.style.height = ((mk[1] - mk[0]) / 0x8000 * 100) + '%';
       if (mk[3]) d.style.setProperty('--vm', VMC[mk[3]]);
-      d.innerHTML = '<div class="dlt"><span>' + mk[2] + '</span><i class="mono">$' + h4(mk[0]) + '</i></div>';
+      // the cores band lists all four 1 KB cores' start addresses
+      var addr = mk[0] === 0x3000 ? '$3000<br>$3400<br>$3800<br>$3C00' : '$' + h4(mk[0]);
+      d.innerHTML = '<div class="dlt"><span>' + mk[2] + '</span><i class="mono">' + addr + '</i></div>';
       // the CIDP is 2 px of the die: its label points to the byte-by-byte CIDP table under it
       if (mk[0] === 0x2F00 && host.id === 'dieLabels') {
         var lt = d.firstChild;

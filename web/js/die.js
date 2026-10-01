@@ -33,7 +33,7 @@
     for (var a = 0, p = 0; a < 32768; a++, p += 4) {
       var v = M[a];
       // base texture: code bytes glint faintly by value
-      var b = v ? 22 + (v >> 4) : 7;
+      var b = v ? 46 + (v >> 3) : 7;
       var r = b, g = b + 2, bl = b + 6;
       var h = heat[a];
       if (h) {
