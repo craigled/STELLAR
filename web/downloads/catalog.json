@@ -29,6 +29,13 @@
  },
  {
   "group": "Games",
+  "name": "Getting Warmer",
+  "what": "Guess the number from 1 to 1000 in ten tries: higher or lower, warmer or colder. Plain text.",
+  "href": "samples/Getting-Warmer.lst",
+  "note": null
+ },
+ {
+  "group": "Games",
   "name": "Pong",
   "what": "You on the right against the computer. VT100, arrow keys.",
   "href": "samples/Pong.lst",

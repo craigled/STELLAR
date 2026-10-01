@@ -186,6 +186,14 @@
     "speed": "Elf2K"
   },
   {
+    "name": "Getting Warmer (guess the number)",
+    "file": "Getting-Warmer.lst",
+    "input": "",
+    "blurb": "The computer picks a number from 1 to 1000 and you have ten guesses. Click the terminal, press any key, then type a guess and Enter. Each answer says go higher or lower - and from the second guess on whether you are getting warmer or colder than your last one. Ten is always enough if you halve the range each time. A line that is not a number from 1 to 1000 costs nothing; Q gives up; Y plays again, N quits. Plain text: no VT100 needed. Verified on the Elf2K.",
+    "maxSteps": 14000000,
+    "halts": false
+  },
+  {
     "name": "Starship (VT100)",
     "file": "Starship.lst",
     "input": "",

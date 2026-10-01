@@ -24,6 +24,8 @@ CATALOG = [
   'samples/Snake.lst', None),
  ('Games', 'Breakout', 'Knock out the wall of bricks; three balls, faster each wall. VT100, arrow keys.',
   'samples/Breakout.lst', None),
+ ('Games', 'Getting Warmer', 'Guess the number from 1 to 1000 in ten tries: higher or lower, warmer or colder. Plain text.',
+  'samples/Getting-Warmer.lst', None),
  ('Games', 'Pong', 'You on the right against the computer. VT100, arrow keys.', 'samples/Pong.lst', None),
  ('Games', 'Racer', 'Keep the car on a scrolling, winding road. VT100, arrow keys.', 'samples/Racer.lst', None),
  ('Games', 'Invaders', 'Two rows of six invaders and an arrow-key gun. VT100.', 'samples/Invaders.lst', None),
