@@ -202,6 +202,15 @@
     "speed": "Elf2K"
   },
   {
+    "name": "Battleship (VT100, arrow keys)",
+    "file": "Battleship.lst",
+    "input": "",
+    "blurb": "You against the computer on two 10 x 10 seas: carrier 5, battleship 4, cruiser 3, submarine 3, destroyer 2. Click the terminal and press SPACE; R shuffles your fleet, SPACE starts the battle. The arrow keys move your aim over ENEMY WATERS and SPACE or Enter fires - or type a square (B7, J10) to jump there. The computer hunts on a checkerboard and works round every hit. Q gives up and shows its ships. Verified on the Elf2K.",
+    "maxSteps": 14000000,
+    "halts": false,
+    "speed": "Elf2K"
+  },
+  {
     "name": "Getting Warmer (guess the number)",
     "file": "Getting-Warmer.lst",
     "input": "",
