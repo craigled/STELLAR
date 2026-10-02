@@ -6,6 +6,7 @@
 (function () {
 
   var panel = new window.FrontPanel(document.getElementById('frontpanel'));
+  var qAudio = window.QAudio ? new window.QAudio() : null;
   var memView = null;   // built after the app exists, so it can read the live memory
 
   function showBreaks(n) {
@@ -36,6 +37,9 @@
     coldBoot: true,
     statusEl: document.getElementById('status'),
     onBreaksChanged: function (n) { showBreaks(n); },
+    onTick: function (vm, ips) {
+      if (qAudio) qAudio.tick(vm.cpu, ips === window.ClockRow.ELF2K);
+    },
     onState: function (s) {
       panel.render(panelState(s));
       if (memView) memView.render();
@@ -48,7 +52,7 @@
   function btn(id) { return document.getElementById(id); }
   var samples = [];
 
-  fetch('samples/manifest.json?v=88')
+  fetch('samples/manifest.json?v=89')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       samples = list;
@@ -84,7 +88,7 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=88')
+    fetch('samples/' + s.file + '?v=89')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
@@ -205,7 +209,7 @@
 
   // The full catalogue (web/build/gen_downloads.py): every finished app, grouped.
   var catalog = [];
-  fetch('downloads/catalog.json?v=88')
+  fetch('downloads/catalog.json?v=89')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       catalog = list;
@@ -232,7 +236,7 @@
     var a = catalog[+btn('dlPick').value];
     if (!a) return;
     var fn = a.href.split('/').pop();
-    fetch(a.href + '?v=88')
+    fetch(a.href + '?v=89')
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         saveFile(fn, text);
@@ -257,5 +261,25 @@
 
   var clock = window.ClockRow(btn('clockBtns'), btn('speedLabel'), function (sp) {
     app.setSpeed(sp.ops || 0, sp.ms, sp.ips);
+    soundNote();
   });
+
+  // ---- Q as sound (js/q-audio.js) ----
+  function soundNote() {
+    var el = btn('soundNote');
+    if (!el || !qAudio) return;
+    var sp = clock && clock.current();
+    el.textContent = !qAudio.enabled ? 'Q through a speaker: the program\u2019s own pitch, at the Elf2K clock only.'
+      : (sp && sp.ips === window.ClockRow.ELF2K) ? 'Playing Q as a speaker would, at the Elf2K\u2019s 3 MHz.'
+      : 'Muted: sound plays only at the Elf2K speed (other clocks would change the pitch).';
+  }
+  if (qAudio) {
+    btn('sound').addEventListener('click', function () {
+      var on = qAudio.setEnabled(!qAudio.enabled);
+      this.textContent = on ? '🔊 Sound on' : '🔈 Sound off';
+      this.setAttribute('aria-pressed', on ? 'true' : 'false');
+      soundNote();
+    });
+  } else btn('sound').disabled = true;
+  soundNote();
 })();

@@ -8,6 +8,7 @@
   'use strict';
 
   var ENTRY = 0x4000;
+  var CPI = 375000 / 170000;   // Elf2K machine cycles a second / ClockRow's instructions a second
   function hx(v, n) { return v.toString(16).toUpperCase().padStart(n, '0'); }
 
   // opts: { coreEl, disasmEl, terminalEl, statusEl } (any subset)
@@ -176,17 +177,22 @@
     this._skipBreak = !!this.breaks[this._pl()];
     this._setStatus('running…');
     var self = this;
-    var last = Date.now();
+    var last = Date.now(), credit = 0;
     this.timer = setInterval(function () {
-      var now = Date.now(), budget = Infinity, spent = 0;
+      var now = Date.now(), budget = Infinity, c = self.vm.cpu, c0 = c.cycles;
       if (self.instrPerSec) {
-        // a long gap (a backgrounded tab) is capped so the machine does not race to catch up
-        budget = Math.min(now - last, 60) / 1000 * self.instrPerSec;
+        // Real time is paced in 1802 MACHINE CYCLES, the hardware's own clock (an
+        // Elf2K runs 375,000 a second; ClockRow quotes it as ~170,000 instructions).
+        // The budget is a running credit: one opcode can outlast a tick - a RUNMC
+        // tone holds the machine for a whole dash - and the debt is paid back by
+        // waiting, so the machine never drifts ahead of the wall clock. A long gap
+        // (a backgrounded tab) is capped so it does not race to catch up.
+        credit = Math.min(credit + Math.min(now - last, 60) / 1000 * self.instrPerSec * CPI, 0.06 * self.instrPerSec * CPI);
+        budget = credit;
       }
       last = now;
-      for (var i = 0; self.instrPerSec ? spent < budget : i < self.opsPerTick; i++) {
+      for (var i = 0; self.instrPerSec ? c.cycles - c0 < budget : i < self.opsPerTick; i++) {
         var r = self.vm.stepOpcode();
-        spent += r.cost || 0;
         // stop() before _render(): the render fires onState, and the page decides
         // the Run/Step/Pause button states from this.running — rendering first
         // would leave them disabled after we have already stopped.
@@ -201,7 +207,9 @@
           }
         }
       }
+      if (self.instrPerSec) credit -= c.cycles - c0;
       self._render();
+      if (self.opts.onTick) self.opts.onTick(self.vm, self.instrPerSec);
     }, this.tickMs);
   };
 

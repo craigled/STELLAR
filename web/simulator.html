@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Simulator</title>
 <meta name="description" content="Run STELLAR programs in the browser on the real firmware — step through the disassembly and watch the core update live.">
-<link rel="stylesheet" href="css/site.css?v=88">
+<link rel="stylesheet" href="css/site.css?v=89">
 </head>
 <body>
 <main class="wrap">
@@ -55,6 +55,10 @@
         <div class="fp-wrap">
           <h4>Front panel</h4>
           <div class="fp" id="frontpanel"></div>
+          <div class="sim-controls fp-sound">
+            <button id="sound" aria-pressed="false" title="Play the Q line as a speaker would - at the Elf2K speed">🔈 Sound off</button>
+          </div>
+          <p class="arrow-note" id="soundNote">Q through a speaker: the program's own pitch, at the Elf2K clock only.</p>
         </div>
       </div>
     </div>
@@ -96,19 +100,20 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=88"></script>
-<script src="js/firmware-0061-34.js?v=88"></script>
-<script src="js/stellar-vm.js?v=88"></script>
-<script src="js/disasm.js?v=88"></script>
-<script src="js/core-view.js?v=88"></script>
-<script src="js/mem-view.js?v=88"></script>
-<script src="js/front-panel.js?v=88"></script>
-<script src="js/vt100.js?v=88"></script>
-<script src="js/term-zoom.js?v=88"></script>
-<script src="js/term-input.js?v=88"></script>
-<script src="js/sim-app.js?v=88"></script>
-<script src="js/clock-row.js?v=88"></script>
-<script src="js/simulator-page.js?v=88"></script>
-<script src="js/nav.js?v=88"></script>
+<script src="js/opcodes.js?v=89"></script>
+<script src="js/firmware-0061-34.js?v=89"></script>
+<script src="js/stellar-vm.js?v=89"></script>
+<script src="js/disasm.js?v=89"></script>
+<script src="js/core-view.js?v=89"></script>
+<script src="js/mem-view.js?v=89"></script>
+<script src="js/front-panel.js?v=89"></script>
+<script src="js/vt100.js?v=89"></script>
+<script src="js/term-zoom.js?v=89"></script>
+<script src="js/term-input.js?v=89"></script>
+<script src="js/sim-app.js?v=89"></script>
+<script src="js/q-audio.js?v=89"></script>
+<script src="js/clock-row.js?v=89"></script>
+<script src="js/simulator-page.js?v=89"></script>
+<script src="js/nav.js?v=89"></script>
 </body>
 </html>

@@ -39,6 +39,8 @@
     this.io_in = {};           // port -> object with pop(i)
     this.halted = false;
     this.steps = 0;
+    this.cycles = 0;           // machine cycles (8 clocks each) - the clock Q audio is timed by
+    this.qLog = null;          // set to [] to record [cycle, level] at every change of Q
   }
   CPU.prototype._fetch = function () {
     var b = this.M[this.R[this.P]];
@@ -65,6 +67,7 @@
     else if (hi === 0xD) { this.P = lo; }                     // SEP
     else if (hi === 0xE) { this.X = lo; }                     // SEX
     else if (hi === 0xF) { this._miscF(op); }
+    this.cycles += hi === 0xC ? 3 : 2;      // long branches and skips 3, the rest 2 (68 xx adds its own)
     this.steps++;
     return !this.halted;
   };
@@ -143,12 +146,16 @@
     else if (op === 0x77) { m = this.M[R[this.X]]; t = this.D - m - (1 - this.DF); this.DF = t >= 0 ? 1 : 0; this.D = t & 0xFF; } // SMB
     else if (op === 0x78) { this.M[R[this.X]] = this.T; }             // SAV
     else if (op === 0x79) { this.T = (this.X << 4) | this.P; this.M[R[2]] = this.T; this.X = this.P; R[2] = (R[2] - 1) & 0xFFFF; } // MARK
-    else if (op === 0x7A) { this.Q = 0; }                             // REQ
-    else if (op === 0x7B) { this.Q = 1; }                             // SEQ
+    else if (op === 0x7A) { this._setQ(0); }                          // REQ
+    else if (op === 0x7B) { this._setQ(1); }                          // SEQ
     else if (op === 0x7C) { m = this._fetch(); t = this.D + m + this.DF; this.DF = t > 255 ? 1 : 0; this.D = t & 0xFF; } // ADCI
     else if (op === 0x7D) { m = this._fetch(); t = m - this.D - (1 - this.DF); this.DF = t >= 0 ? 1 : 0; this.D = t & 0xFF; } // SDBI
     else if (op === 0x7E) { nb = (this.D >> 7) & 1; this.D = ((this.D << 1) | this.DF) & 0xFF; this.DF = nb; } // SHLC
     else if (op === 0x7F) { m = this._fetch(); t = this.D - m - (1 - this.DF); this.DF = t >= 0 ? 1 : 0; this.D = t & 0xFF; } // SMBI
+  };
+  CPU.prototype._setQ = function (v) {
+    if (this.qLog && this.Q !== v) this.qLog.push(this.cycles, v);
+    this.Q = v;
   };
   CPU.prototype._miscF = function (op) {
     var X = this.R[this.X], t;
@@ -171,6 +178,7 @@
   };
   CPU.prototype._extended = function () {
     var op2 = this._fetch(), hi = op2 >> 4, lo = op2 & 0xF, R = this.R, h, l;
+    this.cycles += (hi === 0xC || hi === 0x2 || hi === 0x6 || hi === 0xA) ? 3 : 2;   // 1805 datasheet, as cosmac.js
     if (hi === 0xC) { h = this._fetch(); l = this._fetch(); R[lo] = (h << 8) | l; }            // RLDI
     else if (hi === 0x6) { h = this.M[R[this.X]]; R[this.X] = (R[this.X] + 1) & 0xFFFF; l = this.M[R[this.X]]; R[this.X] = (R[this.X] + 1) & 0xFFFF; R[lo] = (h << 8) | l; } // RLXA
     else if (hi === 0xA) { this.M[R[this.X]] = R[lo] & 0xFF; R[this.X] = (R[this.X] - 1) & 0xFFFF; this.M[R[this.X]] = (R[lo] >> 8) & 0xFF; R[this.X] = (R[this.X] - 1) & 0xFFFF; } // RSXD
