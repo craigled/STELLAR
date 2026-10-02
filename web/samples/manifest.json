@@ -133,6 +133,15 @@
     "halts": true
   },
   {
+    "name": "Morse Sender v18 (700 Hz tone - turn Sound on)",
+    "file": "Morse-Sender-v18.lst",
+    "input": "12\rCQ DE STELLAR\r",
+    "blurb": "Sends what you type as Morse code on the Q line - every dot and dash a 700 Hz tone, made by a little raw-1802 loop run through RUNMC. Click \ud83d\udd08 Sound under the Front Panel to hear it (the clock must be at Elf2K). The input box pre-loads 12 WPM and 'CQ DE STELLAR'; then click the terminal and type more lines. Speeds 5-25 WPM; Enter on an empty line quits. The pitch byte is at $4E42 (2A = 700 Hz; bigger = lower). For keying real Morse equipment use v17 (in the downloads), which holds Q steady. Verified on the Elf2K.",
+    "speed": "Elf2K",
+    "maxSteps": 14000000,
+    "halts": false
+  },
+  {
     "name": "Starfield (VT100)",
     "file": "Starfield.lst",
     "input": " 12\r",

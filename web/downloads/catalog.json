@@ -120,6 +120,13 @@
  },
  {
   "group": "Morse",
+  "name": "Morse Sender v18",
+  "what": "The same, but every dot and dash is a 700 Hz tone on Q (RUNMC) - for a speaker; v17 is for keying real gear.",
+  "href": "samples/Morse-Sender-v18.lst",
+  "note": null
+ },
+ {
+  "group": "Morse",
   "name": "Morse Receiver v10",
   "what": "Key Morse on the Input switch; it learns your hand and prints the text.",
   "href": "downloads/Morse-Receiver-v10.lst",

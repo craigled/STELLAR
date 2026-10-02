@@ -42,6 +42,8 @@ CATALOG = [
  ('Text', 'String Store', 'Keep three typed lines in slots and print them back.', 'samples/String-Store.lst', None),
  ('Morse', 'Morse Sender v17', 'Type text; it is sent as Morse code on the Q output.',
   'APPLICATIONS/MORSE CODE/Morse-Sender-v17.lst', None),
+ ('Morse', 'Morse Sender v18', 'The same, but every dot and dash is a 700 Hz tone on Q (RUNMC) - for a speaker; v17 is for keying real gear.',
+  'samples/Morse-Sender-v18.lst', None),
  ('Morse', 'Morse Receiver v10', 'Key Morse on the Input switch; it learns your hand and prints the text.',
   'APPLICATIONS/MORSE CODE/Morse-Receiver-v10.lst', 'simulator-verified, not yet run on hardware'),
  ('Math', 'Simple-Calc-5', '5-digit calculator, all in STELLAR bytecode.', 'samples/Simple-Calc-5.lst', None),
