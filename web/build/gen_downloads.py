@@ -40,6 +40,8 @@ CATALOG = [
  ('Text', 'Banner', 'Prints what you type as big block letters.', 'samples/Banner.lst', None),
  ('Text', 'GETSTR', 'The $C2 line-input opcode: read a line, print it back.', 'samples/GETSTR.lst', None),
  ('Text', 'String Store', 'Keep three typed lines in slots and print them back.', 'samples/String-Store.lst', None),
+ ('Clock', 'Big Clock', 'The time in big seven-segment digits, the day of the week and the date, from the RTC ($07). VT100.',
+  'samples/Big-Clock.lst', 'simulator-verified, not yet run on hardware; needs firmware V0061.35'),
  ('Morse', 'Morse Sender v17', 'Type text; it is sent as Morse code on the Q output.',
   'APPLICATIONS/MORSE CODE/Morse-Sender-v17.lst', None),
  ('Morse', 'Morse Sender v18', 'The same, but every dot and dash is a 700 Hz tone on Q (RUNMC) - for a speaker; v17 is for keying real gear.',

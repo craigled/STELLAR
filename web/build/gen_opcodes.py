@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # tools/stellar_disasm.py lives in the sibling work repo
 DISASM = os.path.expanduser('~/Projects/stellar-1802/tools/stellar_disasm.py')
 FMATH  = os.path.expanduser('~/Projects/stellar-1802/Firmware-Math')
-DOCX   = 'STELLAR MAIN V0061.34.docx'
+DOCX   = 'STELLAR MAIN V0061.35.docx'
 
 def load_disasm():
     spec = importlib.util.spec_from_file_location('stellar_disasm', DISASM)
@@ -35,6 +35,7 @@ DESC = {
 0x04: ('io', 'NN', 'Output an immediate byte on the defined output port.'),
 0x05: ('io', 'DZ', 'Output byte Z of accumulator D (0=Acc, 1=MA, 2=DA).'),
 0x06: ('io', 'ZX', 'Output register X (Z=0: low byte, else high byte).'),
+0x07: ('io', 'FX', 'RTC - the DS12887 real-time clock. F=0 RTCGET: the date and time, plain, into the 8 bytes at M(RX): sec min hour weekday(0=Sun) day month year(2 bytes). F=1 RTCSET from M(RX): every field checked, written in the chip\'s own mode; Test = 1 written, 0 refused (nothing written). F=2 Acc = chip register X; F=3 chip register X = Acc low.'),
 0x08: ('io', '0X', 'Output the byte in memory pointed to by register X.'),
 0x09: ('io', '', 'Scan all four EF lines into the Accumulator as a mask: bit 0 = EF1 ... bit 3 = EF4, high byte 0.'),
 0x0A: ('io', '0Z', 'Set Q (0=Off, 1=On, 2=On-then-Off, 3=On,On then Off,Off).'),

@@ -2,7 +2,7 @@
 """
 Generate web/build/fixtures.json — golden serial output for each sample program,
 produced by the REAL firmware simulator in Firmware-Math, over the SAME image the
-browser gets (extract_firmware.build_image = V0061.34 as flashed). The Node parity
+browser gets (extract_firmware.build_image = V0061.35 as flashed). The Node parity
 test (test_parity.mjs) asserts the JS engine reproduces these byte-for-byte.
 
     python3 web/build/gen_fixtures.py
@@ -23,7 +23,7 @@ from calc_interactive import UART               # noqa: E402
 CORE = 0x3000
 
 def run(lst_path, inp, max_steps):
-    mem = bytearray(build_image())      # V0061.34 exactly as flashed
+    mem = bytearray(build_image())      # V0061.35 exactly as flashed
     for ln in open(lst_path):
         import re
         m = re.match(r'D\s+([0-9A-Fa-f]{4})\s+(.+)', ln.strip())
@@ -65,6 +65,7 @@ def main():
     manifest = json.load(open(os.path.join(SAMPLES, 'manifest.json')))
     out = {}
     for s in manifest:
+        if s.get('fixture') is False: continue      # output depends on the time of day (Big Clock)
         path = os.path.join(SAMPLES, s['file'])
         data, halted, n = run(path, s['input'], s['maxSteps'])
         out[s['file']] = {'input': s['input'], 'outHex': data.hex(),

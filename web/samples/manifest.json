@@ -237,6 +237,16 @@
     "halts": false
   },
   {
+    "name": "Big Clock (VT100, seven-segment)",
+    "file": "Big-Clock.lst",
+    "input": "",
+    "blurb": "The time in big seven-segment digits made of reverse-video blocks, with the day of the week and the date underneath. On the Elf2K it reads the DS12887 real-time clock through the $07 RTC opcode; here the simulator's clock chip runs on this computer's own clock. Only the parts of a digit that change are sent each second. Click the terminal: S sets the clock (the date as YYYY-MM-DD, then the time as HH:MM:SS - the firmware rejects an impossible date), Q quits. Simulator-verified; not yet run on the Elf2K.",
+    "speed": "Elf2K",
+    "maxSteps": 14000000,
+    "halts": false,
+    "fixture": false
+  },
+  {
     "name": "Starship (VT100)",
     "file": "Starship.lst",
     "input": "",

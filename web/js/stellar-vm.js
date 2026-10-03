@@ -3,7 +3,7 @@
 // A faithful port of Firmware-Math/cpu1802.py (CDP1802/1805 base ISA + the
 // 68-prefix extended ops STELLAR uses) plus the VM boot recipe from
 // calc_interactive.run_calc. It runs the REAL flashed firmware image
-// (firmware-0061-34.js), so behavior matches the hardware — the visualizers
+// (firmware-0061-35.js), so behavior matches the hardware — the visualizers
 // just read the emulated $3000 core RAM the firmware maintains.
 //
 // Works in the browser (window.StellarVM) and in Node (module.exports).
@@ -126,6 +126,10 @@
     if (op === 0x60) { R[this.X] = (R[this.X] + 1) & 0xFFFF; }        // IRX
     else if (op === 0x68) { this._extended(); }                       // 1805 prefix
     else if (op >= 0x61 && op <= 0x67) {                              // OUT
+      if (lo === 3 && this.rtc) {                                     // port 3 = the RTC when port 2 selected one
+        var s2 = this.io_out[2], sel = s2 && s2.length ? s2[s2.length - 1] : 0x15;
+        if (sel & 0x80) { this.rtc.write(sel & 0x7F, this.M[R[this.X]]); R[this.X] = (R[this.X] + 1) & 0xFFFF; return; }
+      }
       (this.io_out[lo] || (this.io_out[lo] = [])).push(this.M[R[this.X]]);
       R[this.X] = (R[this.X] + 1) & 0xFFFF;
     } else if (op >= 0x69 && op <= 0x6F) {                            // INP
@@ -211,9 +215,53 @@
   UART.prototype.pop = function () {
     var sel2 = this.io_out[2];
     var sel = sel2 && sel2.length ? sel2[sel2.length - 1] : null;
+    if (sel !== null && (sel & 0x80)) return this.rtc ? this.rtc.read(sel & 0x7F) : 0xFF;   // an RTC register
     if (sel === 0x15) return 0x20 | (this.buf.length ? 0x01 : 0x00); // status
     if (sel === 0x10) return this.buf.length ? this.buf.shift() : 0;  // data
     return 0;
+  };
+
+  // ---- the Elf2K's DS12887 real-time clock (ports 2/3, shared with the UART) ----
+  // Port 2 selects: $80 | register = the RTC, $10 / $15 = the UART's data / status. The time
+  // is THIS COMPUTER'S local clock, presented as Craig's Elf2K BIOS keeps the chip: binary,
+  // 24-hour, year = 1972 + value, Monday = 1 (regB $07). Setting it (regB SET, the fields, SET
+  // off) stores an offset from the computer's clock, shared by every load on the page, so a
+  // time set with $07 RTCSET keeps running. Only what STELLAR's $07 handler uses is modelled:
+  // UIP never shows (no update cycles), periodic/alarm interrupts are absent.
+  var RTC_OFFSET = 0;
+  function RTC() {
+    this.r = new Uint8Array(128);
+    this.r[0x0A] = 0x20; this.r[0x0B] = 0x07; this.r[0x0D] = 0x80;
+    this.setting = false;
+  }
+  RTC.prototype._enc = function (v) { return (this.r[0x0B] & 0x04) ? v : (((v / 10) | 0) << 4) | (v % 10); };
+  RTC.prototype._dec = function (v) { return (this.r[0x0B] & 0x04) ? v : (v >> 4) * 10 + (v & 15); };
+  RTC.prototype._load = function () {               // the clock's fields, now
+    var d = new Date(Date.now() + RTC_OFFSET), r = this.r, binary = r[0x0B] & 0x04;
+    r[0] = this._enc(d.getSeconds()); r[2] = this._enc(d.getMinutes()); r[4] = this._enc(d.getHours());
+    r[6] = d.getDay() === 0 ? 7 : d.getDay();
+    r[7] = this._enc(d.getDate()); r[8] = this._enc(d.getMonth() + 1);
+    r[9] = binary ? (d.getFullYear() - 1972) & 0xFF : this._enc(d.getFullYear() % 100);
+  };
+  RTC.prototype._commit = function () {             // the fields -> the offset
+    var r = this.r, binary = r[0x0B] & 0x04;
+    var y = binary ? 1972 + r[9] : 2000 + this._dec(r[9]);
+    var t = new Date(y, this._dec(r[8]) - 1, this._dec(r[7]), this._dec(r[4]), this._dec(r[2]), this._dec(r[0]));
+    if (!isNaN(t.getTime())) RTC_OFFSET = t.getTime() - Date.now();
+  };
+  RTC.prototype.read = function (n) {
+    if (n <= 9 && !this.setting) this._load();
+    return n === 0x0A ? this.r[n] & 0x7F : this.r[n];
+  };
+  RTC.prototype.write = function (n, v) {
+    if (n === 0x0B) {
+      if ((v & 0x80) && !this.setting) { this._load(); this.setting = true; }
+      this.r[0x0B] = v;
+      if (!(v & 0x80) && this.setting) { this.setting = false; this._commit(); }
+      return;
+    }
+    if (n <= 9 && !this.setting) { this._load(); this.r[n] = v; this._commit(); return; }
+    this.r[n] = n === 0x0A ? v & 0x7F : v;
   };
 
   // ---- helpers ----
@@ -281,6 +329,7 @@
     var c = new CPU(mem);
     c.io_out[2] = [];
     c.io_in[3] = new UART(this.input, c.io_out);
+    c.rtc = c.io_in[3].rtc = new RTC();
     if (this.coldBoot) {
       c.R[0] = 0x0000; c.P = 0; c.X = 0;
       c.R[1] = EXIT_IDL;               // return-to-monitor vector: an address that is always $00 (IDL)
@@ -426,6 +475,7 @@
     var c = new CPU(mem);
     c.io_out[2] = [];
     c.io_in[3] = new UART(this.input, c.io_out);
+    c.rtc = c.io_in[3].rtc = new RTC();
     c.R[0] = 0x0000; c.P = 0; c.X = 0;   // cold boot from the reset vector
     // R1 = interrupt/exit handler PC. On the Elf2K the monitor sets this so that
     // "all VMs done" (SEP R1 at $02E2) returns to the monitor. Point it at an IDL
@@ -508,7 +558,7 @@
   };
 
   return {
-    CPU: CPU, UART: UART, StellarVM: StellarVM, MultiVM: MultiVM,
+    CPU: CPU, UART: UART, RTC: RTC, StellarVM: StellarVM, MultiVM: MultiVM,
     parseLst: parseLst, loadFirmwareImage: loadFirmwareImage, readCore: readCore,
     CORE: CORE, ENTRY: ENTRY
   };

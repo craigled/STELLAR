@@ -10,6 +10,7 @@ var OPS = [
   {op:0x04, name:"OUTI", length:1, group:"io", operands:"NN", desc:"Output an immediate byte on the defined output port."},
   {op:0x05, name:"OUTA", length:1, group:"io", operands:"DZ", desc:"Output byte Z of accumulator D (0=Acc, 1=MA, 2=DA)."},
   {op:0x06, name:"OUTX", length:1, group:"io", operands:"ZX", desc:"Output register X (Z=0: low byte, else high byte)."},
+  {op:0x07, name:"RTC", length:1, group:"io", operands:"FX", desc:"RTC - the DS12887 real-time clock. F=0 RTCGET: the date and time, plain, into the 8 bytes at M(RX): sec min hour weekday(0=Sun) day month year(2 bytes). F=1 RTCSET from M(RX): every field checked, written in the chip's own mode; Test = 1 written, 0 refused (nothing written). F=2 Acc = chip register X; F=3 chip register X = Acc low."},
   {op:0x08, name:"OUTMX", length:1, group:"io", operands:"0X", desc:"Output the byte in memory pointed to by register X."},
   {op:0x09, name:"GETEFA", length:0, group:"io", operands:"", desc:"Scan all four EF lines into the Accumulator as a mask: bit 0 = EF1 ... bit 3 = EF4, high byte 0."},
   {op:0x0A, name:"SETQ", length:1, group:"io", operands:"0Z", desc:"Set Q (0=Off, 1=On, 2=On-then-Off, 3=On,On then Off,Off)."},

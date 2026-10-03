@@ -112,6 +112,13 @@
   "note": null
  },
  {
+  "group": "Clock",
+  "name": "Big Clock",
+  "what": "The time in big seven-segment digits, the day of the week and the date, from the RTC ($07). VT100.",
+  "href": "samples/Big-Clock.lst",
+  "note": "simulator-verified, not yet run on hardware; needs firmware V0061.35"
+ },
+ {
   "group": "Morse",
   "name": "Morse Sender v17",
   "what": "Type text; it is sent as Morse code on the Q output.",
