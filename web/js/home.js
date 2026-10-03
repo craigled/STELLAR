@@ -3,9 +3,13 @@
 (function () {
   'use strict';
 
-  var V = '?v=96';
+  var V = '?v=97';
   // The four programs are drawn at random from samples/home-pool.json (Craig's list) on every
-  // visit - always at least one game. ?apps=Snake,Pong,Racer,Starfield pins a set instead.
+  // visit: EXACTLY ONE "heavy" app - a game, or Sort visualiser - and three others. STELLAR's
+  // scheduler is fair by opcode count, so every VM runs at the pace of the round's dearest
+  // opcodes; an idle game (DLYI / RAND at its title screen) costs ~2,600 machine cycles an opcode
+  // against 200-350 for the rest, and two or three of them halved everyone's speed (measured).
+  // ?apps=Snake,Pong,Racer,Starfield pins a set instead.
   var LINEUP = null;
   function choose(pool) {
     var want = (new URLSearchParams(location.search).get('apps') || '').split(',')
@@ -16,10 +20,10 @@
     var pinned = want.map(find).filter(Boolean);
     if (pinned.length === 4) return pinned;
     var pick = function (list) { return list[Math.floor(Math.random() * list.length)]; };
-    var games = pool.filter(function (p) { return p.game; });
-    var four = [pick(games)];
+    var heavy = pool.filter(function (p) { return p.heavy; }), light = pool.filter(function (p) { return !p.heavy; });
+    var four = [pick(heavy)];
     while (four.length < 4) {
-      var p = pick(pool);
+      var p = pick(light);
       if (four.indexOf(p) < 0) four.push(p);
     }
     for (var i = 3; i > 0; i--) {                       // which slot each lands in, at random too
@@ -30,7 +34,9 @@
   function nameGames() {
     var g = LINEUP.filter(function (p) { return p.game; }).map(function (p) { return p.name; });
     var el = $('gameName');
-    if (el) el.textContent = g.length > 1 ? g.slice(0, -1).join(', ') + ' or ' + g[g.length - 1] : g[0];
+    if (!el) return;
+    if (g.length) el.textContent = g.length > 1 ? g.slice(0, -1).join(', ') + ' or ' + g[g.length - 1] : g[0];
+    else el.parentNode.textContent = 'Click a screen to type to its program.';
   }
   var VMC = ['#9aa3b8', '#ffb547', '#5fe3d0', '#ff7a90', '#b8f36a'];
 
