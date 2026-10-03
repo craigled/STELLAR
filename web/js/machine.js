@@ -50,9 +50,15 @@
 
   Machine.prototype.reset = function () {
     var self = this;
+    // Each program is a VM1 .lst ($4000-$4FFF) that MultiVM moves up into its own block. Only
+    // the bytes inside that block are kept: the "D X000 00" claim lines at the end of every .lst
+    // would otherwise land on the blocks above once it is moved, and a RUN after the program
+    // finishes (which reloads it) would clear the running VMs' START bytes and stop them.
     this.mvm = new LIB.MultiVM({
       firmware: this.firmware,
-      programs: this.programs.map(function (p) { return p.text; })
+      programs: this.programs.map(function (p) {
+        return LIB.parseLst(p.text).filter(function (q) { return q[0] >= 0x4000 && q[0] <= 0x4FFF; });
+      })
     });
     var c = this.cpu = this.mvm.cpu, M = this.M = c.M;
     // per-VM keyboard: SERIN in VM n only ever sees VM n's keys

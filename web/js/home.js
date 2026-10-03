@@ -3,13 +3,35 @@
 (function () {
   'use strict';
 
-  var V = '?v=95';
-  var LINEUP = [
-    { file: 'Mandelbrot.lst', name: 'Mandelbrot', input: '',       what: 'fixed-point maths' },
-    { file: 'Starfield.lst',  name: 'Starfield',  input: ' 12\r',  what: 'VT100 animation' },
-    { file: 'Invaders.lst',   name: 'Invaders',   input: '',       what: 'a game: click, press a key' },
-    { file: 'Starship.lst',   name: 'Starship',   input: '',       what: 'a picture, run-length drawn' }
-  ];
+  var V = '?v=96';
+  // The four programs are drawn at random from samples/home-pool.json (Craig's list) on every
+  // visit - always at least one game. ?apps=Snake,Pong,Racer,Starfield pins a set instead.
+  var LINEUP = null;
+  function choose(pool) {
+    var want = (new URLSearchParams(location.search).get('apps') || '').split(',')
+      .map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
+    var find = function (w) {
+      return pool.filter(function (p) { return p.name.toLowerCase() === w || p.file.toLowerCase().replace('.lst', '') === w; })[0];
+    };
+    var pinned = want.map(find).filter(Boolean);
+    if (pinned.length === 4) return pinned;
+    var pick = function (list) { return list[Math.floor(Math.random() * list.length)]; };
+    var games = pool.filter(function (p) { return p.game; });
+    var four = [pick(games)];
+    while (four.length < 4) {
+      var p = pick(pool);
+      if (four.indexOf(p) < 0) four.push(p);
+    }
+    for (var i = 3; i > 0; i--) {                       // which slot each lands in, at random too
+      var j = Math.floor(Math.random() * (i + 1)), t = four[i]; four[i] = four[j]; four[j] = t;
+    }
+    return four;
+  }
+  function nameGames() {
+    var g = LINEUP.filter(function (p) { return p.game; }).map(function (p) { return p.name; });
+    var el = $('gameName');
+    if (el) el.textContent = g.length > 1 ? g.slice(0, -1).join(', ') + ' or ' + g[g.length - 1] : g[0];
+  }
   var VMC = ['#9aa3b8', '#ffb547', '#5fe3d0', '#ff7a90', '#b8f36a'];
 
   var Machine = window.StellarMachine, Die = window.StellarDie, COS = window.Cosmac;
@@ -625,6 +647,21 @@
   }
 
   function start() {
+    fetch('samples/home-pool.json' + V).then(function (r) {
+      if (!r.ok) throw new Error('home-pool.json: HTTP ' + r.status);
+      return r.json();
+    }).then(function (pool) {
+      LINEUP = choose(pool);
+      start2();
+    }).catch(function (e) {
+      $('quad').innerHTML = '<p class="boot-err">Could not load the list of programs (' + esc(e.message) +
+        '). The site has to be served over http, not opened from a file. See web/README-running.md.</p>';
+    });
+  }
+
+  function start2() {
+    nameGames();
+    if ($('moreBtn')) $('moreBtn').addEventListener('click', function () { location.href = location.pathname; });
     buildQuad();
     buildDieLabels();
     buildCidp();

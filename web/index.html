@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/site.css?v=95">
-<link rel="stylesheet" href="css/home.css?v=95">
+<link rel="stylesheet" href="css/site.css?v=96">
+<link rel="stylesheet" href="css/home.css?v=96">
 </head>
 <body class="home">
 
@@ -43,6 +43,7 @@
     <div class="console-btns">
       <button id="pauseBtn" type="button">❚❚ pause</button>
       <button id="resetBtn" type="button">↺ reboot</button>
+      <button id="moreBtn" type="button" title="Four other programs: a new draw from the list">⟳ four more</button>
     </div>
   </div>
 
@@ -110,7 +111,9 @@
     would share one terminal and draw over each other. Here each byte is sorted by the VM that sent
     it, and each key you type goes only to the screen you clicked. Everything else,
     including the scheduling, the timing and every instruction, is the real firmware.
-    <span class="nowrap">Click <b>Invaders</b> and press a key to play.</span>
+    <span class="nowrap">Click <b id="gameName">the game</b> and press a key to play.</span>
+    The four programs are picked at random from fourteen on every visit -
+    <span class="nowrap">⟳ four more</span> picks again.
   </p>
 </section>
 
@@ -155,12 +158,13 @@
   <div class="story-num">02</div>
   <div class="story-body">
     <h2>Fair by opcode, not by time</h2>
-    <p>Watch the timeline while Invaders waits at <i>press any key</i>. STELLAR's scheduler
+    <p>When Invaders is one of the four (⟳ four more until it is), watch the timeline
+    while it waits at <i>press any key</i>. STELLAR's scheduler
     gives every VM the same turn, three opcodes, and then moves on. That's fair
     <em>by count</em>. But opcodes aren't equal. While it waits, Invaders keeps calling
     <code>$C3&nbsp;RAND</code> to stir its random seed, and a single RAND costs thousands
     of 1802 instructions. So its three opcodes take far longer than anyone else's, and
-    the pink VM ends up with most of the chip.</p>
+    its VM ends up with most of the chip.</p>
     <p class="dim">Press a key in Invaders and watch its share fall. The program's own
     listing says it plainly:</p>
     <pre class="lst"><span class="c">; D 400B C3             RAND                   Stir the generator while we wait</span>
@@ -247,15 +251,15 @@
   firmware <span class="mono">V0061.35</span>
 </footer>
 
-<script src="js/opcodes.js?v=95"></script>
-<script src="js/firmware-0061-35.js?v=95"></script>
-<script src="js/stellar-vm.js?v=95"></script>
-<script src="js/cosmac.js?v=95"></script>
-<script src="js/machine.js?v=95"></script>
-<script src="js/die.js?v=95"></script>
-<script src="js/vt100.js?v=95"></script>
-<script src="js/term-zoom.js?v=95"></script>
-<script src="js/home.js?v=95"></script>
-<script src="js/nav.js?v=95"></script>
+<script src="js/opcodes.js?v=96"></script>
+<script src="js/firmware-0061-35.js?v=96"></script>
+<script src="js/stellar-vm.js?v=96"></script>
+<script src="js/cosmac.js?v=96"></script>
+<script src="js/machine.js?v=96"></script>
+<script src="js/die.js?v=96"></script>
+<script src="js/vt100.js?v=96"></script>
+<script src="js/term-zoom.js?v=96"></script>
+<script src="js/home.js?v=96"></script>
+<script src="js/nav.js?v=96"></script>
 </body>
 </html>
