@@ -26,6 +26,12 @@ has most of them as samples, and its download list is built from the same copies
 | Tetris | [`Tetris.lst`](Games/Tetris.lst) | Steer the falling pieces and clear the rows; levels speed up. VT100, arrow keys. |
 | Tic-Tac-Toe | [`Tic-Tac-Toe.lst`](Games/Tic-Tac-Toe.lst) | You are X against a simple AI. |
 
+## Clock
+
+| App | File | What it does |
+|---|---|---|
+| Big Clock | [`Big-Clock-v3.lst`](Clock/Big-Clock-v3.lst) | The time in big seven-segment digits, the day and the date, from the DS12887 RTC; a timer, an hourly chime and an alarm with snooze on Q. Needs firmware V0061.35 (the $07 RTC opcode). VT100. |
+
 ## Text
 
 | App | File | What it does |

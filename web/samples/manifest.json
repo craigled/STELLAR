@@ -240,7 +240,7 @@
     "name": "Big Clock (VT100: chime, alarm, timer)",
     "file": "Big-Clock-v3.lst",
     "input": "",
-    "blurb": "The time in big seven-segment digits made of reverse-video blocks, with the day of the week and the date underneath - plus a timer, an hourly chime that strikes the hour and an alarm with snooze, both sounding on Q (click \ud83d\udd08 Sound under the Front Panel to hear them). On the Elf2K it reads the DS12887 real-time clock through the $07 RTC opcode; here the simulator's clock chip runs on this computer's own clock. Click the terminal: T starts a timer and T again stops it, showing the time passed; C turns the chime on or off, A sets the alarm (HH:MM, Enter = off), S sets the clock, Q quits. When the alarm rings, Z snoozes 9 minutes and any other key stops it. Simulator-verified; not yet run on the Elf2K.",
+    "blurb": "The time in big seven-segment digits made of reverse-video blocks, with the day of the week and the date underneath - plus a timer, an hourly chime that strikes the hour and an alarm with snooze, both sounding on Q (click \ud83d\udd08 Sound under the Front Panel to hear them). On the Elf2K it reads the DS12887 real-time clock through the $07 RTC opcode; here the simulator's clock chip runs on this computer's own clock. Click the terminal: T starts a timer and T again stops it, showing the time passed; C turns the chime on or off, A sets the alarm (HH:MM, Enter = off), S sets the clock, Q quits. When the alarm rings, Z snoozes 9 minutes and any other key stops it. Verified on the Elf2K.",
     "speed": "Elf2K",
     "maxSteps": 14000000,
     "halts": false,
