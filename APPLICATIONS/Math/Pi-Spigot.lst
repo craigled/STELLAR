@@ -1,0 +1,851 @@
+; ==========================================================================
+; STELLAR PI BY THE SPIGOT  -  the digits of pi, one at a time   (loads at $4000)
+; ==========================================================================
+; Load, cold-boot, type how many digits (1-1526; Enter alone = 100). The digits
+; come out as they are found: 3. then groups of ten, fifty to a line. Y runs
+; it again, N quits.
+;
+; The Rabinowitz-Wagon spigot: an array of small numbers, all 2 to start, is
+; multiplied by 10 and normalised from the far end each pass; the next digit
+; falls out of the front. Whole numbers only. Each pass skips the terms that
+; no longer matter (half the work), and each pass over the array is raw 1802
+; (RUNMC $4730, Firmware-Math/pi_native.asm): no multiply at all, 24-bit
+; sums - 18x faster than bytecode. On the Elf2K: 100 digits ~27 s, 300 ~3 min,
+; 1000 ~31 min, 1526 ~72 min. Uses $4000-$6FFF (SETSIZE 3). Plain text.
+;
+; VERIFICATION (Firmware-Math/pi_verify.py, V0061.34): PASS 2026-10-01 - algorithm vs a reference pi for 321 counts up to 1526 (incl. the Feynman point) with the native bounds (q < 128, 24-bit sums, a[i] high byte never $CD); the program's whole transcript byte-exact for 1, 2, 3, 11, 100, 101, 300 digits, junk answers, Y/N, and a rerun from dirty RAM.
+; HW-VERIFIED on the Elf2K (V0061.34), 2026-10-01 - Craig: "Pi works."
+;
+; 227 STELLAR commands.
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 4000 CD             START
+; D 4001 F2 03          SETSIZE 03                         three 4 KB blocks: $4000-$6FFF (the array)
+; D 4003 11 0F 00 0A    LOADXI R15 000A                    Ten
+; D 4007 11 0B 00 00    LOADXI R11 0000                    RB = 0: the index for variables
+; D 400B 10 00 00       LOADAI 0000
+; D 400E 2F 0B 06 5C    WRITEIDX R11 065C                  NBUF ends in a 0
+; D 4012 11 0E 03 00    LOADXI R14 0300
+; D 4016 C1 0E          PRINTSTR R14
+; ASKN:
+; D 4018 11 0E 04 BA    LOADXI R14 04BA
+; D 401C C1 0E          PRINTSTR R14
+; D 401E 11 0C 06 5E    LOADXI R12 065E
+; D 4022 11 0D 06 5E    LOADXI R13 065E
+; D 4026 C2 CD          GETSTR R12 R13                     Read the line (echoed; backspace works)
+; D 4028 BD 02 27       CALL PARSE
+; D 402B 8C 0D          TESTXZ R13
+; D 402D A1 00 37       IFFALSEI PN
+; D 4030 11 0A 00 64    LOADXI R10 0064                    Enter alone: the default
+; D 4034 B0 00 55       GAL PG
+; PN:
+; D 4037 86 0D FF FE    TESTXI R13 FFFE
+; D 403B A0 00 4C       IFTRUEI PBADN
+; D 403E 8C 0A          TESTXZ R10
+; D 4040 A0 00 4C       IFTRUEI PBADN
+; D 4043 11 0C 05 F7    LOADXI R12 05F7
+; D 4047 89 AC          TESTLXY R10 < R12
+; D 4049 A0 00 55       IFTRUEI PG
+; PBADN:
+; D 404C 11 0E 04 E8    LOADXI R14 04E8
+; D 4050 C1 0E          PRINTSTR R14
+; D 4052 B0 00 18       GAL ASKN
+; PG:
+; D 4055 23 00 A9       COPYXY R10 -> R9                   n = digits to print
+; D 4058 23 00 98       COPYXY R9 -> R8
+; D 405B 52 08 00 06    ADDXI R8 0006                      N = n + GUARD digits computed
+; D 405F 23 00 81       COPYXY R8 -> R1
+; D 4062 4A 1F          MULTXY R1 * R15
+; D 4064 21 11          COPYAX MA -> R1
+; D 4066 11 06 00 03    LOADXI R6 0003
+; D 406A 4D 16          DIVXY R1 / R6
+; D 406C 25             COPYMAA
+; D 406D 21 01          COPYAX Acc -> R1
+; D 406F 52 01 00 04    ADDXI R1 0004                      L = 10 N / 3 + MARGIN terms
+; D 4073 11 0E 08 06    LOADXI R14 0806
+; D 4077 3A 02 1E       COPYXMY R1 -> M(R14)               L for the native INIT
+; D 407A F1 47 00       RUNMC 4700                         a[1..L] = 2, in raw 1802
+; D 407D 11 07 00 00    LOADXI R7 0000                     no passes yet
+; D 4081 11 0A 00 00    LOADXI R10 0000                    nothing printed
+; D 4085 11 0C 00 00    LOADXI R12 0000                    no nines held
+; D 4089 11 0D FF FF    LOADXI R13 FFFF                    no digit held
+; D 408D 11 0E 05 11    LOADXI R14 0511
+; D 4091 C1 0E          PRINTSTR R14
+; PASS:
+; D 4093 87 A9          TESTXY R10 = R9
+; D 4095 A0 01 31       IFTRUEI FIN                        all the digits asked for are out
+; D 4098 87 78          TESTXY R7 = R8
+; D 409A A0 01 1A       IFTRUEI FLUSH                      N passes done (a long run of 9s): print what is held
+; D 409D 51 87 01       SUBXYZ R8 - R7 -> R1
+; D 40A0 4A 1F          MULTXY R1 * R15
+; D 40A2 21 11          COPYAX MA -> R1
+; D 40A4 11 06 00 03    LOADXI R6 0003
+; D 40A8 4D 16          DIVXY R1 / R6
+; D 40AA 25             COPYMAA
+; D 40AB 21 01          COPYAX Acc -> R1
+; D 40AD 52 01 00 04    ADDXI R1 0004                      i = 10 (N - passes) / 3 + MARGIN: the terms that still matter
+; D 40B1 11 0E 08 04    LOADXI R14 0804
+; D 40B5 3A 02 1E       COPYXMY R1 -> M(R14)               TOP for the native PASS
+; D 40B8 F1 47 30       RUNMC 4730                         the whole pass in raw 1802: a[TOP..1], then a[1] = q mod 10
+; D 40BB 2E 0B 08 08    READIDX R11 0808
+; D 40BF 21 04          COPYAX Acc -> R4                   R4 = the new digit (0-10)
+; D 40C1 42 07          INCX R7
+; D 40C3 86 04 00 09    TESTXI R4 0009
+; D 40C7 A1 00 CF       IFFALSEI N9
+; D 40CA 42 0C          INCX R12                           a 9: held with the others
+; D 40CC B0 00 93       GAL PASS
+; N9:
+; D 40CF 86 04 00 0A    TESTXI R4 000A
+; D 40D3 A1 00 F6       IFFALSEI NORM
+; D 40D6 23 00 D6       COPYXY R13 -> R6
+; D 40D9 42 06          INCX R6
+; D 40DB BD 01 87       CALL OUTD
+; Z0:
+; D 40DE 8C 0C          TESTXZ R12
+; D 40E0 A0 00 EF       IFTRUEI Z1
+; D 40E3 11 06 00 00    LOADXI R6 0000
+; D 40E7 BD 01 87       CALL OUTD
+; D 40EA 43 0C          DECX R12
+; D 40EC B0 00 DE       GAL Z0
+; Z1:
+; D 40EF 11 0D 00 00    LOADXI R13 0000                    and 0 is held
+; D 40F3 B0 00 93       GAL PASS
+; NORM:
+; D 40F6 86 0D FF FF    TESTXI R13 FFFF
+; D 40FA A0 01 14       IFTRUEI NH                         the very first digit: nothing held yet
+; D 40FD 23 00 D6       COPYXY R13 -> R6
+; D 4100 BD 01 87       CALL OUTD
+; N90:
+; D 4103 8C 0C          TESTXZ R12
+; D 4105 A0 01 14       IFTRUEI NH
+; D 4108 11 06 00 09    LOADXI R6 0009
+; D 410C BD 01 87       CALL OUTD
+; D 410F 43 0C          DECX R12
+; D 4111 B0 01 03       GAL N90
+; NH:
+; D 4114 23 00 4D       COPYXY R4 -> R13                   this digit is held
+; D 4117 B0 00 93       GAL PASS
+; FLUSH:
+; D 411A 23 00 D6       COPYXY R13 -> R6
+; D 411D BD 01 87       CALL OUTD
+; FL9:
+; D 4120 8C 0C          TESTXZ R12
+; D 4122 A0 01 31       IFTRUEI FIN
+; D 4125 11 06 00 09    LOADXI R6 0009
+; D 4129 BD 01 87       CALL OUTD
+; D 412C 43 0C          DECX R12
+; D 412E B0 01 20       GAL FL9
+; FIN:
+; D 4131 11 0E 05 23    LOADXI R14 0523
+; D 4135 C1 0E          PRINTSTR R14
+; D 4137 23 00 9A       COPYXY R9 -> R10
+; D 413A BD 01 D5       CALL NUM
+; D 413D 11 0E 05 32    LOADXI R14 0532
+; D 4141 C1 0E          PRINTSTR R14
+; D 4143 11 0E 05 41    LOADXI R14 0541
+; D 4147 C1 0E          PRINTSTR R14
+; AW:
+; D 4149 CC             SERST
+; D 414A A1 01 49       IFFALSEI AW
+; D 414D CB             SERIN
+; D 414E 21 0A          COPYAX Acc -> R10
+; D 4150 86 0A 00 79    TESTXI R10 0079
+; D 4154 A0 01 76       IFTRUEI YES
+; D 4157 86 0A 00 59    TESTXI R10 0059
+; D 415B A0 01 76       IFTRUEI YES
+; D 415E 86 0A 00 6E    TESTXI R10 006E
+; D 4162 A0 01 7B       IFTRUEI NO
+; D 4165 86 0A 00 4E    TESTXI R10 004E
+; D 4169 A0 01 7B       IFTRUEI NO
+; D 416C 86 0A 00 1B    TESTXI R10 001B
+; D 4170 A0 01 7B       IFTRUEI NO
+; D 4173 B0 01 49       GAL AW
+; YES:
+; D 4176 CA 59          SEROUTI 59 'Y'                     echo it
+; D 4178 B0 00 18       GAL ASKN
+; NO:
+; D 417B CA 4E          SEROUTI 4E 'N'
+; D 417D 11 0E 05 55    LOADXI R14 0555
+; D 4181 C1 0E          PRINTSTR R14
+; D 4183 00             HALT
+; D 4184 F0 00 00       BREAK
+; OUTD:
+; D 4187 87 A9          TESTXY R10 = R9
+; D 4189 A0 01 D3       IFTRUEI ODR
+; D 418C 22 06          COPYXA R6 -> Acc
+; D 418E 4E 00 30       ADDAI 0030
+; D 4191 C9             SEROUT                             the digit
+; D 4192 42 0A          INCX R10
+; D 4194 86 0A 00 01    TESTXI R10 0001
+; D 4198 A1 01 A3       IFFALSEI OD2
+; D 419B 11 0E 05 18    LOADXI R14 0518
+; D 419F C1 0E          PRINTSTR R14                       3.
+; D 41A1 BE 00          RETURN
+; OD2:
+; D 41A3 87 A9          TESTXY R10 = R9
+; D 41A5 A0 01 D3       IFTRUEI ODR                        the last one: no gap after it
+; D 41A8 23 00 A6       COPYXY R10 -> R6
+; D 41AB 43 06          DECX R6
+; D 41AD 11 0E 00 32    LOADXI R14 0032
+; D 41B1 4D 6E          DIVXY R6 / R14
+; D 41B3 27             COPYREMA
+; D 41B4 81 00 00       TESTAI 0000
+; D 41B7 A1 01 C2       IFFALSEI OD3
+; D 41BA 11 0E 05 1C    LOADXI R14 051C
+; D 41BE C1 0E          PRINTSTR R14                       fifty to a line
+; D 41C0 BE 00          RETURN
+; OD3:
+; D 41C2 21 06          COPYAX Acc -> R6
+; D 41C4 4D 6F          DIVXY R6 / R15
+; D 41C6 27             COPYREMA
+; D 41C7 81 00 00       TESTAI 0000
+; D 41CA A1 01 D3       IFFALSEI ODR
+; D 41CD 11 0E 05 1A    LOADXI R14 051A
+; D 41D1 C1 0E          PRINTSTR R14                       groups of ten
+; ODR:
+; D 41D3 BE 00          RETURN
+; NUM:
+; D 41D5 4D AF          DIVXY R10 / R15
+; D 41D7 27             COPYREMA
+; D 41D8 21 0C          COPYAX Acc -> R12
+; D 41DA 25             COPYMAA
+; D 41DB 21 0A          COPYAX Acc -> R10                  RC = units, RA = n / 10
+; D 41DD 2E 0C 05 F4    READIDX R12 05F4
+; D 41E1 2F 0B 06 5B    WRITEIDX R11 065B
+; D 41E5 4D AF          DIVXY R10 / R15
+; D 41E7 27             COPYREMA
+; D 41E8 21 0C          COPYAX Acc -> R12
+; D 41EA 25             COPYMAA
+; D 41EB 21 0A          COPYAX Acc -> R10                  RC = tens, RA = hundreds and up (< 100)
+; D 41ED 2E 0C 05 F4    READIDX R12 05F4
+; D 41F1 2F 0B 06 5A    WRITEIDX R11 065A
+; D 41F5 2E 0A 05 F4    READIDX R10 05F4
+; D 41F9 2F 0B 06 59    WRITEIDX R11 0659
+; D 41FD 2E 0A 05 90    READIDX R10 0590
+; D 4201 2F 0B 06 58    WRITEIDX R11 0658
+; D 4205 11 0C 00 00    LOADXI R12 0000
+; NZ:
+; D 4209 2E 0C 06 58    READIDX R12 0658
+; D 420D 81 00 30       TESTAI 0030
+; D 4210 A1 02 1C       IFFALSEI NP                        the first digit that is not 0
+; D 4213 42 0C          INCX R12
+; D 4215 86 0C 00 03    TESTXI R12 0003
+; D 4219 A1 02 09       IFFALSEI NZ                        (the last digit always prints)
+; NP:
+; D 421C 11 0E 06 58    LOADXI R14 0658
+; D 4220 50 EC 0E       ADDXYZ R14 + R12 -> R14
+; D 4223 C1 0E          PRINTSTR R14
+; D 4225 BE 00          RETURN
+; PARSE:
+; D 4227 11 0A 00 00    LOADXI R10 0000
+; D 422B 11 0C 00 00    LOADXI R12 0000
+; D 422F 11 0D 00 00    LOADXI R13 0000
+; PS:
+; D 4233 2E 0C 06 5E    READIDX R12 065E
+; D 4237 21 0E          COPYAX Acc -> R14
+; D 4239 8C 0E          TESTXZ R14
+; D 423B A0 02 88       IFTRUEI PR                         end of the line
+; D 423E 86 0E 00 20    TESTXI R14 0020
+; D 4242 A1 02 4F       IFFALSEI PDG
+; D 4245 42 0C          INCX R12
+; D 4247 8C 0D          TESTXZ R13
+; D 4249 A0 02 33       IFTRUEI PS                         spaces before the number
+; D 424C B0 02 6D       GAL PT
+; PDG:
+; D 424F 53 0E 00 30    SUBXI R14 0030
+; D 4253 89 EF          TESTLXY R14 < R15
+; D 4255 A1 02 84       IFFALSEI PBAD                      not a digit
+; D 4258 42 0D          INCX R13
+; D 425A 86 0D 00 05    TESTXI R13 0005
+; D 425E A0 02 84       IFTRUEI PBAD                       five digits: too long
+; D 4261 4A AF          MULTXY R10 * R15
+; D 4263 21 1A          COPYAX MA -> R10
+; D 4265 50 AE 0A       ADDXYZ R10 + R14 -> R10            n = n x 10 + digit
+; D 4268 42 0C          INCX R12
+; D 426A B0 02 33       GAL PS
+; PT:
+; D 426D 2E 0C 06 5E    READIDX R12 065E
+; D 4271 21 0E          COPYAX Acc -> R14
+; D 4273 8C 0E          TESTXZ R14
+; D 4275 A0 02 88       IFTRUEI PR
+; D 4278 86 0E 00 20    TESTXI R14 0020
+; D 427C A1 02 84       IFFALSEI PBAD
+; D 427F 42 0C          INCX R12
+; D 4281 B0 02 6D       GAL PT
+; PBAD:
+; D 4284 11 0D FF FE    LOADXI R13 FFFE
+; PR:
+; D 4288 BE 00          RETURN
+
+; --------------------------------------------------------------------------
+; NATIVE CODE  -  a18 listing of Firmware-Math/pi_native.asm (commented out)
+; --------------------------------------------------------------------------
+;                                CPU     1802
+;                        ; ==========================================================================
+;                        ;  PI BY THE SPIGOT - one pass of the spigot, in raw 1802, called by $F1 RUNMC
+;                        ; ==========================================================================
+;                        ;  The bytecode version spends ~4,350 1802 instructions on each array term
+;                        ;  (16 STELLAR opcodes, mostly dispatch and SCRT). Here a term is ~170.
+;                        ;
+;                        ;  TWO ENTRIES (absolute addresses - RUNMC operands are not program-relative):
+;                        ;    INIT  $4700   a[1..L] = 2              L = the word at LW
+;                        ;    PASS  $4730   one pass from i = TOP down to 1:
+;                        ;                      x = 10 a[i] + q i;  a[i] = x mod (2i-1);  q = x div (2i-1)
+;                        ;                  then a[1] = q mod 10 and DIGIT = q div 10
+;                        ;
+;                        ;  THE ARRAY: a[i] is a big-endian word at ARR + 2i. ARR is even, so every
+;                        ;  high byte is at an even address - and $5000 and $6000 (the first bytes of
+;                        ;  the VM2 and VM3 blocks this program borrows with SETSIZE 3) only ever hold a
+;                        ;  HIGH byte. a[i] < 2i - 1 < 10000, so that byte is never $CD (START): a cold
+;                        ;  boot can never mistake stale array data for a VM2/VM3 program.
+;                        ;
+;                        ;  ARITHMETIC: x is 24 bits (RD.0 : RB) - past ~480 digits 10 a + q i passes
+;                        ;  65535. q is always < 128 (measured: at most 103 for up to 1500 digits).
+;                        ;  NO MULTIPLY: d = 2i - 1, so q i = (q div 2) d + (q div 2) + (i if q is odd),
+;                        ;  and the division only has to count y = 10 a + (q div 2) [+ i] in d's - at
+;                        ;  most about 11, on average about 5 - starting from q div 2.
+;                        ;
+;                        ;  CALLING CONVENTION (the RUNMC handler at $2600, see gol_native.asm):
+;                        ;    P = R3; R6 is the way home; return with D5. R2, R7-R9, RB, RD-RF are
+;                        ;    saved and restored by the handler; RA is avoided. X is not preserved:
+;                        ;    SEX R2 before returning.
+;                        ;
+;                        ;  REGISTERS:  R7 -> a[i] (its high byte)   R8 i   R9 d = 2i - 1
+;                        ;              RB x low 16                   RD.0 x high byte   RD.1 q
+;                        ;              RE -> D0 (d in memory)        RF -> I0 (i in memory)
+;                        ; ==========================================================================
+;
+;   4810                 ARR     EQU     SCR+16          ; a[i] at ARR + 2i (a[0] unused)
+;
+;                        ; --------------------------------------------------------------------------
+;                        ;  INIT: a[1..L] = 2.     RUNMC $4700
+;                        ; --------------------------------------------------------------------------
+;   4700                         ORG     04700H
+;   4700   f8 48         INIT:   LDI     HIGH LWH
+;   4702   bf                    PHI     R15
+;   4703   f8 06                 LDI     LOW LWH
+;   4705   af                    PLO     R15
+;   4706   4f                    LDA     R15
+;   4707   b8                    PHI     R8
+;   4708   0f                    LDN     R15
+;   4709   a8                    PLO     R8                      ; R8 = L
+;   470a   f8 48                 LDI     HIGH (ARR+2)
+;   470c   b7                    PHI     R7
+;   470d   f8 12                 LDI     LOW (ARR+2)
+;   470f   a7                    PLO     R7                      ; R7 -> a[1]
+;   4710   f8 00         FILL:   LDI     000H
+;   4712   57                    STR     R7
+;   4713   17                    INC     R7
+;   4714   f8 02                 LDI     002H
+;   4716   57                    STR     R7
+;   4717   17                    INC     R7
+;   4718   28                    DEC     R8
+;   4719   88                    GLO     R8
+;   471a   3a 10                 BNZ     FILL
+;   471c   98                    GHI     R8
+;   471d   3a 10                 BNZ     FILL
+;   471f   e2                    SEX     R2
+;   4720   d5                    DB      0D5H                    ; RETURN
+;
+;                        ; --------------------------------------------------------------------------
+;                        ;  PASS.     RUNMC $4730
+;                        ; --------------------------------------------------------------------------
+;   4730                         ORG     04730H
+;   4730   f8 48         PASS:   LDI     HIGH TOPH
+;   4732   bf                    PHI     R15
+;   4733   f8 04                 LDI     LOW TOPH
+;   4735   af                    PLO     R15
+;   4736   4f                    LDA     R15
+;   4737   b8                    PHI     R8
+;   4738   0f                    LDN     R15
+;   4739   a8                    PLO     R8                      ; R8 = i = TOP
+;   473a   88                    GLO     R8
+;   473b   fe                    SHL
+;   473c   a9                    PLO     R9
+;   473d   98                    GHI     R8
+;   473e   7e                    SHLC
+;   473f   b9                    PHI     R9                      ; R9 = 2i
+;   4740   89                    GLO     R9
+;   4741   fc 10                 ADI     LOW ARR
+;   4743   a7                    PLO     R7
+;   4744   99                    GHI     R9
+;   4745   7c 48                 ADCI    HIGH ARR
+;   4747   b7                    PHI     R7                      ; R7 = ARR + 2i -> a[i]
+;   4748   29                    DEC     R9                      ; R9 = d = 2i - 1
+;   4749   f8 48                 LDI     HIGH I0
+;   474b   bf                    PHI     R15
+;   474c   be                    PHI     R14
+;   474d   f8 01                 LDI     LOW I0
+;   474f   af                    PLO     R15                     ; RF -> I0
+;   4750   f8 03                 LDI     LOW D0
+;   4752   ae                    PLO     R14                     ; RE -> D0
+;   4753   f8 00                 LDI     000H
+;   4755   bd                    PHI     R13                     ; q = 0
+;
+;   4756   47            TERM:   LDA     R7
+;   4757   bb                    PHI     R11
+;   4758   07                    LDN     R7
+;   4759   ab                    PLO     R11                     ; x = a[i]   (R7 -> its low byte)
+;   475a   f8 00                 LDI     000H
+;   475c   ad                    PLO     R13
+;   475d   8b                    GLO     R11                     ; x <<= 2: 4a
+;   475e   fe                    SHL
+;   475f   ab                    PLO     R11
+;   4760   9b                    GHI     R11
+;   4761   7e                    SHLC
+;   4762   bb                    PHI     R11
+;   4763   8d                    GLO     R13
+;   4764   7e                    SHLC
+;   4765   ad                    PLO     R13
+;   4766   8b                    GLO     R11
+;   4767   fe                    SHL
+;   4768   ab                    PLO     R11
+;   4769   9b                    GHI     R11
+;   476a   7e                    SHLC
+;   476b   bb                    PHI     R11
+;   476c   8d                    GLO     R13
+;   476d   7e                    SHLC
+;   476e   ad                    PLO     R13
+;   476f   e7                    SEX     R7                      ; x += a: 5a   (a is still at R7)
+;   4770   8b                    GLO     R11
+;   4771   f4                    ADD
+;   4772   ab                    PLO     R11
+;   4773   27                    DEC     R7                      ; R7 -> the high byte again
+;   4774   9b                    GHI     R11
+;   4775   74                    ADC
+;   4776   bb                    PHI     R11
+;   4777   8d                    GLO     R13
+;   4778   7c 00                 ADCI    000H
+;   477a   ad                    PLO     R13
+;   477b   8b                    GLO     R11                     ; x <<= 1: 10a
+;   477c   fe                    SHL
+;   477d   ab                    PLO     R11
+;   477e   9b                    GHI     R11
+;   477f   7e                    SHLC
+;   4780   bb                    PHI     R11
+;   4781   8d                    GLO     R13
+;   4782   7e                    SHLC
+;   4783   ad                    PLO     R13
+;                                ; ---- x += q i, with no multiply. d = 2i - 1, so with h = q div 2:
+;                                ;   q i = h d + h + (i if q is odd)
+;                                ; and x div d = h + y div d, x mod d = y mod d, where
+;                                ;   y = 10 a + h + (i if q is odd)          (y < 12 d: a short count)
+;   4784   9d                    GHI     R13
+;   4785   f6                    SHR
+;   4786   bd                    PHI     R13                     ; q = h; DF = q was odd
+;   4787   3b 9c                 BNF     EVEN
+;   4789   88                    GLO     R8                      ; odd: y += i
+;   478a   5f                    STR     R15
+;   478b   2f                    DEC     R15
+;   478c   98                    GHI     R8
+;   478d   5f                    STR     R15
+;   478e   1f                    INC     R15                     ; i into I1:I0
+;   478f   ef                    SEX     R15
+;   4790   8b                    GLO     R11
+;   4791   f4                    ADD
+;   4792   ab                    PLO     R11
+;   4793   2f                    DEC     R15
+;   4794   9b                    GHI     R11
+;   4795   74                    ADC
+;   4796   bb                    PHI     R11
+;   4797   1f                    INC     R15
+;   4798   8d                    GLO     R13
+;   4799   7c 00                 ADCI    000H
+;   479b   ad                    PLO     R13
+;   479c   e2            EVEN:   SEX     R2                      ; y += h   (M(R2) is a scratch byte)
+;   479d   9d                    GHI     R13
+;   479e   52                    STR     R2
+;   479f   8b                    GLO     R11
+;   47a0   f4                    ADD
+;   47a1   ab                    PLO     R11
+;   47a2   9b                    GHI     R11
+;   47a3   7c 00                 ADCI    000H
+;   47a5   bb                    PHI     R11
+;   47a6   8d                    GLO     R13
+;   47a7   7c 00                 ADCI    000H
+;   47a9   ad                    PLO     R13
+;   47aa   89                    GLO     R9                      ; d into D1:D0
+;   47ab   5e                    STR     R14
+;   47ac   2e                    DEC     R14
+;   47ad   99                    GHI     R9
+;   47ae   5e                    STR     R14
+;   47af   1e                    INC     R14
+;   47b0   ee            DIV:    SEX     R14                     ; ---- x div d: subtract d until it borrows
+;   47b1   8b            DSUB:   GLO     R11
+;   47b2   f7                    SM
+;   47b3   ab                    PLO     R11
+;   47b4   2e                    DEC     R14
+;   47b5   9b                    GHI     R11
+;   47b6   77                    SMB
+;   47b7   bb                    PHI     R11
+;   47b8   1e                    INC     R14
+;   47b9   8d                    GLO     R13
+;   47ba   7f 00                 SMBI    000H
+;   47bc   ad                    PLO     R13
+;   47bd   3b c5                 BNF     DBACK                   ; borrowed: one too many
+;   47bf   9d                    GHI     R13
+;   47c0   fc 01                 ADI     001H
+;   47c2   bd                    PHI     R13                     ; q += 1
+;   47c3   30 b1                 BR      DSUB
+;   47c5   8b            DBACK:  GLO     R11                     ; x += d: the remainder (< d, 16 bits)
+;   47c6   f4                    ADD
+;   47c7   ab                    PLO     R11
+;   47c8   2e                    DEC     R14
+;   47c9   9b                    GHI     R11
+;   47ca   74                    ADC
+;   47cb   bb                    PHI     R11
+;   47cc   1e                    INC     R14
+;   47cd   9b                    GHI     R11                     ; a[i] = the remainder
+;   47ce   57                    STR     R7
+;   47cf   17                    INC     R7
+;   47d0   8b                    GLO     R11
+;   47d1   57                    STR     R7
+;   47d2   27                    DEC     R7
+;   47d3   27                    DEC     R7
+;   47d4   27                    DEC     R7                      ; R7 -> a[i-1]
+;   47d5   29                    DEC     R9
+;   47d6   29                    DEC     R9                      ; d -= 2
+;   47d7   28                    DEC     R8                      ; i -= 1
+;   47d8   88                    GLO     R8
+;   47d9   3a 56                 BNZ     TERM
+;   47db   98                    GHI     R8
+;   47dc   3a 56                 BNZ     TERM
+;
+;                                ; a[1] = q mod 10, DIGIT = q div 10     (R7 -> a[0]; a[1] at R7+2)
+;   47de   17                    INC     R7
+;   47df   17                    INC     R7
+;   47e0   f8 00                 LDI     000H
+;   47e2   57                    STR     R7
+;   47e3   17                    INC     R7                      ; R7 -> a[1] low byte
+;   47e4   a8                    PLO     R8                      ; R8.0 = the digit, counted up
+;   47e5   9d            TEN:    GHI     R13
+;   47e6   ff 0a                 SMI     00AH
+;   47e8   3b ee                 BNF     TEND
+;   47ea   bd                    PHI     R13
+;   47eb   18                    INC     R8
+;   47ec   30 e5                 BR      TEN
+;   47ee   9d            TEND:   GHI     R13
+;   47ef   57                    STR     R7                      ; a[1] = q mod 10
+;   47f0   f8 48                 LDI     HIGH DIGIT
+;   47f2   bf                    PHI     R15
+;   47f3   f8 08                 LDI     LOW DIGIT
+;   47f5   af                    PLO     R15
+;   47f6   88                    GLO     R8
+;   47f7   5f                    STR     R15                     ; DIGIT = q div 10
+;   47f8   e2                    SEX     R2
+;   47f9   d5                    DB      0D5H                    ; RETURN
+;   47fa                         END
+; 4810  ARR           4803  D0            4802  D1            47c5  DBACK
+;
+
+; --------------------------------------------------------------------------
+; CODE  -  download this block
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 F2 03
+D 4003 11 0F 00 0A
+D 4007 11 0B 00 00
+D 400B 10 00 00
+D 400E 2F 0B 06 5C
+D 4012 11 0E 03 00
+D 4016 C1 0E
+D 4018 11 0E 04 BA
+D 401C C1 0E
+D 401E 11 0C 06 5E
+D 4022 11 0D 06 5E
+D 4026 C2 CD
+D 4028 BD 02 27
+D 402B 8C 0D
+D 402D A1 00 37
+D 4030 11 0A 00 64
+D 4034 B0 00 55
+D 4037 86 0D FF FE
+D 403B A0 00 4C
+D 403E 8C 0A
+D 4040 A0 00 4C
+D 4043 11 0C 05 F7
+D 4047 89 AC
+D 4049 A0 00 55
+D 404C 11 0E 04 E8
+D 4050 C1 0E
+D 4052 B0 00 18
+D 4055 23 00 A9
+D 4058 23 00 98
+D 405B 52 08 00 06
+D 405F 23 00 81
+D 4062 4A 1F
+D 4064 21 11
+D 4066 11 06 00 03
+D 406A 4D 16
+D 406C 25
+D 406D 21 01
+D 406F 52 01 00 04
+D 4073 11 0E 08 06
+D 4077 3A 02 1E
+D 407A F1 47 00
+D 407D 11 07 00 00
+D 4081 11 0A 00 00
+D 4085 11 0C 00 00
+D 4089 11 0D FF FF
+D 408D 11 0E 05 11
+D 4091 C1 0E
+D 4093 87 A9
+D 4095 A0 01 31
+D 4098 87 78
+D 409A A0 01 1A
+D 409D 51 87 01
+D 40A0 4A 1F
+D 40A2 21 11
+D 40A4 11 06 00 03
+D 40A8 4D 16
+D 40AA 25
+D 40AB 21 01
+D 40AD 52 01 00 04
+D 40B1 11 0E 08 04
+D 40B5 3A 02 1E
+D 40B8 F1 47 30
+D 40BB 2E 0B 08 08
+D 40BF 21 04
+D 40C1 42 07
+D 40C3 86 04 00 09
+D 40C7 A1 00 CF
+D 40CA 42 0C
+D 40CC B0 00 93
+D 40CF 86 04 00 0A
+D 40D3 A1 00 F6
+D 40D6 23 00 D6
+D 40D9 42 06
+D 40DB BD 01 87
+D 40DE 8C 0C
+D 40E0 A0 00 EF
+D 40E3 11 06 00 00
+D 40E7 BD 01 87
+D 40EA 43 0C
+D 40EC B0 00 DE
+D 40EF 11 0D 00 00
+D 40F3 B0 00 93
+D 40F6 86 0D FF FF
+D 40FA A0 01 14
+D 40FD 23 00 D6
+D 4100 BD 01 87
+D 4103 8C 0C
+D 4105 A0 01 14
+D 4108 11 06 00 09
+D 410C BD 01 87
+D 410F 43 0C
+D 4111 B0 01 03
+D 4114 23 00 4D
+D 4117 B0 00 93
+D 411A 23 00 D6
+D 411D BD 01 87
+D 4120 8C 0C
+D 4122 A0 01 31
+D 4125 11 06 00 09
+D 4129 BD 01 87
+D 412C 43 0C
+D 412E B0 01 20
+D 4131 11 0E 05 23
+D 4135 C1 0E
+D 4137 23 00 9A
+D 413A BD 01 D5
+D 413D 11 0E 05 32
+D 4141 C1 0E
+D 4143 11 0E 05 41
+D 4147 C1 0E
+D 4149 CC
+D 414A A1 01 49
+D 414D CB
+D 414E 21 0A
+D 4150 86 0A 00 79
+D 4154 A0 01 76
+D 4157 86 0A 00 59
+D 415B A0 01 76
+D 415E 86 0A 00 6E
+D 4162 A0 01 7B
+D 4165 86 0A 00 4E
+D 4169 A0 01 7B
+D 416C 86 0A 00 1B
+D 4170 A0 01 7B
+D 4173 B0 01 49
+D 4176 CA 59
+D 4178 B0 00 18
+D 417B CA 4E
+D 417D 11 0E 05 55
+D 4181 C1 0E
+D 4183 00
+D 4184 F0 00 00
+D 4187 87 A9
+D 4189 A0 01 D3
+D 418C 22 06
+D 418E 4E 00 30
+D 4191 C9
+D 4192 42 0A
+D 4194 86 0A 00 01
+D 4198 A1 01 A3
+D 419B 11 0E 05 18
+D 419F C1 0E
+D 41A1 BE 00
+D 41A3 87 A9
+D 41A5 A0 01 D3
+D 41A8 23 00 A6
+D 41AB 43 06
+D 41AD 11 0E 00 32
+D 41B1 4D 6E
+D 41B3 27
+D 41B4 81 00 00
+D 41B7 A1 01 C2
+D 41BA 11 0E 05 1C
+D 41BE C1 0E
+D 41C0 BE 00
+D 41C2 21 06
+D 41C4 4D 6F
+D 41C6 27
+D 41C7 81 00 00
+D 41CA A1 01 D3
+D 41CD 11 0E 05 1A
+D 41D1 C1 0E
+D 41D3 BE 00
+D 41D5 4D AF
+D 41D7 27
+D 41D8 21 0C
+D 41DA 25
+D 41DB 21 0A
+D 41DD 2E 0C 05 F4
+D 41E1 2F 0B 06 5B
+D 41E5 4D AF
+D 41E7 27
+D 41E8 21 0C
+D 41EA 25
+D 41EB 21 0A
+D 41ED 2E 0C 05 F4
+D 41F1 2F 0B 06 5A
+D 41F5 2E 0A 05 F4
+D 41F9 2F 0B 06 59
+D 41FD 2E 0A 05 90
+D 4201 2F 0B 06 58
+D 4205 11 0C 00 00
+D 4209 2E 0C 06 58
+D 420D 81 00 30
+D 4210 A1 02 1C
+D 4213 42 0C
+D 4215 86 0C 00 03
+D 4219 A1 02 09
+D 421C 11 0E 06 58
+D 4220 50 EC 0E
+D 4223 C1 0E
+D 4225 BE 00
+D 4227 11 0A 00 00
+D 422B 11 0C 00 00
+D 422F 11 0D 00 00
+D 4233 2E 0C 06 5E
+D 4237 21 0E
+D 4239 8C 0E
+D 423B A0 02 88
+D 423E 86 0E 00 20
+D 4242 A1 02 4F
+D 4245 42 0C
+D 4247 8C 0D
+D 4249 A0 02 33
+D 424C B0 02 6D
+D 424F 53 0E 00 30
+D 4253 89 EF
+D 4255 A1 02 84
+D 4258 42 0D
+D 425A 86 0D 00 05
+D 425E A0 02 84
+D 4261 4A AF
+D 4263 21 1A
+D 4265 50 AE 0A
+D 4268 42 0C
+D 426A B0 02 33
+D 426D 2E 0C 06 5E
+D 4271 21 0E
+D 4273 8C 0E
+D 4275 A0 02 88
+D 4278 86 0E 00 20
+D 427C A1 02 84
+D 427F 42 0C
+D 4281 B0 02 6D
+D 4284 11 0D FF FE
+D 4288 BE 00
+
+D 4300 0D 0A 0D 0A 20 20 50 20 49 20 20 20 42 20 59 20
+D 4310 20 20 54 20 48 20 45 20 20 20 53 20 50 20 49 20
+D 4320 47 20 4F 20 54 0D 0A 0D 0A 20 20 54 68 65 20 64
+D 4330 69 67 69 74 73 20 6F 66 20 70 69 2C 20 77 6F 72
+D 4340 6B 65 64 20 6F 75 74 20 6F 6E 65 20 61 74 20 61
+D 4350 20 74 69 6D 65 20 62 79 20 74 68 65 20 52 61 62
+D 4360 69 6E 6F 77 69 74 7A 2D 57 61 67 6F 6E 0D 0A 20
+D 4370 20 73 70 69 67 6F 74 20 2D 20 77 68 6F 6C 65 20
+D 4380 6E 75 6D 62 65 72 73 20 6F 6E 6C 79 2C 20 6F 6E
+D 4390 20 61 20 31 39 37 36 20 43 50 55 20 72 75 6E 6E
+D 43A0 69 6E 67 20 61 6E 20 69 6E 74 65 72 70 72 65 74
+D 43B0 65 72 2E 0D 0A 20 20 54 68 65 20 69 6E 6E 65 72
+D 43C0 20 6C 6F 6F 70 20 72 75 6E 73 20 61 73 20 72 61
+D 43D0 77 20 31 38 30 32 20 63 6F 64 65 20 28 52 55 4E
+D 43E0 4D 43 29 2E 20 54 68 65 20 66 69 72 73 74 20 64
+D 43F0 69 67 69 74 73 20 61 72 65 0D 0A 20 20 74 68 65
+D 4400 20 73 6C 6F 77 65 73 74 3B 20 74 68 65 79 20 73
+D 4410 70 65 65 64 20 75 70 20 61 73 20 74 68 65 20 77
+D 4420 6F 72 6B 20 6C 65 66 74 20 73 68 72 69 6E 6B 73
+D 4430 2E 20 4F 6E 20 74 68 65 20 45 6C 66 32 4B 3A 0D
+D 4440 0A 20 20 31 30 30 20 64 69 67 69 74 73 20 74 61
+D 4450 6B 65 20 61 62 6F 75 74 20 68 61 6C 66 20 61 20
+D 4460 6D 69 6E 75 74 65 2C 20 33 30 30 20 61 62 6F 75
+D 4470 74 20 33 20 6D 69 6E 75 74 65 73 2C 20 31 30 30
+D 4480 30 20 61 62 6F 75 74 0D 0A 20 20 68 61 6C 66 20
+D 4490 61 6E 20 68 6F 75 72 20 2D 20 74 68 65 20 74 69
+D 44A0 6D 65 20 67 72 6F 77 73 20 77 69 74 68 20 74 68
+D 44B0 65 20 73 71 75 61 72 65 2E 00 0D 0A 0D 0A 20 20
+D 44C0 48 6F 77 20 6D 61 6E 79 20 64 69 67 69 74 73 20
+D 44D0 28 31 2D 31 35 32 36 2C 20 45 6E 74 65 72 20 3D
+D 44E0 20 31 30 30 29 3F 20 00 0D 0A 20 20 50 6C 65 61
+D 44F0 73 65 20 74 79 70 65 20 61 20 6E 75 6D 62 65 72
+D 4500 20 66 72 6F 6D 20 31 20 74 6F 20 31 35 32 36 2E
+D 4510 00 0D 0A 0D 0A 20 20 00 2E 00 20 00 0D 0A 20 20
+D 4520 20 20 00 0D 0A 0D 0A 20 20 54 68 61 74 20 69 73
+D 4530 20 00 20 64 69 67 69 74 73 20 6F 66 20 70 69 2E
+D 4540 00 0D 0A 0D 0A 20 20 41 67 61 69 6E 3F 20 28 59
+D 4550 2F 4E 29 20 00 0D 0A 0D 0A 20 20 54 68 61 6E 6B
+D 4560 73 20 66 6F 72 20 72 75 6E 6E 69 6E 67 20 50 49
+D 4570 20 42 59 20 54 48 45 20 53 50 49 47 4F 54 2E 0D
+D 4580 0A 00
+
+D 4590 30 30 30 30 30 30 30 30 30 30 31 31 31 31 31 31
+D 45A0 31 31 31 31 32 32 32 32 32 32 32 32 32 32 33 33
+D 45B0 33 33 33 33 33 33 33 33 34 34 34 34 34 34 34 34
+D 45C0 34 34 35 35 35 35 35 35 35 35 35 35 36 36 36 36
+D 45D0 36 36 36 36 36 36 37 37 37 37 37 37 37 37 37 37
+D 45E0 38 38 38 38 38 38 38 38 38 38 39 39 39 39 39 39
+D 45F0 39 39 39 39 30 31 32 33 34 35 36 37 38 39 30 31
+D 4600 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 37
+D 4610 38 39 30 31 32 33 34 35 36 37 38 39 30 31 32 33
+D 4620 34 35 36 37 38 39 30 31 32 33 34 35 36 37 38 39
+D 4630 30 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35
+D 4640 36 37 38 39 30 31 32 33 34 35 36 37 38 39 30 31
+D 4650 32 33 34 35 36 37 38 39
+
+D 4700 F8 48 BF F8 06 AF 4F B8 0F A8 F8 48 B7 F8 12 A7
+D 4710 F8 00 57 17 F8 02 57 17 28 88 3A 10 98 3A 10 E2
+D 4720 D5
+
+D 4730 F8 48 BF F8 04 AF 4F B8 0F A8 88 FE A9 98 7E B9
+D 4740 89 FC 10 A7 99 7C 48 B7 29 F8 48 BF BE F8 01 AF
+D 4750 F8 03 AE F8 00 BD 47 BB 07 AB F8 00 AD 8B FE AB
+D 4760 9B 7E BB 8D 7E AD 8B FE AB 9B 7E BB 8D 7E AD E7
+D 4770 8B F4 AB 27 9B 74 BB 8D 7C 00 AD 8B FE AB 9B 7E
+D 4780 BB 8D 7E AD 9D F6 BD 3B 9C 88 5F 2F 98 5F 1F EF
+D 4790 8B F4 AB 2F 9B 74 BB 1F 8D 7C 00 AD E2 9D 52 8B
+D 47A0 F4 AB 9B 7C 00 BB 8D 7C 00 AD 89 5E 2E 99 5E 1E
+D 47B0 EE 8B F7 AB 2E 9B 77 BB 1E 8D 7F 00 AD 3B C5 9D
+D 47C0 FC 01 BD 30 B1 8B F4 AB 2E 9B 74 BB 1E 9B 57 17
+D 47D0 8B 57 27 27 27 29 29 28 88 3A 56 98 3A 56 17 17
+D 47E0 F8 00 57 17 A8 9D FF 0A 3B EE BD 18 30 E5 9D 57
+D 47F0 F8 48 BF F8 08 AF 88 5F E2 D5
+D 5000 00
+D 6000 00
+D 7000 00

@@ -1,0 +1,265 @@
+; ==========================================================================
+; STELLAR STARSHIP  -  the COSMAC ELF logo, any key to quit   (VT100)
+; ==========================================================================
+; The COSMAC ELF starship, drawn once and left on the screen. Any key clears it and
+; returns to the monitor.
+;
+; THE PATTERN IS CRAIG'S. It lives in APPLICATIONS/Starship 2.txt, which he drew by
+; editing the earlier traced version, and this program is generated from that file - so
+; the file is the thing to edit, not this listing. Each line there is |<interior>| and
+; interior column N is screen column N, which puts the drawing in columns 3-80 of lines
+; 1-23. (The tracer that produced the earlier artwork is in git history, at
+; starship_art.py in 6bb4217, if the geometry ever needs re-deriving from the photo.)
+;
+; TWO KINDS OF CONTENT. A '#' is a lit cell, painted as a SPACE IN REVERSE VIDEO
+; (ESC[7m), which gives a solid block on anything back to a real VT100. Anything else is
+; literal text: Craig's 'STELLAR EDITION' caption on line 22. Reverse video is turned OFF
+; before the caption is printed, or it would come out as a solid bar.
+;
+; THE PICTURE IS A RUN TABLE, not a bitmap. A bitmap of 80x23 would be 230 bytes that
+; still needs unpacking bit by bit; instead every unbroken horizontal stretch of lit
+; cells is three bytes - line, first column, length - and a line byte of $00 ends the
+; table. 108 stretches, 325 bytes, 426 lit cells, and the renderer is a dozen commands:
+; read three bytes with READIDX, position the cursor, emit that many spaces, repeat.
+;
+; A run costs the same three bytes however long it is, so the long hull and nacelle
+; lines are nearly free. Painting the whole picture is about 1305 bytes of output.
+;
+; ADDRESSES. The READIDX base in the code is PROGRAM-RELATIVE - $0900 means $4900 at
+; run time - but the data D-lines below carry the ABSOLUTE address. Writing the table at
+; the relative address would drop it on the firmware. The caption sits at $4A80, clear
+; of the run table, which now reaches $4A44; the builder asserts they cannot overlap.
+;
+; Any key quits: SERIN waits cooperatively, yielding to the scheduler rather than
+; spinning, so other VMs keep running while the picture is up.
+;
+; Sim-verified: the escape stream replayed into a 23x80 screen reproduces Craig's
+; pattern CELL FOR CELL, all 1840 of them, caption included; and the keypress restores
+; normal video, shows the cursor, clears the screen and homes.
+;
+; The picture as it appears:
+;
+; |                                                                                  |
+; |    ##### ##### ##### #   # ##### #####                                           |
+; |    #   # #   # #     ## ## #   # #   #                                           |
+; |    #     #   # ##### # # # ##### #                                               |
+; |    #   # #   #     # #   # #   # #   #                                           |
+; |    ##### ##### ##### #   # #   # #####                                           |
+; |                                                                   ########       |
+; |                                         ######################################## |
+; |                  ###                   ##                                     ## |
+; |             #############              ##                                    ##  |
+; |   ############         ############     ########  #############################  |
+; |   #             #####             ##           #  ##                             |
+; |   ############         ############            #  ##                             |
+; |              ##########  ##     ##             #  ##                             |
+; |                 #####     ##     ##            #  ##         ##### #     #####   |
+; |                            ##     ##           #  ##         #     #     #       |
+; |                          #######################  #####      ####  #     ####    |
+; |                        ####                          ###     #     #     #       |
+; |                       ####  ###########               ##     ##### ##### #       |
+; |                        ###                 #############                         |
+; |                         ####       #########                                     |
+; |                            #########                         STELLAR EDITION     |
+; |                                                                                  |
+;
+; 81 STELLAR commands, $4000-$40B2 (179 bytes of code).
+; Data at $4900, 325 bytes, past the end marker.
+; Data at $4A80, 16 bytes, past the end marker.
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+; D 4000 CD             START                  Start of program, and run the label pre-pass
+; D 4001 11 0F 00 0A    LOADXI R15 000A        Ten, for splitting numbers into digits
+; D 4005 CA 1B          SEROUTI 1B             ESC
+; D 4007 CA 5B          SEROUTI 5B             [
+; D 4009 CA 32          SEROUTI 32             2
+; D 400B CA 4A          SEROUTI 4A             J - clear the screen
+; D 400D CA 1B          SEROUTI 1B             ESC
+; D 400F CA 5B          SEROUTI 5B             [
+; D 4011 CA 3F          SEROUTI 3F             ?
+; D 4013 CA 32          SEROUTI 32             2
+; D 4015 CA 35          SEROUTI 35             5
+; D 4017 CA 6C          SEROUTI 6C             l - hide the cursor
+; D 4019 CA 1B          SEROUTI 1B             ESC
+; D 401B CA 5B          SEROUTI 5B             [
+; D 401D CA 37          SEROUTI 37             7
+; D 401F CA 6D          SEROUTI 6D             m - reverse video: a space is now a lit block
+; D 4021 11 09 00 00    LOADXI R9 0000         Index into the run table
+; D 4025 2E 09 09 00    READIDX R9 0900        The line this run sits on
+; D 4029 81 00 00       TESTAI 0000            Zero ends the table
+; D 402C A0 00 52       IFTRUEI SHOWN
+; D 402F 21 0D          COPYAX 0D              into R13 for POSXY
+; D 4031 42 09          INCX R9
+; D 4033 2E 09 09 00    READIDX R9 0900        The column it starts at
+; D 4037 21 0E          COPYAX 0E              into R14
+; D 4039 42 09          INCX R9
+; D 403B 2E 09 09 00    READIDX R9 0900        and how many cells long it is
+; D 403F 21 0A          COPYAX 0A              into R10
+; D 4041 42 09          INCX R9
+; D 4043 BD 00 91       CALL POSXY
+; D 4046 CA 20          SEROUTI 20             A space in reverse video is a lit block
+; D 4048 43 0A          DECX R10
+; D 404A 8C 0A          TESTXZ R10
+; D 404C A1 00 46       IFFALSEI CELL
+; D 404F B0 00 25       GAL NEXT
+; D 4052 CA 1B          SEROUTI 1B             ESC
+; D 4054 CA 5B          SEROUTI 5B             [
+; D 4056 CA 30          SEROUTI 30             0
+; D 4058 CA 6D          SEROUTI 6D             m - normal video for the caption
+; D 405A 11 0D 00 16    LOADXI R13 0016        Caption line
+; D 405E 11 0E 00 3E    LOADXI R14 003E        and column
+; D 4062 BD 00 91       CALL POSXY
+; D 4065 11 0B 0A 80    LOADXI R11 0A80        -> 'STELLAR EDITION'
+; D 4069 C1 0B          PRINTSTR R11
+; D 406B CB             SERIN                  Wait for any key - SERIN yields, so other VMs keep running
+; D 406C CA 1B          SEROUTI 1B             ESC
+; D 406E CA 5B          SEROUTI 5B             [
+; D 4070 CA 30          SEROUTI 30             0
+; D 4072 CA 6D          SEROUTI 6D             m - back to normal video
+; D 4074 CA 1B          SEROUTI 1B             ESC
+; D 4076 CA 5B          SEROUTI 5B             [
+; D 4078 CA 3F          SEROUTI 3F             ?
+; D 407A CA 32          SEROUTI 32             2
+; D 407C CA 35          SEROUTI 35             5
+; D 407E CA 68          SEROUTI 68             h - show the cursor again
+; D 4080 CA 1B          SEROUTI 1B             ESC
+; D 4082 CA 5B          SEROUTI 5B             [
+; D 4084 CA 32          SEROUTI 32             2
+; D 4086 CA 4A          SEROUTI 4A             J - clear the screen
+; D 4088 CA 1B          SEROUTI 1B             ESC
+; D 408A CA 5B          SEROUTI 5B             [
+; D 408C CA 48          SEROUTI 48             H - cursor home
+; D 408E F0 00 00       BREAK                  End of program
+; D 4091 CA 1B          SEROUTI 1B             ESC
+; D 4093 CA 5B          SEROUTI 5B             [
+; D 4095 4D DF          DIVXY R13 R15
+; D 4097 25             COPYMAA
+; D 4098 4E 00 30       ADDAI 0030
+; D 409B C9             SEROUT                 Tens
+; D 409C 27             COPYREMA
+; D 409D 4E 00 30       ADDAI 0030
+; D 40A0 C9             SEROUT                 Units
+; D 40A1 CA 3B          SEROUTI 3B             ;
+; D 40A3 4D EF          DIVXY R14 R15
+; D 40A5 25             COPYMAA
+; D 40A6 4E 00 30       ADDAI 0030
+; D 40A9 C9             SEROUT                 Tens
+; D 40AA 27             COPYREMA
+; D 40AB 4E 00 30       ADDAI 0030
+; D 40AE C9             SEROUT                 Units
+; D 40AF CA 48          SEROUTI 48             H
+; D 40B1 BE 00          RETURN
+; --------------------------------------------------------------------------
+; CODE  -  download this block
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 11 0F 00 0A
+D 4005 CA 1B
+D 4007 CA 5B
+D 4009 CA 32
+D 400B CA 4A
+D 400D CA 1B
+D 400F CA 5B
+D 4011 CA 3F
+D 4013 CA 32
+D 4015 CA 35
+D 4017 CA 6C
+D 4019 CA 1B
+D 401B CA 5B
+D 401D CA 37
+D 401F CA 6D
+D 4021 11 09 00 00
+D 4025 2E 09 09 00
+D 4029 81 00 00
+D 402C A0 00 52
+D 402F 21 0D
+D 4031 42 09
+D 4033 2E 09 09 00
+D 4037 21 0E
+D 4039 42 09
+D 403B 2E 09 09 00
+D 403F 21 0A
+D 4041 42 09
+D 4043 BD 00 91
+D 4046 CA 20
+D 4048 43 0A
+D 404A 8C 0A
+D 404C A1 00 46
+D 404F B0 00 25
+D 4052 CA 1B
+D 4054 CA 5B
+D 4056 CA 30
+D 4058 CA 6D
+D 405A 11 0D 00 16
+D 405E 11 0E 00 3E
+D 4062 BD 00 91
+D 4065 11 0B 0A 80
+D 4069 C1 0B
+D 406B CB
+D 406C CA 1B
+D 406E CA 5B
+D 4070 CA 30
+D 4072 CA 6D
+D 4074 CA 1B
+D 4076 CA 5B
+D 4078 CA 3F
+D 407A CA 32
+D 407C CA 35
+D 407E CA 68
+D 4080 CA 1B
+D 4082 CA 5B
+D 4084 CA 32
+D 4086 CA 4A
+D 4088 CA 1B
+D 408A CA 5B
+D 408C CA 48
+D 408E F0 00 00
+D 4091 CA 1B
+D 4093 CA 5B
+D 4095 4D DF
+D 4097 25
+D 4098 4E 00 30
+D 409B C9
+D 409C 27
+D 409D 4E 00 30
+D 40A0 C9
+D 40A1 CA 3B
+D 40A3 4D EF
+D 40A5 25
+D 40A6 4E 00 30
+D 40A9 C9
+D 40AA 27
+D 40AB 4E 00 30
+D 40AE C9
+D 40AF CA 48
+D 40B1 BE 00
+
+D 4900 02 04 05 02 0A 05 02 10 05 02 16 01 02 1A 01 02
+D 4910 1C 05 02 22 05 03 04 01 03 08 01 03 0A 01 03 0E
+D 4920 01 03 10 01 03 16 02 03 19 02 03 1C 01 03 20 01
+D 4930 03 22 01 03 26 01 04 04 01 04 0A 01 04 0E 01 04
+D 4940 10 05 04 16 01 04 18 01 04 1A 01 04 1C 05 04 22
+D 4950 01 05 04 01 05 08 01 05 0A 01 05 0E 01 05 14 01
+D 4960 05 16 01 05 1A 01 05 1C 01 05 20 01 05 22 01 05
+D 4970 26 01 06 04 05 06 0A 05 06 10 05 06 16 01 06 1A
+D 4980 01 06 1C 01 06 20 01 06 22 05 07 43 08 08 29 28
+D 4990 09 12 03 09 28 02 09 4F 02 0A 0D 0D 0A 28 02 0A
+D 49A0 4E 02 0B 03 0C 0B 18 0C 0B 29 08 0B 33 1D 0C 03
+D 49B0 01 0C 11 05 0C 23 02 0C 30 01 0C 33 02 0D 03 0C
+D 49C0 0D 18 0C 0D 30 01 0D 33 02 0E 0E 0A 0E 1A 02 0E
+D 49D0 21 02 0E 30 01 0E 33 02 0F 11 05 0F 1B 02 0F 22
+D 49E0 02 0F 30 01 0F 33 02 0F 3E 05 0F 44 01 0F 4A 05
+D 49F0 10 1C 02 10 23 02 10 30 01 10 33 02 10 3E 01 10
+D 4A00 44 01 10 4A 01 11 1A 17 11 33 05 11 3E 04 11 44
+D 4A10 01 11 4A 04 12 18 04 12 36 03 12 3E 01 12 44 01
+D 4A20 12 4A 01 13 17 04 13 1D 0B 13 37 02 13 3E 05 13
+D 4A30 44 05 13 4A 01 14 18 03 14 2C 0D 15 19 04 15 24
+D 4A40 09 16 1C 09 00
+
+D 4A80 53 54 45 4C 4C 41 52 20 45 44 49 54 49 4F 4E 00
+D 5000 00
+D 6000 00
+D 7000 00

@@ -1,0 +1,666 @@
+; ==========================================================================
+; STELLAR STARFIELD  -  flying through space, ESC to stop
+; ==========================================================================
+; Stars streaming outward from the centre of the screen, the way they look from the
+; front window of something moving fast. Any key starts it, then it asks how many
+; stars you want; ESC stops it.
+;
+; HOW A STAR MOVES. Each one keeps its distance from the centre on each axis - ox in
+; quarter columns, oy in eighth lines - and every frame does
+;
+;     ox = ox + ox/4        oy = oy + oy/4
+;
+; and nothing else. That one line is the whole effect. A star a quarter of the way
+; out moves a quarter as fast as one near the edge, which is exactly what
+; perspective does, so the field appears to rush past faster the closer it gets.
+; Because both axes grow by the same factor the ratio between them holds, so every
+; star travels in a straight ray out of the centre: measured over 124 flights, the
+; worst departure from a straight line is 1.18 cells, and the arithmetic itself
+; cannot do worse than 1.05.
+;
+; NO DIVISION, NO MULTIPLICATION, NO SIGNED ARITHMETIC. Dividing by four is two
+; SHIFTBX right, and the growth is one ADDXYZ. Both offsets are magnitudes with a
+; separate direction byte per axis, set when the star launches and never changed,
+; so nothing ever goes negative - the column is 40 plus or minus the offset. oy is
+; in eighth lines against ox's quarter columns, which is what makes the burst look
+; round on a terminal whose cells are twice as tall as they are wide.
+;
+; DEPTH. A star is drawn as a full stop while it is far away, a plus once it is
+; past a sixth of the way out, and an asterisk when it is nearly past you.
+;
+; WHAT IT COSTS, MEASURED. Erasing and relighting one star is 18 bytes - two cursor
+; positions of 8 plus two characters - so a frame is about 18 bytes per star: 137 at
+; 8 stars, 213 at 12, 322 at 20.
+;
+; The program does skip a star that has not changed cell, but that turns out to be
+; worth almost nothing: 98% of stars move every frame. Once a star is more than four
+; columns out, growing by a quarter moves it at least one whole column, and only the
+; few frames right at the centre stall. Nor does it help to fold the erase and the
+; redraw into one cursor position when they are adjacent - 63% of moves change BOTH
+; axes, so two positions are genuinely needed, and the trick would save 3%.
+;
+; The real cost is not the serial line at all. Profiling the 1802 program counter and
+; mapping it back through the dispatch table found **77% of the whole program inside
+; $C3 RAND's handler at $2620**. Craig then rewrote that handler (2026-08-23): it is now
+; about 1,800 instructions a call instead of 18,400, and this program's frame went from
+; 246,283 instructions to roughly 190,000.
+;
+; **His rewrite returns an EIGHT-bit value** - the high byte is always $00 - so a launch
+; cannot divide one draw down for several fields. With 16 bits a chain across divisors
+; 37, 37, 2, 2, 19 gives fields of 37, 37, 2, 2 and 12 distinct values; with 8 bits it
+; gives 37, 7, 1, 1, 1, and both direction signs and the launch stagger would be CONSTANT.
+;
+; So LAUNCHES COME OUT OF A TABLE. $4C00 holds 63 ready-made directions, four bytes each -
+; ox, oy, sign x, sign y - and a star simply walks to the next one when it relaunches,
+; keeping its own place in its record. Only the starting place is drawn from RAND, once
+; per star at start-up, so the field still differs from run to run. That took RAND from
+; 18.4% of the frame to 4.3% and the frame from 206,090 instructions to 162,768.
+;
+; The table is SHUFFLED at build time. Stars walk it in order, so with the angles laid out
+; in sequence the quadrants arrived in lockstep - measured, only three of the four were
+; ever occupied. Shuffled, walking in order is already scattered and it costs nothing at
+; run time.
+;
+; Bouncing-Ball needs no such change: its divisors are 2 and 3, which eight bits carry at
+; full range.
+;
+; Two things that were NOT the cause, both measured before being believed: DLYI (taking
+; the delay out entirely changed nothing) and the digit split - replacing four DIVXY per
+; star per frame with the two 81-byte tables at $4B00/$4B60 bought only 14%, worth
+; keeping since it is free once the tables exist, but not the problem.
+;
+; Pick the star count accordingly: fewer stars is a sparser field but a livelier one.
+;
+; STAR COUNT. Typed at the prompt, 1 to 40, RETURN alone gives 12. Non-digits are
+; ignored and anything over 40 is held there, so a stray key cannot corrupt the
+; count.
+;
+; THE FIELD STARTS ALREADY SPREAD OUT. Each star is launched a random number of
+; frames into its journey, otherwise every star leaves the centre together and the
+; whole field pulses. That stagger stops the moment a star reaches the edge: without
+; the check it would multiply past 255, only the low byte gets stored, and a star
+; that lands on ox=0 never grows and never leaves - a dot stuck in the middle of the
+; screen for the whole flight.
+;
+; RAND is seeded identically at every cold boot, so the program spins it while
+; polling SERST for the operator's start key. The number of turns depends on human
+; timing, which is the only thing that makes one run differ from the next.
+;
+; Sim-verified: 124 flights measured for straightness, the number of simultaneously
+; lit cells never exceeds the number of stars asked for (so nothing is left behind),
+; every cursor move lands inside lines 1-23 and columns 1-80, and the counts 1, 12,
+; 40 and a clamped 99 all initialise exactly that many stars with none frozen at the
+; centre. ESC restores the cursor, clears the screen and homes.
+;
+; 256 STELLAR commands, $4000-$42AF (688 bytes of code).
+; Data at $4A00, 109 bytes, past the end marker.
+; Data at $4A80, 26 bytes, past the end marker.
+; Data at $4B00, 81 bytes, past the end marker.
+; Data at $4B60, 81 bytes, past the end marker.
+; Data at $4C00, 252 bytes, past the end marker.
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+; D 4000 CD             START                  Start of program, and run the label pre-pass
+; D 4001 11 0B 0A 00    LOADXI R11 0A00        Point at the banner
+; D 4005 C1 0B          PRINTSTR R11           Print it
+; D 4007 C3             RAND                   Spin the generator while we wait - RAND is seeded the same at every
+; D 4008 CC             SERST                  cold boot, so the number of turns the operator's timing adds is
+; D 4009 A1 00 07       IFFALSEI SEED          the only thing that makes one run differ from the next
+; D 400C CB             SERIN                  Take the key and throw it away
+; D 400D 11 0F 00 0A    LOADXI R15 000A        Ten - splits a number into digits, and builds one up
+; D 4011 11 0B 0A 80    LOADXI R11 0A80
+; D 4015 C1 0B          PRINTSTR R11           Ask how many stars
+; D 4017 11 04 00 00    LOADXI R4 0000         The number being typed
+; D 401B CB             SERIN                  Wait for a key
+; D 401C 21 0C          COPYAX 0C
+; D 401E 86 0C 00 0D    TESTXI R12 000D        RETURN ends the number
+; D 4022 A0 00 4C       IFTRUEI GOTN
+; D 4025 11 0B 00 30    LOADXI R11 0030
+; D 4029 88 CB          TESTGXY R12 R11        At least '0'?
+; D 402B A1 00 1B       IFFALSEI GETD          No - not a digit, ignore it
+; D 402E 11 0B 00 3A    LOADXI R11 003A
+; D 4032 88 CB          TESTGXY R12 R11        Past '9'?
+; D 4034 A0 00 1B       IFTRUEI GETD           Yes - ignore that too, so a stray key cannot corrupt the count
+; D 4037 22 0C          COPYXA 0C
+; D 4039 C9             SEROUT                 Echo the digit
+; D 403A 22 0C          COPYXA 0C
+; D 403C 4F 00 30       SUBAI 0030             Character to value
+; D 403F 21 05          COPYAX 05
+; D 4041 4A 4F          MULTXY R4,R15          Shift the number along one place
+; D 4043 25             COPYMAA
+; D 4044 21 04          COPYAX 04
+; D 4046 50 45 04       ADDXYZ R4,R5 -> R4     and add the new digit
+; D 4049 B0 00 1B       GAL GETD
+; D 404C 8C 04          TESTXZ R4              Nothing typed?
+; D 404E A1 00 55       IFFALSEI CHKHI
+; D 4051 11 04 00 0C    LOADXI R4 000C         Take 12 as the default
+; D 4055 11 0B 00 29    LOADXI R11 0029
+; D 4059 88 4B          TESTGXY R4 R11         More than 40?
+; D 405B A1 00 62       IFFALSEI NOK
+; D 405E 11 04 00 28    LOADXI R4 0028         Hold it at 40 - the table is that big, and more than
+; D 4062 23 00 42       COPYXY R4 -> R2        R2 is the star count from here on
+; D 4065 11 09 00 00    LOADXI R9 0000         Index of the record being filled
+; D 4069 11 03 00 00    LOADXI R3 0000         Star number
+; D 406D C3             RAND                   Which of the 63 launch directions this star starts on
+; D 406E 21 0B          COPYAX 0B
+; D 4070 11 0C 00 3F    LOADXI R12 003F
+; D 4074 4D BC          DIVXY R11 R12
+; D 4076 27             COPYREMA               The remainder is this field
+; D 4077 21 0B          COPYAX 0B
+; D 4079 61 B0          SHIFTBX R11 LEFT
+; D 407B 61 B0          SHIFTBX R11 LEFT       times four - the table has four bytes an entry
+; D 407D 22 0B          COPYXA 0B
+; D 407F 2F 09 09 06    WRITEIDX R9 0906
+; D 4083 2E 09 09 06    READIDX R9 0906
+; D 4087 21 0B          COPYAX 0B              R11 = this star's offset into the direction table
+; D 4089 2E 0B 0C 00    READIDX R11 0C00       how fast it pulls away horizontally
+; D 408D 21 0A          COPYAX 0A
+; D 408F 2E 0B 0C 01    READIDX R11 0C01       and vertically
+; D 4093 21 00          COPYAX 00
+; D 4095 2E 0B 0C 02    READIDX R11 0C02       left of centre or right
+; D 4099 2F 09 09 02    WRITEIDX R9 0902
+; D 409D 2E 0B 0C 03    READIDX R11 0C03       above centre or below
+; D 40A1 2F 09 09 03    WRITEIDX R9 0903
+; D 40A5 22 0B          COPYXA 0B
+; D 40A7 4E 00 04       ADDAI 0004
+; D 40AA 21 0B          COPYAX 0B
+; D 40AC 11 0C 00 FC    LOADXI R12 00FC
+; D 40B0 88 BC          TESTGXY R11 R12        Past the end?
+; D 40B2 A1 00 B9       IFFALSEI NWI
+; D 40B5 11 0B 00 00    LOADXI R11 0000        Back to the start
+; D 40B9 22 0B          COPYXA 0B
+; D 40BB 2F 09 09 06    WRITEIDX R9 0906
+; D 40BF C3             RAND                   How far along this one already is
+; D 40C0 21 0B          COPYAX 0B
+; D 40C2 11 0C 00 13    LOADXI R12 0013
+; D 40C6 4D BC          DIVXY R11 R12
+; D 40C8 27             COPYREMA               The remainder is this field
+; D 40C9 21 06          COPYAX 06
+; D 40CB 8C 06          TESTXZ R6              Done staggering this one?
+; D 40CD A0 00 FB       IFTRUEI STAGD
+; D 40D0 23 00 A8       COPYXY R10 -> R8
+; D 40D3 61 82          SHIFTBX R8 RIGHT
+; D 40D5 61 82          SHIFTBX R8 RIGHT       R8 = a quarter of the distance
+; D 40D7 50 A8 0A       ADDXYZ R10,R8 -> R10
+; D 40DA 23 00 08       COPYXY R0 -> R8
+; D 40DD 61 82          SHIFTBX R8 RIGHT
+; D 40DF 61 82          SHIFTBX R8 RIGHT       R8 = a quarter of the distance
+; D 40E1 50 08 00       ADDXYZ R0,R8 -> R0
+; D 40E4 11 0C 00 99    LOADXI R12 0099
+; D 40E8 88 AC          TESTGXY R10 R12
+; D 40EA A0 00 FB       IFTRUEI STAGD          Already at the edge - leave it there
+; D 40ED 11 0C 00 59    LOADXI R12 0059
+; D 40F1 88 0C          TESTGXY R0 R12
+; D 40F3 A0 00 FB       IFTRUEI STAGD
+; D 40F6 43 06          DECX R6
+; D 40F8 B0 00 CB       GAL STAG
+; D 40FB 22 0A          COPYXA 0A              Distance from the centre, in quarter columns
+; D 40FD 2F 09 09 00    WRITEIDX R9 0900
+; D 4101 22 00          COPYXA 00              and in eighth lines - half as tall, so the burst looks round
+; D 4103 2F 09 09 01    WRITEIDX R9 0901
+; D 4107 11 0B 00 00    LOADXI R11 0000
+; D 410B 22 0B          COPYXA 0B              Nothing drawn yet
+; D 410D 2F 09 09 04    WRITEIDX R9 0904
+; D 4111 22 0B          COPYXA 0B              line 0 means 'this star is not on the screen'
+; D 4113 2F 09 09 05    WRITEIDX R9 0905
+; D 4117 52 09 00 07    ADDXI R9 0007          On to the next record
+; D 411B 42 03          INCX R3
+; D 411D 87 32          TESTXY R3 R2           Filled them all?
+; D 411F A1 00 6D       IFFALSEI INIT
+; D 4122 CA 1B          SEROUTI 1B             Clear the screen
+; D 4124 CA 5B          SEROUTI 5B
+; D 4126 CA 32          SEROUTI 32
+; D 4128 CA 4A          SEROUTI 4A
+; D 412A CA 1B          SEROUTI 1B             Hide the cursor - it would sit in the middle of the field
+; D 412C CA 5B          SEROUTI 5B
+; D 412E CA 3F          SEROUTI 3F
+; D 4130 CA 32          SEROUTI 32
+; D 4132 CA 35          SEROUTI 35
+; D 4134 CA 6C          SEROUTI 6C
+; D 4136 11 09 00 00    LOADXI R9 0000
+; D 413A 11 03 00 00    LOADXI R3 0000
+; D 413E 2E 09 09 00    READIDX R9 0900        This star's distance out
+; D 4142 21 0A          COPYAX 0A
+; D 4144 2E 09 09 01    READIDX R9 0901
+; D 4148 21 00          COPYAX 00
+; D 414A 23 00 A8       COPYXY R10 -> R8       Move it outward - the farther out, the faster it goes, which
+; D 414D 61 82          SHIFTBX R8 RIGHT
+; D 414F 61 82          SHIFTBX R8 RIGHT       R8 = a quarter of the distance
+; D 4151 50 A8 0A       ADDXYZ R10,R8 -> R10
+; D 4154 23 00 08       COPYXY R0 -> R8        is what makes it look like distance rushing past
+; D 4157 61 82          SHIFTBX R8 RIGHT
+; D 4159 61 82          SHIFTBX R8 RIGHT       R8 = a quarter of the distance
+; D 415B 50 08 00       ADDXYZ R0,R8 -> R0
+; D 415E 11 0C 00 99    LOADXI R12 0099
+; D 4162 88 AC          TESTGXY R10 R12        Past the left or right edge?
+; D 4164 A0 01 70       IFTRUEI RESP
+; D 4167 11 0C 00 59    LOADXI R12 0059
+; D 416B 88 0C          TESTGXY R0 R12         Past the top or bottom?
+; D 416D A1 01 AC       IFFALSEI ONSCR
+; D 4170 2E 09 09 06    READIDX R9 0906        Gone - take the next direction out of the table
+; D 4174 21 0B          COPYAX 0B              R11 = this star's offset into the direction table
+; D 4176 2E 0B 0C 00    READIDX R11 0C00       how fast it pulls away horizontally
+; D 417A 21 0A          COPYAX 0A
+; D 417C 2E 0B 0C 01    READIDX R11 0C01       and vertically
+; D 4180 21 00          COPYAX 00
+; D 4182 2E 0B 0C 02    READIDX R11 0C02       left of centre or right
+; D 4186 2F 09 09 02    WRITEIDX R9 0902
+; D 418A 2E 0B 0C 03    READIDX R11 0C03       above centre or below
+; D 418E 2F 09 09 03    WRITEIDX R9 0903
+; D 4192 22 0B          COPYXA 0B
+; D 4194 4E 00 04       ADDAI 0004
+; D 4197 21 0B          COPYAX 0B
+; D 4199 11 0C 00 FC    LOADXI R12 00FC
+; D 419D 88 BC          TESTGXY R11 R12        Past the end?
+; D 419F A1 01 A6       IFFALSEI NWR
+; D 41A2 11 0B 00 00    LOADXI R11 0000        Back to the start
+; D 41A6 22 0B          COPYXA 0B
+; D 41A8 2F 09 09 06    WRITEIDX R9 0906
+; D 41AC 22 0A          COPYXA 0A
+; D 41AE 2F 09 09 00    WRITEIDX R9 0900
+; D 41B2 22 00          COPYXA 00
+; D 41B4 2F 09 09 01    WRITEIDX R9 0901
+; D 41B8 23 00 A8       COPYXY R10 -> R8
+; D 41BB 61 82          SHIFTBX R8 RIGHT
+; D 41BD 61 82          SHIFTBX R8 RIGHT       Quarter columns -> columns
+; D 41BF 23 00 81       COPYXY R8 -> R1        Keep it - the two offsets together say how near the star is
+; D 41C2 2E 09 09 02    READIDX R9 0902        Which side of centre?
+; D 41C6 21 0B          COPYAX 0B
+; D 41C8 11 07 00 28    LOADXI R7 0028         Column 40 - the centre of the screen
+; D 41CC 8C 0B          TESTXZ R11
+; D 41CE A1 01 D7       IFFALSEI XLEFT
+; D 41D1 50 78 07       ADDXYZ R7,R8 -> R7     Right of centre
+; D 41D4 B0 01 DA       GAL XDONE
+; D 41D7 51 78 07       SUBXYZ R7,R8 -> R7     Left of centre
+; D 41DA 23 00 08       COPYXY R0 -> R8
+; D 41DD 61 82          SHIFTBX R8 RIGHT
+; D 41DF 61 82          SHIFTBX R8 RIGHT
+; D 41E1 61 82          SHIFTBX R8 RIGHT       Eighth lines -> lines
+; D 41E3 50 18 01       ADDXYZ R1,R8 -> R1     R1 is now the distance from the centre
+; D 41E6 2E 09 09 03    READIDX R9 0903        Above or below?
+; D 41EA 21 0B          COPYAX 0B
+; D 41EC 11 06 00 0C    LOADXI R6 000C         Line 12 - the vanishing point
+; D 41F0 8C 0B          TESTXZ R11
+; D 41F2 A1 01 FB       IFFALSEI YUP
+; D 41F5 50 68 06       ADDXYZ R6,R8 -> R6     Below centre
+; D 41F8 B0 01 FE       GAL YDONE
+; D 41FB 51 68 06       SUBXYZ R6,R8 -> R6     Above centre
+; D 41FE 2E 09 09 04    READIDX R9 0904        The cell it is lit in now
+; D 4202 21 05          COPYAX 05
+; D 4204 2E 09 09 05    READIDX R9 0905
+; D 4208 21 04          COPYAX 04
+; D 420A 87 75          TESTXY R7 R5           Same column as last frame?
+; D 420C A1 02 14       IFFALSEI MOVED
+; D 420F 87 64          TESTXY R6 R4           and the same line?
+; D 4211 A0 02 57       IFTRUEI NEXT           Then it has not moved - leave the screen alone.
+; Stars near the centre creep, so this saves most of the output
+; D 4214 8C 04          TESTXZ R4              Was it ever drawn?
+; D 4216 A0 02 24       IFTRUEI NOERA
+; D 4219 23 00 4D       COPYXY R4 -> R13       Rub out the old one
+; D 421C 23 00 5E       COPYXY R5 -> R14
+; D 421F BD 02 75       CALL POSXY
+; D 4222 CA 20          SEROUTI 20             A space
+; D 4224 23 00 6D       COPYXY R6 -> R13       and light the new one
+; D 4227 23 00 7E       COPYXY R7 -> R14
+; D 422A BD 02 75       CALL POSXY
+; D 422D 11 0B 00 06    LOADXI R11 0006
+; D 4231 88 1B          TESTGXY R1 R11         Well away from the centre?
+; D 4233 A0 02 3B       IFTRUEI MID
+; D 4236 CA 2E          SEROUTI 2E             Still far off - a faint full stop
+; D 4238 B0 02 4B       GAL DREW
+; D 423B 11 0B 00 12    LOADXI R11 0012
+; D 423F 88 1B          TESTGXY R1 R11         Nearly past us?
+; D 4241 A0 02 49       IFTRUEI NEAR
+; D 4244 CA 2B          SEROUTI 2B             Closer - a plus
+; D 4246 B0 02 4B       GAL DREW
+; D 4249 CA 2A          SEROUTI 2A             Nearly on top of us - a bright asterisk
+; D 424B 22 07          COPYXA 07
+; D 424D 2F 09 09 04    WRITEIDX R9 0904
+; D 4251 22 06          COPYXA 06
+; D 4253 2F 09 09 05    WRITEIDX R9 0905
+; D 4257 52 09 00 07    ADDXI R9 0007
+; D 425B 42 03          INCX R3
+; D 425D 87 32          TESTXY R3 R2           Done every star?
+; D 425F A1 01 3E       IFFALSEI STAR
+; D 4262 CC             SERST                  A key waiting?
+; D 4263 A1 02 70       IFFALSEI NOKEY
+; D 4266 CB             SERIN
+; D 4267 21 0C          COPYAX 0C
+; D 4269 86 0C 00 1B    TESTXI R12 001B        ESC stops the flight
+; D 426D A0 02 93       IFTRUEI QUIT
+; D 4270 C0 02          DLYI 02                The speed knob
+; D 4272 B0 01 36       GAL FRAME
+; D 4275 CA 1B          SEROUTI 1B             ESC
+; D 4277 CA 5B          SEROUTI 5B             [
+; D 4279 2E 0D 0B 00    READIDX R13 0B00
+; D 427D C9             SEROUT                 Line, tens
+; D 427E 2E 0D 0B 60    READIDX R13 0B60
+; D 4282 C9             SEROUT                 Line, units
+; D 4283 CA 3B          SEROUTI 3B             ;
+; D 4285 2E 0E 0B 00    READIDX R14 0B00
+; D 4289 C9             SEROUT                 Column, tens
+; D 428A 2E 0E 0B 60    READIDX R14 0B60
+; D 428E C9             SEROUT                 Column, units
+; D 428F CA 48          SEROUTI 48             H
+; D 4291 BE 00          RETURN
+; D 4293 CA 1B          SEROUTI 1B             Show the cursor again
+; D 4295 CA 5B          SEROUTI 5B
+; D 4297 CA 3F          SEROUTI 3F
+; D 4299 CA 32          SEROUTI 32
+; D 429B CA 35          SEROUTI 35
+; D 429D CA 68          SEROUTI 68
+; D 429F CA 1B          SEROUTI 1B
+; D 42A1 CA 5B          SEROUTI 5B
+; D 42A3 CA 32          SEROUTI 32
+; D 42A5 CA 4A          SEROUTI 4A
+; D 42A7 CA 1B          SEROUTI 1B             Cursor home
+; D 42A9 CA 5B          SEROUTI 5B
+; D 42AB CA 48          SEROUTI 48
+; D 42AD F0 00 00       BREAK                  End of program
+; --------------------------------------------------------------------------
+; CODE  -  download this block
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 11 0B 0A 00
+D 4005 C1 0B
+D 4007 C3
+D 4008 CC
+D 4009 A1 00 07
+D 400C CB
+D 400D 11 0F 00 0A
+D 4011 11 0B 0A 80
+D 4015 C1 0B
+D 4017 11 04 00 00
+D 401B CB
+D 401C 21 0C
+D 401E 86 0C 00 0D
+D 4022 A0 00 4C
+D 4025 11 0B 00 30
+D 4029 88 CB
+D 402B A1 00 1B
+D 402E 11 0B 00 3A
+D 4032 88 CB
+D 4034 A0 00 1B
+D 4037 22 0C
+D 4039 C9
+D 403A 22 0C
+D 403C 4F 00 30
+D 403F 21 05
+D 4041 4A 4F
+D 4043 25
+D 4044 21 04
+D 4046 50 45 04
+D 4049 B0 00 1B
+D 404C 8C 04
+D 404E A1 00 55
+D 4051 11 04 00 0C
+D 4055 11 0B 00 29
+D 4059 88 4B
+D 405B A1 00 62
+D 405E 11 04 00 28
+D 4062 23 00 42
+D 4065 11 09 00 00
+D 4069 11 03 00 00
+D 406D C3
+D 406E 21 0B
+D 4070 11 0C 00 3F
+D 4074 4D BC
+D 4076 27
+D 4077 21 0B
+D 4079 61 B0
+D 407B 61 B0
+D 407D 22 0B
+D 407F 2F 09 09 06
+D 4083 2E 09 09 06
+D 4087 21 0B
+D 4089 2E 0B 0C 00
+D 408D 21 0A
+D 408F 2E 0B 0C 01
+D 4093 21 00
+D 4095 2E 0B 0C 02
+D 4099 2F 09 09 02
+D 409D 2E 0B 0C 03
+D 40A1 2F 09 09 03
+D 40A5 22 0B
+D 40A7 4E 00 04
+D 40AA 21 0B
+D 40AC 11 0C 00 FC
+D 40B0 88 BC
+D 40B2 A1 00 B9
+D 40B5 11 0B 00 00
+D 40B9 22 0B
+D 40BB 2F 09 09 06
+D 40BF C3
+D 40C0 21 0B
+D 40C2 11 0C 00 13
+D 40C6 4D BC
+D 40C8 27
+D 40C9 21 06
+D 40CB 8C 06
+D 40CD A0 00 FB
+D 40D0 23 00 A8
+D 40D3 61 82
+D 40D5 61 82
+D 40D7 50 A8 0A
+D 40DA 23 00 08
+D 40DD 61 82
+D 40DF 61 82
+D 40E1 50 08 00
+D 40E4 11 0C 00 99
+D 40E8 88 AC
+D 40EA A0 00 FB
+D 40ED 11 0C 00 59
+D 40F1 88 0C
+D 40F3 A0 00 FB
+D 40F6 43 06
+D 40F8 B0 00 CB
+D 40FB 22 0A
+D 40FD 2F 09 09 00
+D 4101 22 00
+D 4103 2F 09 09 01
+D 4107 11 0B 00 00
+D 410B 22 0B
+D 410D 2F 09 09 04
+D 4111 22 0B
+D 4113 2F 09 09 05
+D 4117 52 09 00 07
+D 411B 42 03
+D 411D 87 32
+D 411F A1 00 6D
+D 4122 CA 1B
+D 4124 CA 5B
+D 4126 CA 32
+D 4128 CA 4A
+D 412A CA 1B
+D 412C CA 5B
+D 412E CA 3F
+D 4130 CA 32
+D 4132 CA 35
+D 4134 CA 6C
+D 4136 11 09 00 00
+D 413A 11 03 00 00
+D 413E 2E 09 09 00
+D 4142 21 0A
+D 4144 2E 09 09 01
+D 4148 21 00
+D 414A 23 00 A8
+D 414D 61 82
+D 414F 61 82
+D 4151 50 A8 0A
+D 4154 23 00 08
+D 4157 61 82
+D 4159 61 82
+D 415B 50 08 00
+D 415E 11 0C 00 99
+D 4162 88 AC
+D 4164 A0 01 70
+D 4167 11 0C 00 59
+D 416B 88 0C
+D 416D A1 01 AC
+D 4170 2E 09 09 06
+D 4174 21 0B
+D 4176 2E 0B 0C 00
+D 417A 21 0A
+D 417C 2E 0B 0C 01
+D 4180 21 00
+D 4182 2E 0B 0C 02
+D 4186 2F 09 09 02
+D 418A 2E 0B 0C 03
+D 418E 2F 09 09 03
+D 4192 22 0B
+D 4194 4E 00 04
+D 4197 21 0B
+D 4199 11 0C 00 FC
+D 419D 88 BC
+D 419F A1 01 A6
+D 41A2 11 0B 00 00
+D 41A6 22 0B
+D 41A8 2F 09 09 06
+D 41AC 22 0A
+D 41AE 2F 09 09 00
+D 41B2 22 00
+D 41B4 2F 09 09 01
+D 41B8 23 00 A8
+D 41BB 61 82
+D 41BD 61 82
+D 41BF 23 00 81
+D 41C2 2E 09 09 02
+D 41C6 21 0B
+D 41C8 11 07 00 28
+D 41CC 8C 0B
+D 41CE A1 01 D7
+D 41D1 50 78 07
+D 41D4 B0 01 DA
+D 41D7 51 78 07
+D 41DA 23 00 08
+D 41DD 61 82
+D 41DF 61 82
+D 41E1 61 82
+D 41E3 50 18 01
+D 41E6 2E 09 09 03
+D 41EA 21 0B
+D 41EC 11 06 00 0C
+D 41F0 8C 0B
+D 41F2 A1 01 FB
+D 41F5 50 68 06
+D 41F8 B0 01 FE
+D 41FB 51 68 06
+D 41FE 2E 09 09 04
+D 4202 21 05
+D 4204 2E 09 09 05
+D 4208 21 04
+D 420A 87 75
+D 420C A1 02 14
+D 420F 87 64
+D 4211 A0 02 57
+D 4214 8C 04
+D 4216 A0 02 24
+D 4219 23 00 4D
+D 421C 23 00 5E
+D 421F BD 02 75
+D 4222 CA 20
+D 4224 23 00 6D
+D 4227 23 00 7E
+D 422A BD 02 75
+D 422D 11 0B 00 06
+D 4231 88 1B
+D 4233 A0 02 3B
+D 4236 CA 2E
+D 4238 B0 02 4B
+D 423B 11 0B 00 12
+D 423F 88 1B
+D 4241 A0 02 49
+D 4244 CA 2B
+D 4246 B0 02 4B
+D 4249 CA 2A
+D 424B 22 07
+D 424D 2F 09 09 04
+D 4251 22 06
+D 4253 2F 09 09 05
+D 4257 52 09 00 07
+D 425B 42 03
+D 425D 87 32
+D 425F A1 01 3E
+D 4262 CC
+D 4263 A1 02 70
+D 4266 CB
+D 4267 21 0C
+D 4269 86 0C 00 1B
+D 426D A0 02 93
+D 4270 C0 02
+D 4272 B0 01 36
+D 4275 CA 1B
+D 4277 CA 5B
+D 4279 2E 0D 0B 00
+D 427D C9
+D 427E 2E 0D 0B 60
+D 4282 C9
+D 4283 CA 3B
+D 4285 2E 0E 0B 00
+D 4289 C9
+D 428A 2E 0E 0B 60
+D 428E C9
+D 428F CA 48
+D 4291 BE 00
+D 4293 CA 1B
+D 4295 CA 5B
+D 4297 CA 3F
+D 4299 CA 32
+D 429B CA 35
+D 429D CA 68
+D 429F CA 1B
+D 42A1 CA 5B
+D 42A3 CA 32
+D 42A5 CA 4A
+D 42A7 CA 1B
+D 42A9 CA 5B
+D 42AB CA 48
+D 42AD F0 00 00
+
+D 4A00 53 54 45 4C 4C 41 52 20 53 54 41 52 46 49 45 4C
+D 4A10 44 20 2D 2D 20 66 6C 79 69 6E 67 20 74 68 72 6F
+D 4A20 75 67 68 20 73 70 61 63 65 2E 0D 0A 50 72 65 73
+D 4A30 73 20 61 6E 79 20 6B 65 79 2C 20 74 68 65 6E 20
+D 4A40 73 61 79 20 68 6F 77 20 6D 61 6E 79 20 73 74 61
+D 4A50 72 73 2E 0D 0A 45 53 43 20 73 74 6F 70 73 20 74
+D 4A60 68 65 20 66 6C 69 67 68 74 2E 0D 0A 00
+
+D 4A80 0D 0A 48 6F 77 20 6D 61 6E 79 20 73 74 61 72 73
+D 4A90 20 28 31 2D 34 30 29 3F 20 00
+
+D 4B00 30 30 30 30 30 30 30 30 30 30 31 31 31 31 31 31
+D 4B10 31 31 31 31 32 32 32 32 32 32 32 32 32 32 33 33
+D 4B20 33 33 33 33 33 33 33 33 34 34 34 34 34 34 34 34
+D 4B30 34 34 35 35 35 35 35 35 35 35 35 35 36 36 36 36
+D 4B40 36 36 36 36 36 36 37 37 37 37 37 37 37 37 37 37
+D 4B50 38
+
+D 4B60 30 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35
+D 4B70 36 37 38 39 30 31 32 33 34 35 36 37 38 39 30 31
+D 4B80 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 37
+D 4B90 38 39 30 31 32 33 34 35 36 37 38 39 30 31 32 33
+D 4BA0 34 35 36 37 38 39 30 31 32 33 34 35 36 37 38 39
+D 4BB0 30
+
+D 4C00 27 0A 00 01 0D 26 01 01 1B 1F 00 00 0B 27 00 00
+D 4C10 04 27 01 00 07 27 01 00 26 0C 00 01 17 21 01 00
+D 4C20 1B 1E 01 00 22 16 01 00 27 0B 00 00 18 21 00 01
+D 4C30 25 11 01 01 27 08 01 00 20 1A 01 01 13 24 01 00
+D 4C40 20 1A 00 01 0F 26 00 01 11 25 00 01 27 07 00 01
+D 4C50 15 23 01 00 1E 1C 01 01 24 12 00 00 03 27 00 01
+D 4C60 27 0C 01 01 21 18 00 01 04 27 01 01 0B 27 01 01
+D 4C70 10 25 00 00 24 12 01 00 24 14 00 01 1B 1F 01 01
+D 4C80 25 10 00 00 1E 1C 00 01 05 27 00 01 06 27 00 00
+D 4C90 21 19 01 00 26 0E 01 01 19 20 00 00 28 04 00 00
+D 4CA0 23 15 00 00 1D 1D 00 00 14 24 00 01 16 22 00 01
+D 4CB0 27 05 01 00 12 25 01 01 1F 1B 00 00 25 10 01 00
+D 4CC0 07 27 00 01 23 14 01 00 0F 25 01 01 1A 20 01 00
+D 4CD0 09 27 01 00 14 23 01 01 21 18 01 01 27 09 01 01
+D 4CE0 22 16 00 01 0C 27 01 00 26 0E 00 00 0E 26 00 00
+D 4CF0 1D 1D 01 01 09 27 00 00 17 22 00 00
+D 5000 00
+D 6000 00
+D 7000 00

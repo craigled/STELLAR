@@ -1,0 +1,630 @@
+; ==========================================================================
+; STELLAR PI - STELLAR ONLY  -  pi by the spigot, pure bytecode   (loads at $4000)
+; ==========================================================================
+; Load, cold-boot, type how many digits (1-350; Enter alone = 50). The digits
+; come out as they are found: 3. then groups of ten, fifty to a line. Y runs
+; it again, N quits.
+;
+; The Rabinowitz-Wagon spigot: an array of small numbers, all 2 to start, is
+; multiplied by 10 and normalised from the far end each pass; the next digit
+; falls out of the front. Whole numbers only - MULTXY and DIVXY - and every
+; intermediate stays under 65536. Each pass skips the terms that no longer
+; matter (half the work). EVERY STEP IS STELLAR BYTECODE: on the Elf2K 20
+; digits take ~32 s, 50 ~2 1/2 min, 100 ~8 min. Pi-Spigot.lst is the same
+; program with each pass in raw 1802 (RUNMC): 18x faster. Plain text.
+;
+; VERIFICATION (Firmware-Math/pi_verify.py, V0061.34): PASS 2026-10-01 - algorithm vs a reference pi for 213 counts up to 350, every intermediate < 65536; the program's whole transcript byte-exact for 1, 2, 3, 11, 50, 51, 100 digits, junk answers, Y/N, and a rerun from dirty RAM. The same digit logic as Pi-Spigot.lst (HW-verified); this pure-bytecode build awaits its own HW run.
+;
+; 255 STELLAR commands.
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 4000 CD             START
+; D 4001 11 0F 00 0A    LOADXI R15 000A                    Ten
+; D 4005 11 0B 00 00    LOADXI R11 0000                    RB = 0: the index for variables
+; D 4009 10 00 00       LOADAI 0000
+; D 400C 2F 0B 06 6C    WRITEIDX R11 066C                  NBUF ends in a 0
+; D 4010 11 0E 03 00    LOADXI R14 0300
+; D 4014 C1 0E          PRINTSTR R14
+; ASKN:
+; D 4016 11 0E 04 D1    LOADXI R14 04D1
+; D 401A C1 0E          PRINTSTR R14
+; D 401C 11 0C 06 6E    LOADXI R12 066E
+; D 4020 11 0D 06 6E    LOADXI R13 066E
+; D 4024 C2 CD          GETSTR R12 R13                     Read the line (echoed; backspace works)
+; D 4026 BD 02 6B       CALL PARSE
+; D 4029 8C 0D          TESTXZ R13
+; D 402B A1 00 35       IFFALSEI PN
+; D 402E 11 0A 00 32    LOADXI R10 0032                    Enter alone: the default
+; D 4032 B0 00 53       GAL PG
+; PN:
+; D 4035 86 0D FF FE    TESTXI R13 FFFE
+; D 4039 A0 00 4A       IFTRUEI PBADN
+; D 403C 8C 0A          TESTXZ R10
+; D 403E A0 00 4A       IFTRUEI PBADN
+; D 4041 11 0C 01 5F    LOADXI R12 015F
+; D 4045 89 AC          TESTLXY R10 < R12
+; D 4047 A0 00 53       IFTRUEI PG
+; PBADN:
+; D 404A 11 0E 04 FD    LOADXI R14 04FD
+; D 404E C1 0E          PRINTSTR R14
+; D 4050 B0 00 16       GAL ASKN
+; PG:
+; D 4053 23 00 A9       COPYXY R10 -> R9                   n = digits to print
+; D 4056 23 00 98       COPYXY R9 -> R8
+; D 4059 52 08 00 06    ADDXI R8 0006                      N = n + GUARD digits computed
+; D 405D 23 00 81       COPYXY R8 -> R1
+; D 4060 4A 1F          MULTXY R1 * R15
+; D 4062 21 11          COPYAX MA -> R1
+; D 4064 11 06 00 03    LOADXI R6 0003
+; D 4068 4D 16          DIVXY R1 / R6
+; D 406A 25             COPYMAA
+; D 406B 21 01          COPYAX Acc -> R1
+; D 406D 52 01 00 04    ADDXI R1 0004                      L = 10 N / 3 + MARGIN terms
+; D 4071 11 02 06 B0    LOADXI R2 06B0
+; FILL:
+; D 4075 32 02 00 02    COPYMX2I R2 0002                   a[i] = 2
+; D 4079 52 02 00 02    ADDXI R2 0002
+; D 407D 43 01          DECX R1
+; D 407F 8C 01          TESTXZ R1
+; D 4081 A1 00 75       IFFALSEI FILL
+; D 4084 11 07 00 00    LOADXI R7 0000                     no passes yet
+; D 4088 11 0A 00 00    LOADXI R10 0000                    nothing printed
+; D 408C 11 0C 00 00    LOADXI R12 0000                    no nines held
+; D 4090 11 0D FF FF    LOADXI R13 FFFF                    no digit held
+; D 4094 11 0E 05 25    LOADXI R14 0525
+; D 4098 C1 0E          PRINTSTR R14
+; PASS:
+; D 409A 87 A9          TESTXY R10 = R9
+; D 409C A0 01 75       IFTRUEI FIN                        all the digits asked for are out
+; D 409F 87 78          TESTXY R7 = R8
+; D 40A1 A0 01 5E       IFTRUEI FLUSH                      N passes done (a long run of 9s): print what is held
+; D 40A4 51 87 01       SUBXYZ R8 - R7 -> R1
+; D 40A7 4A 1F          MULTXY R1 * R15
+; D 40A9 21 11          COPYAX MA -> R1
+; D 40AB 11 06 00 03    LOADXI R6 0003
+; D 40AF 4D 16          DIVXY R1 / R6
+; D 40B1 25             COPYMAA
+; D 40B2 21 01          COPYAX Acc -> R1
+; D 40B4 52 01 00 04    ADDXI R1 0004                      i = 10 (N - passes) / 3 + MARGIN: the terms that still matter
+; D 40B8 23 00 12       COPYXY R1 -> R2
+; D 40BB 50 22 02       ADDXYZ R2 + R2 -> R2
+; D 40BE 52 02 06 AE    ADDXI R2 06AE                      the pointer to a[i]
+; D 40C2 23 00 13       COPYXY R1 -> R3
+; D 40C5 50 33 03       ADDXYZ R3 + R3 -> R3
+; D 40C8 43 03          DECX R3                            2i - 1
+; D 40CA 11 04 00 00    LOADXI R4 0000                     q = 0
+; TERM:
+; D 40CE 39 02 25       COPYMXY M(R2) -> R5                a[i]
+; D 40D1 4A 5F          MULTXY R5 * R15
+; D 40D3 21 15          COPYAX MA -> R5                    10 a[i]
+; D 40D5 4A 41          MULTXY R4 * R1
+; D 40D7 21 16          COPYAX MA -> R6                    q i
+; D 40D9 50 56 05       ADDXYZ R5 + R6 -> R5               x = 10 a[i] + q i
+; D 40DC 4D 53          DIVXY R5 / R3                      x / (2i - 1)
+; D 40DE 27             COPYREMA
+; D 40DF 21 06          COPYAX Acc -> R6
+; D 40E1 3A 02 62       COPYXMY R6 -> M(R2)                a[i] = the remainder
+; D 40E4 25             COPYMAA
+; D 40E5 21 04          COPYAX Acc -> R4                   q = the quotient
+; D 40E7 53 02 00 02    SUBXI R2 0002
+; D 40EB 53 03 00 02    SUBXI R3 0002
+; D 40EF 43 01          DECX R1
+; D 40F1 8C 01          TESTXZ R1
+; D 40F3 A1 00 CE       IFFALSEI TERM
+; D 40F6 4D 4F          DIVXY R4 / R15
+; D 40F8 27             COPYREMA
+; D 40F9 11 06 06 B0    LOADXI R6 06B0
+; D 40FD 21 05          COPYAX Acc -> R5
+; D 40FF 3A 02 56       COPYXMY R5 -> M(R6)                a[1] = q mod 10
+; D 4102 25             COPYMAA
+; D 4103 21 04          COPYAX Acc -> R4                   R4 = the new digit (0-10)
+; D 4105 42 07          INCX R7
+; D 4107 86 04 00 09    TESTXI R4 0009
+; D 410B A1 01 13       IFFALSEI N9
+; D 410E 42 0C          INCX R12                           a 9: held with the others
+; D 4110 B0 00 9A       GAL PASS
+; N9:
+; D 4113 86 04 00 0A    TESTXI R4 000A
+; D 4117 A1 01 3A       IFFALSEI NORM
+; D 411A 23 00 D6       COPYXY R13 -> R6
+; D 411D 42 06          INCX R6
+; D 411F BD 01 CB       CALL OUTD
+; Z0:
+; D 4122 8C 0C          TESTXZ R12
+; D 4124 A0 01 33       IFTRUEI Z1
+; D 4127 11 06 00 00    LOADXI R6 0000
+; D 412B BD 01 CB       CALL OUTD
+; D 412E 43 0C          DECX R12
+; D 4130 B0 01 22       GAL Z0
+; Z1:
+; D 4133 11 0D 00 00    LOADXI R13 0000                    and 0 is held
+; D 4137 B0 00 9A       GAL PASS
+; NORM:
+; D 413A 86 0D FF FF    TESTXI R13 FFFF
+; D 413E A0 01 58       IFTRUEI NH                         the very first digit: nothing held yet
+; D 4141 23 00 D6       COPYXY R13 -> R6
+; D 4144 BD 01 CB       CALL OUTD
+; N90:
+; D 4147 8C 0C          TESTXZ R12
+; D 4149 A0 01 58       IFTRUEI NH
+; D 414C 11 06 00 09    LOADXI R6 0009
+; D 4150 BD 01 CB       CALL OUTD
+; D 4153 43 0C          DECX R12
+; D 4155 B0 01 47       GAL N90
+; NH:
+; D 4158 23 00 4D       COPYXY R4 -> R13                   this digit is held
+; D 415B B0 00 9A       GAL PASS
+; FLUSH:
+; D 415E 23 00 D6       COPYXY R13 -> R6
+; D 4161 BD 01 CB       CALL OUTD
+; FL9:
+; D 4164 8C 0C          TESTXZ R12
+; D 4166 A0 01 75       IFTRUEI FIN
+; D 4169 11 06 00 09    LOADXI R6 0009
+; D 416D BD 01 CB       CALL OUTD
+; D 4170 43 0C          DECX R12
+; D 4172 B0 01 64       GAL FL9
+; FIN:
+; D 4175 11 0E 05 37    LOADXI R14 0537
+; D 4179 C1 0E          PRINTSTR R14
+; D 417B 23 00 9A       COPYXY R9 -> R10
+; D 417E BD 02 19       CALL NUM
+; D 4181 11 0E 05 46    LOADXI R14 0546
+; D 4185 C1 0E          PRINTSTR R14
+; D 4187 11 0E 05 55    LOADXI R14 0555
+; D 418B C1 0E          PRINTSTR R14
+; AW:
+; D 418D CC             SERST
+; D 418E A1 01 8D       IFFALSEI AW
+; D 4191 CB             SERIN
+; D 4192 21 0A          COPYAX Acc -> R10
+; D 4194 86 0A 00 79    TESTXI R10 0079
+; D 4198 A0 01 BA       IFTRUEI YES
+; D 419B 86 0A 00 59    TESTXI R10 0059
+; D 419F A0 01 BA       IFTRUEI YES
+; D 41A2 86 0A 00 6E    TESTXI R10 006E
+; D 41A6 A0 01 BF       IFTRUEI NO
+; D 41A9 86 0A 00 4E    TESTXI R10 004E
+; D 41AD A0 01 BF       IFTRUEI NO
+; D 41B0 86 0A 00 1B    TESTXI R10 001B
+; D 41B4 A0 01 BF       IFTRUEI NO
+; D 41B7 B0 01 8D       GAL AW
+; YES:
+; D 41BA CA 59          SEROUTI 59 'Y'                     echo it
+; D 41BC B0 00 16       GAL ASKN
+; NO:
+; D 41BF CA 4E          SEROUTI 4E 'N'
+; D 41C1 11 0E 05 69    LOADXI R14 0569
+; D 41C5 C1 0E          PRINTSTR R14
+; D 41C7 00             HALT
+; D 41C8 F0 00 00       BREAK
+; OUTD:
+; D 41CB 87 A9          TESTXY R10 = R9
+; D 41CD A0 02 17       IFTRUEI ODR
+; D 41D0 22 06          COPYXA R6 -> Acc
+; D 41D2 4E 00 30       ADDAI 0030
+; D 41D5 C9             SEROUT                             the digit
+; D 41D6 42 0A          INCX R10
+; D 41D8 86 0A 00 01    TESTXI R10 0001
+; D 41DC A1 01 E7       IFFALSEI OD2
+; D 41DF 11 0E 05 2C    LOADXI R14 052C
+; D 41E3 C1 0E          PRINTSTR R14                       3.
+; D 41E5 BE 00          RETURN
+; OD2:
+; D 41E7 87 A9          TESTXY R10 = R9
+; D 41E9 A0 02 17       IFTRUEI ODR                        the last one: no gap after it
+; D 41EC 23 00 A6       COPYXY R10 -> R6
+; D 41EF 43 06          DECX R6
+; D 41F1 11 0E 00 32    LOADXI R14 0032
+; D 41F5 4D 6E          DIVXY R6 / R14
+; D 41F7 27             COPYREMA
+; D 41F8 81 00 00       TESTAI 0000
+; D 41FB A1 02 06       IFFALSEI OD3
+; D 41FE 11 0E 05 30    LOADXI R14 0530
+; D 4202 C1 0E          PRINTSTR R14                       fifty to a line
+; D 4204 BE 00          RETURN
+; OD3:
+; D 4206 21 06          COPYAX Acc -> R6
+; D 4208 4D 6F          DIVXY R6 / R15
+; D 420A 27             COPYREMA
+; D 420B 81 00 00       TESTAI 0000
+; D 420E A1 02 17       IFFALSEI ODR
+; D 4211 11 0E 05 2E    LOADXI R14 052E
+; D 4215 C1 0E          PRINTSTR R14                       groups of ten
+; ODR:
+; D 4217 BE 00          RETURN
+; NUM:
+; D 4219 4D AF          DIVXY R10 / R15
+; D 421B 27             COPYREMA
+; D 421C 21 0C          COPYAX Acc -> R12
+; D 421E 25             COPYMAA
+; D 421F 21 0A          COPYAX Acc -> R10                  RC = units, RA = n / 10
+; D 4221 2E 0C 06 04    READIDX R12 0604
+; D 4225 2F 0B 06 6B    WRITEIDX R11 066B
+; D 4229 4D AF          DIVXY R10 / R15
+; D 422B 27             COPYREMA
+; D 422C 21 0C          COPYAX Acc -> R12
+; D 422E 25             COPYMAA
+; D 422F 21 0A          COPYAX Acc -> R10                  RC = tens, RA = hundreds and up (< 100)
+; D 4231 2E 0C 06 04    READIDX R12 0604
+; D 4235 2F 0B 06 6A    WRITEIDX R11 066A
+; D 4239 2E 0A 06 04    READIDX R10 0604
+; D 423D 2F 0B 06 69    WRITEIDX R11 0669
+; D 4241 2E 0A 05 A0    READIDX R10 05A0
+; D 4245 2F 0B 06 68    WRITEIDX R11 0668
+; D 4249 11 0C 00 00    LOADXI R12 0000
+; NZ:
+; D 424D 2E 0C 06 68    READIDX R12 0668
+; D 4251 81 00 30       TESTAI 0030
+; D 4254 A1 02 60       IFFALSEI NP                        the first digit that is not 0
+; D 4257 42 0C          INCX R12
+; D 4259 86 0C 00 03    TESTXI R12 0003
+; D 425D A1 02 4D       IFFALSEI NZ                        (the last digit always prints)
+; NP:
+; D 4260 11 0E 06 68    LOADXI R14 0668
+; D 4264 50 EC 0E       ADDXYZ R14 + R12 -> R14
+; D 4267 C1 0E          PRINTSTR R14
+; D 4269 BE 00          RETURN
+; PARSE:
+; D 426B 11 0A 00 00    LOADXI R10 0000
+; D 426F 11 0C 00 00    LOADXI R12 0000
+; D 4273 11 0D 00 00    LOADXI R13 0000
+; PS:
+; D 4277 2E 0C 06 6E    READIDX R12 066E
+; D 427B 21 0E          COPYAX Acc -> R14
+; D 427D 8C 0E          TESTXZ R14
+; D 427F A0 02 CC       IFTRUEI PR                         end of the line
+; D 4282 86 0E 00 20    TESTXI R14 0020
+; D 4286 A1 02 93       IFFALSEI PDG
+; D 4289 42 0C          INCX R12
+; D 428B 8C 0D          TESTXZ R13
+; D 428D A0 02 77       IFTRUEI PS                         spaces before the number
+; D 4290 B0 02 B1       GAL PT
+; PDG:
+; D 4293 53 0E 00 30    SUBXI R14 0030
+; D 4297 89 EF          TESTLXY R14 < R15
+; D 4299 A1 02 C8       IFFALSEI PBAD                      not a digit
+; D 429C 42 0D          INCX R13
+; D 429E 86 0D 00 05    TESTXI R13 0005
+; D 42A2 A0 02 C8       IFTRUEI PBAD                       five digits: too long
+; D 42A5 4A AF          MULTXY R10 * R15
+; D 42A7 21 1A          COPYAX MA -> R10
+; D 42A9 50 AE 0A       ADDXYZ R10 + R14 -> R10            n = n x 10 + digit
+; D 42AC 42 0C          INCX R12
+; D 42AE B0 02 77       GAL PS
+; PT:
+; D 42B1 2E 0C 06 6E    READIDX R12 066E
+; D 42B5 21 0E          COPYAX Acc -> R14
+; D 42B7 8C 0E          TESTXZ R14
+; D 42B9 A0 02 CC       IFTRUEI PR
+; D 42BC 86 0E 00 20    TESTXI R14 0020
+; D 42C0 A1 02 C8       IFFALSEI PBAD
+; D 42C3 42 0C          INCX R12
+; D 42C5 B0 02 B1       GAL PT
+; PBAD:
+; D 42C8 11 0D FF FE    LOADXI R13 FFFE
+; PR:
+; D 42CC BE 00          RETURN
+
+; --------------------------------------------------------------------------
+; CODE  -  download this block
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 11 0F 00 0A
+D 4005 11 0B 00 00
+D 4009 10 00 00
+D 400C 2F 0B 06 6C
+D 4010 11 0E 03 00
+D 4014 C1 0E
+D 4016 11 0E 04 D1
+D 401A C1 0E
+D 401C 11 0C 06 6E
+D 4020 11 0D 06 6E
+D 4024 C2 CD
+D 4026 BD 02 6B
+D 4029 8C 0D
+D 402B A1 00 35
+D 402E 11 0A 00 32
+D 4032 B0 00 53
+D 4035 86 0D FF FE
+D 4039 A0 00 4A
+D 403C 8C 0A
+D 403E A0 00 4A
+D 4041 11 0C 01 5F
+D 4045 89 AC
+D 4047 A0 00 53
+D 404A 11 0E 04 FD
+D 404E C1 0E
+D 4050 B0 00 16
+D 4053 23 00 A9
+D 4056 23 00 98
+D 4059 52 08 00 06
+D 405D 23 00 81
+D 4060 4A 1F
+D 4062 21 11
+D 4064 11 06 00 03
+D 4068 4D 16
+D 406A 25
+D 406B 21 01
+D 406D 52 01 00 04
+D 4071 11 02 06 B0
+D 4075 32 02 00 02
+D 4079 52 02 00 02
+D 407D 43 01
+D 407F 8C 01
+D 4081 A1 00 75
+D 4084 11 07 00 00
+D 4088 11 0A 00 00
+D 408C 11 0C 00 00
+D 4090 11 0D FF FF
+D 4094 11 0E 05 25
+D 4098 C1 0E
+D 409A 87 A9
+D 409C A0 01 75
+D 409F 87 78
+D 40A1 A0 01 5E
+D 40A4 51 87 01
+D 40A7 4A 1F
+D 40A9 21 11
+D 40AB 11 06 00 03
+D 40AF 4D 16
+D 40B1 25
+D 40B2 21 01
+D 40B4 52 01 00 04
+D 40B8 23 00 12
+D 40BB 50 22 02
+D 40BE 52 02 06 AE
+D 40C2 23 00 13
+D 40C5 50 33 03
+D 40C8 43 03
+D 40CA 11 04 00 00
+D 40CE 39 02 25
+D 40D1 4A 5F
+D 40D3 21 15
+D 40D5 4A 41
+D 40D7 21 16
+D 40D9 50 56 05
+D 40DC 4D 53
+D 40DE 27
+D 40DF 21 06
+D 40E1 3A 02 62
+D 40E4 25
+D 40E5 21 04
+D 40E7 53 02 00 02
+D 40EB 53 03 00 02
+D 40EF 43 01
+D 40F1 8C 01
+D 40F3 A1 00 CE
+D 40F6 4D 4F
+D 40F8 27
+D 40F9 11 06 06 B0
+D 40FD 21 05
+D 40FF 3A 02 56
+D 4102 25
+D 4103 21 04
+D 4105 42 07
+D 4107 86 04 00 09
+D 410B A1 01 13
+D 410E 42 0C
+D 4110 B0 00 9A
+D 4113 86 04 00 0A
+D 4117 A1 01 3A
+D 411A 23 00 D6
+D 411D 42 06
+D 411F BD 01 CB
+D 4122 8C 0C
+D 4124 A0 01 33
+D 4127 11 06 00 00
+D 412B BD 01 CB
+D 412E 43 0C
+D 4130 B0 01 22
+D 4133 11 0D 00 00
+D 4137 B0 00 9A
+D 413A 86 0D FF FF
+D 413E A0 01 58
+D 4141 23 00 D6
+D 4144 BD 01 CB
+D 4147 8C 0C
+D 4149 A0 01 58
+D 414C 11 06 00 09
+D 4150 BD 01 CB
+D 4153 43 0C
+D 4155 B0 01 47
+D 4158 23 00 4D
+D 415B B0 00 9A
+D 415E 23 00 D6
+D 4161 BD 01 CB
+D 4164 8C 0C
+D 4166 A0 01 75
+D 4169 11 06 00 09
+D 416D BD 01 CB
+D 4170 43 0C
+D 4172 B0 01 64
+D 4175 11 0E 05 37
+D 4179 C1 0E
+D 417B 23 00 9A
+D 417E BD 02 19
+D 4181 11 0E 05 46
+D 4185 C1 0E
+D 4187 11 0E 05 55
+D 418B C1 0E
+D 418D CC
+D 418E A1 01 8D
+D 4191 CB
+D 4192 21 0A
+D 4194 86 0A 00 79
+D 4198 A0 01 BA
+D 419B 86 0A 00 59
+D 419F A0 01 BA
+D 41A2 86 0A 00 6E
+D 41A6 A0 01 BF
+D 41A9 86 0A 00 4E
+D 41AD A0 01 BF
+D 41B0 86 0A 00 1B
+D 41B4 A0 01 BF
+D 41B7 B0 01 8D
+D 41BA CA 59
+D 41BC B0 00 16
+D 41BF CA 4E
+D 41C1 11 0E 05 69
+D 41C5 C1 0E
+D 41C7 00
+D 41C8 F0 00 00
+D 41CB 87 A9
+D 41CD A0 02 17
+D 41D0 22 06
+D 41D2 4E 00 30
+D 41D5 C9
+D 41D6 42 0A
+D 41D8 86 0A 00 01
+D 41DC A1 01 E7
+D 41DF 11 0E 05 2C
+D 41E3 C1 0E
+D 41E5 BE 00
+D 41E7 87 A9
+D 41E9 A0 02 17
+D 41EC 23 00 A6
+D 41EF 43 06
+D 41F1 11 0E 00 32
+D 41F5 4D 6E
+D 41F7 27
+D 41F8 81 00 00
+D 41FB A1 02 06
+D 41FE 11 0E 05 30
+D 4202 C1 0E
+D 4204 BE 00
+D 4206 21 06
+D 4208 4D 6F
+D 420A 27
+D 420B 81 00 00
+D 420E A1 02 17
+D 4211 11 0E 05 2E
+D 4215 C1 0E
+D 4217 BE 00
+D 4219 4D AF
+D 421B 27
+D 421C 21 0C
+D 421E 25
+D 421F 21 0A
+D 4221 2E 0C 06 04
+D 4225 2F 0B 06 6B
+D 4229 4D AF
+D 422B 27
+D 422C 21 0C
+D 422E 25
+D 422F 21 0A
+D 4231 2E 0C 06 04
+D 4235 2F 0B 06 6A
+D 4239 2E 0A 06 04
+D 423D 2F 0B 06 69
+D 4241 2E 0A 05 A0
+D 4245 2F 0B 06 68
+D 4249 11 0C 00 00
+D 424D 2E 0C 06 68
+D 4251 81 00 30
+D 4254 A1 02 60
+D 4257 42 0C
+D 4259 86 0C 00 03
+D 425D A1 02 4D
+D 4260 11 0E 06 68
+D 4264 50 EC 0E
+D 4267 C1 0E
+D 4269 BE 00
+D 426B 11 0A 00 00
+D 426F 11 0C 00 00
+D 4273 11 0D 00 00
+D 4277 2E 0C 06 6E
+D 427B 21 0E
+D 427D 8C 0E
+D 427F A0 02 CC
+D 4282 86 0E 00 20
+D 4286 A1 02 93
+D 4289 42 0C
+D 428B 8C 0D
+D 428D A0 02 77
+D 4290 B0 02 B1
+D 4293 53 0E 00 30
+D 4297 89 EF
+D 4299 A1 02 C8
+D 429C 42 0D
+D 429E 86 0D 00 05
+D 42A2 A0 02 C8
+D 42A5 4A AF
+D 42A7 21 1A
+D 42A9 50 AE 0A
+D 42AC 42 0C
+D 42AE B0 02 77
+D 42B1 2E 0C 06 6E
+D 42B5 21 0E
+D 42B7 8C 0E
+D 42B9 A0 02 CC
+D 42BC 86 0E 00 20
+D 42C0 A1 02 C8
+D 42C3 42 0C
+D 42C5 B0 02 B1
+D 42C8 11 0D FF FE
+D 42CC BE 00
+
+D 4300 0D 0A 0D 0A 20 20 50 20 49 20 20 20 42 20 59 20
+D 4310 20 20 54 20 48 20 45 20 20 20 53 20 50 20 49 20
+D 4320 47 20 4F 20 54 20 20 20 2D 20 20 20 53 20 54 20
+D 4330 45 20 4C 20 4C 20 41 20 52 20 20 20 4F 20 4E 20
+D 4340 4C 20 59 0D 0A 0D 0A 20 20 54 68 65 20 64 69 67
+D 4350 69 74 73 20 6F 66 20 70 69 2C 20 77 6F 72 6B 65
+D 4360 64 20 6F 75 74 20 6F 6E 65 20 61 74 20 61 20 74
+D 4370 69 6D 65 20 62 79 20 74 68 65 20 52 61 62 69 6E
+D 4380 6F 77 69 74 7A 2D 57 61 67 6F 6E 0D 0A 20 20 73
+D 4390 70 69 67 6F 74 20 2D 20 77 68 6F 6C 65 20 6E 75
+D 43A0 6D 62 65 72 73 20 6F 6E 6C 79 2C 20 6F 6E 20 61
+D 43B0 20 31 39 37 36 20 43 50 55 20 72 75 6E 6E 69 6E
+D 43C0 67 20 61 6E 20 69 6E 74 65 72 70 72 65 74 65 72
+D 43D0 2E 0D 0A 20 20 45 76 65 72 79 20 73 74 65 70 20
+D 43E0 69 73 20 53 54 45 4C 4C 41 52 20 62 79 74 65 63
+D 43F0 6F 64 65 20 2D 20 6E 6F 20 6E 61 74 69 76 65 20
+D 4400 63 6F 64 65 2E 20 54 68 65 20 66 69 72 73 74 20
+D 4410 64 69 67 69 74 73 20 61 72 65 0D 0A 20 20 74 68
+D 4420 65 20 73 6C 6F 77 65 73 74 3B 20 74 68 65 79 20
+D 4430 73 70 65 65 64 20 75 70 20 61 73 20 74 68 65 20
+D 4440 77 6F 72 6B 20 6C 65 66 74 20 73 68 72 69 6E 6B
+D 4450 73 2E 20 4F 6E 20 74 68 65 20 45 6C 66 32 4B 3A
+D 4460 0D 0A 20 20 32 30 20 64 69 67 69 74 73 20 74 61
+D 4470 6B 65 20 61 62 6F 75 74 20 68 61 6C 66 20 61 20
+D 4480 6D 69 6E 75 74 65 2C 20 35 30 20 61 62 6F 75 74
+D 4490 20 32 20 31 2F 32 20 6D 69 6E 75 74 65 73 2C 20
+D 44A0 31 30 30 20 61 62 6F 75 74 0D 0A 20 20 38 20 2D
+D 44B0 20 74 68 65 20 74 69 6D 65 20 67 72 6F 77 73 20
+D 44C0 77 69 74 68 20 74 68 65 20 73 71 75 61 72 65 2E
+D 44D0 00 0D 0A 0D 0A 20 20 48 6F 77 20 6D 61 6E 79 20
+D 44E0 64 69 67 69 74 73 20 28 31 2D 33 35 30 2C 20 45
+D 44F0 6E 74 65 72 20 3D 20 35 30 29 3F 20 00 0D 0A 20
+D 4500 20 50 6C 65 61 73 65 20 74 79 70 65 20 61 20 6E
+D 4510 75 6D 62 65 72 20 66 72 6F 6D 20 31 20 74 6F 20
+D 4520 33 35 30 2E 00 0D 0A 0D 0A 20 20 00 2E 00 20 00
+D 4530 0D 0A 20 20 20 20 00 0D 0A 0D 0A 20 20 54 68 61
+D 4540 74 20 69 73 20 00 20 64 69 67 69 74 73 20 6F 66
+D 4550 20 70 69 2E 00 0D 0A 0D 0A 20 20 41 67 61 69 6E
+D 4560 3F 20 28 59 2F 4E 29 20 00 0D 0A 0D 0A 20 20 54
+D 4570 68 61 6E 6B 73 20 66 6F 72 20 72 75 6E 6E 69 6E
+D 4580 67 20 50 49 20 42 59 20 54 48 45 20 53 50 49 47
+D 4590 4F 54 2E 0D 0A 00
+
+D 45A0 30 30 30 30 30 30 30 30 30 30 31 31 31 31 31 31
+D 45B0 31 31 31 31 32 32 32 32 32 32 32 32 32 32 33 33
+D 45C0 33 33 33 33 33 33 33 33 34 34 34 34 34 34 34 34
+D 45D0 34 34 35 35 35 35 35 35 35 35 35 35 36 36 36 36
+D 45E0 36 36 36 36 36 36 37 37 37 37 37 37 37 37 37 37
+D 45F0 38 38 38 38 38 38 38 38 38 38 39 39 39 39 39 39
+D 4600 39 39 39 39 30 31 32 33 34 35 36 37 38 39 30 31
+D 4610 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 37
+D 4620 38 39 30 31 32 33 34 35 36 37 38 39 30 31 32 33
+D 4630 34 35 36 37 38 39 30 31 32 33 34 35 36 37 38 39
+D 4640 30 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35
+D 4650 36 37 38 39 30 31 32 33 34 35 36 37 38 39 30 31
+D 4660 32 33 34 35 36 37 38 39
+D 5000 00
+D 6000 00
+D 7000 00

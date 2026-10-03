@@ -1,0 +1,619 @@
+; ==========================================================================
+; STELLAR INVADERS  -  two rows of six, arrows to move, SPACE to fire
+; ==========================================================================
+; Two rows of six invaders march across the screen and drop a line each time they
+; reach an edge. The gun sits on line 23. LEFT and RIGHT arrows move it, SPACE
+; fires, and Q quits. If your terminal does not send arrow keys, a and d work too.
+; One rocket in the air at a time. Shoot all twelve and you win; let them reach
+; line 21 and they have landed.
+;
+; SHIP TABLE. The twelve ships are twelve bytes at $4960, one per ship - $01 alive,
+; $00 destroyed - reached with READIDX and WRITEIDX, which index a
+; program-relative base by a register and leave that register alone. Ships 0-5 are
+; the top row, 6-11 the bottom.
+;
+; ONE DIVIDE ANSWERS "WHICH SHIP". Ships are three columns wide on a six-column
+; pitch, so DIVXY of (rocket column - formation column) by six gives the ship
+; number as the quotient and the offset within it as the remainder: a remainder of
+; 0-2 is a hit, 3-5 is the gap between ships. The remainder is also exactly what
+; the erase needs to find the ship's left-hand column, so it is kept in R11 rather
+; than recomputed. An earlier draft divided a second time using a register that by
+; then held the ship INDEX - which for ship 0 is a divide by zero, and that raises
+; Error $07 and stops the VM.
+;
+; ARROW KEYS ARE THREE BYTES. The left arrow is ESC [ D and the right is ESC [ C,
+; so a byte at a time is not enough - the program keeps a small state machine in
+; memory at $4970: 0 = waiting for anything, 1 = seen ESC, 2 = seen ESC and [.
+; That is also why ESC is not the quit key here, as it is in the other apps: it is
+; the first byte of every arrow press.
+;
+; DRAWING. The formation is redrawn only on the frames it actually marches - every
+; eighth - not every frame. Redrawing it every frame costs about 110 bytes of
+; output per frame and makes the ships shimmer; as it stands a quiet frame costs
+; about 4 bytes. Each row is drawn as one 37-character run starting one column
+; left of the formation, with dead ships drawn as blanks, so the same pass erases
+; the trailing column and the destroyed ships without any separate erase.
+;
+; The gun is drawn with a space each side so a move wipes its own trail, and the
+; rocket erases its old cell before drawing the new one.
+;
+; REGISTERS. R1 gun column, R2 rocket column, R3 rocket line (0 = none in flight),
+; R4 formation column, R5 formation top line, R6 direction, R7 frame counter,
+; R8 ships left, R9-R12 scratch, R13 line and R14 column for POSXY, R15 = ten.
+; The end-of-game message is passed in R12 because R14 belongs to POSXY - passing
+; it in R14 means the position call overwrites it, which is exactly the bug that
+; made all three endings print YOU WIN.
+;
+; ADDRESSES. The LOADXI values in the code are PROGRAM-RELATIVE - $0960 means
+; $4960 at run time, because MEMMODE is relative - but the data D-lines below carry
+; the ABSOLUTE address. Writing the data at the relative address would drop the
+; title text on top of the firmware: $09A0 is inside the opcode dispatch table.
+;
+; Sim-verified with an autoplayer driving the real key sequences: a full
+; twelve-ship game played through to ALL SHIPS DESTROYED, the formation marching
+; down to line 21 for THE INVADERS HAVE LANDED, Q for GAME ABANDONED, arrow keys
+; and a/d both moving the gun, and ship 0 - the divide-by-zero case - destroyed
+; cleanly.
+;
+; NOTE every D-line here is 16 bytes or fewer. The Elf2K monitor's input buffer is
+; 64 characters - "D aaaa " plus 19 bytes - and it silently keeps what fits.
+;
+; 264 STELLAR commands, $4000-$42E7 (744 bytes of code).
+; Data at $4900, 94 bytes, past the end marker.
+; Data at $49A0, 30 bytes, past the end marker.
+; Data at $49C0, 25 bytes, past the end marker.
+; Data at $49E0, 15 bytes, past the end marker.
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+; D 4000 CD             START                  Start of program, and run the label pre-pass
+; D 4001 11 0F 00 0A    LOADXI R15 000A        Ten, for splitting numbers into digits
+; D 4005 11 0E 09 00    LOADXI R14 0900        Point at the title text
+; D 4009 C1 0E          PRINTSTR R14           Print it
+; D 400B C3             RAND                   Stir the generator while we wait
+; D 400C CC             SERST                  A key yet?
+; D 400D A1 00 0B       IFFALSEI SEED
+; D 4010 CB             SERIN                  Take it and discard it
+; D 4011 11 01 00 26    LOADXI R1 0026         Gun starts at column 38
+; D 4015 11 02 00 00    LOADXI R2 0000         No rocket in flight
+; D 4019 11 03 00 00    LOADXI R3 0000
+; D 401D 11 04 00 08    LOADXI R4 0008         The formation starts at column 8
+; D 4021 11 05 00 02    LOADXI R5 0002         top row on line 2
+; D 4025 11 06 00 00    LOADXI R6 0000         marching right
+; D 4029 11 07 00 00    LOADXI R7 0000         Frame counter
+; D 402D 11 08 00 0C    LOADXI R8 000C         Twelve ships to shoot down
+; D 4031 11 0B 09 70    LOADXI R11 0970        Clear the arrow-key state
+; D 4035 32 0B 00 00    COPYMX2I R11 0000
+; D 4039 11 09 00 00    LOADXI R9 0000         Ship index
+; D 403D 10 00 01       LOADAI 0001            Alive
+; D 4040 2F 09 09 60    WRITEIDX R9 0960
+; D 4044 42 09          INCX R9
+; D 4046 86 09 00 0C    TESTXI R9 000C         All twelve done?
+; D 404A A1 00 3D       IFFALSEI MKALIVE
+; D 404D CA 1B          SEROUTI 1B             ''
+; D 404F CA 5B          SEROUTI 5B             '['
+; D 4051 CA 32          SEROUTI 32             '2'
+; D 4053 CA 4A          SEROUTI 4A             'J'
+; D 4055 CA 1B          SEROUTI 1B             ''
+; D 4057 CA 5B          SEROUTI 5B             '['
+; D 4059 CA 3F          SEROUTI 3F             '?'
+; D 405B CA 32          SEROUTI 32             '2'
+; D 405D CA 35          SEROUTI 35             '5'
+; D 405F CA 6C          SEROUTI 6C             'l'
+; D 4061 BD 02 02       CALL DRAWALL           Both rows of ships
+; D 4064 BD 01 BB       CALL DRAWGUN           and the gun
+; D 4067 42 07          INCX R7                Count the frame
+; D 4069 CC             SERST                  Anything typed?
+; D 406A A1 01 0D       IFFALSEI NOKEY         No
+; D 406D CB             SERIN                  Read the byte
+; D 406E 21 0C          COPYAX 0C              Keep it in R12
+; D 4070 11 0B 09 70    LOADXI R11 0970        Where are we in an escape sequence?
+; D 4074 33 0B          COPYMXA 0B
+; D 4076 81 00 01       TESTAI 0001            Waiting for the '[' ?
+; D 4079 A0 00 B8       IFTRUEI KST1
+; D 407C 33 0B          COPYMXA 0B
+; D 407E 81 00 02       TESTAI 0002            Waiting for the letter?
+; D 4081 A0 00 CA       IFTRUEI KST2
+; D 4084 86 0C 00 1B    TESTXI R12 001B        ESC starts an arrow key
+; D 4088 A1 00 92       IFFALSEI KNOTESC
+; D 408B 32 0B 00 01    COPYMX2I R11 0001      Remember we have seen ESC
+; D 408F B0 01 0D       GAL NOKEY
+; D 4092 86 0C 00 20    TESTXI R12 0020        Space fires
+; D 4096 A0 00 FD       IFTRUEI FIRE
+; D 4099 86 0C 00 71    TESTXI R12 0071        q quits
+; D 409D A0 01 90       IFTRUEI QUIT
+; D 40A0 86 0C 00 51    TESTXI R12 0051        and so does Q
+; D 40A4 A0 01 90       IFTRUEI QUIT
+; D 40A7 86 0C 00 61    TESTXI R12 0061        a moves left, for terminals that send no arrows
+; D 40AB A0 00 DF       IFTRUEI GOLEFT
+; D 40AE 86 0C 00 64    TESTXI R12 0064        d moves right
+; D 40B2 A0 00 EE       IFTRUEI GORIGHT
+; D 40B5 B0 01 0D       GAL NOKEY
+; D 40B8 32 0B 00 00    COPYMX2I R11 0000      Whatever it was, the sequence restarts
+; D 40BC 86 0C 00 5B    TESTXI R12 005B        Was it '[' ?
+; D 40C0 A1 01 0D       IFFALSEI NOKEY
+; D 40C3 32 0B 00 02    COPYMX2I R11 0002      Now expect the letter
+; D 40C7 B0 01 0D       GAL NOKEY
+; D 40CA 32 0B 00 00    COPYMX2I R11 0000      Sequence finished
+; D 40CE 86 0C 00 44    TESTXI R12 0044        'D' is the left arrow
+; D 40D2 A0 00 DF       IFTRUEI GOLEFT
+; D 40D5 86 0C 00 43    TESTXI R12 0043        'C' is the right arrow
+; D 40D9 A0 00 EE       IFTRUEI GORIGHT
+; D 40DC B0 01 0D       GAL NOKEY
+; D 40DF 86 01 00 02    TESTXI R1 0002         Already hard left?
+; D 40E3 A0 01 0D       IFTRUEI NOKEY
+; D 40E6 43 01          DECX R1
+; D 40E8 BD 01 BB       CALL DRAWGUN
+; D 40EB B0 01 0D       GAL NOKEY
+; D 40EE 86 01 00 4D    TESTXI R1 004D         Already hard right? (column 77)
+; D 40F2 A0 01 0D       IFTRUEI NOKEY
+; D 40F5 42 01          INCX R1
+; D 40F7 BD 01 BB       CALL DRAWGUN
+; D 40FA B0 01 0D       GAL NOKEY
+; D 40FD 8C 03          TESTXZ R3              Is a rocket already in flight?
+; D 40FF A1 01 0D       IFFALSEI NOKEY         Yes - only one at a time
+; D 4102 23 00 12       COPYXY R1 R2           It leaves from the gun
+; D 4105 52 02 00 01    ADDXI R2 0001          from the middle of the barrel
+; D 4109 11 03 00 16    LOADXI R3 0016         starting one line above the gun
+; D 410D 8C 03          TESTXZ R3              Anything in flight?
+; D 410F A0 01 37       IFTRUEI NOSHOT         No
+; D 4112 23 00 3D       COPYXY R3 R13          Erase it from where it was
+; D 4115 23 00 2E       COPYXY R2 R14
+; D 4118 BD 02 C6       CALL POSXY
+; D 411B CA 20          SEROUTI 20             ' '
+; D 411D 43 03          DECX R3                and move it up a line
+; D 411F 8C 03          TESTXZ R3              Off the top of the screen?
+; D 4121 A0 01 37       IFTRUEI NOSHOT         Then it is spent
+; D 4124 BD 02 59       CALL HITTEST           Did it strike a ship?
+; D 4127 8C 03          TESTXZ R3              HITTEST clears the rocket on a hit
+; D 4129 A0 01 37       IFTRUEI NOSHOT
+; D 412C 23 00 3D       COPYXY R3 R13          Draw it in its new place
+; D 412F 23 00 2E       COPYXY R2 R14
+; D 4132 BD 02 C6       CALL POSXY
+; D 4135 CA 7C          SEROUTI 7C             '|'
+; D 4137 11 0B 00 08    LOADXI R11 0008
+; D 413B 4D 7B          DIVXY R7 R11           Frame counter divided by eight
+; D 413D 27             COPYREMA
+; D 413E 81 00 00       TESTAI 0000            Is this a marching frame?
+; D 4141 A1 01 71       IFFALSEI NOMARCH       No
+; D 4144 86 06 00 00    TESTXI R6 0000         Marching right?
+; D 4148 A1 01 5E       IFFALSEI MLEFT
+; D 414B 42 04          INCX R4
+; D 414D 86 04 00 2F    TESTXI R4 002F         Reached the right-hand limit? (column 47)
+; D 4151 A1 01 6E       IFFALSEI MARCHED
+; D 4154 11 06 00 01    LOADXI R6 0001         Turn around
+; D 4158 BD 01 D5       CALL DROP              and drop a line
+; D 415B B0 01 6E       GAL MARCHED
+; D 415E 43 04          DECX R4
+; D 4160 86 04 00 02    TESTXI R4 0002         Reached the left-hand limit?
+; D 4164 A1 01 6E       IFFALSEI MARCHED
+; D 4167 11 06 00 00    LOADXI R6 0000         Turn around
+; D 416B BD 01 D5       CALL DROP              and drop a line
+; D 416E BD 02 02       CALL DRAWALL           Redraw both rows - only on a marching frame
+; D 4171 8C 08          TESTXZ R8              All twelve shot down?
+; D 4173 A0 01 82       IFTRUEI WIN
+; D 4176 86 05 00 15    TESTXI R5 0015         Has the formation reached line 21?
+; D 417A A0 01 89       IFTRUEI LOSE
+; D 417D C0 02          DLYI 02                Pace the game
+; D 417F B0 00 67       GAL LOOP
+; D 4182 11 0C 09 A0    LOADXI R12 09A0        The message goes in R12 - R14 is POSXY's column
+; D 4186 B0 01 94       GAL FINISH
+; D 4189 11 0C 09 C0    LOADXI R12 09C0
+; D 418D B0 01 94       GAL FINISH
+; D 4190 11 0C 09 E0    LOADXI R12 09E0
+; D 4194 11 0D 00 0C    LOADXI R13 000C        Say so in the middle of the screen
+; D 4198 11 0E 00 1A    LOADXI R14 001A
+; D 419C BD 02 C6       CALL POSXY
+; D 419F C1 0C          PRINTSTR R12           Whichever message we came here with
+; D 41A1 CA 1B          SEROUTI 1B             ''
+; D 41A3 CA 5B          SEROUTI 5B             '['
+; D 41A5 CA 3F          SEROUTI 3F             '?'
+; D 41A7 CA 32          SEROUTI 32             '2'
+; D 41A9 CA 35          SEROUTI 35             '5'
+; D 41AB CA 68          SEROUTI 68             'h'
+; D 41AD 11 0D 00 17    LOADXI R13 0017
+; D 41B1 11 0E 00 01    LOADXI R14 0001
+; D 41B5 BD 02 C6       CALL POSXY
+; D 41B8 F0 00 00       BREAK                  End of program
+; D 41BB 11 0D 00 17    LOADXI R13 0017        Line 23
+; D 41BF 23 00 1E       COPYXY R1 R14
+; D 41C2 52 0E FF FF    ADDXI R14 FFFF         one column to the left
+; D 41C6 BD 02 C6       CALL POSXY
+; D 41C9 CA 20          SEROUTI 20             ' '
+; D 41CB CA 2F          SEROUTI 2F             '/'
+; D 41CD CA 5E          SEROUTI 5E             '^'
+; D 41CF CA 5C          SEROUTI 5C             '\'
+; D 41D1 CA 20          SEROUTI 20             ' '
+; D 41D3 BE 00          RETURN
+; D 41D5 23 00 5D       COPYXY R5 R13          Blank the two lines it is leaving
+; D 41D8 BD 01 E9       CALL BLANKROW
+; D 41DB 23 00 5D       COPYXY R5 R13
+; D 41DE 52 0D 00 02    ADDXI R13 0002
+; D 41E2 BD 01 E9       CALL BLANKROW
+; D 41E5 42 05          INCX R5
+; D 41E7 BE 00          RETURN
+; D 41E9 23 00 4E       COPYXY R4 R14
+; D 41EC 52 0E FF FF    ADDXI R14 FFFF
+; D 41F0 BD 02 C6       CALL POSXY
+; D 41F3 11 09 00 26    LOADXI R9 0026         38 columns
+; D 41F7 CA 20          SEROUTI 20             ' '
+; D 41F9 43 09          DECX R9
+; D 41FB 8C 09          TESTXZ R9
+; D 41FD A1 01 F7       IFFALSEI BLLOOP
+; D 4200 BE 00          RETURN
+; D 4202 23 00 5D       COPYXY R5 R13          Top row
+; D 4205 11 0B 00 00    LOADXI R11 0000        ships 0-5
+; D 4209 BD 02 1C       CALL DRAWROW
+; D 420C 23 00 5D       COPYXY R5 R13          Bottom row, two lines down
+; D 420F 52 0D 00 02    ADDXI R13 0002
+; D 4213 11 0B 00 06    LOADXI R11 0006        ships 6-11
+; D 4217 BD 02 1C       CALL DRAWROW
+; D 421A BE 00          RETURN
+; D 421C 23 00 4E       COPYXY R4 R14
+; D 421F 52 0E FF FF    ADDXI R14 FFFF         start one column left, to wipe the trailing edge
+; D 4223 BD 02 C6       CALL POSXY
+; D 4226 CA 20          SEROUTI 20             ' '
+; D 4228 11 09 00 00    LOADXI R9 0000         Ship number within the row
+; D 422C 50 B9 0A       ADDXYZ R11 R9 R10      Index into the alive table
+; D 422F 2E 0A 09 60    READIDX R10 0960       Is this one still flying?
+; D 4233 81 00 00       TESTAI 0000
+; D 4236 A0 02 42       IFTRUEI DRDEAD         No - leave a hole
+; D 4239 CA 3C          SEROUTI 3C             '<'
+; D 423B CA 4F          SEROUTI 4F             'O'
+; D 423D CA 3E          SEROUTI 3E             '>'
+; D 423F B0 02 48       GAL DRGAP
+; D 4242 CA 20          SEROUTI 20             ' '
+; D 4244 CA 20          SEROUTI 20             ' '
+; D 4246 CA 20          SEROUTI 20             ' '
+; D 4248 CA 20          SEROUTI 20             ' '
+; D 424A CA 20          SEROUTI 20             ' '
+; D 424C CA 20          SEROUTI 20             ' '
+; D 424E 42 09          INCX R9
+; D 4250 86 09 00 06    TESTXI R9 0006         All six done?
+; D 4254 A1 02 2C       IFFALSEI DRLOOP
+; D 4257 BE 00          RETURN
+; D 4259 23 00 5B       COPYXY R5 R11          The top row's line
+; D 425C 87 3B          TESTXY R3 R11          Is the rocket on it?
+; D 425E A0 02 71       IFTRUEI HTROW0
+; D 4261 52 0B 00 02    ADDXI R11 0002         The bottom row's line
+; D 4265 87 3B          TESTXY R3 R11
+; D 4267 A1 02 C4       IFFALSEI HTNONE        Neither - nothing to hit
+; D 426A 11 0C 00 06    LOADXI R12 0006        Ships 6-11 are the bottom row
+; D 426E B0 02 75       GAL HTCOL
+; D 4271 11 0C 00 00    LOADXI R12 0000        Ships 0-5
+; D 4275 88 24          TESTGXY R2 R4          Is the rocket right of the formation's left edge?
+; D 4277 A1 02 C4       IFFALSEI HTNONE
+; D 427A 51 24 0B       SUBXYZ R2 R4 R11       How far into the formation
+; D 427D 11 0A 00 06    LOADXI R10 0006        Six columns per ship
+; D 4281 4D BA          DIVXY R11 R10          One divide gives both answers
+; D 4283 27             COPYREMA               The remainder is the offset within the ship
+; D 4284 21 0B          COPYAX 0B              Keep it in R11 - the erase below needs it
+; D 4286 25             COPYMAA                and the quotient is which ship in the row
+; D 4287 21 09          COPYAX 09
+; D 4289 88 9A          TESTGXY R9 R10         Past the sixth ship?
+; D 428B A0 02 C4       IFTRUEI HTNONE         Then it is beyond the formation
+; D 428E 11 0A 00 03    LOADXI R10 0003        A ship is three columns wide
+; D 4292 88 BA          TESTGXY R11 R10        Is the rocket in the gap between ships?
+; D 4294 A0 02 C4       IFTRUEI HTNONE         Yes - a clean miss
+; D 4297 50 C9 0A       ADDXYZ R12 R9 R10      The ship's index in the alive table
+; D 429A 2E 0A 09 60    READIDX R10 0960       Is it still there?
+; D 429E 81 00 00       TESTAI 0000
+; D 42A1 A0 02 C4       IFTRUEI HTNONE         Already destroyed
+; D 42A4 10 00 00       LOADAI 0000            Mark it destroyed
+; D 42A7 2F 0A 09 60    WRITEIDX R10 0960
+; D 42AB 43 08          DECX R8                One fewer ship
+; D 42AD 23 00 3D       COPYXY R3 R13          Wipe the ship off the screen
+; D 42B0 51 2B 0E       SUBXYZ R2 R11 R14      R11 still holds the offset, so this is the ship's left column
+; D 42B3 BD 02 C6       CALL POSXY
+; D 42B6 CA 20          SEROUTI 20             ' '
+; D 42B8 CA 20          SEROUTI 20             ' '
+; D 42BA CA 20          SEROUTI 20             ' '
+; D 42BC 11 03 00 00    LOADXI R3 0000         The rocket is spent
+; D 42C0 11 02 00 00    LOADXI R2 0000
+; D 42C4 BE 00          RETURN
+; D 42C6 CA 1B          SEROUTI 1B             ''
+; D 42C8 CA 5B          SEROUTI 5B             '['
+; D 42CA 4D DF          DIVXY R13 R15
+; D 42CC 25             COPYMAA
+; D 42CD 4E 00 30       ADDAI 0030
+; D 42D0 C9             SEROUT                 Tens
+; D 42D1 27             COPYREMA
+; D 42D2 4E 00 30       ADDAI 0030
+; D 42D5 C9             SEROUT                 Units
+; D 42D6 CA 3B          SEROUTI 3B             ';'
+; D 42D8 4D EF          DIVXY R14 R15
+; D 42DA 25             COPYMAA
+; D 42DB 4E 00 30       ADDAI 0030
+; D 42DE C9             SEROUT                 Tens
+; D 42DF 27             COPYREMA
+; D 42E0 4E 00 30       ADDAI 0030
+; D 42E3 C9             SEROUT                 Units
+; D 42E4 CA 48          SEROUTI 48             'H'
+; D 42E6 BE 00          RETURN
+; --------------------------------------------------------------------------
+; CODE  -  download this block
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 11 0F 00 0A
+D 4005 11 0E 09 00
+D 4009 C1 0E
+D 400B C3
+D 400C CC
+D 400D A1 00 0B
+D 4010 CB
+D 4011 11 01 00 26
+D 4015 11 02 00 00
+D 4019 11 03 00 00
+D 401D 11 04 00 08
+D 4021 11 05 00 02
+D 4025 11 06 00 00
+D 4029 11 07 00 00
+D 402D 11 08 00 0C
+D 4031 11 0B 09 70
+D 4035 32 0B 00 00
+D 4039 11 09 00 00
+D 403D 10 00 01
+D 4040 2F 09 09 60
+D 4044 42 09
+D 4046 86 09 00 0C
+D 404A A1 00 3D
+D 404D CA 1B
+D 404F CA 5B
+D 4051 CA 32
+D 4053 CA 4A
+D 4055 CA 1B
+D 4057 CA 5B
+D 4059 CA 3F
+D 405B CA 32
+D 405D CA 35
+D 405F CA 6C
+D 4061 BD 02 02
+D 4064 BD 01 BB
+D 4067 42 07
+D 4069 CC
+D 406A A1 01 0D
+D 406D CB
+D 406E 21 0C
+D 4070 11 0B 09 70
+D 4074 33 0B
+D 4076 81 00 01
+D 4079 A0 00 B8
+D 407C 33 0B
+D 407E 81 00 02
+D 4081 A0 00 CA
+D 4084 86 0C 00 1B
+D 4088 A1 00 92
+D 408B 32 0B 00 01
+D 408F B0 01 0D
+D 4092 86 0C 00 20
+D 4096 A0 00 FD
+D 4099 86 0C 00 71
+D 409D A0 01 90
+D 40A0 86 0C 00 51
+D 40A4 A0 01 90
+D 40A7 86 0C 00 61
+D 40AB A0 00 DF
+D 40AE 86 0C 00 64
+D 40B2 A0 00 EE
+D 40B5 B0 01 0D
+D 40B8 32 0B 00 00
+D 40BC 86 0C 00 5B
+D 40C0 A1 01 0D
+D 40C3 32 0B 00 02
+D 40C7 B0 01 0D
+D 40CA 32 0B 00 00
+D 40CE 86 0C 00 44
+D 40D2 A0 00 DF
+D 40D5 86 0C 00 43
+D 40D9 A0 00 EE
+D 40DC B0 01 0D
+D 40DF 86 01 00 02
+D 40E3 A0 01 0D
+D 40E6 43 01
+D 40E8 BD 01 BB
+D 40EB B0 01 0D
+D 40EE 86 01 00 4D
+D 40F2 A0 01 0D
+D 40F5 42 01
+D 40F7 BD 01 BB
+D 40FA B0 01 0D
+D 40FD 8C 03
+D 40FF A1 01 0D
+D 4102 23 00 12
+D 4105 52 02 00 01
+D 4109 11 03 00 16
+D 410D 8C 03
+D 410F A0 01 37
+D 4112 23 00 3D
+D 4115 23 00 2E
+D 4118 BD 02 C6
+D 411B CA 20
+D 411D 43 03
+D 411F 8C 03
+D 4121 A0 01 37
+D 4124 BD 02 59
+D 4127 8C 03
+D 4129 A0 01 37
+D 412C 23 00 3D
+D 412F 23 00 2E
+D 4132 BD 02 C6
+D 4135 CA 7C
+D 4137 11 0B 00 08
+D 413B 4D 7B
+D 413D 27
+D 413E 81 00 00
+D 4141 A1 01 71
+D 4144 86 06 00 00
+D 4148 A1 01 5E
+D 414B 42 04
+D 414D 86 04 00 2F
+D 4151 A1 01 6E
+D 4154 11 06 00 01
+D 4158 BD 01 D5
+D 415B B0 01 6E
+D 415E 43 04
+D 4160 86 04 00 02
+D 4164 A1 01 6E
+D 4167 11 06 00 00
+D 416B BD 01 D5
+D 416E BD 02 02
+D 4171 8C 08
+D 4173 A0 01 82
+D 4176 86 05 00 15
+D 417A A0 01 89
+D 417D C0 02
+D 417F B0 00 67
+D 4182 11 0C 09 A0
+D 4186 B0 01 94
+D 4189 11 0C 09 C0
+D 418D B0 01 94
+D 4190 11 0C 09 E0
+D 4194 11 0D 00 0C
+D 4198 11 0E 00 1A
+D 419C BD 02 C6
+D 419F C1 0C
+D 41A1 CA 1B
+D 41A3 CA 5B
+D 41A5 CA 3F
+D 41A7 CA 32
+D 41A9 CA 35
+D 41AB CA 68
+D 41AD 11 0D 00 17
+D 41B1 11 0E 00 01
+D 41B5 BD 02 C6
+D 41B8 F0 00 00
+D 41BB 11 0D 00 17
+D 41BF 23 00 1E
+D 41C2 52 0E FF FF
+D 41C6 BD 02 C6
+D 41C9 CA 20
+D 41CB CA 2F
+D 41CD CA 5E
+D 41CF CA 5C
+D 41D1 CA 20
+D 41D3 BE 00
+D 41D5 23 00 5D
+D 41D8 BD 01 E9
+D 41DB 23 00 5D
+D 41DE 52 0D 00 02
+D 41E2 BD 01 E9
+D 41E5 42 05
+D 41E7 BE 00
+D 41E9 23 00 4E
+D 41EC 52 0E FF FF
+D 41F0 BD 02 C6
+D 41F3 11 09 00 26
+D 41F7 CA 20
+D 41F9 43 09
+D 41FB 8C 09
+D 41FD A1 01 F7
+D 4200 BE 00
+D 4202 23 00 5D
+D 4205 11 0B 00 00
+D 4209 BD 02 1C
+D 420C 23 00 5D
+D 420F 52 0D 00 02
+D 4213 11 0B 00 06
+D 4217 BD 02 1C
+D 421A BE 00
+D 421C 23 00 4E
+D 421F 52 0E FF FF
+D 4223 BD 02 C6
+D 4226 CA 20
+D 4228 11 09 00 00
+D 422C 50 B9 0A
+D 422F 2E 0A 09 60
+D 4233 81 00 00
+D 4236 A0 02 42
+D 4239 CA 3C
+D 423B CA 4F
+D 423D CA 3E
+D 423F B0 02 48
+D 4242 CA 20
+D 4244 CA 20
+D 4246 CA 20
+D 4248 CA 20
+D 424A CA 20
+D 424C CA 20
+D 424E 42 09
+D 4250 86 09 00 06
+D 4254 A1 02 2C
+D 4257 BE 00
+D 4259 23 00 5B
+D 425C 87 3B
+D 425E A0 02 71
+D 4261 52 0B 00 02
+D 4265 87 3B
+D 4267 A1 02 C4
+D 426A 11 0C 00 06
+D 426E B0 02 75
+D 4271 11 0C 00 00
+D 4275 88 24
+D 4277 A1 02 C4
+D 427A 51 24 0B
+D 427D 11 0A 00 06
+D 4281 4D BA
+D 4283 27
+D 4284 21 0B
+D 4286 25
+D 4287 21 09
+D 4289 88 9A
+D 428B A0 02 C4
+D 428E 11 0A 00 03
+D 4292 88 BA
+D 4294 A0 02 C4
+D 4297 50 C9 0A
+D 429A 2E 0A 09 60
+D 429E 81 00 00
+D 42A1 A0 02 C4
+D 42A4 10 00 00
+D 42A7 2F 0A 09 60
+D 42AB 43 08
+D 42AD 23 00 3D
+D 42B0 51 2B 0E
+D 42B3 BD 02 C6
+D 42B6 CA 20
+D 42B8 CA 20
+D 42BA CA 20
+D 42BC 11 03 00 00
+D 42C0 11 02 00 00
+D 42C4 BE 00
+D 42C6 CA 1B
+D 42C8 CA 5B
+D 42CA 4D DF
+D 42CC 25
+D 42CD 4E 00 30
+D 42D0 C9
+D 42D1 27
+D 42D2 4E 00 30
+D 42D5 C9
+D 42D6 CA 3B
+D 42D8 4D EF
+D 42DA 25
+D 42DB 4E 00 30
+D 42DE C9
+D 42DF 27
+D 42E0 4E 00 30
+D 42E3 C9
+D 42E4 CA 48
+D 42E6 BE 00
+
+D 4900 53 54 45 4C 4C 41 52 20 49 4E 56 41 44 45 52 53
+D 4910 20 2D 2D 20 61 72 72 6F 77 73 20 6F 72 20 61 2F
+D 4920 64 20 74 6F 20 6D 6F 76 65 2C 20 53 50 41 43 45
+D 4930 20 74 6F 20 66 69 72 65 2C 20 51 20 74 6F 20 71
+D 4940 75 69 74 0D 0A 50 72 65 73 73 20 61 6E 79 20 6B
+D 4950 65 79 20 74 6F 20 62 65 67 69 6E 0D 0A 00
+
+D 49A0 41 4C 4C 20 53 48 49 50 53 20 44 45 53 54 52 4F
+D 49B0 59 45 44 20 2D 20 59 4F 55 20 57 49 4E 00
+
+D 49C0 54 48 45 20 49 4E 56 41 44 45 52 53 20 48 41 56
+D 49D0 45 20 4C 41 4E 44 45 44 00
+
+D 49E0 47 41 4D 45 20 41 42 41 4E 44 4F 4E 45 44 00
+D 5000 00
+D 6000 00
+D 7000 00

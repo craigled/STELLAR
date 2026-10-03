@@ -1,0 +1,69 @@
+; ============================================================
+; String-Store-Test  —  read 3 lines, keep them, print them back
+; ============================================================
+; Needs Firmware-Math/GETSTR-2frag.dlines.txt flashed (uses $C2 GETSTR).
+;
+; Demonstrates the storage pattern:
+;   $C2 GETSTR   reads a line into a buffer
+;   $3B COPYMXMY copies the buffer into a numbered slot (block memory move)
+;   $52 ADDXI    steps the slot pointer on by the slot size
+;   $C1 PRINTSTR prints any slot back later, in any order
+;
+; Layout inside VM1's 4 KB block (addresses are program-relative; $09xx -> $49xx):
+;   $0900   line buffer, 32 bytes      (working area, reused each line)
+;   $0A00   slot 0  \
+;   $0A20   slot 1   >  32 bytes each
+;   $0A40   slot 2  /
+;
+; Type three lines. It then prints them back as slot2, slot0, slot1 to show the
+; slots are independently addressable, not just a stream.
+;
+; Expected (typing ALPHA, BETA, GAMMA):
+;   ALPHABETAGAMMA        <- the echo as you type
+;   GAMMA
+;   ALPHA
+;   BETA
+;
+; The loop uses $B5 LOOPI (the ADDRESS form), but $B6 LOOPL (the LABEL form)
+; works here too - both were tested on a cold-booted VM and give the same result.
+;
+; CORRECTION, for the record: an earlier version of this comment claimed LOOPL
+; was broken. That was wrong. The apparent failure was a test-harness artifact -
+; the harness started execution straight at $4000 without the VM launch that runs
+; the label pre-pass, so the label table at $3200 was still empty on the first
+; pass. GTL then took its undefined-label error path, the VM restarted, the
+; pre-pass ran, and the retry worked - which looked like an erratic branch back
+; to $4000. On a properly booted VM the pre-pass populates the table first and
+; LOOPL is correct.
+; ============================================================
+
+; ---- CODE ($4000..$4058) ----
+D 4000 CD
+D 4001 11 03 0A 00
+D 4005 11 05 00 03
+D 4009 11 06 00 00
+D 400D 11 01 09 00
+D 4011 11 02 09 00
+D 4015 C2 12
+D 4017 3B 23 20
+D 401A 52 03 00 20
+D 401E 42 06
+D 4020 B5 65 00 0D
+D 4024 10 00 0D C9
+D 4028 10 00 0A C9
+D 402C 11 03 0A 40
+D 4030 C1 03
+D 4032 10 00 0D C9
+D 4036 10 00 0A C9
+D 403A 11 03 0A 00
+D 403E C1 03
+D 4040 10 00 0D C9
+D 4044 10 00 0A C9
+D 4048 11 03 0A 20
+D 404C C1 03
+D 404E 10 00 0D C9
+D 4052 10 00 0A C9
+D 4056 F0 00 00
+D 5000 00
+D 6000 00
+D 7000 00

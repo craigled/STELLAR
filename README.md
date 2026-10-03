@@ -70,22 +70,9 @@ There is no assembler, no compiler, no toolchain. Every byte of machine code is 
 
 ## Applications
 
-Programs written in the STELLAR VM instruction set, hand-assembled as D-line hex. All load at `$4000` (VM1) and run over the terminal. Found in [`APPLICATIONS/`](APPLICATIONS/).
+Programs written in the STELLAR VM instruction set, as D-line hex for the Elf2K monitor, grouped by kind (games, text, Morse, math, graphics, multitasking) in [`APPLICATIONS/`](APPLICATIONS/) - see its [index](APPLICATIONS/README.md). Most load at `$4000` (VM1) and run over the terminal; the multitasking ones use several VMs.
 
-| App | Description |
-|-----|-------------|
-| `Simple-Calc.lst` | Terminal four-function calculator with chained operations |
-| `Prime-Gen.lst` | Prime-number generator over a user-supplied range |
-| `Tic-Tac-Toe.lst` | Tic-Tac-Toe against a heuristic computer opponent; board drawn with a 1–9 position legend |
-| `Lite-Writer.lst` | Minimal terminal text-entry editor |
-| `STAR-Writer.lst` | Basic terminal text-entry app |
-| `ELIZA.lst` | ELIZA-style conversational chatbot (keyword matching + pronoun swap) |
-| `Banner.lst` | Big-letter ASCII banner printer, 5x5 pre-rendered font |
-| `Mandelbrot.lst` | ASCII Mandelbrot set, Q8.8 sign-magnitude fixed point |
-| `Game-of-Life.lst` | Conway's Game of Life, animated on a 40x20 grid |
-| `Starship.lst` | The COSMAC ELF logo as a static picture; any key quits |
-| `Bouncing-Ball.lst` | Two 3x3 reverse-video balls bouncing off the walls and each other |
-| `Invaders.lst` | Space Invaders: two rows of six, arrow-key gun, aliens drop bombs |
+39 programs: Games 12, Text 6, Morse 2, Math 7, Graphics 7, Multitasking 5 - Tetris, Breakout, Battleship, MOONBASE, Lite-Writer 2, ELIZA, Morse code, pi to 1,526 digits, Mandelbrot, four-VM races and more.
 
 ## Code Format
 

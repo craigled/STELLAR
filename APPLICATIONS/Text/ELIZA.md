@@ -3,7 +3,8 @@
 A STELLAR (1802 vCPU) port of the classic ELIZA "conversation" program — a
 terminal chatbot that fakes a Rogerian therapist with pattern-matching, no AI.
 
-Status: **design / not yet built.** Target file: `APPLICATIONS/ELIZA.lst`.
+Status: **built** - this was the design document; the finished program is `ELIZA.lst` beside this file
+(run on the Elf2K, and a sample in the web Simulator).
 
 ---
 

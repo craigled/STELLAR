@@ -1,0 +1,1237 @@
+; ==========================================================================
+; STELLAR SIMPLE-CALC 8  -  eight significant digits; the arithmetic is
+; native 1802 called by $F1 RUNMC                          (VM1 @ $4000)
+; ==========================================================================
+; Companion to Simple-Calc-5 (same keys, same rules, three more digits).
+; Needs firmware with RUNMC $F1, PRINTSTR $C1 and GETSTR $C2; built and
+; verified against V0061.30.
+;
+;   > 1/7              = 0.14285714
+;   > 123456.78*9      = 1111111     (1111111.02 to 8 digits)
+;   > 2+3*4            = 20          left to right, like a pocket calculator
+;   > *2               = 40          a line starting + * / uses the last answer
+;   > -2.5*4           = -10         a leading - is a negative number
+;   > 99999999*99999999 = 9.9999998E15
+;   > 5/0              = Err         the last answer is kept
+;   Enter on an empty line quits.  x also means times.
+;
+; NUMBERS carry 8 significant digits and a decimal exponent; every result is
+; the exact answer ROUNDED HALF-UP to 8 digits (so 1/3*3 = 0.99999999, as on a
+; pocket calculator). Up to 9.9999999E99; smaller than 1E-99 becomes 0.
+; Plain display for integers of up to 12 digits and up to 12 decimal places,
+; d.ddddddd E x otherwise.
+;
+; THE SPLIT. The STELLAR program ($4000-$42D2) reads the line, keeps the
+; running answer and prints. All the arithmetic is ONE native routine at
+; $4800 (Firmware-Math/calc8_native.asm, 770 bytes), entered with RUNMC $4800
+; and an operation letter at $4D30: N (round a typed number), + - * /.
+; Numbers are held ONE DECIMAL DIGIT PER BYTE, so the parser writes digits
+; straight into the native work area and the printer reads them back - no
+; binary/decimal conversion anywhere. The native code does schoolbook
+; arithmetic that is exact up to one final rounding: add/subtract at the true
+; alignment, a full 16-digit product, and long division to 10 digits.
+;
+; RECORDS (page $4D): NA $4D00 the running answer, NB $4D10 the number just
+; typed, ANS $4D20 the last answer. 10 bytes each: sign, exponent+$80, eight
+; digits (most significant first); value = digits x 10^exponent. $4D30
+; operation, $4D31 status (0 ok, 1 divide by zero, 2 too big), $4D32-34 the
+; parser's raw exponent/count/sign, $4D40 work area, $4D80/$4D90 divide.
+; Input line at $4E00.
+;
+; RUNMC CONVENTION (see RUNMC-Test.lst / gol_native.asm): absolute address,
+; return with D5, RA avoided, SEX R2 before returning. Inside, the native code
+; calls its own subroutines through the firmware's SCRT (D4/D5); that touches
+; only R2, R3, R6 and D. The longest native call (a divide) is ~25,000 1802
+; instructions - about a tenth of a second - and does not yield to other VMs.
+;
+; VERIFICATION (real V0061.30 image, cold boot):
+;   Firmware-Math/calc8_native_test.py - the native routine alone, 3018 random + hand cases vs the model, 0 wrong.
+;   Firmware-Math/simplecalc8_verify.py - the whole program against an
+;   exact-fraction model, character for character: 81 set lines + 400 random expressions, 0 wrong.
+;
+; HARDWARE-VERIFIED on the Elf2K, 2026-09-24, on firmware V0061.33 - Craig: "works
+; very well". The first app whose arithmetic runs as native 1802 through RUNMC.
+;
+; 242 STELLAR commands, $4000-$42D2 (723 bytes); native code $4800-$4B01.
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 4000 CD             START                              Start of program, and run the label pre-pass
+; D 4001 11 0F 00 0A    LOADXI R15 000A                    Ten
+; D 4005 11 0E 0D 20    LOADXI R14 0D20                    The last answer starts as +0: sign 0, exponent $80,
+; D 4009 32 0E 00 80    COPYMX2I R14 0080
+; D 400D 52 0E 00 02    ADDXI R14 0002
+; D 4011 32 0E 00 00    COPYMX2I R14 0000
+; D 4015 52 0E 00 02    ADDXI R14 0002
+; D 4019 32 0E 00 00    COPYMX2I R14 0000
+; D 401D 52 0E 00 02    ADDXI R14 0002
+; D 4021 32 0E 00 00    COPYMX2I R14 0000
+; D 4025 52 0E 00 02    ADDXI R14 0002
+; D 4029 32 0E 00 00    COPYMX2I R14 0000                  eight zero digits (the pre-pass does not clear RAM)
+; D 402D 11 0E 0C 00    LOADXI R14 0C00
+; D 4031 C1 0E          PRINTSTR R14                       The banner
+; PROMPT:
+; D 4033 11 0E 0B 40    LOADXI R14 0B40
+; D 4037 C1 0E          PRINTSTR R14                       >
+; D 4039 11 0C 0E 00    LOADXI R12 0E00
+; D 403D 11 0D 0E 00    LOADXI R13 0E00
+; D 4041 C2 CD          GETSTR R12 R13                     Read a line (echoed; backspace works)
+; D 4043 11 0C 0E 00    LOADXI R12 0E00                    Back to the start of it
+; D 4047 BD 01 1E       CALL SKIPSP
+; D 404A 8C 00          TESTXZ R0                          An empty line quits
+; D 404C A0 01 15       IFTRUEI QUIT
+; D 404F 86 00 00 2B    TESTXI R0 002B                     A line that starts with + * / carries on
+; D 4053 A0 00 80       IFTRUEI USEANS
+; D 4056 86 00 00 2A    TESTXI R0 002A                     from the last answer
+; D 405A A0 00 80       IFTRUEI USEANS
+; D 405D 86 00 00 2F    TESTXI R0 002F
+; D 4061 A0 00 80       IFTRUEI USEANS
+; D 4064 BD 01 3F       CALL PARSE                         The first number -> NB
+; D 4067 8C 0A          TESTXZ R10                         No digits: not a number
+; D 4069 A0 00 FD       IFTRUEI SYNERR
+; D 406C BD 01 32       CALL STATUS                        Too big to hold?
+; D 406F A1 01 06       IFFALSEI MATHERR
+; D 4072 11 0D 0D 10    LOADXI R13 0D10                    It becomes the running answer NA
+; D 4076 11 0E 0D 00    LOADXI R14 0D00
+; D 407A 3B DE 0A       COPYMXMY R13 R14 0A                10-byte record
+; D 407D B0 00 8B       GAL OPLOOP
+; USEANS:
+; D 4080 11 0D 0D 20    LOADXI R13 0D20                    Load the last answer
+; D 4084 11 0E 0D 00    LOADXI R14 0D00
+; D 4088 3B DE 0A       COPYMXMY R13 R14 0A                10-byte record
+; OPLOOP:
+; D 408B BD 01 1E       CALL SKIPSP
+; D 408E 8C 00          TESTXZ R0                          End of the line: show the answer
+; D 4090 A0 00 E6       IFTRUEI SHOW
+; D 4093 23 00 09       COPYXY R0 -> R9                    R9 = the operator
+; D 4096 86 09 00 2B    TESTXI R9 002B
+; D 409A A0 00 BD       IFTRUEI OPOK
+; D 409D 86 09 00 2D    TESTXI R9 002D
+; D 40A1 A0 00 BD       IFTRUEI OPOK
+; D 40A4 86 09 00 2A    TESTXI R9 002A
+; D 40A8 A0 00 BD       IFTRUEI OPOK
+; D 40AB 86 09 00 2F    TESTXI R9 002F
+; D 40AF A0 00 BD       IFTRUEI OPOK
+; D 40B2 86 09 00 78    TESTXI R9 0078                     x means times
+; D 40B6 A1 00 FD       IFFALSEI SYNERR
+; D 40B9 11 09 00 2A    LOADXI R9 002A
+; OPOK:
+; D 40BD 42 0C          INCX R12                           Past the operator
+; D 40BF BD 01 1E       CALL SKIPSP
+; D 40C2 BD 01 3F       CALL PARSE                         The next number -> NB
+; D 40C5 8C 0A          TESTXZ R10
+; D 40C7 A0 00 FD       IFTRUEI SYNERR
+; D 40CA BD 01 32       CALL STATUS
+; D 40CD A1 01 06       IFFALSEI MATHERR
+; D 40D0 11 0E 00 00    LOADXI R14 0000
+; D 40D4 22 09          COPYXA R9 -> Acc                   The operation letter for the native code
+; D 40D6 2F 0E 0D 30    WRITEIDX R14 0D30
+; D 40DA F1 48 00       RUNMC 4800                         NA = NA op NB, in raw 1802
+; D 40DD BD 01 32       CALL STATUS                        Divide by zero, or too big?
+; D 40E0 A1 01 06       IFFALSEI MATHERR
+; D 40E3 B0 00 8B       GAL OPLOOP
+; SHOW:
+; D 40E6 11 0D 0D 00    LOADXI R13 0D00                    Keep it as the last answer
+; D 40EA 11 0E 0D 20    LOADXI R14 0D20
+; D 40EE 3B DE 0A       COPYMXMY R13 R14 0A                10-byte record
+; D 40F1 11 0E 0B 48    LOADXI R14 0B48
+; D 40F5 C1 0E          PRINTSTR R14                        =
+; D 40F7 BD 01 E4       CALL PRINTNUM
+; D 40FA B0 00 33       GAL PROMPT
+; SYNERR:
+; D 40FD 11 0E 0B 58    LOADXI R14 0B58
+; D 4101 C1 0E          PRINTSTR R14                        = ?  (the last answer is kept)
+; D 4103 B0 00 33       GAL PROMPT
+; MATHERR:
+; D 4106 11 0E 0B 48    LOADXI R14 0B48
+; D 410A C1 0E          PRINTSTR R14
+; D 410C 11 0E 0B 50    LOADXI R14 0B50
+; D 4110 C1 0E          PRINTSTR R14                       Err
+; D 4112 B0 00 33       GAL PROMPT
+; QUIT:
+; D 4115 11 0E 0B 60    LOADXI R14 0B60
+; D 4119 C1 0E          PRINTSTR R14
+; D 411B F0 00 00       BREAK                              End of program
+; SKIPSP:
+; D 411E 2E 0C 00 00    READIDX R12 0000
+; D 4122 21 00          COPYAX Acc -> R0
+; D 4124 86 00 00 20    TESTXI R0 0020
+; D 4128 A1 01 30       IFFALSEI SKR
+; D 412B 42 0C          INCX R12
+; D 412D B0 01 1E       GAL SKIPSP
+; SKR:
+; D 4130 BE 00          RETURN
+; STATUS:
+; D 4132 11 0E 00 00    LOADXI R14 0000
+; D 4136 2E 0E 0D 31    READIDX R14 0D31
+; D 413A 81 00 00       TESTAI 0000
+; D 413D BE 00          RETURN
+; PARSE:
+; D 413F 11 04 00 00    LOADXI R4 0000
+; D 4143 11 05 00 00    LOADXI R5 0000
+; D 4147 11 06 00 80    LOADXI R6 0080
+; D 414B 11 08 00 00    LOADXI R8 0000
+; D 414F 11 0A 00 00    LOADXI R10 0000
+; D 4153 2E 0C 00 00    READIDX R12 0000
+; D 4157 21 00          COPYAX Acc -> R0
+; D 4159 86 00 00 2D    TESTXI R0 002D                     A leading minus
+; D 415D A1 01 66       IFFALSEI PLOOP
+; D 4160 11 04 00 01    LOADXI R4 0001
+; D 4164 42 0C          INCX R12
+; PLOOP:
+; D 4166 2E 0C 00 00    READIDX R12 0000
+; D 416A 21 00          COPYAX Acc -> R0
+; D 416C 86 00 00 2E    TESTXI R0 002E
+; D 4170 A1 01 81       IFFALSEI PDIG
+; D 4173 8C 08          TESTXZ R8                          A second point ends the number
+; D 4175 A1 01 C2       IFFALSEI PEND
+; D 4178 11 08 00 01    LOADXI R8 0001                     Digits from here on are fraction
+; D 417C 42 0C          INCX R12
+; D 417E B0 01 66       GAL PLOOP
+; PDIG:
+; D 4181 53 00 00 30    SUBXI R0 0030                      A digit is '0'..'9': c-'0' < 10
+; D 4185 89 0F          TESTLXY R0 < R15
+; D 4187 A1 01 C2       IFFALSEI PEND
+; D 418A 42 0C          INCX R12
+; D 418C 11 0A 00 01    LOADXI R10 0001                    Seen a digit
+; D 4190 8C 05          TESTXZ R5                          A leading zero is not kept
+; D 4192 A1 01 9D       IFFALSEI PKEEP
+; D 4195 8C 00          TESTXZ R0
+; D 4197 A1 01 9D       IFFALSEI PKEEP
+; D 419A B0 01 AE       GAL PFRAC                          but after the point it still moves the exponent
+; PKEEP:
+; D 419D 11 0E 00 14    LOADXI R14 0014                    Keep up to 20 digits
+; D 41A1 89 5E          TESTLXY R5 < R14
+; D 41A3 A1 01 B8       IFFALSEI PFULL
+; D 41A6 22 00          COPYXA R0 -> Acc
+; D 41A8 2F 05 0D 40    WRITEIDX R5 0D40                   W[k] = the digit
+; D 41AC 42 05          INCX R5
+; PFRAC:
+; D 41AE 8C 08          TESTXZ R8                          After the point each digit is a tenth
+; D 41B0 A0 01 66       IFTRUEI PLOOP
+; D 41B3 43 06          DECX R6
+; D 41B5 B0 01 66       GAL PLOOP
+; PFULL:
+; D 41B8 8C 08          TESTXZ R8                          A dropped digit before the point is a x10
+; D 41BA A1 01 66       IFFALSEI PLOOP
+; D 41BD 42 06          INCX R6
+; D 41BF B0 01 66       GAL PLOOP
+; PEND:
+; D 41C2 11 0E 00 00    LOADXI R14 0000                    Hand the raw digits to the native code
+; D 41C6 22 05          COPYXA R5 -> Acc
+; D 41C8 2F 0E 0D 33    WRITEIDX R14 0D33
+; D 41CC 22 06          COPYXA R6 -> Acc
+; D 41CE 2F 0E 0D 32    WRITEIDX R14 0D32
+; D 41D2 22 04          COPYXA R4 -> Acc
+; D 41D4 2F 0E 0D 34    WRITEIDX R14 0D34
+; D 41D8 10 00 4E       LOADAI 004E
+; D 41DB 2F 0E 0D 30    WRITEIDX R14 0D30
+; D 41DF F1 48 00       RUNMC 4800                         Round to 8 digits -> NB
+; D 41E2 BE 00          RETURN
+; PRINTNUM:
+; D 41E4 11 07 00 08    LOADXI R7 0008
+; PNT:
+; D 41E8 8C 07          TESTXZ R7                          All eight zero: the number is 0
+; D 41EA A0 02 CF       IFTRUEI PNZERO
+; D 41ED 43 07          DECX R7
+; D 41EF 2E 07 0D 02    READIDX R7 0D02                    Drop trailing zeros
+; D 41F3 81 00 00       TESTAI 0000
+; D 41F6 A0 01 E8       IFTRUEI PNT
+; D 41F9 42 07          INCX R7
+; D 41FB 11 0E 00 00    LOADXI R14 0000
+; D 41FF 2E 0E 0D 00    READIDX R14 0D00                   The sign
+; D 4203 81 00 00       TESTAI 0000
+; D 4206 A0 02 0B       IFTRUEI PN1
+; D 4209 CA 2D          SEROUTI 2D '-'
+; PN1:
+; D 420B 2E 0E 0D 01    READIDX R14 0D01                   e = exponent + 8 - n
+; D 420F 21 03          COPYAX Acc -> R3
+; D 4211 52 03 00 08    ADDXI R3 0008
+; D 4215 51 37 03       SUBXYZ R3 - R7 -> R3
+; D 4218 50 73 08       ADDXYZ R7 + R3 -> R8               p = n + e
+; D 421B 11 06 00 00    LOADXI R6 0000
+; D 421F 11 0E 00 80    LOADXI R14 0080
+; D 4223 88 3E          TESTGXY R3 >= R14                  e >= 0: plain if p <= 12
+; D 4225 A1 02 34       IFFALSEI PNNEG
+; D 4228 11 0E 00 8C    LOADXI R14 008C
+; D 422C 88 E8          TESTGXY R14 >= R8
+; D 422E A0 02 48       IFTRUEI PNFMT
+; D 4231 B0 02 3D       GAL PNSCI
+; PNNEG:
+; D 4234 11 0E 00 74    LOADXI R14 0074                    e < 0: plain if e >= -12
+; D 4238 88 3E          TESTGXY R3 >= R14
+; D 423A A0 02 48       IFTRUEI PNFMT
+; PNSCI:
+; D 423D 11 06 00 01    LOADXI R6 0001                     Otherwise d.ddddddd E x
+; D 4241 23 00 89       COPYXY R8 -> R9
+; D 4244 11 08 00 81    LOADXI R8 0081
+; PNFMT:
+; D 4248 11 0E 00 80    LOADXI R14 0080
+; D 424C 88 E8          TESTGXY R14 >= R8                  p <= 0: 0. and zeros first
+; D 424E A1 02 61       IFFALSEI PNDS
+; D 4251 CA 30          SEROUTI 30 '0'
+; D 4253 CA 2E          SEROUTI 2E '.'
+; PNZ:
+; D 4255 87 8E          TESTXY R8 = R14
+; D 4257 A0 02 61       IFTRUEI PNDS
+; D 425A CA 30          SEROUTI 30 '0'
+; D 425C 42 08          INCX R8
+; D 425E B0 02 55       GAL PNZ
+; PNDS:
+; D 4261 23 00 8A       COPYXY R8 -> R10
+; D 4264 53 0A 00 80    SUBXI R10 0080                     RA = digits before the point
+; D 4268 11 04 00 00    LOADXI R4 0000
+; PNL:
+; D 426C 87 47          TESTXY R4 = R7                     Printed them all?
+; D 426E A0 02 91       IFTRUEI PNTAIL
+; D 4271 2E 04 0D 02    READIDX R4 0D02
+; D 4275 4E 00 30       ADDAI 0030
+; D 4278 C9             SEROUT
+; D 4279 42 04          INCX R4
+; D 427B 8C 0A          TESTXZ R10
+; D 427D A0 02 6C       IFTRUEI PNL
+; D 4280 43 0A          DECX R10
+; D 4282 8C 0A          TESTXZ R10
+; D 4284 A1 02 6C       IFFALSEI PNL
+; D 4287 87 47          TESTXY R4 = R7                     the point, if digits follow
+; D 4289 A0 02 6C       IFTRUEI PNL
+; D 428C CA 2E          SEROUTI 2E '.'
+; D 428E B0 02 6C       GAL PNL
+; PNTAIL:
+; D 4291 8C 0A          TESTXZ R10                         Zeros to fill an integer out
+; D 4293 A0 02 9D       IFTRUEI PNEXP
+; D 4296 CA 30          SEROUTI 30 '0'
+; D 4298 43 0A          DECX R10
+; D 429A B0 02 91       GAL PNTAIL
+; PNEXP:
+; D 429D 8C 06          TESTXZ R6
+; D 429F A0 02 CD       IFTRUEI PNRET
+; D 42A2 CA 45          SEROUTI 45 'E'
+; D 42A4 43 09          DECX R9                            x = p - 1
+; D 42A6 11 0E 00 80    LOADXI R14 0080
+; D 42AA 89 9E          TESTLXY R9 < R14
+; D 42AC A1 02 B7       IFFALSEI PNEP
+; D 42AF CA 2D          SEROUTI 2D '-'
+; D 42B1 51 E9 09       SUBXYZ R14 - R9 -> R9
+; D 42B4 B0 02 BB       GAL PNEV
+; PNEP:
+; D 42B7 53 09 00 80    SUBXI R9 0080
+; PNEV:
+; D 42BB 4D 9F          DIVXY R9 / R15
+; D 42BD 25             COPYMAA
+; D 42BE 81 00 00       TESTAI 0000
+; D 42C1 A0 02 C8       IFTRUEI PNEU
+; D 42C4 4E 00 30       ADDAI 0030
+; D 42C7 C9             SEROUT
+; PNEU:
+; D 42C8 27             COPYREMA
+; D 42C9 4E 00 30       ADDAI 0030
+; D 42CC C9             SEROUT
+; PNRET:
+; D 42CD BE 00          RETURN
+; PNZERO:
+; D 42CF CA 30          SEROUTI 30 '0'
+; D 42D1 BE 00          RETURN
+
+; --------------------------------------------------------------------------
+; NATIVE CODE  -  a18 listing of Firmware-Math/calc8_native.asm
+; --------------------------------------------------------------------------
+;                   R2      EQU     2
+;                   R3      EQU     3
+;                   R5      EQU     5
+;                   R7      EQU     7
+;                   R8      EQU     8
+;                   R9      EQU     9
+;                   R11     EQU     11
+;                   R13     EQU     13
+;                   R14     EQU     14
+;                   R15     EQU     15
+;                   CALL    EQU     0D4H            ; SEP R4 - SCRT call, address follows
+;                   RETN    EQU     0D5H            ; SEP R5 - SCRT return
+;                   DPAGE   EQU     04DH            ; every data address below is in this page
+;                   NA      EQU     04D00H          ; STELLAR-relative $0D00
+;                   NB      EQU     04D10H          ; $0D10
+;                   ANS     EQU     04D20H          ; $0D20  (STELLAR side only)
+;                   OPB     EQU     04D30H          ; operation letter
+;                   STAT    EQU     04D31H          ; result status
+;                   RAWE    EQU     04D32H          ; parser: exponent + $80 of the raw digits
+;                   RAWN    EQU     04D33H          ; parser: how many raw digits
+;                   RAWS    EQU     04D34H          ; parser: sign
+;                   SGN     EQU     04D35H          ; the sign NORM gives its result
+;                   W       EQU     04D40H          ; 64-byte digit work area ($4D40-$4D7F)
+;                   RDV     EQU     04D80H          ; divide: the running remainder, 9 digits
+;                   DVS     EQU     04D90H          ; divide: the divisor, 9 digits (leading 0)
+; 4800 F8 4D        ENTRY:  LDI     DPAGE
+; 4802 B7                   PHI     R7
+; 4803 B8                   PHI     R8
+; 4804 BF                   PHI     R15
+; 4805 F8 31                LDI     LOW STAT
+; 4807 A8                   PLO     R8
+; 4808 F8 00                LDI     0
+; 480A 58                   STR     R8              ; STAT = 0
+; 480B F8 30                LDI     LOW OPB
+; 480D A8                   PLO     R8
+; 480E 08                   LDN     R8
+; 480F FB 4E                XRI     'N'
+; 4811 C2 48 2B             LBZ     DON
+; 4814 08                   LDN     R8
+; 4815 FB 2A                XRI     '*'
+; 4817 C2 48 F2             LBZ     DOMUL
+; 481A 08                   LDN     R8
+; 481B FB 2F                XRI     '/'
+; 481D C2 49 36             LBZ     DODIV
+; 4820 08                   LDN     R8
+; 4821 FB 2D                XRI     '-'
+; 4823 C2 48 5B             LBZ     DOSUB
+; 4826 C0 48 62             LBR     DOADD
+; 4829 E2           DONE:   SEX     R2
+; 482A D5                   DB      RETN            ; home to the RUNMC handler
+; 482B F8 34        DON:    LDI     LOW RAWS
+; 482D A7                   PLO     R7
+; 482E F8 35                LDI     LOW SGN
+; 4830 A8                   PLO     R8
+; 4831 07                   LDN     R7
+; 4832 58                   STR     R8              ; SGN = RAWS
+; 4833 F8 33                LDI     LOW RAWN
+; 4835 A7                   PLO     R7
+; 4836 07                   LDN     R7
+; 4837 AB                   PLO     R11             ; L = the digit count
+; 4838 FC 40                ADI     LOW W
+; 483A A8                   PLO     R8              ; W[L] ...
+; 483B F8 0A                LDI     10
+; 483D A9                   PLO     R9
+; 483E F8 00        DON1:   LDI     0               ; ... W[L+9] = 0: what NORM reads past the end
+; 4840 58                   STR     R8
+; 4841 18                   INC     R8
+; 4842 29                   DEC     R9
+; 4843 89                   GLO     R9
+; 4844 3A 3E                BNZ     DON1
+; 4846 F8 32                LDI     LOW RAWE
+; 4848 A7                   PLO     R7
+; 4849 07                   LDN     R7
+; 484A FC 80                ADI     080H            ; E = RAWE - $80 + $8000
+; 484C AD                   PLO     R13
+; 484D F8 7F                LDI     07FH
+; 484F 7C 00                ADCI    0
+; 4851 BD                   PHI     R13
+; 4852 F8 10                LDI     LOW NB
+; 4854 AF                   PLO     R15
+; 4855 D4                   DB      CALL
+; 4856 4A 7C                DW      NORM
+; 4858 C0 48 29             LBR     DONE
+; 485B F8 10        DOSUB:  LDI     LOW NB
+; 485D A8                   PLO     R8
+; 485E 08                   LDN     R8
+; 485F FB 01                XRI     1
+; 4861 58                   STR     R8
+; 4862 F8 12        DOADD:  LDI     LOW NB+2
+; 4864 A7                   PLO     R7
+; 4865 07                   LDN     R7
+; 4866 C2 48 29             LBZ     DONE            ; adding zero: A stands
+; 4869 F8 02                LDI     LOW NA+2
+; 486B A7                   PLO     R7
+; 486C 07                   LDN     R7
+; 486D 3A 82                BNZ     ADD1
+; 486F F8 10                LDI     LOW NB          ; A is zero: the answer is B
+; 4871 A7                   PLO     R7
+; 4872 F8 00                LDI     LOW NA
+; 4874 A8                   PLO     R8
+; 4875 F8 0A                LDI     10
+; 4877 A9                   PLO     R9
+; 4878 47           ADD0:   LDA     R7
+; 4879 58                   STR     R8
+; 487A 18                   INC     R8
+; 487B 29                   DEC     R9
+; 487C 89                   GLO     R9
+; 487D 3A 78                BNZ     ADD0
+; 487F C0 48 29             LBR     DONE
+; 4882 F8 01        ADD1:   LDI     LOW NA+1        ; the bigger magnitude goes in NA:
+; 4884 A7                   PLO     R7              ; compare exponent, then the 8 digits
+; 4885 F8 11                LDI     LOW NB+1
+; 4887 A8                   PLO     R8
+; 4888 F8 09                LDI     9
+; 488A A9                   PLO     R9
+; 488B D4                   DB      CALL
+; 488C 4A 10                DW      CMPN
+; 488E 33 93                BDF     ADD2
+; 4890 D4                   DB      CALL
+; 4891 49 FA                DW      SWAPAB
+; 4893 F8 01        ADD2:   LDI     LOW NA+1
+; 4895 A7                   PLO     R7
+; 4896 F8 11                LDI     LOW NB+1
+; 4898 A8                   PLO     R8
+; 4899 E8                   SEX     R8
+; 489A 07                   LDN     R7
+; 489B F7                   SM                      ; d = expA - expB
+; 489C AE                   PLO     R14
+; 489D FF 12                SMI     18
+; 489F C3 48 29             LBDF    DONE            ; 18 or more apart: B is far below A's
+; 48A2 F8 00                LDI     LOW NA
+; 48A4 A7                   PLO     R7
+; 48A5 F8 10                LDI     LOW NB
+; 48A7 A8                   PLO     R8
+; 48A8 E8                   SEX     R8
+; 48A9 07                   LDN     R7
+; 48AA F3                   XOR                     ; RE.1 = sign A xor sign B
+; 48AB BE                   PHI     R14
+; 48AC F8 35                LDI     LOW SGN
+; 48AE A8                   PLO     R8
+; 48AF 07                   LDN     R7
+; 48B0 58                   STR     R8              ; the answer has A's sign
+; 48B1 D4                   DB      CALL
+; 48B2 49 EB                DW      CLRW
+; 48B4 F8 02                LDI     LOW NA+2        ; W[1..8] = A
+; 48B6 A7                   PLO     R7
+; 48B7 F8 41                LDI     LOW W+1
+; 48B9 A8                   PLO     R8
+; 48BA F8 08                LDI     8
+; 48BC A9                   PLO     R9
+; 48BD 47           ADD3:   LDA     R7
+; 48BE 58                   STR     R8
+; 48BF 18                   INC     R8
+; 48C0 29                   DEC     R9
+; 48C1 89                   GLO     R9
+; 48C2 3A BD                BNZ     ADD3
+; 48C4 8E                   GLO     R14             ; B's last digit lines up with W[8+d]
+; 48C5 FC 48                ADI     LOW W+8
+; 48C7 A8                   PLO     R8
+; 48C8 F8 19                LDI     LOW NB+9
+; 48CA A7                   PLO     R7
+; 48CB F8 08                LDI     8
+; 48CD A9                   PLO     R9
+; 48CE 9E                   GHI     R14             ; same signs add, different subtract
+; 48CF 3A D6                BNZ     ADD5
+; 48D1 D4                   DB      CALL
+; 48D2 4A 1C                DW      ADDLP
+; 48D4 30 D9                BR      ADD6
+; 48D6 D4           ADD5:   DB      CALL
+; 48D7 4A 4D                DW      SUBLP
+; 48D9 8E           ADD6:   GLO     R14             ; the value in W[0..8+d] is B's scale:
+; 48DA FC 09                ADI     9               ; L = 9 + d, E = expB
+; 48DC AB                   PLO     R11
+; 48DD F8 11                LDI     LOW NB+1
+; 48DF A7                   PLO     R7
+; 48E0 07                   LDN     R7
+; 48E1 FC 80                ADI     080H
+; 48E3 AD                   PLO     R13
+; 48E4 F8 7F                LDI     07FH
+; 48E6 7C 00                ADCI    0
+; 48E8 BD                   PHI     R13
+; 48E9 F8 00                LDI     LOW NA
+; 48EB AF                   PLO     R15
+; 48EC D4                   DB      CALL
+; 48ED 4A 7C                DW      NORM
+; 48EF C0 48 29             LBR     DONE
+; 48F2 D4           DOMUL:  DB      CALL
+; 48F3 49 DB                DW      XSIGN
+; 48F5 D4                   DB      CALL
+; 48F6 49 EB                DW      CLRW
+; 48F8 F8 00                LDI     0
+; 48FA AE                   PLO     R14             ; j = 0..7, B's digit
+; 48FB 8E           MUL1:   GLO     R14
+; 48FC FC 12                ADI     LOW NB+2
+; 48FE A7                   PLO     R7
+; 48FF 07                   LDN     R7
+; 4900 AD                   PLO     R13             ; how many times to add A
+; 4901 8D           MUL2:   GLO     R13
+; 4902 32 14                BZ      MUL3
+; 4904 2D                   DEC     R13
+; 4905 8E                   GLO     R14             ; A's last digit lands on W[8+j]
+; 4906 FC 48                ADI     LOW W+8
+; 4908 A8                   PLO     R8
+; 4909 F8 09                LDI     LOW NA+9
+; 490B A7                   PLO     R7
+; 490C F8 08                LDI     8
+; 490E A9                   PLO     R9
+; 490F D4                   DB      CALL
+; 4910 4A 1C                DW      ADDLP
+; 4912 30 01                BR      MUL2
+; 4914 1E           MUL3:   INC     R14
+; 4915 8E                   GLO     R14
+; 4916 FB 08                XRI     8
+; 4918 CA 48 FB             LBNZ    MUL1
+; 491B F8 01                LDI     LOW NA+1        ; E = expA + expB - $80 - $80 + $8000
+; 491D A7                   PLO     R7
+; 491E F8 11                LDI     LOW NB+1
+; 4920 A8                   PLO     R8
+; 4921 E8                   SEX     R8
+; 4922 07                   LDN     R7
+; 4923 F4                   ADD
+; 4924 AD                   PLO     R13
+; 4925 F8 7F                LDI     07FH
+; 4927 7C 00                ADCI    0
+; 4929 BD                   PHI     R13
+; 492A F8 10                LDI     16
+; 492C AB                   PLO     R11
+; 492D F8 00                LDI     LOW NA
+; 492F AF                   PLO     R15
+; 4930 D4                   DB      CALL
+; 4931 4A 7C                DW      NORM
+; 4933 C0 48 29             LBR     DONE
+; 4936 F8 12        DODIV:  LDI     LOW NB+2
+; 4938 A7                   PLO     R7
+; 4939 07                   LDN     R7
+; 493A 3A 45                BNZ     DIV1
+; 493C F8 31                LDI     LOW STAT
+; 493E A8                   PLO     R8
+; 493F F8 01                LDI     1
+; 4941 58                   STR     R8              ; divide by zero
+; 4942 C0 48 29             LBR     DONE
+; 4945 D4           DIV1:   DB      CALL
+; 4946 49 DB                DW      XSIGN
+; 4948 D4                   DB      CALL
+; 4949 49 EB                DW      CLRW
+; 494B F8 80                LDI     LOW RDV
+; 494D A8                   PLO     R8
+; 494E F8 00                LDI     0
+; 4950 58                   STR     R8
+; 4951 F8 90                LDI     LOW DVS
+; 4953 A8                   PLO     R8
+; 4954 F8 00                LDI     0
+; 4956 58                   STR     R8
+; 4957 F8 08                LDI     8
+; 4959 A9                   PLO     R9
+; 495A F8 02                LDI     LOW NA+2
+; 495C A7                   PLO     R7
+; 495D F8 81                LDI     LOW RDV+1
+; 495F A8                   PLO     R8
+; 4960 47           DIV2:   LDA     R7
+; 4961 58                   STR     R8
+; 4962 18                   INC     R8
+; 4963 29                   DEC     R9
+; 4964 89                   GLO     R9
+; 4965 3A 60                BNZ     DIV2
+; 4967 F8 08                LDI     8
+; 4969 A9                   PLO     R9
+; 496A F8 12                LDI     LOW NB+2
+; 496C A7                   PLO     R7
+; 496D F8 91                LDI     LOW DVS+1
+; 496F A8                   PLO     R8
+; 4970 47           DIV3:   LDA     R7
+; 4971 58                   STR     R8
+; 4972 18                   INC     R8
+; 4973 29                   DEC     R9
+; 4974 89                   GLO     R9
+; 4975 3A 70                BNZ     DIV3
+; 4977 F8 00                LDI     0
+; 4979 AE                   PLO     R14             ; k = 0..9
+; 497A F8 00        DIV4:   LDI     0
+; 497C AD                   PLO     R13             ; q = 0
+; 497D F8 80        DIV5:   LDI     LOW RDV
+; 497F A7                   PLO     R7
+; 4980 F8 90                LDI     LOW DVS
+; 4982 A8                   PLO     R8
+; 4983 F8 09                LDI     9
+; 4985 A9                   PLO     R9
+; 4986 D4                   DB      CALL
+; 4987 4A 10                DW      CMPN
+; 4989 3B 9A                BNF     DIV6            ; remainder < divisor: q is this digit
+; 498B F8 98                LDI     LOW DVS+8
+; 498D A7                   PLO     R7
+; 498E F8 88                LDI     LOW RDV+8
+; 4990 A8                   PLO     R8
+; 4991 F8 09                LDI     9
+; 4993 A9                   PLO     R9
+; 4994 D4                   DB      CALL
+; 4995 4A 4D                DW      SUBLP
+; 4997 1D                   INC     R13
+; 4998 30 7D                BR      DIV5
+; 499A 8E           DIV6:   GLO     R14
+; 499B FC 40                ADI     LOW W
+; 499D A8                   PLO     R8
+; 499E 8D                   GLO     R13
+; 499F 58                   STR     R8              ; W[k] = q
+; 49A0 F8 80                LDI     LOW RDV         ; remainder x 10
+; 49A2 A7                   PLO     R7
+; 49A3 F8 08                LDI     8
+; 49A5 A9                   PLO     R9
+; 49A6 17           DIV7:   INC     R7
+; 49A7 07                   LDN     R7
+; 49A8 27                   DEC     R7
+; 49A9 57                   STR     R7
+; 49AA 17                   INC     R7
+; 49AB 29                   DEC     R9
+; 49AC 89                   GLO     R9
+; 49AD 3A A6                BNZ     DIV7
+; 49AF F8 00                LDI     0
+; 49B1 57                   STR     R7
+; 49B2 1E                   INC     R14
+; 49B3 8E                   GLO     R14
+; 49B4 FB 0A                XRI     10
+; 49B6 3A 7A                BNZ     DIV4
+; 49B8 F8 11                LDI     LOW NB+1        ; E = expA - expB + $8000 - 9
+; 49BA A8                   PLO     R8
+; 49BB F8 01                LDI     LOW NA+1
+; 49BD A7                   PLO     R7
+; 49BE E8                   SEX     R8
+; 49BF 07                   LDN     R7
+; 49C0 F7                   SM
+; 49C1 AD                   PLO     R13
+; 49C2 F8 80                LDI     080H
+; 49C4 7F 00                SMBI    0
+; 49C6 BD                   PHI     R13
+; 49C7 8D                   GLO     R13
+; 49C8 FF 09                SMI     9
+; 49CA AD                   PLO     R13
+; 49CB 9D                   GHI     R13
+; 49CC 7F 00                SMBI    0
+; 49CE BD                   PHI     R13
+; 49CF F8 0A                LDI     10
+; 49D1 AB                   PLO     R11
+; 49D2 F8 00                LDI     LOW NA
+; 49D4 AF                   PLO     R15
+; 49D5 D4                   DB      CALL
+; 49D6 4A 7C                DW      NORM
+; 49D8 C0 48 29             LBR     DONE
+; 49DB F8 00        XSIGN:  LDI     LOW NA
+; 49DD A7                   PLO     R7
+; 49DE F8 10                LDI     LOW NB
+; 49E0 A8                   PLO     R8
+; 49E1 E8                   SEX     R8
+; 49E2 07                   LDN     R7
+; 49E3 F3                   XOR
+; 49E4 52                   STR     R2
+; 49E5 F8 35                LDI     LOW SGN
+; 49E7 A8                   PLO     R8
+; 49E8 02                   LDN     R2
+; 49E9 58                   STR     R8
+; 49EA D5                   DB      RETN
+; 49EB F8 40        CLRW:   LDI     LOW W
+; 49ED A8                   PLO     R8
+; 49EE F8 40                LDI     64
+; 49F0 A9                   PLO     R9
+; 49F1 F8 00        CLRW1:  LDI     0
+; 49F3 58                   STR     R8
+; 49F4 18                   INC     R8
+; 49F5 29                   DEC     R9
+; 49F6 89                   GLO     R9
+; 49F7 3A F1                BNZ     CLRW1
+; 49F9 D5                   DB      RETN
+; 49FA F8 00        SWAPAB: LDI     LOW NA
+; 49FC A7                   PLO     R7
+; 49FD F8 10                LDI     LOW NB
+; 49FF A8                   PLO     R8
+; 4A00 F8 0A                LDI     10
+; 4A02 A9                   PLO     R9
+; 4A03 07           SWAP1:  LDN     R7
+; 4A04 52                   STR     R2
+; 4A05 08                   LDN     R8
+; 4A06 57                   STR     R7
+; 4A07 02                   LDN     R2
+; 4A08 58                   STR     R8
+; 4A09 17                   INC     R7
+; 4A0A 18                   INC     R8
+; 4A0B 29                   DEC     R9
+; 4A0C 89                   GLO     R9
+; 4A0D 3A 03                BNZ     SWAP1
+; 4A0F D5                   DB      RETN
+; 4A10 E8           CMPN:   SEX     R8
+; 4A11 07           CMP1:   LDN     R7
+; 4A12 F7                   SM                      ; DF = 1: no borrow, R7's byte >= R8's
+; 4A13 3A 1B                BNZ     CMP2            ; first difference decides
+; 4A15 17                   INC     R7
+; 4A16 18                   INC     R8
+; 4A17 29                   DEC     R9
+; 4A18 89                   GLO     R9
+; 4A19 3A 11                BNZ     CMP1            ; all equal: DF = 1 from the last SM
+; 4A1B D5           CMP2:   DB      RETN            ; (the SCRT return leaves DF alone)
+; 4A1C F8 00        ADDLP:  LDI     0
+; 4A1E B9                   PHI     R9              ; carry
+; 4A1F 07           ADL1:   LDN     R7
+; 4A20 27                   DEC     R7
+; 4A21 52                   STR     R2
+; 4A22 99                   GHI     R9
+; 4A23 E2                   SEX     R2
+; 4A24 F4                   ADD
+; 4A25 52                   STR     R2              ; digit + carry
+; 4A26 08                   LDN     R8
+; 4A27 F4                   ADD                     ; + the digit already there
+; 4A28 FF 0A                SMI     10
+; 4A2A 33 34                BDF     ADL2
+; 4A2C FC 0A                ADI     10
+; 4A2E 58                   STR     R8
+; 4A2F F8 00                LDI     0
+; 4A31 B9                   PHI     R9
+; 4A32 30 38                BR      ADL3
+; 4A34 58           ADL2:   STR     R8
+; 4A35 F8 01                LDI     1
+; 4A37 B9                   PHI     R9
+; 4A38 28           ADL3:   DEC     R8
+; 4A39 29                   DEC     R9
+; 4A3A 89                   GLO     R9
+; 4A3B 3A 1F                BNZ     ADL1
+; 4A3D 99           ADL4:   GHI     R9
+; 4A3E 32 4C                BZ      ADL5
+; 4A40 08                   LDN     R8
+; 4A41 FC 01                ADI     1
+; 4A43 58                   STR     R8
+; 4A44 FF 0A                SMI     10
+; 4A46 3B 4C                BNF     ADL5
+; 4A48 58                   STR     R8
+; 4A49 28                   DEC     R8
+; 4A4A 30 3D                BR      ADL4
+; 4A4C D5           ADL5:   DB      RETN
+; 4A4D F8 00        SUBLP:  LDI     0
+; 4A4F B9                   PHI     R9              ; borrow
+; 4A50 07           SBL1:   LDN     R7
+; 4A51 27                   DEC     R7
+; 4A52 52                   STR     R2
+; 4A53 99                   GHI     R9
+; 4A54 E2                   SEX     R2
+; 4A55 F4                   ADD
+; 4A56 52                   STR     R2              ; digit + borrow
+; 4A57 08                   LDN     R8
+; 4A58 F7                   SM                      ; the digit there - that
+; 4A59 33 63                BDF     SBL2
+; 4A5B FC 0A                ADI     10
+; 4A5D 58                   STR     R8
+; 4A5E F8 01                LDI     1
+; 4A60 B9                   PHI     R9
+; 4A61 30 67                BR      SBL3
+; 4A63 58           SBL2:   STR     R8
+; 4A64 F8 00                LDI     0
+; 4A66 B9                   PHI     R9
+; 4A67 28           SBL3:   DEC     R8
+; 4A68 29                   DEC     R9
+; 4A69 89                   GLO     R9
+; 4A6A 3A 50                BNZ     SBL1
+; 4A6C 99           SBL4:   GHI     R9
+; 4A6D 32 7B                BZ      SBL6
+; 4A6F 08                   LDN     R8
+; 4A70 FF 01                SMI     1
+; 4A72 33 7A                BDF     SBL5
+; 4A74 FC 0A                ADI     10
+; 4A76 58                   STR     R8
+; 4A77 28                   DEC     R8
+; 4A78 30 6C                BR      SBL4
+; 4A7A 58           SBL5:   STR     R8
+; 4A7B D5           SBL6:   DB      RETN
+; 4A7C F8 40        NORM:   LDI     LOW W
+; 4A7E A7                   PLO     R7
+; 4A7F 8B           NRM1:   GLO     R11             ; skip leading zeros
+; 4A80 C2 4A E5             LBZ     NZERO
+; 4A83 07                   LDN     R7
+; 4A84 3A 8A                BNZ     NRM2
+; 4A86 17                   INC     R7
+; 4A87 2B                   DEC     R11
+; 4A88 30 7F                BR      NRM1
+; 4A8A 8B           NRM2:   GLO     R11             ; RB.0 = digits from here to the end
+; 4A8B 52                   STR     R2
+; 4A8C E2                   SEX     R2
+; 4A8D 8D                   GLO     R13             ; E = E + that - 8
+; 4A8E F4                   ADD
+; 4A8F AD                   PLO     R13
+; 4A90 9D                   GHI     R13
+; 4A91 7C 00                ADCI    0
+; 4A93 BD                   PHI     R13
+; 4A94 8D                   GLO     R13
+; 4A95 FF 08                SMI     8
+; 4A97 AD                   PLO     R13
+; 4A98 9D                   GHI     R13
+; 4A99 7F 00                SMBI    0
+; 4A9B BD                   PHI     R13
+; 4A9C 8F                   GLO     R15             ; eight digits into the record
+; 4A9D FC 02                ADI     2
+; 4A9F A8                   PLO     R8
+; 4AA0 F8 08                LDI     8
+; 4AA2 A9                   PLO     R9
+; 4AA3 47           NRM3:   LDA     R7
+; 4AA4 58                   STR     R8
+; 4AA5 18                   INC     R8
+; 4AA6 29                   DEC     R9
+; 4AA7 89                   GLO     R9
+; 4AA8 3A A3                BNZ     NRM3
+; 4AAA 07                   LDN     R7              ; the next digit rounds
+; 4AAB FF 05                SMI     5
+; 4AAD 3B C6                BNF     NRM6
+; 4AAF 28                   DEC     R8
+; 4AB0 F8 08                LDI     8
+; 4AB2 A9                   PLO     R9
+; 4AB3 08           NRM4:   LDN     R8
+; 4AB4 FC 01                ADI     1
+; 4AB6 58                   STR     R8
+; 4AB7 FF 0A                SMI     10
+; 4AB9 3B C6                BNF     NRM6
+; 4ABB 58                   STR     R8              ; 10 -> 0, carry on
+; 4ABC 28                   DEC     R8
+; 4ABD 29                   DEC     R9
+; 4ABE 89                   GLO     R9
+; 4ABF 3A B3                BNZ     NRM4
+; 4AC1 18                   INC     R8              ; 99999999 + 1: 10000000 and E + 1
+; 4AC2 F8 01                LDI     1
+; 4AC4 58                   STR     R8
+; 4AC5 1D                   INC     R13
+; 4AC6 8D           NRM6:   GLO     R13             ; T = E - ($8000 - 106)
+; 4AC7 FF 96                SMI     096H
+; 4AC9 A9                   PLO     R9
+; 4ACA 9D                   GHI     R13
+; 4ACB 7F 7F                SMBI    07FH
+; 4ACD 3B E5                BNF     NZERO           ; below -106: zero
+; 4ACF 3A FB                BNZ     NOVF
+; 4AD1 89                   GLO     R9
+; 4AD2 FF C7                SMI     199
+; 4AD4 33 FB                BDF     NOVF            ; above +92: too big
+; 4AD6 89                   GLO     R9
+; 4AD7 FC 16                ADI     22              ; exponent byte = e + $80
+; 4AD9 A9                   PLO     R9
+; 4ADA 8F                   GLO     R15
+; 4ADB A8                   PLO     R8
+; 4ADC F8 35                LDI     LOW SGN
+; 4ADE A7                   PLO     R7
+; 4ADF 07                   LDN     R7
+; 4AE0 58                   STR     R8
+; 4AE1 18                   INC     R8
+; 4AE2 89                   GLO     R9
+; 4AE3 58                   STR     R8
+; 4AE4 D5                   DB      RETN
+; 4AE5 8F           NZERO:  GLO     R15
+; 4AE6 A8                   PLO     R8
+; 4AE7 F8 00                LDI     0
+; 4AE9 58                   STR     R8
+; 4AEA 18                   INC     R8
+; 4AEB F8 80                LDI     080H
+; 4AED 58                   STR     R8
+; 4AEE 18                   INC     R8
+; 4AEF F8 08                LDI     8
+; 4AF1 A9                   PLO     R9
+; 4AF2 F8 00        NZ1:    LDI     0
+; 4AF4 58                   STR     R8
+; 4AF5 18                   INC     R8
+; 4AF6 29                   DEC     R9
+; 4AF7 89                   GLO     R9
+; 4AF8 3A F2                BNZ     NZ1
+; 4AFA D5                   DB      RETN
+; 4AFB F8 31        NOVF:   LDI     LOW STAT
+; 4AFD A8                   PLO     R8
+; 4AFE F8 02                LDI     2
+; 4B00 58                   STR     R8
+; 4B01 D5                   DB      RETN
+;                   2  ADD1          4893  ADD2          48bd  ADD3
+
+; --------------------------------------------------------------------------
+; CODE  -  download this block (STELLAR program, native code, text)
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 11 0F 00 0A
+D 4005 11 0E 0D 20
+D 4009 32 0E 00 80
+D 400D 52 0E 00 02
+D 4011 32 0E 00 00
+D 4015 52 0E 00 02
+D 4019 32 0E 00 00
+D 401D 52 0E 00 02
+D 4021 32 0E 00 00
+D 4025 52 0E 00 02
+D 4029 32 0E 00 00
+D 402D 11 0E 0C 00
+D 4031 C1 0E
+D 4033 11 0E 0B 40
+D 4037 C1 0E
+D 4039 11 0C 0E 00
+D 403D 11 0D 0E 00
+D 4041 C2 CD
+D 4043 11 0C 0E 00
+D 4047 BD 01 1E
+D 404A 8C 00
+D 404C A0 01 15
+D 404F 86 00 00 2B
+D 4053 A0 00 80
+D 4056 86 00 00 2A
+D 405A A0 00 80
+D 405D 86 00 00 2F
+D 4061 A0 00 80
+D 4064 BD 01 3F
+D 4067 8C 0A
+D 4069 A0 00 FD
+D 406C BD 01 32
+D 406F A1 01 06
+D 4072 11 0D 0D 10
+D 4076 11 0E 0D 00
+D 407A 3B DE 0A
+D 407D B0 00 8B
+D 4080 11 0D 0D 20
+D 4084 11 0E 0D 00
+D 4088 3B DE 0A
+D 408B BD 01 1E
+D 408E 8C 00
+D 4090 A0 00 E6
+D 4093 23 00 09
+D 4096 86 09 00 2B
+D 409A A0 00 BD
+D 409D 86 09 00 2D
+D 40A1 A0 00 BD
+D 40A4 86 09 00 2A
+D 40A8 A0 00 BD
+D 40AB 86 09 00 2F
+D 40AF A0 00 BD
+D 40B2 86 09 00 78
+D 40B6 A1 00 FD
+D 40B9 11 09 00 2A
+D 40BD 42 0C
+D 40BF BD 01 1E
+D 40C2 BD 01 3F
+D 40C5 8C 0A
+D 40C7 A0 00 FD
+D 40CA BD 01 32
+D 40CD A1 01 06
+D 40D0 11 0E 00 00
+D 40D4 22 09
+D 40D6 2F 0E 0D 30
+D 40DA F1 48 00
+D 40DD BD 01 32
+D 40E0 A1 01 06
+D 40E3 B0 00 8B
+D 40E6 11 0D 0D 00
+D 40EA 11 0E 0D 20
+D 40EE 3B DE 0A
+D 40F1 11 0E 0B 48
+D 40F5 C1 0E
+D 40F7 BD 01 E4
+D 40FA B0 00 33
+D 40FD 11 0E 0B 58
+D 4101 C1 0E
+D 4103 B0 00 33
+D 4106 11 0E 0B 48
+D 410A C1 0E
+D 410C 11 0E 0B 50
+D 4110 C1 0E
+D 4112 B0 00 33
+D 4115 11 0E 0B 60
+D 4119 C1 0E
+D 411B F0 00 00
+D 411E 2E 0C 00 00
+D 4122 21 00
+D 4124 86 00 00 20
+D 4128 A1 01 30
+D 412B 42 0C
+D 412D B0 01 1E
+D 4130 BE 00
+D 4132 11 0E 00 00
+D 4136 2E 0E 0D 31
+D 413A 81 00 00
+D 413D BE 00
+D 413F 11 04 00 00
+D 4143 11 05 00 00
+D 4147 11 06 00 80
+D 414B 11 08 00 00
+D 414F 11 0A 00 00
+D 4153 2E 0C 00 00
+D 4157 21 00
+D 4159 86 00 00 2D
+D 415D A1 01 66
+D 4160 11 04 00 01
+D 4164 42 0C
+D 4166 2E 0C 00 00
+D 416A 21 00
+D 416C 86 00 00 2E
+D 4170 A1 01 81
+D 4173 8C 08
+D 4175 A1 01 C2
+D 4178 11 08 00 01
+D 417C 42 0C
+D 417E B0 01 66
+D 4181 53 00 00 30
+D 4185 89 0F
+D 4187 A1 01 C2
+D 418A 42 0C
+D 418C 11 0A 00 01
+D 4190 8C 05
+D 4192 A1 01 9D
+D 4195 8C 00
+D 4197 A1 01 9D
+D 419A B0 01 AE
+D 419D 11 0E 00 14
+D 41A1 89 5E
+D 41A3 A1 01 B8
+D 41A6 22 00
+D 41A8 2F 05 0D 40
+D 41AC 42 05
+D 41AE 8C 08
+D 41B0 A0 01 66
+D 41B3 43 06
+D 41B5 B0 01 66
+D 41B8 8C 08
+D 41BA A1 01 66
+D 41BD 42 06
+D 41BF B0 01 66
+D 41C2 11 0E 00 00
+D 41C6 22 05
+D 41C8 2F 0E 0D 33
+D 41CC 22 06
+D 41CE 2F 0E 0D 32
+D 41D2 22 04
+D 41D4 2F 0E 0D 34
+D 41D8 10 00 4E
+D 41DB 2F 0E 0D 30
+D 41DF F1 48 00
+D 41E2 BE 00
+D 41E4 11 07 00 08
+D 41E8 8C 07
+D 41EA A0 02 CF
+D 41ED 43 07
+D 41EF 2E 07 0D 02
+D 41F3 81 00 00
+D 41F6 A0 01 E8
+D 41F9 42 07
+D 41FB 11 0E 00 00
+D 41FF 2E 0E 0D 00
+D 4203 81 00 00
+D 4206 A0 02 0B
+D 4209 CA 2D
+D 420B 2E 0E 0D 01
+D 420F 21 03
+D 4211 52 03 00 08
+D 4215 51 37 03
+D 4218 50 73 08
+D 421B 11 06 00 00
+D 421F 11 0E 00 80
+D 4223 88 3E
+D 4225 A1 02 34
+D 4228 11 0E 00 8C
+D 422C 88 E8
+D 422E A0 02 48
+D 4231 B0 02 3D
+D 4234 11 0E 00 74
+D 4238 88 3E
+D 423A A0 02 48
+D 423D 11 06 00 01
+D 4241 23 00 89
+D 4244 11 08 00 81
+D 4248 11 0E 00 80
+D 424C 88 E8
+D 424E A1 02 61
+D 4251 CA 30
+D 4253 CA 2E
+D 4255 87 8E
+D 4257 A0 02 61
+D 425A CA 30
+D 425C 42 08
+D 425E B0 02 55
+D 4261 23 00 8A
+D 4264 53 0A 00 80
+D 4268 11 04 00 00
+D 426C 87 47
+D 426E A0 02 91
+D 4271 2E 04 0D 02
+D 4275 4E 00 30
+D 4278 C9
+D 4279 42 04
+D 427B 8C 0A
+D 427D A0 02 6C
+D 4280 43 0A
+D 4282 8C 0A
+D 4284 A1 02 6C
+D 4287 87 47
+D 4289 A0 02 6C
+D 428C CA 2E
+D 428E B0 02 6C
+D 4291 8C 0A
+D 4293 A0 02 9D
+D 4296 CA 30
+D 4298 43 0A
+D 429A B0 02 91
+D 429D 8C 06
+D 429F A0 02 CD
+D 42A2 CA 45
+D 42A4 43 09
+D 42A6 11 0E 00 80
+D 42AA 89 9E
+D 42AC A1 02 B7
+D 42AF CA 2D
+D 42B1 51 E9 09
+D 42B4 B0 02 BB
+D 42B7 53 09 00 80
+D 42BB 4D 9F
+D 42BD 25
+D 42BE 81 00 00
+D 42C1 A0 02 C8
+D 42C4 4E 00 30
+D 42C7 C9
+D 42C8 27
+D 42C9 4E 00 30
+D 42CC C9
+D 42CD BE 00
+D 42CF CA 30
+D 42D1 BE 00
+
+D 4800 F8 4D B7 B8 BF F8 31 A8 F8 00 58 F8 30 A8 08 FB
+D 4810 4E C2 48 2B 08 FB 2A C2 48 F2 08 FB 2F C2 49 36
+D 4820 08 FB 2D C2 48 5B C0 48 62 E2 D5 F8 34 A7 F8 35
+D 4830 A8 07 58 F8 33 A7 07 AB FC 40 A8 F8 0A A9 F8 00
+D 4840 58 18 29 89 3A 3E F8 32 A7 07 FC 80 AD F8 7F 7C
+D 4850 00 BD F8 10 AF D4 4A 7C C0 48 29 F8 10 A8 08 FB
+D 4860 01 58 F8 12 A7 07 C2 48 29 F8 02 A7 07 3A 82 F8
+D 4870 10 A7 F8 00 A8 F8 0A A9 47 58 18 29 89 3A 78 C0
+D 4880 48 29 F8 01 A7 F8 11 A8 F8 09 A9 D4 4A 10 33 93
+D 4890 D4 49 FA F8 01 A7 F8 11 A8 E8 07 F7 AE FF 12 C3
+D 48A0 48 29 F8 00 A7 F8 10 A8 E8 07 F3 BE F8 35 A8 07
+D 48B0 58 D4 49 EB F8 02 A7 F8 41 A8 F8 08 A9 47 58 18
+D 48C0 29 89 3A BD 8E FC 48 A8 F8 19 A7 F8 08 A9 9E 3A
+D 48D0 D6 D4 4A 1C 30 D9 D4 4A 4D 8E FC 09 AB F8 11 A7
+D 48E0 07 FC 80 AD F8 7F 7C 00 BD F8 00 AF D4 4A 7C C0
+D 48F0 48 29 D4 49 DB D4 49 EB F8 00 AE 8E FC 12 A7 07
+D 4900 AD 8D 32 14 2D 8E FC 48 A8 F8 09 A7 F8 08 A9 D4
+D 4910 4A 1C 30 01 1E 8E FB 08 CA 48 FB F8 01 A7 F8 11
+D 4920 A8 E8 07 F4 AD F8 7F 7C 00 BD F8 10 AB F8 00 AF
+D 4930 D4 4A 7C C0 48 29 F8 12 A7 07 3A 45 F8 31 A8 F8
+D 4940 01 58 C0 48 29 D4 49 DB D4 49 EB F8 80 A8 F8 00
+D 4950 58 F8 90 A8 F8 00 58 F8 08 A9 F8 02 A7 F8 81 A8
+D 4960 47 58 18 29 89 3A 60 F8 08 A9 F8 12 A7 F8 91 A8
+D 4970 47 58 18 29 89 3A 70 F8 00 AE F8 00 AD F8 80 A7
+D 4980 F8 90 A8 F8 09 A9 D4 4A 10 3B 9A F8 98 A7 F8 88
+D 4990 A8 F8 09 A9 D4 4A 4D 1D 30 7D 8E FC 40 A8 8D 58
+D 49A0 F8 80 A7 F8 08 A9 17 07 27 57 17 29 89 3A A6 F8
+D 49B0 00 57 1E 8E FB 0A 3A 7A F8 11 A8 F8 01 A7 E8 07
+D 49C0 F7 AD F8 80 7F 00 BD 8D FF 09 AD 9D 7F 00 BD F8
+D 49D0 0A AB F8 00 AF D4 4A 7C C0 48 29 F8 00 A7 F8 10
+D 49E0 A8 E8 07 F3 52 F8 35 A8 02 58 D5 F8 40 A8 F8 40
+D 49F0 A9 F8 00 58 18 29 89 3A F1 D5 F8 00 A7 F8 10 A8
+D 4A00 F8 0A A9 07 52 08 57 02 58 17 18 29 89 3A 03 D5
+D 4A10 E8 07 F7 3A 1B 17 18 29 89 3A 11 D5 F8 00 B9 07
+D 4A20 27 52 99 E2 F4 52 08 F4 FF 0A 33 34 FC 0A 58 F8
+D 4A30 00 B9 30 38 58 F8 01 B9 28 29 89 3A 1F 99 32 4C
+D 4A40 08 FC 01 58 FF 0A 3B 4C 58 28 30 3D D5 F8 00 B9
+D 4A50 07 27 52 99 E2 F4 52 08 F7 33 63 FC 0A 58 F8 01
+D 4A60 B9 30 67 58 F8 00 B9 28 29 89 3A 50 99 32 7B 08
+D 4A70 FF 01 33 7A FC 0A 58 28 30 6C 58 D5 F8 40 A7 8B
+D 4A80 C2 4A E5 07 3A 8A 17 2B 30 7F 8B 52 E2 8D F4 AD
+D 4A90 9D 7C 00 BD 8D FF 08 AD 9D 7F 00 BD 8F FC 02 A8
+D 4AA0 F8 08 A9 47 58 18 29 89 3A A3 07 FF 05 3B C6 28
+D 4AB0 F8 08 A9 08 FC 01 58 FF 0A 3B C6 58 28 29 89 3A
+D 4AC0 B3 18 F8 01 58 1D 8D FF 96 A9 9D 7F 7F 3B E5 3A
+D 4AD0 FB 89 FF C7 33 FB 89 FC 16 A9 8F A8 F8 35 A7 07
+D 4AE0 58 18 89 58 D5 8F A8 F8 00 58 18 F8 80 58 18 F8
+D 4AF0 08 A9 F8 00 58 18 29 89 3A F2 D5 F8 31 A8 F8 02
+D 4B00 58 D5
+
+D 4B40 0D 0A 3E 20 00
+
+D 4B48 0D 0A 20 3D 20 00
+
+D 4B50 45 72 72 00
+
+D 4B58 0D 0A 20 3D 20 3F 00
+
+D 4B60 0D 0A 42 79 65 0D 0A 00
+
+D 4C00 0D 0A 53 54 45 4C 4C 41 52 20 53 49 4D 50 4C 45
+D 4C10 2D 43 41 4C 43 20 38 0D 0A 54 79 70 65 20 61 20
+D 4C20 73 75 6D 20 61 6E 64 20 70 72 65 73 73 20 45 6E
+D 4C30 74 65 72 2C 20 65 2E 67 2E 20 20 32 2B 33 2A 34
+D 4C40 20 20 20 31 2F 37 20 20 20 2D 32 2E 35 2A 34 0D
+D 4C50 0A 49 74 20 77 6F 72 6B 73 20 6C 65 66 74 20 74
+D 4C60 6F 20 72 69 67 68 74 2E 20 53 74 61 72 74 20 61
+D 4C70 20 6C 69 6E 65 20 77 69 74 68 20 2B 20 2A 20 2F
+D 4C80 20 74 6F 20 75 73 65 20 74 68 65 20 6C 61 73 74
+D 4C90 20 61 6E 73 77 65 72 2E 0D 0A 38 20 73 69 67 6E
+D 4CA0 69 66 69 63 61 6E 74 20 64 69 67 69 74 73 2C 20
+D 4CB0 72 6F 75 6E 64 65 64 3B 20 65 78 70 6F 6E 65 6E
+D 4CC0 74 73 20 74 6F 20 2B 2F 2D 39 39 2E 0D 0A 45 6E
+D 4CD0 74 65 72 20 6F 6E 20 69 74 73 20 6F 77 6E 20 71
+D 4CE0 75 69 74 73 2E 0D 0A 00
+D 5000 00
+D 6000 00
+D 7000 00

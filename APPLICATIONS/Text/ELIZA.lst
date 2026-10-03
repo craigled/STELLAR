@@ -1,0 +1,1209 @@
+; ==========================================================================
+; STELLAR ELIZA v3  -  the 1966 chatbot, fast and conversational   (VM1 @ $4000)
+; ==========================================================================
+; Type normally - lower case is fine. It asks your name first. BYE to quit.
+;
+;   > hello                   HELLO, CRAIG. WHAT'S ON YOUR MIND?
+;   > my mother hates me      TELL ME MORE ABOUT YOUR FAMILY.
+;   > i am sad                DID YOU COME TO ME BECAUSE YOU ARE SAD?
+;   > i am sad                PLEASE DON'T REPEAT YOURSELF, CRAIG.
+;   > whatever                EARLIER YOU SAID YOUR MOTHER HATES YOU.
+;
+; A rewrite of ELIZA v2 (none of its code is reused). New: type in any case;
+; whole-word keywords by priority (100 keywords in 31 groups); 124 replies taken in
+; turn; memory ("MY ..." comes back later); notices repeats; uses your name.
+; A reply starts 6,000-49,000 1802 instructions after Enter - about 0.02-0.2 s
+; (v2: up to 1.7 million, 7 seconds).
+;
+; THE SPLIT. The text work is native 1802 at $4C00 (Firmware-Math/eliza_native.asm,
+; 866 bytes), entered with RUNMC and an operation letter at $6B00: P parse the
+; line, N take the name, B fill in a reply. The conversation - which group to
+; answer from, the rotation of replies, the memory, goodbye - is the STELLAR
+; program below. Edit the script (keywords, replies, pronoun swaps) in
+; Firmware-Math/build_eliza3.py, not here.
+;
+; MEMORY. SETSIZE 3 takes $4000-$6FFF, so load it with no other programs in
+; the $5000 and $6000 blocks. Replies $5000-$5FFF, buffers $6000-$6FFF.
+; Needs firmware with SETSIZE ($F2), RUNMC ($F1), PRINTSTR, GETSTR - V0061.28 on.
+;
+; VERIFICATION (Firmware-Math/eliza3_verify.py, V0061.33 image): conversations
+; replayed against a Python model of the same rules, character for character -
+; 33 scripted lines + 400 random lines, 0 wrong.
+;
+; RUN ON THE ELF2K 2026-09-24 (V0061.33) - Craig: "It is much faster. Well done."
+;
+; 99 STELLAR commands, $4000-$4141 (322 bytes); native code $4C00-$4F61.
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 4000 CD             START                              Start of program, and run the label pre-pass
+; D 4001 F2 03          SETSIZE 3                          Take $4000-$6FFF: VM1 plus the two blocks above it
+; D 4003 11 04 00 40    LOADXI R4 0040                     Every group starts on its first reply
+; ZROT:
+; D 4007 43 04          DECX R4
+; D 4009 10 00 00       LOADAI 0000
+; D 400C 2F 04 2B 10    WRITEIDX R4 2B10
+; D 4010 8C 04          TESTXZ R4
+; D 4012 A1 00 07       IFFALSEI ZROT
+; D 4015 11 0E 00 00    LOADXI R14 0000
+; D 4019 2F 0E 2B 08    WRITEIDX R14 2B08                  Nothing remembered yet
+; D 401D 2F 0E 21 00    WRITEIDX R14 2100                  and no previous line
+; D 4021 11 0E 03 00    LOADXI R14 0300
+; D 4025 C1 0E          PRINTSTR R14                       HI, I'M ELIZA. WHAT'S YOUR NAME?
+; D 4027 BD 00 DB       CALL INPUT
+; D 402A 11 0E 00 00    LOADXI R14 0000
+; D 402E 10 00 4E       LOADAI 004E
+; D 4031 2F 0E 2B 00    WRITEIDX R14 2B00
+; D 4035 F1 4C 00       RUNMC 4C00                         Pick the name out of the reply
+; D 4038 11 04 00 23    LOADXI R4 0023
+; D 403C BD 00 F3       CALL SAY                           NICE TO MEET YOU, <name>. ...
+; LOOP:
+; D 403F BD 00 DB       CALL INPUT
+; D 4042 11 0E 00 00    LOADXI R14 0000
+; D 4046 10 00 50       LOADAI 0050
+; D 4049 2F 0E 2B 00    WRITEIDX R14 2B00
+; D 404D F1 4C 00       RUNMC 4C00                         Parse: words, repeat check, keyword, swapped fragment, MY
+; D 4050 2E 0E 2B 04    READIDX R14 2B04                   Said "MY ..."? Remember it
+; D 4054 81 00 00       TESTAI 0000
+; D 4057 A0 00 70       IFTRUEI NOMY
+; D 405A 11 0D 24 00    LOADXI R13 2400
+; D 405E 11 0E 26 00    LOADXI R14 2600
+; D 4062 3B DE FF       COPYMXMY R13 R14 FF                MEM := MYF
+; D 4065 11 0E 00 00    LOADXI R14 0000
+; D 4069 10 00 01       LOADAI 0001
+; D 406C 2F 0E 2B 08    WRITEIDX R14 2B08
+; NOMY:
+; D 4070 11 0E 00 00    LOADXI R14 0000
+; D 4074 2E 0E 2B 03    READIDX R14 2B03
+; D 4078 81 00 00       TESTAI 0000
+; D 407B A0 00 85       IFTRUEI NOTEMPTY
+; D 407E 11 04 00 21    LOADXI R4 0021                     An empty line
+; D 4082 B0 00 C9       GAL ANSWER
+; NOTEMPTY:
+; D 4085 2E 0E 2B 02    READIDX R14 2B02
+; D 4089 81 00 00       TESTAI 0000
+; D 408C A0 00 96       IFTRUEI NOTREP
+; D 408F 11 04 00 20    LOADXI R4 0020                     The same line twice
+; D 4093 B0 00 C9       GAL ANSWER
+; NOTREP:
+; D 4096 2E 0E 2B 01    READIDX R14 2B01
+; D 409A 21 04          COPYAX Acc -> R4                   R4 = the keyword group
+; D 409C 86 04 00 FF    TESTXI R4 00FF
+; D 40A0 A0 00 AD       IFTRUEI NOKEY
+; D 40A3 86 04 00 00    TESTXI R4 0000
+; D 40A7 A0 00 CF       IFTRUEI QUIT
+; D 40AA B0 00 C9       GAL ANSWER
+; NOKEY:
+; D 40AD 2E 0E 2B 08    READIDX R14 2B08                   Nothing matched: bring back the memory, if any
+; D 40B1 81 00 00       TESTAI 0000
+; D 40B4 A0 00 C5       IFTRUEI FALL
+; D 40B7 10 00 00       LOADAI 0000
+; D 40BA 2F 0E 2B 08    WRITEIDX R14 2B08
+; D 40BE 11 04 00 22    LOADXI R4 0022
+; D 40C2 B0 00 C9       GAL ANSWER
+; FALL:
+; D 40C5 11 04 00 1F    LOADXI R4 001F
+; ANSWER:
+; D 40C9 BD 00 F3       CALL SAY
+; D 40CC B0 00 3F       GAL LOOP
+; QUIT:
+; D 40CF BD 00 F3       CALL SAY                           Goodbye
+; D 40D2 11 0E 03 31    LOADXI R14 0331
+; D 40D6 C1 0E          PRINTSTR R14                       and a new line for the monitor
+; D 40D8 F0 00 00       BREAK                              End of program
+; INPUT:
+; D 40DB 11 0E 03 2A    LOADXI R14 032A
+; D 40DF C1 0E          PRINTSTR R14
+; D 40E1 11 0C 2C 00    LOADXI R12 2C00
+; D 40E5 11 0D 2C 00    LOADXI R13 2C00
+; D 40E9 C2 CD          GETSTR R12 R13                     Read the line (echoed; backspace works)
+; D 40EB 11 0E 03 31    LOADXI R14 0331
+; D 40EF C1 0E          PRINTSTR R14
+; D 40F1 BE 00          RETURN
+; SAY:
+; D 40F3 2E 04 0A 00    READIDX R4 0A00
+; D 40F7 21 05          COPYAX Acc -> R5                   R5 = the group's first reply
+; D 40F9 2E 04 2B 10    READIDX R4 2B10
+; D 40FD 21 06          COPYAX Acc -> R6                   R6 = where its rotation is
+; D 40FF 50 56 07       ADDXYZ R5 + R6 -> R7               R7 = the reply to use
+; D 4102 2E 04 0A 40    READIDX R4 0A40
+; D 4106 21 08          COPYAX Acc -> R8
+; D 4108 42 06          INCX R6                            advance the rotation
+; D 410A 89 68          TESTLXY R6 < R8
+; D 410C A0 01 13       IFTRUEI SAY1
+; D 410F 11 06 00 00    LOADXI R6 0000                     wrapping round
+; SAY1:
+; D 4113 22 06          COPYXA R6 -> Acc
+; D 4115 2F 04 2B 10    WRITEIDX R4 2B10
+; D 4119 50 77 09       ADDXYZ R7 + R7 -> R9               R9 = 2 x reply: its pointer
+; D 411C 11 0E 00 00    LOADXI R14 0000
+; D 4120 2E 09 0A 80    READIDX R9 0A80
+; D 4124 2F 0E 2B 05    WRITEIDX R14 2B05
+; D 4128 2E 09 0A 81    READIDX R9 0A81
+; D 412C 2F 0E 2B 06    WRITEIDX R14 2B06
+; D 4130 10 00 42       LOADAI 0042
+; D 4133 2F 0E 2B 00    WRITEIDX R14 2B00
+; D 4137 F1 4C 00       RUNMC 4C00                         Fill it in: * fragment, @ name, & memory
+; D 413A 11 0E 28 00    LOADXI R14 2800
+; D 413E C1 0E          PRINTSTR R14
+; D 4140 BE 00          RETURN
+
+; --------------------------------------------------------------------------
+; NATIVE ENGINE  -  a18 listing of Firmware-Math/eliza_native.asm
+; --------------------------------------------------------------------------
+; 4C00 F8 6B        ENTRY:  LDI     HIGH VARS
+; 4C02 B8                   PHI     R8
+; 4C03 F8 00                LDI     LOW OP
+; 4C05 A8                   PLO     R8
+; 4C06 08                   LDN     R8
+; 4C07 FB 50                XRI     'P'
+; 4C09 C2 4C 1A             LBZ     PARSE
+; 4C0C 08                   LDN     R8
+; 4C0D FB 4E                XRI     'N'
+; 4C0F C2 4C C8             LBZ     GETNAME
+; 4C12 08                   LDN     R8
+; 4C13 FB 42                XRI     'B'
+; 4C15 C2 4D 2B             LBZ     BUILD
+; 4C18 E2           DONE:   SEX     R2
+; 4C19 D5                   DB      RETN
+; 4C1A F8 01        PARSE:  LDI     LOW K
+; 4C1C A8                   PLO     R8
+; 4C1D F8 FF                LDI     0FFH
+; 4C1F 58                   STR     R8              ; K = none
+; 4C20 18                   INC     R8
+; 4C21 F8 00                LDI     0
+; 4C23 58                   STR     R8              ; REP = 0
+; 4C24 18                   INC     R8
+; 4C25 58                   STR     R8              ; EMPTY = 0
+; 4C26 18                   INC     R8
+; 4C27 58                   STR     R8              ; MYFL = 0
+; 4C28 D4                   DB      CALL
+; 4C29 4D 85                DW      NORMZ
+; 4C2B F8 60                LDI     HIGH NORM
+; 4C2D BD                   PHI     R13
+; 4C2E F8 00                LDI     LOW NORM
+; 4C30 AD                   PLO     R13
+; 4C31 0D                   LDN     R13
+; 4C32 CA 4C 3E             LBNZ    PA1
+; 4C35 F8 03                LDI     LOW EMPTY       ; no words at all
+; 4C37 A8                   PLO     R8
+; 4C38 F8 01                LDI     1
+; 4C3A 58                   STR     R8
+; 4C3B C0 4C 18             LBR     DONE
+; 4C3E F8 61        PA1:    LDI     HIGH PREV       ; the same line as last time?
+; 4C40 BF                   PHI     R15
+; 4C41 F8 00                LDI     LOW PREV
+; 4C43 AF                   PLO     R15
+; 4C44 4D           PA2:    LDA     R13
+; 4C45 52                   STR     R2
+; 4C46 E2                   SEX     R2
+; 4C47 4F                   LDA     R15
+; 4C48 F3                   XOR
+; 4C49 CA 4C 56             LBNZ    PA3
+; 4C4C 02                   LDN     R2
+; 4C4D CA 4C 44             LBNZ    PA2
+; 4C50 F8 02                LDI     LOW REP
+; 4C52 A8                   PLO     R8
+; 4C53 F8 01                LDI     1
+; 4C55 58                   STR     R8
+; 4C56 F8 00        PA3:    LDI     LOW NORM        ; PREV := NORM
+; 4C58 AD                   PLO     R13
+; 4C59 F8 00                LDI     LOW PREV
+; 4C5B AF                   PLO     R15
+; 4C5C 4D           PA4:    LDA     R13
+; 4C5D 5F                   STR     R15
+; 4C5E 1F                   INC     R15
+; 4C5F CA 4C 5C             LBNZ    PA4
+; 4C62 F8 6B                LDI     HIGH WS         ; list where every word starts, once, so the
+; 4C64 BF                   PHI     R15             ; keyword search visits only those places
+; 4C65 F8 80                LDI     LOW WS
+; 4C67 AF                   PLO     R15
+; 4C68 F8 00                LDI     0
+; 4C6A 5F                   STR     R15             ; the first word starts at offset 0
+; 4C6B 1F                   INC     R15
+; 4C6C F8 00                LDI     LOW NORM
+; 4C6E AD                   PLO     R13
+; 4C6F 4D           WS1:    LDA     R13
+; 4C70 C2 4C 85             LBZ     WS3
+; 4C73 FB 20                XRI     ' '
+; 4C75 C2 4C 7F             LBZ     WS2
+; 4C78 2D                   DEC     R13
+; 4C79 4D                   LDA     R13
+; 4C7A FB 7C                XRI     '|'
+; 4C7C CA 4C 6F             LBNZ    WS1
+; 4C7F 8D           WS2:    GLO     R13             ; the next word starts here
+; 4C80 5F                   STR     R15
+; 4C81 1F                   INC     R15
+; 4C82 C0 4C 6F             LBR     WS1
+; 4C85 F8 FF        WS3:    LDI     0FFH
+; 4C87 5F                   STR     R15
+; 4C88 F8 62                LDI     HIGH FRAG       ; FRAG := "" until a keyword is found
+; 4C8A BE                   PHI     R14
+; 4C8B F8 00                LDI     LOW FRAG
+; 4C8D AE                   PLO     R14
+; 4C8E F8 00                LDI     0
+; 4C90 5E                   STR     R14
+; 4C91 D4                   DB      CALL
+; 4C92 4E 92                DW      FINDKW
+; 4C94 CB 4C 9A             LBNF    PA5
+; 4C97 D4                   DB      CALL            ; RD is just after the keyword
+; 4C98 4E C2                DW      CONJ
+; 4C9A F8 64        PA5:    LDI     HIGH MYF        ; and separately: anything after MY?
+; 4C9C BE                   PHI     R14
+; 4C9D F8 00                LDI     LOW MYF
+; 4C9F AE                   PLO     R14
+; 4CA0 F8 00                LDI     0
+; 4CA2 5E                   STR     R14
+; 4CA3 F8 48                LDI     HIGH MYENT
+; 4CA5 BB                   PHI     R11
+; 4CA6 F8 00                LDI     LOW MYENT
+; 4CA8 AB                   PLO     R11
+; 4CA9 D4                   DB      CALL
+; 4CAA 4E 59                DW      MATCH
+; 4CAC CB 4C 18             LBNF    DONE
+; 4CAF D4                   DB      CALL
+; 4CB0 4E C2                DW      CONJ
+; 4CB2 F8 00                LDI     LOW MYF
+; 4CB4 AE                   PLO     R14
+; 4CB5 F8 64                LDI     HIGH MYF
+; 4CB7 BE                   PHI     R14
+; 4CB8 0E                   LDN     R14
+; 4CB9 C2 4C 18             LBZ     DONE            ; MY and nothing after it
+; 4CBC F8 6B                LDI     HIGH VARS
+; 4CBE B8                   PHI     R8
+; 4CBF F8 04                LDI     LOW MYFL
+; 4CC1 A8                   PLO     R8
+; 4CC2 F8 01                LDI     1
+; 4CC4 58                   STR     R8
+; 4CC5 C0 4C 18             LBR     DONE
+; 4CC8 D4           GETNAME: DB     CALL
+; 4CC9 4D 85                DW      NORMZ
+; 4CCB F8 60                LDI     HIGH NORM
+; 4CCD BD                   PHI     R13
+; 4CCE F8 00                LDI     LOW NORM
+; 4CD0 AD                   PLO     R13
+; 4CD1 F8 48                LDI     HIGH NAMEPFX
+; 4CD3 BB                   PHI     R11
+; 4CD4 F8 10                LDI     LOW NAMEPFX
+; 4CD6 AB                   PLO     R11
+; 4CD7 0B           GN1:    LDN     R11
+; 4CD8 C2 4C F2             LBZ     GN3             ; no prefix: the name is the first word
+; 4CDB D4                   DB      CALL
+; 4CDC 4E 18                DW      CMPAT
+; 4CDE C3 4C E7             LBDF    GN2
+; 4CE1 D4                   DB      CALL
+; 4CE2 4E 4C                DW      NEXTENT
+; 4CE4 C0 4C D7             LBR     GN1
+; 4CE7 9F           GN2:    GHI     R15             ; skip the prefix and its space
+; 4CE8 BD                   PHI     R13
+; 4CE9 8F                   GLO     R15
+; 4CEA AD                   PLO     R13
+; 4CEB 0D                   LDN     R13
+; 4CEC FB 20                XRI     ' '
+; 4CEE CA 4C F2             LBNZ    GN3
+; 4CF1 1D                   INC     R13
+; 4CF2 F8 67        GN3:    LDI     HIGH NAME
+; 4CF4 BE                   PHI     R14
+; 4CF5 F8 00                LDI     LOW NAME
+; 4CF7 AE                   PLO     R14
+; 4CF8 F8 0F                LDI     15
+; 4CFA A9                   PLO     R9
+; 4CFB 0D           GN4:    LDN     R13             ; copy one word
+; 4CFC C2 4D 12             LBZ     GN5
+; 4CFF FB 20                XRI     ' '
+; 4D01 C2 4D 12             LBZ     GN5
+; 4D04 0D                   LDN     R13
+; 4D05 FB 7C                XRI     '|'
+; 4D07 C2 4D 12             LBZ     GN5
+; 4D0A 4D                   LDA     R13
+; 4D0B 5E                   STR     R14
+; 4D0C 1E                   INC     R14
+; 4D0D 29                   DEC     R9
+; 4D0E 89                   GLO     R9
+; 4D0F CA 4C FB             LBNZ    GN4
+; 4D12 F8 00        GN5:    LDI     0
+; 4D14 5E                   STR     R14
+; 4D15 F8 00                LDI     LOW NAME
+; 4D17 AE                   PLO     R14
+; 4D18 0E                   LDN     R14
+; 4D19 CA 4C 18             LBNZ    DONE
+; 4D1C F8 49                LDI     HIGH FRIENDS    ; nothing: "FRIEND"
+; 4D1E BD                   PHI     R13
+; 4D1F F8 F8                LDI     LOW FRIENDS
+; 4D21 AD                   PLO     R13
+; 4D22 4D           GN6:    LDA     R13
+; 4D23 5E                   STR     R14
+; 4D24 1E                   INC     R14
+; 4D25 CA 4D 22             LBNZ    GN6
+; 4D28 C0 4C 18             LBR     DONE
+; 4D2B F8 05        BUILD:  LDI     LOW TPLH
+; 4D2D A8                   PLO     R8
+; 4D2E 48                   LDA     R8
+; 4D2F B7                   PHI     R7
+; 4D30 08                   LDN     R8
+; 4D31 A7                   PLO     R7
+; 4D32 F8 68                LDI     HIGH OUT
+; 4D34 BE                   PHI     R14
+; 4D35 F8 00                LDI     LOW OUT
+; 4D37 AE                   PLO     R14
+; 4D38 47           BL1:    LDA     R7
+; 4D39 C2 4D 7F             LBZ     BLEND
+; 4D3C 52                   STR     R2
+; 4D3D FB 2A                XRI     '*'
+; 4D3F C2 4D 54             LBZ     BLF
+; 4D42 02                   LDN     R2
+; 4D43 FB 40                XRI     '@'
+; 4D45 C2 4D 67             LBZ     BLN
+; 4D48 02                   LDN     R2
+; 4D49 FB 26                XRI     '&'
+; 4D4B C2 4D 70             LBZ     BLM
+; 4D4E 02                   LDN     R2
+; 4D4F 5E                   STR     R14
+; 4D50 1E                   INC     R14
+; 4D51 C0 4D 38             LBR     BL1
+; 4D54 F8 62        BLF:    LDI     HIGH FRAG
+; 4D56 BD                   PHI     R13
+; 4D57 F8 00                LDI     LOW FRAG
+; 4D59 AD                   PLO     R13
+; 4D5A 0D                   LDN     R13
+; 4D5B CA 4D 76             LBNZ    BLC
+; 4D5E F8 49                LDI     HIGH THATS      ; nothing followed the keyword
+; 4D60 BD                   PHI     R13
+; 4D61 F8 F0                LDI     LOW THATS
+; 4D63 AD                   PLO     R13
+; 4D64 C0 4D 76             LBR     BLC
+; 4D67 F8 67        BLN:    LDI     HIGH NAME
+; 4D69 BD                   PHI     R13
+; 4D6A F8 00                LDI     LOW NAME
+; 4D6C AD                   PLO     R13
+; 4D6D C0 4D 76             LBR     BLC
+; 4D70 F8 66        BLM:    LDI     HIGH MEM
+; 4D72 BD                   PHI     R13
+; 4D73 F8 00                LDI     LOW MEM
+; 4D75 AD                   PLO     R13
+; 4D76 4D           BLC:    LDA     R13
+; 4D77 C2 4D 38             LBZ     BL1
+; 4D7A 5E                   STR     R14
+; 4D7B 1E                   INC     R14
+; 4D7C C0 4D 76             LBR     BLC
+; 4D7F F8 00        BLEND:  LDI     0
+; 4D81 5E                   STR     R14
+; 4D82 C0 4C 18             LBR     DONE
+; 4D85 F8 6C        NORMZ:  LDI     HIGH LINE
+; 4D87 BD                   PHI     R13
+; 4D88 F8 00                LDI     LOW LINE
+; 4D8A AD                   PLO     R13
+; 4D8B F8 60                LDI     HIGH NORM
+; 4D8D BF                   PHI     R15
+; 4D8E F8 00                LDI     LOW NORM
+; 4D90 AF                   PLO     R15
+; 4D91 F8 00                LDI     0
+; 4D93 AE                   PLO     R14
+; 4D94 BE                   PHI     R14
+; 4D95 4D           NZ1:    LDA     R13
+; 4D96 C2 4E 14             LBZ     NZEND
+; 4D99 A9                   PLO     R9
+; 4D9A FF 61                SMI     'a'
+; 4D9C CB 4D A9             LBNF    NZ2
+; 4D9F 89                   GLO     R9
+; 4DA0 FF 7B                SMI     'z'+1
+; 4DA2 C3 4D A9             LBDF    NZ2
+; 4DA5 89                   GLO     R9
+; 4DA6 FF 20                SMI     20H             ; lower case -> capital
+; 4DA8 A9                   PLO     R9
+; 4DA9 89           NZ2:    GLO     R9
+; 4DAA FF 41                SMI     'A'
+; 4DAC CB 4D B5             LBNF    NZ3
+; 4DAF 89                   GLO     R9
+; 4DB0 FF 5B                SMI     'Z'+1
+; 4DB2 CB 4D FB             LBNF    NZW
+; 4DB5 89           NZ3:    GLO     R9
+; 4DB6 FF 30                SMI     '0'
+; 4DB8 CB 4D C1             LBNF    NZ4
+; 4DBB 89                   GLO     R9
+; 4DBC FF 3A                SMI     '9'+1
+; 4DBE CB 4D FB             LBNF    NZW
+; 4DC1 89           NZ4:    GLO     R9
+; 4DC2 FB 27                XRI     27H             ; apostrophe
+; 4DC4 C2 4D FB             LBZ     NZW
+; 4DC7 89                   GLO     R9
+; 4DC8 FB 2E                XRI     '.'
+; 4DCA C2 4D F5             LBZ     NZT
+; 4DCD 89                   GLO     R9
+; 4DCE FB 2C                XRI     ','
+; 4DD0 C2 4D F5             LBZ     NZT
+; 4DD3 89                   GLO     R9
+; 4DD4 FB 3F                XRI     '?'
+; 4DD6 C2 4D F5             LBZ     NZT
+; 4DD9 89                   GLO     R9
+; 4DDA FB 21                XRI     '!'
+; 4DDC C2 4D F5             LBZ     NZT
+; 4DDF 89                   GLO     R9
+; 4DE0 FB 3B                XRI     ';'
+; 4DE2 C2 4D F5             LBZ     NZT
+; 4DE5 89                   GLO     R9
+; 4DE6 FB 3A                XRI     ':'
+; 4DE8 C2 4D F5             LBZ     NZT
+; 4DEB 9E                   GHI     R14             ; a plain separator
+; 4DEC CA 4D 95             LBNZ    NZ1             ; (one is already waiting)
+; 4DEF F8 20                LDI     ' '
+; 4DF1 BE                   PHI     R14
+; 4DF2 C0 4D 95             LBR     NZ1
+; 4DF5 F8 7C        NZT:    LDI     '|'
+; 4DF7 BE                   PHI     R14
+; 4DF8 C0 4D 95             LBR     NZ1
+; 4DFB 8E           NZW:    GLO     R14
+; 4DFC C2 4E 05             LBZ     NZW2            ; nothing written yet: no leading separator
+; 4DFF 9E                   GHI     R14
+; 4E00 C2 4E 05             LBZ     NZW2
+; 4E03 5F                   STR     R15
+; 4E04 1F                   INC     R15
+; 4E05 F8 00        NZW2:   LDI     0
+; 4E07 BE                   PHI     R14
+; 4E08 F8 01                LDI     1
+; 4E0A AE                   PLO     R14
+; 4E0B 89                   GLO     R9
+; 4E0C 5F                   STR     R15
+; 4E0D 1F                   INC     R15
+; 4E0E 8F                   GLO     R15
+; 4E0F FB F0                XRI     0F0H
+; 4E11 CA 4D 95             LBNZ    NZ1
+; 4E14 F8 00        NZEND:  LDI     0
+; 4E16 5F                   STR     R15
+; 4E17 D5                   DB      RETN
+; 4E18 9B           CMPAT:  GHI     R11
+; 4E19 B7                   PHI     R7
+; 4E1A 8B                   GLO     R11
+; 4E1B FC 02                ADI     2
+; 4E1D A7                   PLO     R7
+; 4E1E 97                   GHI     R7
+; 4E1F 7C 00                ADCI    0
+; 4E21 B7                   PHI     R7
+; 4E22 0B                   LDN     R11
+; 4E23 A9                   PLO     R9
+; 4E24 9D                   GHI     R13
+; 4E25 BF                   PHI     R15
+; 4E26 8D                   GLO     R13
+; 4E27 AF                   PLO     R15
+; 4E28 47           CA1:    LDA     R7
+; 4E29 52                   STR     R2
+; 4E2A E2                   SEX     R2
+; 4E2B 4F                   LDA     R15
+; 4E2C F3                   XOR
+; 4E2D CA 4E 44             LBNZ    CANO
+; 4E30 29                   DEC     R9
+; 4E31 89                   GLO     R9
+; 4E32 CA 4E 28             LBNZ    CA1
+; 4E35 0F                   LDN     R15
+; 4E36 C2 4E 48             LBZ     CAYES
+; 4E39 FB 20                XRI     ' '
+; 4E3B C2 4E 48             LBZ     CAYES
+; 4E3E 0F                   LDN     R15
+; 4E3F FB 7C                XRI     '|'
+; 4E41 C2 4E 48             LBZ     CAYES
+; 4E44 F8 00        CANO:   LDI     0
+; 4E46 F6                   SHR                     ; DF = 0
+; 4E47 D5                   DB      RETN
+; 4E48 F8 01        CAYES:  LDI     1
+; 4E4A F6                   SHR                     ; DF = 1
+; 4E4B D5                   DB      RETN
+; 4E4C 0B           NEXTENT: LDN    R11
+; 4E4D FC 02                ADI     2
+; 4E4F 52                   STR     R2
+; 4E50 E2                   SEX     R2
+; 4E51 8B                   GLO     R11
+; 4E52 F4                   ADD
+; 4E53 AB                   PLO     R11
+; 4E54 9B                   GHI     R11
+; 4E55 7C 00                ADCI    0
+; 4E57 BB                   PHI     R11
+; 4E58 D5                   DB      RETN
+; 4E59 1B           MATCH:  INC     R11             ; the keyword's first letter -> R8.1
+; 4E5A 1B                   INC     R11
+; 4E5B 0B                   LDN     R11
+; 4E5C B8                   PHI     R8
+; 4E5D 2B                   DEC     R11
+; 4E5E 2B                   DEC     R11
+; 4E5F F8 00                LDI     0
+; 4E61 A8                   PLO     R8              ; R8.0 = index into WS
+; 4E62 F8 60                LDI     HIGH NORM
+; 4E64 BD                   PHI     R13
+; 4E65 F8 6B        MA1:    LDI     HIGH WS
+; 4E67 BF                   PHI     R15
+; 4E68 88                   GLO     R8
+; 4E69 FC 80                ADI     LOW WS
+; 4E6B AF                   PLO     R15
+; 4E6C 18                   INC     R8
+; 4E6D 0F                   LDN     R15
+; 4E6E FB FF                XRI     0FFH
+; 4E70 C2 4E 8E             LBZ     MANO
+; 4E73 0F                   LDN     R15
+; 4E74 AD                   PLO     R13             ; RD = that word start
+; 4E75 98                   GHI     R8
+; 4E76 52                   STR     R2
+; 4E77 E2                   SEX     R2
+; 4E78 0D                   LDN     R13
+; 4E79 F3                   XOR
+; 4E7A CA 4E 65             LBNZ    MA1
+; 4E7D D4                   DB      CALL
+; 4E7E 4E 18                DW      CMPAT
+; 4E80 C3 4E 86             LBDF    MAYES
+; 4E83 C0 4E 65             LBR     MA1
+; 4E86 9F           MAYES:  GHI     R15
+; 4E87 BD                   PHI     R13
+; 4E88 8F                   GLO     R15
+; 4E89 AD                   PLO     R13
+; 4E8A F8 01                LDI     1
+; 4E8C F6                   SHR
+; 4E8D D5                   DB      RETN
+; 4E8E F8 00        MANO:   LDI     0
+; 4E90 F6                   SHR
+; 4E91 D5                   DB      RETN
+; 4E92 F8 44        FINDKW: LDI     HIGH KWT
+; 4E94 BB                   PHI     R11
+; 4E95 F8 00                LDI     LOW KWT
+; 4E97 AB                   PLO     R11
+; 4E98 0B           FK1:    LDN     R11
+; 4E99 C2 4E BE             LBZ     FKNO
+; 4E9C D4                   DB      CALL
+; 4E9D 4E 59                DW      MATCH
+; 4E9F C3 4E B1             LBDF    FKYES
+; 4EA2 0B                   LDN     R11             ; next entry (NEXTENT, inline)
+; 4EA3 FC 02                ADI     2
+; 4EA5 52                   STR     R2
+; 4EA6 E2                   SEX     R2
+; 4EA7 8B                   GLO     R11
+; 4EA8 F4                   ADD
+; 4EA9 AB                   PLO     R11
+; 4EAA 9B                   GHI     R11
+; 4EAB 7C 00                ADCI    0
+; 4EAD BB                   PHI     R11
+; 4EAE C0 4E 98             LBR     FK1
+; 4EB1 1B           FKYES:  INC     R11
+; 4EB2 F8 6B                LDI     HIGH K
+; 4EB4 B8                   PHI     R8
+; 4EB5 F8 01                LDI     LOW K
+; 4EB7 A8                   PLO     R8
+; 4EB8 0B                   LDN     R11
+; 4EB9 58                   STR     R8
+; 4EBA F8 01                LDI     1
+; 4EBC F6                   SHR
+; 4EBD D5                   DB      RETN
+; 4EBE F8 00        FKNO:   LDI     0
+; 4EC0 F6                   SHR
+; 4EC1 D5                   DB      RETN
+; 4EC2 F8 00        CONJ:   LDI     0
+; 4EC4 A8                   PLO     R8
+; 4EC5 0D           CJ0:    LDN     R13             ; skip spaces
+; 4EC6 FB 20                XRI     ' '
+; 4EC8 CA 4E CF             LBNZ    CJW
+; 4ECB 1D                   INC     R13
+; 4ECC C0 4E C5             LBR     CJ0
+; 4ECF 0D           CJW:    LDN     R13
+; 4ED0 C2 4F 55             LBZ     CJEND
+; 4ED3 FB 7C                XRI     '|'
+; 4ED5 C2 4F 55             LBZ     CJEND
+; 4ED8 F8 48                LDI     HIGH CONJT
+; 4EDA BB                   PHI     R11
+; 4EDB F8 80                LDI     LOW CONJT
+; 4EDD AB                   PLO     R11
+; 4EDE 0B           CJT:    LDN     R11
+; 4EDF C2 4F 37             LBZ     CJCOPY          ; no swap for this word
+; 4EE2 1B                   INC     R11             ; first letters differ: not this one
+; 4EE3 1B                   INC     R11             ; (saves a CMPAT call on most entries)
+; 4EE4 0B                   LDN     R11
+; 4EE5 2B                   DEC     R11
+; 4EE6 2B                   DEC     R11
+; 4EE7 52                   STR     R2
+; 4EE8 E2                   SEX     R2
+; 4EE9 0D                   LDN     R13
+; 4EEA F3                   XOR
+; 4EEB CA 4F 1D             LBNZ    CJNEXT
+; 4EEE D4                   DB      CALL
+; 4EEF 4E 18                DW      CMPAT
+; 4EF1 CB 4F 1D             LBNF    CJNEXT
+; 4EF4 1B                   INC     R11             ; only at the end?
+; 4EF5 0B                   LDN     R11
+; 4EF6 2B                   DEC     R11
+; 4EF7 C2 4F 06             LBZ     CJUSE
+; 4EFA 0F                   LDN     R15
+; 4EFB C2 4F 06             LBZ     CJUSE
+; 4EFE FB 7C                XRI     '|'
+; 4F00 C2 4F 06             LBZ     CJUSE
+; 4F03 C0 4F 1D             LBR     CJNEXT
+; 4F06 D4           CJUSE:  DB      CALL
+; 4F07 4F 59                DW      SPACE
+; 4F09 47                   LDA     R7              ; R7 is on the swap's to-length
+; 4F0A A9                   PLO     R9
+; 4F0B 47           CJU1:   LDA     R7
+; 4F0C 5E                   STR     R14
+; 4F0D 1E                   INC     R14
+; 4F0E 29                   DEC     R9
+; 4F0F 89                   GLO     R9
+; 4F10 CA 4F 0B             LBNZ    CJU1
+; 4F13 9F                   GHI     R15             ; the source moves past the matched words
+; 4F14 BD                   PHI     R13
+; 4F15 8F                   GLO     R15
+; 4F16 AD                   PLO     R13
+; 4F17 F8 01                LDI     1
+; 4F19 A8                   PLO     R8
+; 4F1A C0 4E C5             LBR     CJ0
+; 4F1D 0B           CJNEXT: LDN     R11             ; past [len][flag][from] (NEXTENT, inline)
+; 4F1E FC 02                ADI     2
+; 4F20 52                   STR     R2
+; 4F21 E2                   SEX     R2
+; 4F22 8B                   GLO     R11
+; 4F23 F4                   ADD
+; 4F24 AB                   PLO     R11
+; 4F25 9B                   GHI     R11
+; 4F26 7C 00                ADCI    0
+; 4F28 BB                   PHI     R11
+; 4F29 0B                   LDN     R11             ; and past [to-len][to]
+; 4F2A FC 01                ADI     1
+; 4F2C 52                   STR     R2
+; 4F2D 8B                   GLO     R11
+; 4F2E F4                   ADD
+; 4F2F AB                   PLO     R11
+; 4F30 9B                   GHI     R11
+; 4F31 7C 00                ADCI    0
+; 4F33 BB                   PHI     R11
+; 4F34 C0 4E DE             LBR     CJT
+; 4F37 D4           CJCOPY: DB      CALL
+; 4F38 4F 59                DW      SPACE
+; 4F3A 0D           CJC1:   LDN     R13
+; 4F3B C2 4F 4F             LBZ     CJC2
+; 4F3E FB 20                XRI     ' '
+; 4F40 C2 4F 4F             LBZ     CJC2
+; 4F43 0D                   LDN     R13
+; 4F44 FB 7C                XRI     '|'
+; 4F46 C2 4F 4F             LBZ     CJC2
+; 4F49 4D                   LDA     R13
+; 4F4A 5E                   STR     R14
+; 4F4B 1E                   INC     R14
+; 4F4C C0 4F 3A             LBR     CJC1
+; 4F4F F8 01        CJC2:   LDI     1
+; 4F51 A8                   PLO     R8
+; 4F52 C0 4E C5             LBR     CJ0
+; 4F55 F8 00        CJEND:  LDI     0
+; 4F57 5E                   STR     R14
+; 4F58 D5                   DB      RETN
+; 4F59 88           SPACE:  GLO     R8
+; 4F5A C2 4F 61             LBZ     SP1
+; 4F5D F8 20                LDI     ' '
+; 4F5F 5E                   STR     R14
+; 4F60 1E                   INC     R14
+; 4F61 D5           SP1:    DB      RETN
+
+; --------------------------------------------------------------------------
+; CODE  -  download this block (program, native engine, script, a zero at $6000)
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 F2 03
+D 4003 11 04 00 40
+D 4007 43 04
+D 4009 10 00 00
+D 400C 2F 04 2B 10
+D 4010 8C 04
+D 4012 A1 00 07
+D 4015 11 0E 00 00
+D 4019 2F 0E 2B 08
+D 401D 2F 0E 21 00
+D 4021 11 0E 03 00
+D 4025 C1 0E
+D 4027 BD 00 DB
+D 402A 11 0E 00 00
+D 402E 10 00 4E
+D 4031 2F 0E 2B 00
+D 4035 F1 4C 00
+D 4038 11 04 00 23
+D 403C BD 00 F3
+D 403F BD 00 DB
+D 4042 11 0E 00 00
+D 4046 10 00 50
+D 4049 2F 0E 2B 00
+D 404D F1 4C 00
+D 4050 2E 0E 2B 04
+D 4054 81 00 00
+D 4057 A0 00 70
+D 405A 11 0D 24 00
+D 405E 11 0E 26 00
+D 4062 3B DE FF
+D 4065 11 0E 00 00
+D 4069 10 00 01
+D 406C 2F 0E 2B 08
+D 4070 11 0E 00 00
+D 4074 2E 0E 2B 03
+D 4078 81 00 00
+D 407B A0 00 85
+D 407E 11 04 00 21
+D 4082 B0 00 C9
+D 4085 2E 0E 2B 02
+D 4089 81 00 00
+D 408C A0 00 96
+D 408F 11 04 00 20
+D 4093 B0 00 C9
+D 4096 2E 0E 2B 01
+D 409A 21 04
+D 409C 86 04 00 FF
+D 40A0 A0 00 AD
+D 40A3 86 04 00 00
+D 40A7 A0 00 CF
+D 40AA B0 00 C9
+D 40AD 2E 0E 2B 08
+D 40B1 81 00 00
+D 40B4 A0 00 C5
+D 40B7 10 00 00
+D 40BA 2F 0E 2B 08
+D 40BE 11 04 00 22
+D 40C2 B0 00 C9
+D 40C5 11 04 00 1F
+D 40C9 BD 00 F3
+D 40CC B0 00 3F
+D 40CF BD 00 F3
+D 40D2 11 0E 03 31
+D 40D6 C1 0E
+D 40D8 F0 00 00
+D 40DB 11 0E 03 2A
+D 40DF C1 0E
+D 40E1 11 0C 2C 00
+D 40E5 11 0D 2C 00
+D 40E9 C2 CD
+D 40EB 11 0E 03 31
+D 40EF C1 0E
+D 40F1 BE 00
+D 40F3 2E 04 0A 00
+D 40F7 21 05
+D 40F9 2E 04 2B 10
+D 40FD 21 06
+D 40FF 50 56 07
+D 4102 2E 04 0A 40
+D 4106 21 08
+D 4108 42 06
+D 410A 89 68
+D 410C A0 01 13
+D 410F 11 06 00 00
+D 4113 22 06
+D 4115 2F 04 2B 10
+D 4119 50 77 09
+D 411C 11 0E 00 00
+D 4120 2E 09 0A 80
+D 4124 2F 0E 2B 05
+D 4128 2E 09 0A 81
+D 412C 2F 0E 2B 06
+D 4130 10 00 42
+D 4133 2F 0E 2B 00
+D 4137 F1 4C 00
+D 413A 11 0E 28 00
+D 413E C1 0E
+D 4140 BE 00
+
+D 4300 0D 0A 45 4C 49 5A 41 0D 0A 48 49 2C 20 49 27 4D
+D 4310 20 45 4C 49 5A 41 2E 20 57 48 41 54 27 53 20 59
+D 4320 4F 55 52 20 4E 41 4D 45 3F 00 0D 0A 0D 0A 3E 20
+D 4330 00 0D 0A 00
+
+D 4400 07 00 47 4F 4F 44 42 59 45 03 00 42 59 45 04 00
+D 4410 51 55 49 54 04 01 4E 41 4D 45 08 02 43 4F 4D 50
+D 4420 55 54 45 52 09 02 43 4F 4D 50 55 54 45 52 53 07
+D 4430 02 4D 41 43 48 49 4E 45 08 02 4D 41 43 48 49 4E
+D 4440 45 53 05 02 52 4F 42 4F 54 06 02 52 4F 42 4F 54
+D 4450 53 04 02 31 38 30 32 03 02 45 4C 46 07 02 50 52
+D 4460 4F 47 52 41 4D 05 03 53 4F 52 52 59 09 03 41 50
+D 4470 4F 4C 4F 47 49 5A 45 09 03 41 50 4F 4C 4F 47 49
+D 4480 53 45 0F 04 44 4F 20 59 4F 55 20 52 45 4D 45 4D
+D 4490 42 45 52 0A 05 49 20 52 45 4D 45 4D 42 45 52 05
+D 44A0 06 44 52 45 41 4D 06 06 44 52 45 41 4D 53 07 06
+D 44B0 44 52 45 41 4D 45 44 06 06 44 52 45 41 4D 54 09
+D 44C0 06 4E 49 47 48 54 4D 41 52 45 0A 06 4E 49 47 48
+D 44D0 54 4D 41 52 45 53 0D 07 57 48 59 20 44 4F 4E 27
+D 44E0 54 20 59 4F 55 0C 07 57 48 59 20 44 4F 4E 54 20
+D 44F0 59 4F 55 0B 08 57 48 59 20 43 41 4E 27 54 20 49
+D 4500 0A 08 57 48 59 20 43 41 4E 54 20 49 07 09 43 41
+D 4510 4E 20 59 4F 55 05 0A 43 41 4E 20 49 07 0B 59 4F
+D 4520 55 20 41 52 45 06 0B 59 4F 55 27 52 45 05 0B 59
+D 4530 4F 55 52 45 07 0C 41 52 45 20 59 4F 55 07 0D 49
+D 4540 20 44 4F 4E 27 54 06 0D 49 20 44 4F 4E 54 08 0D
+D 4550 49 20 44 4F 20 4E 4F 54 06 0E 49 20 46 45 45 4C
+D 4560 06 0E 49 20 46 45 4C 54 07 0F 49 20 43 41 4E 27
+D 4570 54 06 0F 49 20 43 41 4E 54 08 0F 49 20 43 41 4E
+D 4580 4E 4F 54 07 10 49 20 54 48 49 4E 4B 09 10 49 20
+D 4590 42 45 4C 49 45 56 45 06 11 49 20 57 41 4E 54 06
+D 45A0 11 49 20 4E 45 45 44 06 11 49 20 57 49 53 48 04
+D 45B0 12 49 20 41 4D 03 12 49 27 4D 02 12 49 4D 06 13
+D 45C0 4D 4F 54 48 45 52 06 13 46 41 54 48 45 52 03 13
+D 45D0 4D 4F 4D 03 13 44 41 44 03 13 4D 55 4D 06 13 53
+D 45E0 49 53 54 45 52 07 13 42 52 4F 54 48 45 52 04 13
+D 45F0 57 49 46 45 07 13 48 55 53 42 41 4E 44 03 13 53
+D 4600 4F 4E 08 13 44 41 55 47 48 54 45 52 08 13 43 48
+D 4610 49 4C 44 52 45 4E 04 13 4B 49 44 53 06 13 46 41
+D 4620 4D 49 4C 59 07 13 50 41 52 45 4E 54 53 02 14 4D
+D 4630 59 07 15 42 45 43 41 55 53 45 05 15 43 41 55 53
+D 4640 45 06 16 41 4C 57 41 59 53 05 16 4E 45 56 45 52
+D 4650 08 16 45 56 45 52 59 4F 4E 45 09 16 45 56 45 52
+D 4660 59 42 4F 44 59 06 16 4E 4F 42 4F 44 59 05 17 41
+D 4670 4C 49 4B 45 04 17 53 41 4D 45 07 17 53 49 4D 49
+D 4680 4C 41 52 06 18 46 52 49 45 4E 44 07 18 46 52 49
+D 4690 45 4E 44 53 04 19 57 48 41 54 03 19 48 4F 57 03
+D 46A0 19 57 48 4F 05 19 57 48 45 52 45 04 19 57 48 45
+D 46B0 4E 03 19 57 48 59 03 1A 59 45 53 04 1A 59 45 41
+D 46C0 48 03 1A 59 45 50 04 1A 53 55 52 45 02 1B 4E 4F
+D 46D0 04 1B 4E 4F 50 45 03 1B 4E 4F 54 05 1C 4D 41 59
+D 46E0 42 45 07 1C 50 45 52 48 41 50 53 08 1C 50 52 4F
+D 46F0 42 41 42 4C 59 05 1D 48 45 4C 4C 4F 02 1D 48 49
+D 4700 03 1D 48 45 59 05 1D 48 4F 57 44 59 03 1E 59 4F
+D 4710 55 04 1E 59 4F 55 52 00
+
+D 4800 02 00 4D 59 00
+
+D 4810 0A 00 4D 59 20 4E 41 4D 45 20 49 53 07 00 4E 41
+D 4820 4D 45 20 49 53 04 00 49 20 41 4D 03 00 49 27 4D
+D 4830 02 00 49 4D 07 00 43 41 4C 4C 20 4D 45 04 00 49
+D 4840 54 27 53 05 00 49 54 20 49 53 07 00 54 48 49 53
+D 4850 20 49 53 00
+
+D 4880 07 00 59 4F 55 20 41 52 45 04 49 20 41 4D 08 00
+D 4890 59 4F 55 20 57 45 52 45 05 49 20 57 41 53 04 00
+D 48A0 49 20 41 4D 07 59 4F 55 20 41 52 45 05 00 49 20
+D 48B0 57 41 53 08 59 4F 55 20 57 45 52 45 06 00 59 4F
+D 48C0 55 27 52 45 03 49 27 4D 05 00 59 4F 55 52 45 03
+D 48D0 49 27 4D 03 00 49 27 4D 06 59 4F 55 27 52 45 02
+D 48E0 00 49 4D 06 59 4F 55 27 52 45 04 00 49 27 56 45
+D 48F0 06 59 4F 55 27 56 45 06 00 59 4F 55 27 56 45 04
+D 4900 49 27 56 45 04 00 49 27 4C 4C 06 59 4F 55 27 4C
+D 4910 4C 06 00 59 4F 55 27 4C 4C 04 49 27 4C 4C 03 00
+D 4920 49 27 44 05 59 4F 55 27 44 06 00 4D 59 53 45 4C
+D 4930 46 08 59 4F 55 52 53 45 4C 46 08 00 59 4F 55 52
+D 4940 53 45 4C 46 06 4D 59 53 45 4C 46 04 00 4D 49 4E
+D 4950 45 05 59 4F 55 52 53 05 00 59 4F 55 52 53 04 4D
+D 4960 49 4E 45 02 00 4D 59 04 59 4F 55 52 04 00 59 4F
+D 4970 55 52 02 4D 59 02 00 4D 45 03 59 4F 55 01 00 49
+D 4980 03 59 4F 55 02 00 41 4D 03 41 52 45 03 01 59 4F
+D 4990 55 02 4D 45 03 00 59 4F 55 01 49 00
+
+D 49F0 54 48 41 54 00
+
+D 49F8 46 52 49 45 4E 44 00
+
+D 4A00 00 02 05 09 0C 0F 12 16 19 1C 1F 22 26 29 2D 31
+D 4A10 34 37 3B 3F 43 47 4B 4F 52 55 5A 5E 61 64 67 6B
+D 4A20 72 75 78 7B
+
+D 4A40 02 03 04 03 03 03 04 03 03 03 03 04 03 04 04 03
+D 4A50 03 04 04 04 04 04 04 03 03 05 04 03 03 03 04 07
+D 4A60 03 03 03 01
+
+D 4A80 50 00 50 28 50 4C 50 66 50 8E 50 CD 50 E5 51 03
+D 4A90 51 2F 51 68 51 80 51 A0 51 CE 51 EE 52 16 52 24
+D 4AA0 52 3D 52 5D 52 78 52 9D 52 B4 52 D7 53 1D 53 3E
+D 4AB0 53 5D 53 72 53 98 53 A9 53 B9 53 D9 54 0A 54 2A
+D 4AC0 54 47 54 64 54 85 54 A2 54 C8 54 E8 55 0A 55 3B
+D 4AD0 55 60 55 82 55 96 55 A7 55 C4 55 DE 56 00 56 15
+D 4AE0 56 2D 56 44 56 61 56 71 56 8A 56 A2 56 BA 56 CA
+D 4AF0 56 F2 57 05 57 1D 57 36 57 5C 57 76 57 9B 57 B1
+D 4B00 57 D1 57 FD 58 27 58 5A 58 62 58 79 58 AF 58 D3
+D 4B10 58 EC 59 12 59 3A 59 5D 59 82 59 88 59 98 59 A9
+D 4B20 59 B6 59 D3 59 FC 5A 26 5A 41 5A 64 5A 74 5A 98
+D 4B30 5A BF 5A D2 5A EE 5B 07 5B 15 5B 1C 5B 2A 5B 51
+D 4B40 5B 72 5B 7B 5B 99 5B B1 5B CD 5B EC 5C 0B 5C 32
+D 4B50 5C 52 5C 5B 5C 88 5C A4 5C B2 5C C7 5C E9 5D 0E
+D 4B60 5D 29 5D 4F 5D 6C 5D 8D 5D A1 5D B5 5D CE 5D FD
+D 4B70 5E 0D 5E 26 5E 4B 5E 84
+
+D 4C00 F8 6B B8 F8 00 A8 08 FB 50 C2 4C 1A 08 FB 4E C2
+D 4C10 4C C8 08 FB 42 C2 4D 2B E2 D5 F8 01 A8 F8 FF 58
+D 4C20 18 F8 00 58 18 58 18 58 D4 4D 85 F8 60 BD F8 00
+D 4C30 AD 0D CA 4C 3E F8 03 A8 F8 01 58 C0 4C 18 F8 61
+D 4C40 BF F8 00 AF 4D 52 E2 4F F3 CA 4C 56 02 CA 4C 44
+D 4C50 F8 02 A8 F8 01 58 F8 00 AD F8 00 AF 4D 5F 1F CA
+D 4C60 4C 5C F8 6B BF F8 80 AF F8 00 5F 1F F8 00 AD 4D
+D 4C70 C2 4C 85 FB 20 C2 4C 7F 2D 4D FB 7C CA 4C 6F 8D
+D 4C80 5F 1F C0 4C 6F F8 FF 5F F8 62 BE F8 00 AE F8 00
+D 4C90 5E D4 4E 92 CB 4C 9A D4 4E C2 F8 64 BE F8 00 AE
+D 4CA0 F8 00 5E F8 48 BB F8 00 AB D4 4E 59 CB 4C 18 D4
+D 4CB0 4E C2 F8 00 AE F8 64 BE 0E C2 4C 18 F8 6B B8 F8
+D 4CC0 04 A8 F8 01 58 C0 4C 18 D4 4D 85 F8 60 BD F8 00
+D 4CD0 AD F8 48 BB F8 10 AB 0B C2 4C F2 D4 4E 18 C3 4C
+D 4CE0 E7 D4 4E 4C C0 4C D7 9F BD 8F AD 0D FB 20 CA 4C
+D 4CF0 F2 1D F8 67 BE F8 00 AE F8 0F A9 0D C2 4D 12 FB
+D 4D00 20 C2 4D 12 0D FB 7C C2 4D 12 4D 5E 1E 29 89 CA
+D 4D10 4C FB F8 00 5E F8 00 AE 0E CA 4C 18 F8 49 BD F8
+D 4D20 F8 AD 4D 5E 1E CA 4D 22 C0 4C 18 F8 05 A8 48 B7
+D 4D30 08 A7 F8 68 BE F8 00 AE 47 C2 4D 7F 52 FB 2A C2
+D 4D40 4D 54 02 FB 40 C2 4D 67 02 FB 26 C2 4D 70 02 5E
+D 4D50 1E C0 4D 38 F8 62 BD F8 00 AD 0D CA 4D 76 F8 49
+D 4D60 BD F8 F0 AD C0 4D 76 F8 67 BD F8 00 AD C0 4D 76
+D 4D70 F8 66 BD F8 00 AD 4D C2 4D 38 5E 1E C0 4D 76 F8
+D 4D80 00 5E C0 4C 18 F8 6C BD F8 00 AD F8 60 BF F8 00
+D 4D90 AF F8 00 AE BE 4D C2 4E 14 A9 FF 61 CB 4D A9 89
+D 4DA0 FF 7B C3 4D A9 89 FF 20 A9 89 FF 41 CB 4D B5 89
+D 4DB0 FF 5B CB 4D FB 89 FF 30 CB 4D C1 89 FF 3A CB 4D
+D 4DC0 FB 89 FB 27 C2 4D FB 89 FB 2E C2 4D F5 89 FB 2C
+D 4DD0 C2 4D F5 89 FB 3F C2 4D F5 89 FB 21 C2 4D F5 89
+D 4DE0 FB 3B C2 4D F5 89 FB 3A C2 4D F5 9E CA 4D 95 F8
+D 4DF0 20 BE C0 4D 95 F8 7C BE C0 4D 95 8E C2 4E 05 9E
+D 4E00 C2 4E 05 5F 1F F8 00 BE F8 01 AE 89 5F 1F 8F FB
+D 4E10 F0 CA 4D 95 F8 00 5F D5 9B B7 8B FC 02 A7 97 7C
+D 4E20 00 B7 0B A9 9D BF 8D AF 47 52 E2 4F F3 CA 4E 44
+D 4E30 29 89 CA 4E 28 0F C2 4E 48 FB 20 C2 4E 48 0F FB
+D 4E40 7C C2 4E 48 F8 00 F6 D5 F8 01 F6 D5 0B FC 02 52
+D 4E50 E2 8B F4 AB 9B 7C 00 BB D5 1B 1B 0B B8 2B 2B F8
+D 4E60 00 A8 F8 60 BD F8 6B BF 88 FC 80 AF 18 0F FB FF
+D 4E70 C2 4E 8E 0F AD 98 52 E2 0D F3 CA 4E 65 D4 4E 18
+D 4E80 C3 4E 86 C0 4E 65 9F BD 8F AD F8 01 F6 D5 F8 00
+D 4E90 F6 D5 F8 44 BB F8 00 AB 0B C2 4E BE D4 4E 59 C3
+D 4EA0 4E B1 0B FC 02 52 E2 8B F4 AB 9B 7C 00 BB C0 4E
+D 4EB0 98 1B F8 6B B8 F8 01 A8 0B 58 F8 01 F6 D5 F8 00
+D 4EC0 F6 D5 F8 00 A8 0D FB 20 CA 4E CF 1D C0 4E C5 0D
+D 4ED0 C2 4F 55 FB 7C C2 4F 55 F8 48 BB F8 80 AB 0B C2
+D 4EE0 4F 37 1B 1B 0B 2B 2B 52 E2 0D F3 CA 4F 1D D4 4E
+D 4EF0 18 CB 4F 1D 1B 0B 2B C2 4F 06 0F C2 4F 06 FB 7C
+D 4F00 C2 4F 06 C0 4F 1D D4 4F 59 47 A9 47 5E 1E 29 89
+D 4F10 CA 4F 0B 9F BD 8F AD F8 01 A8 C0 4E C5 0B FC 02
+D 4F20 52 E2 8B F4 AB 9B 7C 00 BB 0B FC 01 52 8B F4 AB
+D 4F30 9B 7C 00 BB C0 4E DE D4 4F 59 0D C2 4F 4F FB 20
+D 4F40 C2 4F 4F 0D FB 7C C2 4F 4F 4D 5E 1E C0 4F 3A F8
+D 4F50 01 A8 C0 4E C5 F8 00 5E D5 88 C2 4F 61 F8 20 5E
+D 4F60 1E D5
+
+D 5000 47 4F 4F 44 42 59 45 2C 20 40 2E 20 49 54 20 57
+D 5010 41 53 20 4E 49 43 45 20 54 41 4C 4B 49 4E 47 20
+D 5020 54 4F 20 59 4F 55 2E 00 42 59 45 20 46 4F 52 20
+D 5030 4E 4F 57 2C 20 40 2E 20 43 4F 4D 45 20 42 41 43
+D 5040 4B 20 41 4E 59 20 54 49 4D 45 2E 00 49 27 4D 20
+D 5050 45 4C 49 5A 41 2C 20 41 4E 44 20 59 4F 55 20 41
+D 5060 52 45 20 40 2E 00 4E 41 4D 45 53 20 44 4F 4E 27
+D 5070 54 20 49 4E 54 45 52 45 53 54 20 4D 45 20 4D 55
+D 5080 43 48 2C 20 40 2E 20 47 4F 20 4F 4E 2E 00 57 45
+D 5090 20 4B 4E 4F 57 20 45 41 43 48 20 4F 54 48 45 52
+D 50A0 27 53 20 4E 41 4D 45 53 20 41 4C 52 45 41 44 59
+D 50B0 2E 20 57 48 41 54 20 45 4C 53 45 20 49 53 20 4F
+D 50C0 4E 20 59 4F 55 52 20 4D 49 4E 44 3F 00 44 4F 20
+D 50D0 43 4F 4D 50 55 54 45 52 53 20 57 4F 52 52 59 20
+D 50E0 59 4F 55 3F 00 57 48 59 20 44 4F 20 59 4F 55 20
+D 50F0 4D 45 4E 54 49 4F 4E 20 43 4F 4D 50 55 54 45 52
+D 5100 53 3F 00 49 20 52 55 4E 20 4F 4E 20 41 4E 20 52
+D 5110 43 41 20 31 38 30 32 2E 20 44 4F 45 53 20 54 48
+D 5120 41 54 20 42 4F 54 48 45 52 20 59 4F 55 3F 00 57
+D 5130 48 41 54 20 44 4F 20 59 4F 55 20 54 48 49 4E 4B
+D 5140 20 4D 41 43 48 49 4E 45 53 20 48 41 56 45 20 54
+D 5150 4F 20 44 4F 20 57 49 54 48 20 59 4F 55 52 20 50
+D 5160 52 4F 42 4C 45 4D 3F 00 50 4C 45 41 53 45 20 44
+D 5170 4F 4E 27 54 20 41 50 4F 4C 4F 47 49 5A 45 2E 00
+D 5180 41 50 4F 4C 4F 47 49 45 53 20 41 52 45 20 4E 4F
+D 5190 54 20 4E 45 43 45 53 53 41 52 59 2C 20 40 2E 00
+D 51A0 57 48 41 54 20 46 45 45 4C 49 4E 47 53 20 44 4F
+D 51B0 20 59 4F 55 20 48 41 56 45 20 57 48 45 4E 20 59
+D 51C0 4F 55 20 41 50 4F 4C 4F 47 49 5A 45 3F 00 44 49
+D 51D0 44 20 59 4F 55 20 54 48 49 4E 4B 20 49 20 57 4F
+D 51E0 55 4C 44 20 46 4F 52 47 45 54 20 2A 3F 00 57 48
+D 51F0 59 20 44 4F 20 59 4F 55 20 54 48 49 4E 4B 20 49
+D 5200 20 53 48 4F 55 4C 44 20 52 45 43 41 4C 4C 20 2A
+D 5210 20 4E 4F 57 3F 00 57 48 41 54 20 41 42 4F 55 54
+D 5220 20 2A 3F 00 44 4F 20 59 4F 55 20 4F 46 54 45 4E
+D 5230 20 54 48 49 4E 4B 20 4F 46 20 2A 3F 00 57 48 59
+D 5240 20 44 4F 20 59 4F 55 20 52 45 4D 45 4D 42 45 52
+D 5250 20 2A 20 4A 55 53 54 20 4E 4F 57 3F 00 57 48 41
+D 5260 54 20 45 4C 53 45 20 44 4F 20 59 4F 55 20 52 45
+D 5270 4D 45 4D 42 45 52 3F 00 57 48 41 54 20 44 4F 45
+D 5280 53 20 54 48 41 54 20 44 52 45 41 4D 20 53 55 47
+D 5290 47 45 53 54 20 54 4F 20 59 4F 55 3F 00 44 4F 20
+D 52A0 59 4F 55 20 44 52 45 41 4D 20 4F 46 54 45 4E 2C
+D 52B0 20 40 3F 00 57 48 41 54 20 50 45 4F 50 4C 45 20
+D 52C0 41 50 50 45 41 52 20 49 4E 20 59 4F 55 52 20 44
+D 52D0 52 45 41 4D 53 3F 00 44 4F 4E 27 54 20 59 4F 55
+D 52E0 20 42 45 4C 49 45 56 45 20 54 48 41 54 20 44 52
+D 52F0 45 41 4D 53 20 48 41 56 45 20 53 4F 4D 45 54 48
+D 5300 49 4E 47 20 54 4F 20 44 4F 20 57 49 54 48 20 59
+D 5310 4F 55 52 20 50 52 4F 42 4C 45 4D 3F 00 44 4F 20
+D 5320 59 4F 55 20 52 45 41 4C 4C 59 20 42 45 4C 49 45
+D 5330 56 45 20 49 20 44 4F 4E 27 54 20 2A 3F 00 50 45
+D 5340 52 48 41 50 53 20 49 4E 20 47 4F 4F 44 20 54 49
+D 5350 4D 45 20 49 20 57 49 4C 4C 20 2A 2E 00 44 4F 20
+D 5360 59 4F 55 20 57 41 4E 54 20 4D 45 20 54 4F 20 2A
+D 5370 3F 00 44 4F 20 59 4F 55 20 54 48 49 4E 4B 20 59
+D 5380 4F 55 20 53 48 4F 55 4C 44 20 42 45 20 41 42 4C
+D 5390 45 20 54 4F 20 2A 3F 00 57 48 59 20 43 41 4E 27
+D 53A0 54 20 59 4F 55 20 2A 3F 00 48 41 56 45 20 59 4F
+D 53B0 55 20 54 52 49 45 44 3F 00 59 4F 55 20 42 45 4C
+D 53C0 49 45 56 45 20 49 20 43 41 4E 20 2A 2C 20 44 4F
+D 53D0 4E 27 54 20 59 4F 55 3F 00 50 45 52 48 41 50 53
+D 53E0 20 59 4F 55 20 57 4F 55 4C 44 20 4C 49 4B 45 20
+D 53F0 54 4F 20 42 45 20 41 42 4C 45 20 54 4F 20 2A 20
+D 5400 59 4F 55 52 53 45 4C 46 2E 00 57 48 59 20 44 4F
+D 5410 20 59 4F 55 20 41 53 4B 20 57 48 45 54 48 45 52
+D 5420 20 49 20 43 41 4E 20 2A 3F 00 50 45 52 48 41 50
+D 5430 53 20 59 4F 55 20 44 4F 4E 27 54 20 57 41 4E 54
+D 5440 20 54 4F 20 2A 2E 00 44 4F 20 59 4F 55 20 57 41
+D 5450 4E 54 20 54 4F 20 42 45 20 41 42 4C 45 20 54 4F
+D 5460 20 2A 3F 00 57 48 41 54 20 53 54 4F 50 53 20 59
+D 5470 4F 55 20 46 52 4F 4D 20 54 52 59 49 4E 47 20 54
+D 5480 4F 20 2A 3F 00 57 48 41 54 20 4D 41 4B 45 53 20
+D 5490 59 4F 55 20 54 48 49 4E 4B 20 49 20 41 4D 20 2A
+D 54A0 3F 00 44 4F 45 53 20 49 54 20 50 4C 45 41 53 45
+D 54B0 20 59 4F 55 20 54 4F 20 42 45 4C 49 45 56 45 20
+D 54C0 49 20 41 4D 20 2A 3F 00 50 45 52 48 41 50 53 20
+D 54D0 59 4F 55 20 57 4F 55 4C 44 20 4C 49 4B 45 20 54
+D 54E0 4F 20 42 45 20 2A 2E 00 44 4F 20 59 4F 55 20 53
+D 54F0 4F 4D 45 54 49 4D 45 53 20 57 49 53 48 20 59 4F
+D 5500 55 20 57 45 52 45 20 2A 3F 00 57 48 59 20 41 52
+D 5510 45 20 59 4F 55 20 49 4E 54 45 52 45 53 54 45 44
+D 5520 20 49 4E 20 57 48 45 54 48 45 52 20 49 20 41 4D
+D 5530 20 2A 20 4F 52 20 4E 4F 54 3F 00 57 4F 55 4C 44
+D 5540 20 59 4F 55 20 50 52 45 46 45 52 20 49 54 20 49
+D 5550 46 20 49 20 57 45 52 45 20 4E 4F 54 20 2A 3F 00
+D 5560 50 45 52 48 41 50 53 20 49 4E 20 59 4F 55 52 20
+D 5570 46 41 4E 54 41 53 49 45 53 20 49 20 41 4D 20 2A
+D 5580 2E 00 44 4F 4E 27 54 20 59 4F 55 20 52 45 41 4C
+D 5590 4C 59 20 2A 3F 00 57 48 59 20 44 4F 4E 27 54 20
+D 55A0 59 4F 55 20 2A 3F 00 44 4F 20 59 4F 55 20 57 49
+D 55B0 53 48 20 54 4F 20 42 45 20 41 42 4C 45 20 54 4F
+D 55C0 20 2A 3F 00 44 4F 45 53 20 54 48 41 54 20 54 52
+D 55D0 4F 55 42 4C 45 20 59 4F 55 2C 20 40 3F 00 54 45
+D 55E0 4C 4C 20 4D 45 20 4D 4F 52 45 20 41 42 4F 55 54
+D 55F0 20 53 55 43 48 20 46 45 45 4C 49 4E 47 53 2E 00
+D 5600 44 4F 20 59 4F 55 20 4F 46 54 45 4E 20 46 45 45
+D 5610 4C 20 2A 3F 00 44 4F 20 59 4F 55 20 45 4E 4A 4F
+D 5620 59 20 46 45 45 4C 49 4E 47 20 2A 3F 00 57 48 41
+D 5630 54 20 4D 41 4B 45 53 20 59 4F 55 20 46 45 45 4C
+D 5640 20 2A 3F 00 48 4F 57 20 44 4F 20 59 4F 55 20 4B
+D 5650 4E 4F 57 20 59 4F 55 20 43 41 4E 27 54 20 2A 3F
+D 5660 00 48 41 56 45 20 59 4F 55 20 54 52 49 45 44 3F
+D 5670 00 50 45 52 48 41 50 53 20 59 4F 55 20 43 4F 55
+D 5680 4C 44 20 2A 20 4E 4F 57 2E 00 44 4F 20 59 4F 55
+D 5690 20 52 45 41 4C 4C 59 20 54 48 49 4E 4B 20 53 4F
+D 56A0 3F 00 42 55 54 20 59 4F 55 20 41 52 45 20 4E 4F
+D 56B0 54 20 53 55 52 45 20 2A 3F 00 44 4F 20 59 4F 55
+D 56C0 20 44 4F 55 42 54 20 2A 3F 00 57 48 41 54 20 57
+D 56D0 4F 55 4C 44 20 49 54 20 4D 45 41 4E 20 54 4F 20
+D 56E0 59 4F 55 20 49 46 20 59 4F 55 20 47 4F 54 20 2A
+D 56F0 3F 00 57 48 59 20 44 4F 20 59 4F 55 20 57 41 4E
+D 5700 54 20 2A 3F 00 53 55 50 50 4F 53 45 20 59 4F 55
+D 5710 20 47 4F 54 20 2A 20 53 4F 4F 4E 2E 00 57 48 41
+D 5720 54 20 49 46 20 59 4F 55 20 4E 45 56 45 52 20 47
+D 5730 4F 54 20 2A 3F 00 44 49 44 20 59 4F 55 20 43 4F
+D 5740 4D 45 20 54 4F 20 4D 45 20 42 45 43 41 55 53 45
+D 5750 20 59 4F 55 20 41 52 45 20 2A 3F 00 48 4F 57 20
+D 5760 4C 4F 4E 47 20 48 41 56 45 20 59 4F 55 20 42 45
+D 5770 45 4E 20 2A 3F 00 44 4F 20 59 4F 55 20 42 45 4C
+D 5780 49 45 56 45 20 49 54 20 49 53 20 4E 4F 52 4D 41
+D 5790 4C 20 54 4F 20 42 45 20 2A 3F 00 44 4F 20 59 4F
+D 57A0 55 20 45 4E 4A 4F 59 20 42 45 49 4E 47 20 2A 3F
+D 57B0 00 54 45 4C 4C 20 4D 45 20 4D 4F 52 45 20 41 42
+D 57C0 4F 55 54 20 59 4F 55 52 20 46 41 4D 49 4C 59 2E
+D 57D0 00 57 48 4F 20 45 4C 53 45 20 49 4E 20 59 4F 55
+D 57E0 52 20 46 41 4D 49 4C 59 20 44 4F 20 59 4F 55 20
+D 57F0 54 48 49 4E 4B 20 41 42 4F 55 54 3F 00 48 4F 57
+D 5800 20 44 4F 20 59 4F 55 20 47 45 54 20 41 4C 4F 4E
+D 5810 47 20 57 49 54 48 20 59 4F 55 52 20 46 41 4D 49
+D 5820 4C 59 2C 20 40 3F 00 44 4F 45 53 20 41 4E 59 4F
+D 5830 4E 45 20 45 4C 53 45 20 49 4E 20 59 4F 55 52 20
+D 5840 46 41 4D 49 4C 59 20 46 45 45 4C 20 54 48 45 20
+D 5850 53 41 4D 45 20 57 41 59 3F 00 59 4F 55 52 20 2A
+D 5860 3F 00 57 48 59 20 44 4F 20 59 4F 55 20 53 41 59
+D 5870 20 59 4F 55 52 20 2A 3F 00 44 4F 45 53 20 54 48
+D 5880 41 54 20 53 55 47 47 45 53 54 20 41 4E 59 54 48
+D 5890 49 4E 47 20 45 4C 53 45 20 57 48 49 43 48 20 42
+D 58A0 45 4C 4F 4E 47 53 20 54 4F 20 59 4F 55 3F 00 49
+D 58B0 53 20 49 54 20 49 4D 50 4F 52 54 41 4E 54 20 54
+D 58C0 4F 20 59 4F 55 20 54 48 41 54 20 59 4F 55 52 20
+D 58D0 2A 3F 00 49 53 20 54 48 41 54 20 54 48 45 20 52
+D 58E0 45 41 4C 20 52 45 41 53 4F 4E 3F 00 44 4F 4E 27
+D 58F0 54 20 41 4E 59 20 4F 54 48 45 52 20 52 45 41 53
+D 5900 4F 4E 53 20 43 4F 4D 45 20 54 4F 20 4D 49 4E 44
+D 5910 3F 00 44 4F 45 53 20 54 48 41 54 20 52 45 41 53
+D 5920 4F 4E 20 45 58 50 4C 41 49 4E 20 41 4E 59 54 48
+D 5930 49 4E 47 20 45 4C 53 45 3F 00 57 48 41 54 20 4F
+D 5940 54 48 45 52 20 52 45 41 53 4F 4E 53 20 4D 49 47
+D 5950 48 54 20 54 48 45 52 45 20 42 45 3F 00 43 41 4E
+D 5960 20 59 4F 55 20 54 48 49 4E 4B 20 4F 46 20 41 20
+D 5970 53 50 45 43 49 46 49 43 20 45 58 41 4D 50 4C 45
+D 5980 3F 00 57 48 45 4E 3F 00 52 45 41 4C 4C 59 2C 20
+D 5990 41 4C 57 41 59 53 3F 00 41 52 45 20 59 4F 55 20
+D 59A0 53 55 52 45 2C 20 40 3F 00 49 4E 20 57 48 41 54
+D 59B0 20 57 41 59 3F 00 57 48 41 54 20 52 45 53 45 4D
+D 59C0 42 4C 41 4E 43 45 20 44 4F 20 59 4F 55 20 53 45
+D 59D0 45 3F 00 57 48 41 54 20 44 4F 45 53 20 54 48 45
+D 59E0 20 53 49 4D 49 4C 41 52 49 54 59 20 53 55 47 47
+D 59F0 45 53 54 20 54 4F 20 59 4F 55 3F 00 57 48 59 20
+D 5A00 44 4F 20 59 4F 55 20 42 52 49 4E 47 20 55 50 20
+D 5A10 54 48 45 20 54 4F 50 49 43 20 4F 46 20 46 52 49
+D 5A20 45 4E 44 53 3F 00 44 4F 20 59 4F 55 52 20 46 52
+D 5A30 49 45 4E 44 53 20 57 4F 52 52 59 20 59 4F 55 3F
+D 5A40 00 41 52 45 20 59 4F 55 20 53 55 52 45 20 59 4F
+D 5A50 55 20 48 41 56 45 20 41 4E 59 20 46 52 49 45 4E
+D 5A60 44 53 3F 00 57 48 59 20 44 4F 20 59 4F 55 20 41
+D 5A70 53 4B 3F 00 44 4F 45 53 20 54 48 41 54 20 51 55
+D 5A80 45 53 54 49 4F 4E 20 49 4E 54 45 52 45 53 54 20
+D 5A90 59 4F 55 2C 20 40 3F 00 57 48 41 54 20 41 4E 53
+D 5AA0 57 45 52 20 57 4F 55 4C 44 20 50 4C 45 41 53 45
+D 5AB0 20 59 4F 55 20 54 48 45 20 4D 4F 53 54 3F 00 57
+D 5AC0 48 41 54 20 44 4F 20 59 4F 55 20 54 48 49 4E 4B
+D 5AD0 3F 00 48 41 56 45 20 59 4F 55 20 41 53 4B 45 44
+D 5AE0 20 41 4E 59 4F 4E 45 20 45 4C 53 45 3F 00 59 4F
+D 5AF0 55 20 53 45 45 4D 20 51 55 49 54 45 20 50 4F 53
+D 5B00 49 54 49 56 45 2E 00 41 52 45 20 59 4F 55 20 53
+D 5B10 55 52 45 3F 00 49 20 53 45 45 2E 00 49 20 55 4E
+D 5B20 44 45 52 53 54 41 4E 44 2E 00 41 52 45 20 59 4F
+D 5B30 55 20 53 41 59 49 4E 47 20 4E 4F 20 4A 55 53 54
+D 5B40 20 54 4F 20 42 45 20 4E 45 47 41 54 49 56 45 3F
+D 5B50 00 59 4F 55 20 41 52 45 20 42 45 49 4E 47 20 41
+D 5B60 20 42 49 54 20 4E 45 47 41 54 49 56 45 2C 20 40
+D 5B70 2E 00 57 48 59 20 4E 4F 54 3F 00 59 4F 55 20 44
+D 5B80 4F 4E 27 54 20 53 45 45 4D 20 51 55 49 54 45 20
+D 5B90 43 45 52 54 41 49 4E 2E 00 57 48 59 20 54 48 45
+D 5BA0 20 55 4E 43 45 52 54 41 49 4E 20 54 4F 4E 45 3F
+D 5BB0 00 43 41 4E 27 54 20 59 4F 55 20 42 45 20 4D 4F
+D 5BC0 52 45 20 50 4F 53 49 54 49 56 45 3F 00 48 45 4C
+D 5BD0 4C 4F 2C 20 40 2E 20 57 48 41 54 27 53 20 4F 4E
+D 5BE0 20 59 4F 55 52 20 4D 49 4E 44 3F 00 48 49 2E 20
+D 5BF0 48 4F 57 20 41 52 45 20 59 4F 55 20 46 45 45 4C
+D 5C00 49 4E 47 20 54 4F 44 41 59 3F 00 48 45 4C 4C 4F
+D 5C10 20 41 47 41 49 4E 2E 20 57 48 41 54 20 53 48 41
+D 5C20 4C 4C 20 57 45 20 54 41 4C 4B 20 41 42 4F 55 54
+D 5C30 3F 00 57 45 20 57 45 52 45 20 44 49 53 43 55 53
+D 5C40 53 49 4E 47 20 59 4F 55 2C 20 4E 4F 54 20 4D 45
+D 5C50 2E 00 4F 48 2C 20 49 20 2A 3F 00 59 4F 55 27 52
+D 5C60 45 20 4E 4F 54 20 52 45 41 4C 4C 59 20 54 41 4C
+D 5C70 4B 49 4E 47 20 41 42 4F 55 54 20 4D 45 2C 20 41
+D 5C80 52 45 20 59 4F 55 3F 00 57 48 41 54 20 41 52 45
+D 5C90 20 59 4F 55 52 20 46 45 45 4C 49 4E 47 53 20 4E
+D 5CA0 4F 57 3F 00 50 4C 45 41 53 45 20 47 4F 20 4F 4E
+D 5CB0 2E 00 49 20 53 45 45 2E 20 54 45 4C 4C 20 4D 45
+D 5CC0 20 4D 4F 52 45 2E 00 57 48 41 54 20 44 4F 45 53
+D 5CD0 20 54 48 41 54 20 53 55 47 47 45 53 54 20 54 4F
+D 5CE0 20 59 4F 55 2C 20 40 3F 00 49 27 4D 20 4E 4F 54
+D 5CF0 20 53 55 52 45 20 49 20 55 4E 44 45 52 53 54 41
+D 5D00 4E 44 20 59 4F 55 20 46 55 4C 4C 59 2E 00 43 41
+D 5D10 4E 20 59 4F 55 20 45 4C 41 42 4F 52 41 54 45 20
+D 5D20 4F 4E 20 54 48 41 54 3F 00 54 48 41 54 20 49 53
+D 5D30 20 49 4E 54 45 52 45 53 54 49 4E 47 2E 20 50 4C
+D 5D40 45 41 53 45 20 43 4F 4E 54 49 4E 55 45 2E 00 48
+D 5D50 4F 57 20 44 4F 45 53 20 54 48 41 54 20 4D 41 4B
+D 5D60 45 20 59 4F 55 20 46 45 45 4C 3F 00 50 4C 45 41
+D 5D70 53 45 20 44 4F 4E 27 54 20 52 45 50 45 41 54 20
+D 5D80 59 4F 55 52 53 45 4C 46 2C 20 40 2E 00 59 4F 55
+D 5D90 20 4A 55 53 54 20 53 41 49 44 20 54 48 41 54 2E
+D 5DA0 00 41 52 45 20 59 4F 55 20 54 45 53 54 49 4E 47
+D 5DB0 20 4D 45 3F 00 50 4C 45 41 53 45 20 53 41 59 20
+D 5DC0 53 4F 4D 45 54 48 49 4E 47 2C 20 40 2E 00 53 49
+D 5DD0 4C 45 4E 43 45 20 49 53 20 46 49 4E 45 2C 20 42
+D 5DE0 55 54 20 49 27 44 20 52 41 54 48 45 52 20 48 45
+D 5DF0 41 52 20 59 4F 55 20 54 41 4C 4B 2E 00 54 41 4B
+D 5E00 45 20 59 4F 55 52 20 54 49 4D 45 2E 00 45 41 52
+D 5E10 4C 49 45 52 20 59 4F 55 20 53 41 49 44 20 59 4F
+D 5E20 55 52 20 26 2E 00 4C 45 54 27 53 20 54 41 4C 4B
+D 5E30 20 46 55 52 54 48 45 52 20 41 42 4F 55 54 20 57
+D 5E40 48 59 20 59 4F 55 52 20 26 2E 00 44 4F 45 53 20
+D 5E50 54 48 41 54 20 48 41 56 45 20 41 4E 59 54 48 49
+D 5E60 4E 47 20 54 4F 20 44 4F 20 57 49 54 48 20 54 48
+D 5E70 45 20 46 41 43 54 20 54 48 41 54 20 59 4F 55 52
+D 5E80 20 26 3F 00 4E 49 43 45 20 54 4F 20 4D 45 45 54
+D 5E90 20 59 4F 55 2C 20 40 2E 20 57 48 41 54 20 57 4F
+D 5EA0 55 4C 44 20 59 4F 55 20 4C 49 4B 45 20 54 4F 20
+D 5EB0 54 41 4C 4B 20 41 42 4F 55 54 3F 00
+D 6000 00
+D 7000 00
+
