@@ -42,6 +42,8 @@
     },
     onState: function (s) {
       panel.render(panelState(s));
+      var k = btn('inKey'), down = !!(app.vm && app.vm.cpu.EF[3]);
+      if (k && k.classList.contains('on') !== down) k.classList.toggle('on', down);
       if (memView) memView.render();
       btn('pause').disabled = !app.running;
       btn('run').disabled = app.running || s.halted;
@@ -52,7 +54,7 @@
   function btn(id) { return document.getElementById(id); }
   var samples = [];
 
-  fetch('samples/manifest.json?v=90')
+  fetch('samples/manifest.json?v=91')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       samples = list;
@@ -88,7 +90,7 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=90')
+    fetch('samples/' + s.file + '?v=91')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
@@ -209,7 +211,7 @@
 
   // The full catalogue (web/build/gen_downloads.py): every finished app, grouped.
   var catalog = [];
-  fetch('downloads/catalog.json?v=90')
+  fetch('downloads/catalog.json?v=91')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       catalog = list;
@@ -236,7 +238,7 @@
     var a = catalog[+btn('dlPick').value];
     if (!a) return;
     var fn = a.href.split('/').pop();
-    fetch(a.href + '?v=90')
+    fetch(a.href + '?v=91')
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         saveFile(fn, text);
@@ -282,4 +284,41 @@
     });
   } else btn('sound').disabled = true;
   soundNote();
+
+  // ---- the INPUT switch (EF4): held with the mouse, a finger, or Space ----
+  (function () {
+    var k = btn('inKey'), held = false;
+    function set(v) { if (v !== held) { held = v; app.keyEdge(v ? 1 : 0); k.classList.toggle('on', v); } }
+    k.addEventListener('pointerdown', function (e) { e.preventDefault(); k.setPointerCapture(e.pointerId); set(true); });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (ev) { k.addEventListener(ev, function () { set(false); }); });
+    k.addEventListener('keydown', function (e) { if (e.key === ' ') { e.preventDefault(); if (!e.repeat) set(true); } });
+    k.addEventListener('keyup', function (e) { if (e.key === ' ') { e.preventDefault(); set(false); } });
+    k.addEventListener('blur', function () { set(false); });
+  })();
+
+  // ---- 🎤 Listen: a tone from the microphone keys EF4 (js/tone-listen.js) ----
+  var listener = null;
+  btn('listen').addEventListener('click', function () {
+    var b = this, note = btn('listenNote');
+    if (listener) {
+      listener.stop(); listener = null; app.keyEdge(0);
+      b.textContent = '🎤 Listen'; b.setAttribute('aria-pressed', 'false');
+      note.textContent = 'Stopped listening.';
+      return;
+    }
+    listener = new window.ToneListen({
+      onEdge: function (v, wall) { app.keyEdge(v, wall); },
+      onMeter: function (m) {
+        var db = m.level > 0 ? Math.round(10 * Math.log10(m.level)) : -99;
+        note.textContent = (m.down ? '● TONE  ' : '○ quiet  ') + m.hz + ' Hz  ' + db + ' dB' +
+          (clock.current().ips === window.ClockRow.ELF2K ? '' : '  - set the clock to Elf2K for Morse timing');
+      }
+    });
+    b.textContent = '🎤 Listening…'; b.setAttribute('aria-pressed', 'true');
+    note.textContent = 'Allow the microphone, then send a tone (another laptop, Sound on, Morse Sender v18).';
+    listener.start('js/tone-detect.js?v=91').catch(function (e) {
+      listener = null; b.textContent = '🎤 Listen'; b.setAttribute('aria-pressed', 'false');
+      note.textContent = 'Could not listen: ' + (e && e.message || e);
+    });
+  });
 })();

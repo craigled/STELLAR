@@ -81,7 +81,7 @@
   "name": "Lite-Writer 2",
   "what": "Full-screen word processor: word wrap, find, cut/paste, 4 save slots. VT100.",
   "href": "samples/Lite-Writer-2.lst",
-  "note": null
+  "note": "the 2026-10-03 keep-the-slots change is simulator-verified, not yet on hardware"
  },
  {
   "group": "Text",
@@ -124,6 +124,13 @@
   "what": "The same, but every dot and dash is a 700 Hz tone on Q (RUNMC) - for a speaker; v17 is for keying real gear.",
   "href": "samples/Morse-Sender-v18.lst",
   "note": null
+ },
+ {
+  "group": "Morse",
+  "name": "Morse Receiver v11",
+  "what": "Key Morse on the Input switch; it learns your hand, and can put the text in a Lite-Writer 2 slot.",
+  "href": "samples/Morse-Receiver-v11.lst",
+  "note": "simulator-verified, not yet run on hardware"
  },
  {
   "group": "Morse",

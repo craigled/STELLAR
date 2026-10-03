@@ -263,11 +263,16 @@
     // The golden fixtures are taken on the cold boot too. Pass coldBoot:false for
     // the old hand-built state.
     this.coldBoot = opts.coldBoot !== false;
+    this.keepRam = opts.keepRam || null;
     this.reset();
   }
   StellarVM.prototype.reset = function () {
     var mem = new Uint8Array(0x10000);
     loadFirmwareImage(mem, this.firmware);
+    // RAM that outlives a load, as on the Elf2K (opts.keepRam = {addr, bytes}): the
+    // Simulator carries Lite-Writer 2's slot pool over, so text Morse Receiver v11 left
+    // in a slot opens in Lite-Writer. The program's own bytes still win.
+    if (this.keepRam) mem.set(this.keepRam.bytes, this.keepRam.addr);
     this.programPokes.forEach(function (p) { mem[p[0]] = p[1]; });
     // core setup (calc_interactive.run_calc)
     mem[CORE + 0x3B] = 1;      // relative addressing mode

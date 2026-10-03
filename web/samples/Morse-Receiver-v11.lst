@@ -1,0 +1,709 @@
+; ==========================================================================
+; STELLAR MORSE RECEIVER v11  -  key it on the Input switch   (loads at $4000, VM1)
+;                                 the text can go into a LITE-WRITER 2 slot
+; ==========================================================================
+; Load, cold-boot. It asks for a Lite-Writer 2 slot (1-4; that slot's old text is
+; replaced; Enter = do not save), then roughly how fast you key (5-25 WPM, Enter = 12).
+; Key Morse on the Elf2K's Input switch (EF4). Each letter appears on the terminal
+; (and the hex display) as you finish it, and goes into the slot at once; a longer
+; pause is a word space. Q follows the key. Q or ESC on the terminal quits.
+;
+; TO EDIT IT: load Lite-Writer-2.lst (a build that keeps the slots - 2026-10-03 or
+; later), run it, press ^L and the slot number.
+;
+; IT LEARNS YOUR HAND: running averages of your dots and dashes decide dot or dash,
+; and separate averages of YOUR gaps - inside a letter, between letters, between
+; words - decide where letters and words end. The first six marks are learned at
+; double speed. The learning runs as native 1802 code ($4300, via $F1 RUNMC); the
+; slot writer is native too ($4D00 open the slot, $4DE0 append a character).
+;
+; Limits found in testing: if you key much FASTER than you told it (a third faster)
+; the first letter or two may come out wrong while it learns; a very uneven hand at
+; 18+ WPM can split a letter now and then. Best at 5-20 WPM.
+;
+; NEEDS the GETEFA mask patch (in V0061.34 and later): the key is bit 3 of GETEFA's mask.
+; Uses VM4's block for the slot pool ($7001-$7EFF) as Lite-Writer 2 does; $7000 stays $00.
+;
+; VERIFICATION (Firmware-Math/morse_rx11_verify.py): ALL PASS 2026-10-03, timed in machine cycles: 12/20/8/15 WPM, jitter, a sloppy hand, told 12 keyed 15, punctuation, a long message, a rerun, the first key 0.8-4 s after Listening; slot 2 replaced with 1 and 3 kept byte for byte; Enter = nothing saved; garbage pool x6; a full pool. KNOWN LIMIT (v10 the same): a hand slowing 18 -> 8 WPM within a few letters splits letters.
+; NOT YET RUN ON HARDWARE.
+;
+; 251 STELLAR commands (+ the native learning step and slot writer).
+;
+; --------------------------------------------------------------------------
+; DISASSEMBLY  -  commented out; the loader skips it
+; --------------------------------------------------------------------------
+
+; D 4000 CD             START
+; D 4001 11 0F 00 0A    LOADXI R15 000A
+; D 4005 11 0B 00 00    LOADXI R11 0000
+; D 4009 0A 00          SETQ 00
+; D 400B 11 0E 07 80    LOADXI R14 0780
+; D 400F C1 0E          PRINTSTR R14
+; ASKS:
+; D 4011 11 0E 08 E8    LOADXI R14 08E8
+; D 4015 C1 0E          PRINTSTR R14
+; D 4017 11 0C 0A 00    LOADXI R12 0A00
+; D 401B 11 0D 0A 00    LOADXI R13 0A00
+; D 401F C2 CD          GETSTR R12 R13                     the answer
+; D 4021 11 04 00 00    LOADXI R4 0000
+; D 4025 2E 04 0A 00    READIDX R4 0A00                    its first character
+; D 4029 21 0A          COPYAX Acc -> R10
+; D 402B 8C 0A          TESTXZ R10
+; D 402D A0 00 70       IFTRUEI S0                         Enter alone: do not save
+; D 4030 11 04 00 01    LOADXI R4 0001
+; D 4034 2E 04 0A 00    READIDX R4 0A00
+; D 4038 81 00 00       TESTAI 0000
+; D 403B A1 00 11       IFFALSEI ASKS                      one character only
+; D 403E 11 09 00 31    LOADXI R9 0031
+; D 4042 89 A9          TESTLXY R10 < R9
+; D 4044 A0 00 11       IFTRUEI ASKS
+; D 4047 11 09 00 35    LOADXI R9 0035
+; D 404B 88 A9          TESTGXY R10 >= R9
+; D 404D A0 00 11       IFTRUEI ASKS                       not 1-4: ask again
+; D 4050 53 0A 00 30    SUBXI R10 0030
+; D 4054 22 0A          COPYXA R10 -> Acc
+; D 4056 2F 0B 0B 10    WRITEIDX R11 0B10                  the slot
+; D 405A F1 4D 00       RUNMC 4D00                         drop the slot's old text, start it afresh at the end of the pool
+; D 405D 2E 0B 0B 16    READIDX R11 0B16
+; D 4061 81 00 00       TESTAI 0000
+; D 4064 A0 00 7B       IFTRUEI ASK
+; D 4067 11 0E 09 32    LOADXI R14 0932
+; D 406B C1 0E          PRINTSTR R14
+; D 406D B0 00 7B       GAL ASK
+; S0:
+; D 4070 10 00 00       LOADAI 0000
+; D 4073 2F 0B 0B 10    WRITEIDX R11 0B10                  slot 0: not saving
+; D 4077 2F 0B 0B 16    WRITEIDX R11 0B16
+; ASK:
+; D 407B 11 0E 08 8A    LOADXI R14 088A
+; D 407F C1 0E          PRINTSTR R14
+; D 4081 11 0C 0A 00    LOADXI R12 0A00
+; D 4085 11 0D 0A 00    LOADXI R13 0A00
+; D 4089 C2 CD          GETSTR R12 R13                     the number
+; D 408B 11 07 00 00    LOADXI R7 0000
+; D 408F 11 04 00 00    LOADXI R4 0000
+; DIG:
+; D 4093 2E 04 0A 00    READIDX R4 0A00                    next character
+; D 4097 21 0A          COPYAX Acc -> R10
+; D 4099 8C 0A          TESTXZ R10
+; D 409B A0 00 C0       IFTRUEI DGD
+; D 409E 11 09 00 30    LOADXI R9 0030
+; D 40A2 89 A9          TESTLXY R10 < R9
+; D 40A4 A0 00 7B       IFTRUEI ASK                        not a digit: ask again
+; D 40A7 11 09 00 3A    LOADXI R9 003A
+; D 40AB 88 A9          TESTGXY R10 >= R9
+; D 40AD A0 00 7B       IFTRUEI ASK
+; D 40B0 53 0A 00 30    SUBXI R10 0030
+; D 40B4 4A 7F          MULTXY R7 * R15
+; D 40B6 21 17          COPYAX MA -> R7                    W x 10
+; D 40B8 50 7A 07       ADDXYZ R7 + R10 -> R7              + the digit
+; D 40BB 42 04          INCX R4
+; D 40BD B0 00 93       GAL DIG
+; DGD:
+; D 40C0 8C 07          TESTXZ R7
+; D 40C2 A1 00 C9       IFFALSEI HAVE
+; D 40C5 11 07 00 0C    LOADXI R7 000C                     Enter alone: 12
+; HAVE:
+; D 40C9 11 09 00 05    LOADXI R9 0005
+; D 40CD 89 79          TESTLXY R7 < R9
+; D 40CF A0 00 7B       IFTRUEI ASK
+; D 40D2 11 09 00 1A    LOADXI R9 001A
+; D 40D6 88 79          TESTGXY R7 >= R9
+; D 40D8 A0 00 7B       IFTRUEI ASK
+; D 40DB 11 0E 08 CC    LOADXI R14 08CC
+; D 40DF C1 0E          PRINTSTR R14                       printed FIRST: PRINTSTR uses RE, which then holds a gap average
+; D 40E1 11 01 00 73    LOADXI R1 0073
+; D 40E5 23 00 7A       COPYXY R7 -> R10
+; D 40E8 11 09 00 02    LOADXI R9 0002
+; D 40EC 4D A9          DIVXY R10 / R9
+; D 40EE 25             COPYMAA
+; D 40EF 21 09          COPYAX Acc -> R9
+; D 40F1 50 19 01       ADDXYZ R1 + R9 -> R1
+; D 40F4 4D 17          DIVXY R1 / R7
+; D 40F6 25             COPYMAA
+; D 40F7 21 01          COPYAX Acc -> R1                   dot = 106 / WPM samples, rounded
+; D 40F9 50 11 02       ADDXYZ R1 + R1 -> R2
+; D 40FC 50 21 02       ADDXYZ R2 + R1 -> R2               dash = 3 dots
+; D 40FF 50 11 0E       ADDXYZ R1 + R1 -> R14              gap in a letter: 1 dot (x2: the gap loop counts in twos)
+; D 4102 50 EE 0F       ADDXYZ R14 + R14 -> R15
+; D 4105 50 FE 0F       ADDXYZ R15 + R14 -> R15            3 dots (x2) ...
+; D 4108 23 00 17       COPYXY R1 -> R7
+; D 410B 61 72          SHIFTBX R7 right 1
+; D 410D 50 F7 0F       ADDXYZ R15 + R7 -> R15             ... + a quarter dot: between letters 3.25 to start
+; D 4110 50 EE 07       ADDXYZ R14 + R14 -> R7
+; D 4113 50 77 07       ADDXYZ R7 + R7 -> R7
+; D 4116 50 77 07       ADDXYZ R7 + R7 -> R7
+; D 4119 51 7E 07       SUBXYZ R7 - R14 -> R7              between words: 7 dots (x2: 16 - 2 = 14)
+; D 411C 11 0A 0B 00    LOADXI R10 0B00
+; D 4120 3A 02 7A       COPYXMY R7 -> M(R10)
+; D 4123 11 07 00 00    LOADXI R7 0000
+; D 4127 52 0A 00 02    ADDXI R10 0002
+; D 412B 3A 02 7A       COPYXMY R7 -> M(R10)               no marks seen yet: learn fast for the first six
+; D 412E 50 12 03       ADDXYZ R1 + R2 -> R3               dot + dash
+; D 4131 50 EF 0C       ADDXYZ R14 + R15 -> R12
+; D 4134 61 C2          SHIFTBX R12 right 1                LETTER = midway: inside a letter / between letters
+; D 4136 11 0A 0B 00    LOADXI R10 0B00
+; D 413A 39 02 A9       COPYMXY M(R10) -> R9
+; D 413D 50 9F 09       ADDXYZ R9 + R15 -> R9
+; D 4140 61 92          SHIFTBX R9 right 1                 WORD = midway: between letters / words
+; D 4142 50 11 07       ADDXYZ R1 + R1 -> R7
+; D 4145 50 77 0A       ADDXYZ R7 + R7 -> R10              RA = 4 dots (x2)
+; D 4148 23 00 17       COPYXY R1 -> R7
+; D 414B 61 72          SHIFTBX R7 right 1
+; D 414D 50 71 07       ADDXYZ R7 + R1 -> R7
+; D 4150 50 7A 07       ADDXYZ R7 + R10 -> R7              5.5 (x2) = 2.75 dots
+; D 4153 89 7C          TESTLXY R7 < R12
+; D 4155 A1 01 5B       IFFALSEI CL1s
+; D 4158 23 00 7C       COPYXY R7 -> R12
+; CL1s:
+; D 415B 50 AA 07       ADDXYZ R10 + R10 -> R7
+; D 415E 50 71 07       ADDXYZ R7 + R1 -> R7               9 (x2) = 4.5 dots
+; D 4161 89 97          TESTLXY R9 < R7
+; D 4163 A1 01 69       IFFALSEI CL2s
+; D 4166 23 00 79       COPYXY R7 -> R9
+; CL2s:
+; D 4169 50 7A 07       ADDXYZ R7 + R10 -> R7              13 (x2) = 6.5 dots
+; D 416C 89 79          TESTLXY R7 < R9
+; D 416E A1 01 74       IFFALSEI CL3s
+; D 4171 23 00 79       COPYXY R7 -> R9
+; CL3s:
+; D 4174 11 05 00 01    LOADXI R5 0001                     no elements yet
+; D 4178 11 06 00 00    LOADXI R6 0000
+; D 417C 11 08 00 00    LOADXI R8 0000
+; UP:
+; D 4180 11 04 00 00    LOADXI R4 0000
+; UL:
+; D 4184 CC             SERST                              a key on the terminal?
+; D 4185 A0 01 F5       IFTRUEI TKEY
+; D 4188 10 00 00       LOADAI 0000
+; D 418B 09             GETEFA                             EF1-4 as a mask
+; D 418C 1A 08          TESTBITI 08                        EF4: the Input switch
+; D 418E A0 01 C8       IFTRUEI DOWN                       the key went down
+; D 4191 52 04 00 02    ADDXI R4 0002                      the gap loop counts in TWOS: R4 = 2 x gap, no doubling needed
+; D 4195 88 4C          TESTGXY R4 >= R12
+; D 4197 A0 01 A8       IFTRUEI PAST                       past LETTER: the decisions
+; D 419A C4             NOP                                pad: evens the two sampling loops
+; D 419B C4             NOP                                pad: evens the two sampling loops
+; D 419C C4             NOP                                pad: evens the two sampling loops
+; D 419D C4             NOP                                pad: evens the two sampling loops
+; D 419E C4             NOP                                pad: evens the two sampling loops
+; D 419F C4             NOP                                pad: evens the two sampling loops
+; D 41A0 C4             NOP                                pad: evens the two sampling loops
+; D 41A1 C4             NOP                                pad: evens the two sampling loops
+; D 41A2 C4             NOP                                pad: evens the two sampling loops
+; D 41A3 C0 01          DLYI 01                            one sample
+; D 41A5 B0 01 84       GAL UL
+; PAST:
+; D 41A8 86 05 00 01    TESTXI R5 0001
+; D 41AC A0 01 B2       IFTRUEI P1                         nothing keyed, or done already
+; D 41AF BD 02 4A       CALL LETTER                        the letter is complete
+; P1:
+; D 41B2 88 49          TESTGXY R4 >= R9
+; D 41B4 A1 01 C4       IFFALSEI P1X                       past WORD:
+; D 41B7 8C 06          TESTXZ R6
+; D 41B9 A0 01 BF       IFTRUEI P2
+; D 41BC BD 02 75       CALL SPACE                           a word gap
+; P2:
+; D 41BF C0 01          DLYI 01                            one sample
+; D 41C1 B0 01 84       GAL UL
+; P1X:
+; D 41C4 C4             NOP                                pad: evens the two sampling loops
+; D 41C5 B0 01 BF       GAL P2                             padded: every sample of a gap is the same length
+; DOWN:
+; D 41C8 0A 01          SETQ 01                            Q follows the key
+; D 41CA 23 00 4D       COPYXY R4 -> R13                   RD = the gap that just ended - learned from after this mark
+; D 41CD 11 04 00 00    LOADXI R4 0000
+; DL:
+; D 41D1 42 04          INCX R4
+; D 41D3 C4             NOP                                pad: evens the two sampling loops
+; D 41D4 C4             NOP                                pad: evens the two sampling loops
+; D 41D5 C4             NOP                                pad: evens the two sampling loops
+; D 41D6 C4             NOP                                pad: evens the two sampling loops
+; D 41D7 C4             NOP                                pad: evens the two sampling loops
+; D 41D8 C4             NOP                                pad: evens the two sampling loops
+; D 41D9 C4             NOP                                pad: evens the two sampling loops
+; D 41DA C4             NOP                                pad: evens the two sampling loops
+; D 41DB C4             NOP                                pad: evens the two sampling loops
+; D 41DC C4             NOP                                pad: evens the two sampling loops
+; D 41DD C4             NOP                                pad: evens the two sampling loops
+; D 41DE C4             NOP                                pad: evens the two sampling loops
+; D 41DF C4             NOP                                pad: evens the two sampling loops
+; D 41E0 C4             NOP                                pad: evens the two sampling loops
+; D 41E1 C4             NOP                                pad: evens the two sampling loops
+; D 41E2 C0 01          DLYI 01                            one sample
+; D 41E4 10 00 00       LOADAI 0000
+; D 41E7 09             GETEFA                             EF1-4 as a mask
+; D 41E8 1A 08          TESTBITI 08                        EF4: the Input switch
+; D 41EA A0 01 D1       IFTRUEI DL
+; D 41ED 0A 00          SETQ 00                            key up
+; D 41EF F1 43 00       RUNMC 4300                         learn: the element, dot/dash, the averages, the thresholds
+; D 41F2 B0 01 80       GAL UP
+; TKEY:
+; D 41F5 CB             SERIN
+; D 41F6 21 07          COPYAX Acc -> R7
+; D 41F8 86 07 00 71    TESTXI R7 0071
+; D 41FC A0 02 10       IFTRUEI QUIT
+; D 41FF 86 07 00 51    TESTXI R7 0051
+; D 4203 A0 02 10       IFTRUEI QUIT
+; D 4206 86 07 00 1B    TESTXI R7 001B
+; D 420A A0 02 10       IFTRUEI QUIT
+; D 420D B0 01 84       GAL UL                             anything else: ignored
+; QUIT:
+; D 4210 2E 0B 0B 10    READIDX R11 0B10
+; D 4214 81 00 00       TESTAI 0000
+; D 4217 A0 02 3E       IFTRUEI QB                         not saving
+; D 421A 11 0E 09 6C    LOADXI R14 096C
+; D 421E C1 0E          PRINTSTR R14
+; D 4220 2E 0B 0B 10    READIDX R11 0B10
+; D 4224 4E 00 30       ADDAI 0030
+; D 4227 C9             SEROUT                             the slot number
+; D 4228 11 0E 09 85    LOADXI R14 0985
+; D 422C C1 0E          PRINTSTR R14
+; D 422E 2E 0B 0B 16    READIDX R11 0B16
+; D 4232 81 00 00       TESTAI 0000
+; D 4235 A0 02 3E       IFTRUEI QB
+; D 4238 11 0E 09 B1    LOADXI R14 09B1
+; D 423C C1 0E          PRINTSTR R14
+; QB:
+; D 423E 11 0E 08 7A    LOADXI R14 087A
+; D 4242 C1 0E          PRINTSTR R14
+; D 4244 0A 00          SETQ 00
+; D 4246 00             HALT
+; D 4247 F0 00 00       BREAK
+; LETTER:
+; D 424A 10 00 2A       LOADAI 002A
+; D 424D 11 07 00 80    LOADXI R7 0080
+; D 4251 89 57          TESTLXY R5 < R7
+; D 4253 A1 02 63       IFFALSEI LP                        too long: *
+; D 4256 2E 05 0C 00    READIDX R5 0C00                    the leading-1 code -> the character
+; D 425A 81 00 00       TESTAI 0000
+; D 425D A1 02 63       IFFALSEI LP
+; D 4260 10 00 2A       LOADAI 002A
+; LP:
+; D 4263 C9             SEROUT
+; D 4264 05 00          OUTA 00                            and on the hex display
+; D 4266 BD 02 98       CALL KEEP                          and into the slot
+; D 4269 42 08          INCX R8
+; D 426B 11 05 00 01    LOADXI R5 0001
+; D 426F 11 06 00 01    LOADXI R6 0001
+; D 4273 BE 00          RETURN
+; SPACE:
+; D 4275 10 00 20       LOADAI 0020
+; D 4278 BD 02 98       CALL KEEP                          a space in the slot: Lite-Writer wraps the words itself
+; D 427B 11 06 00 00    LOADXI R6 0000
+; D 427F 11 07 00 40    LOADXI R7 0040
+; D 4283 89 87          TESTLXY R8 < R7
+; D 4285 A1 02 8E       IFFALSEI SNL
+; D 4288 CA 20          SEROUTI 20
+; D 428A 42 08          INCX R8
+; D 428C BE 00          RETURN
+; SNL:
+; D 428E 11 08 00 00    LOADXI R8 0000
+; D 4292 CA 0D          SEROUTI 0D
+; D 4294 CA 0A          SEROUTI 0A                         a new line (RE holds a gap average)
+; D 4296 BE 00          RETURN
+; KEEP:
+; D 4298 2F 0B 0B 11    WRITEIDX R11 0B11
+; D 429C 2E 0B 0B 10    READIDX R11 0B10
+; D 42A0 81 00 00       TESTAI 0000
+; D 42A3 A0 02 A9       IFTRUEI KP0                        not saving
+; D 42A6 F1 4D E0       RUNMC 4DE0                         append it; the pool stays whole
+; KP0:
+; D 42A9 BE 00          RETURN
+
+; --------------------------------------------------------------------------
+; CODE  -  download this block
+; --------------------------------------------------------------------------
+
+D 4000 CD
+D 4001 11 0F 00 0A
+D 4005 11 0B 00 00
+D 4009 0A 00
+D 400B 11 0E 07 80
+D 400F C1 0E
+D 4011 11 0E 08 E8
+D 4015 C1 0E
+D 4017 11 0C 0A 00
+D 401B 11 0D 0A 00
+D 401F C2 CD
+D 4021 11 04 00 00
+D 4025 2E 04 0A 00
+D 4029 21 0A
+D 402B 8C 0A
+D 402D A0 00 70
+D 4030 11 04 00 01
+D 4034 2E 04 0A 00
+D 4038 81 00 00
+D 403B A1 00 11
+D 403E 11 09 00 31
+D 4042 89 A9
+D 4044 A0 00 11
+D 4047 11 09 00 35
+D 404B 88 A9
+D 404D A0 00 11
+D 4050 53 0A 00 30
+D 4054 22 0A
+D 4056 2F 0B 0B 10
+D 405A F1 4D 00
+D 405D 2E 0B 0B 16
+D 4061 81 00 00
+D 4064 A0 00 7B
+D 4067 11 0E 09 32
+D 406B C1 0E
+D 406D B0 00 7B
+D 4070 10 00 00
+D 4073 2F 0B 0B 10
+D 4077 2F 0B 0B 16
+D 407B 11 0E 08 8A
+D 407F C1 0E
+D 4081 11 0C 0A 00
+D 4085 11 0D 0A 00
+D 4089 C2 CD
+D 408B 11 07 00 00
+D 408F 11 04 00 00
+D 4093 2E 04 0A 00
+D 4097 21 0A
+D 4099 8C 0A
+D 409B A0 00 C0
+D 409E 11 09 00 30
+D 40A2 89 A9
+D 40A4 A0 00 7B
+D 40A7 11 09 00 3A
+D 40AB 88 A9
+D 40AD A0 00 7B
+D 40B0 53 0A 00 30
+D 40B4 4A 7F
+D 40B6 21 17
+D 40B8 50 7A 07
+D 40BB 42 04
+D 40BD B0 00 93
+D 40C0 8C 07
+D 40C2 A1 00 C9
+D 40C5 11 07 00 0C
+D 40C9 11 09 00 05
+D 40CD 89 79
+D 40CF A0 00 7B
+D 40D2 11 09 00 1A
+D 40D6 88 79
+D 40D8 A0 00 7B
+D 40DB 11 0E 08 CC
+D 40DF C1 0E
+D 40E1 11 01 00 73
+D 40E5 23 00 7A
+D 40E8 11 09 00 02
+D 40EC 4D A9
+D 40EE 25
+D 40EF 21 09
+D 40F1 50 19 01
+D 40F4 4D 17
+D 40F6 25
+D 40F7 21 01
+D 40F9 50 11 02
+D 40FC 50 21 02
+D 40FF 50 11 0E
+D 4102 50 EE 0F
+D 4105 50 FE 0F
+D 4108 23 00 17
+D 410B 61 72
+D 410D 50 F7 0F
+D 4110 50 EE 07
+D 4113 50 77 07
+D 4116 50 77 07
+D 4119 51 7E 07
+D 411C 11 0A 0B 00
+D 4120 3A 02 7A
+D 4123 11 07 00 00
+D 4127 52 0A 00 02
+D 412B 3A 02 7A
+D 412E 50 12 03
+D 4131 50 EF 0C
+D 4134 61 C2
+D 4136 11 0A 0B 00
+D 413A 39 02 A9
+D 413D 50 9F 09
+D 4140 61 92
+D 4142 50 11 07
+D 4145 50 77 0A
+D 4148 23 00 17
+D 414B 61 72
+D 414D 50 71 07
+D 4150 50 7A 07
+D 4153 89 7C
+D 4155 A1 01 5B
+D 4158 23 00 7C
+D 415B 50 AA 07
+D 415E 50 71 07
+D 4161 89 97
+D 4163 A1 01 69
+D 4166 23 00 79
+D 4169 50 7A 07
+D 416C 89 79
+D 416E A1 01 74
+D 4171 23 00 79
+D 4174 11 05 00 01
+D 4178 11 06 00 00
+D 417C 11 08 00 00
+D 4180 11 04 00 00
+D 4184 CC
+D 4185 A0 01 F5
+D 4188 10 00 00
+D 418B 09
+D 418C 1A 08
+D 418E A0 01 C8
+D 4191 52 04 00 02
+D 4195 88 4C
+D 4197 A0 01 A8
+D 419A C4
+D 419B C4
+D 419C C4
+D 419D C4
+D 419E C4
+D 419F C4
+D 41A0 C4
+D 41A1 C4
+D 41A2 C4
+D 41A3 C0 01
+D 41A5 B0 01 84
+D 41A8 86 05 00 01
+D 41AC A0 01 B2
+D 41AF BD 02 4A
+D 41B2 88 49
+D 41B4 A1 01 C4
+D 41B7 8C 06
+D 41B9 A0 01 BF
+D 41BC BD 02 75
+D 41BF C0 01
+D 41C1 B0 01 84
+D 41C4 C4
+D 41C5 B0 01 BF
+D 41C8 0A 01
+D 41CA 23 00 4D
+D 41CD 11 04 00 00
+D 41D1 42 04
+D 41D3 C4
+D 41D4 C4
+D 41D5 C4
+D 41D6 C4
+D 41D7 C4
+D 41D8 C4
+D 41D9 C4
+D 41DA C4
+D 41DB C4
+D 41DC C4
+D 41DD C4
+D 41DE C4
+D 41DF C4
+D 41E0 C4
+D 41E1 C4
+D 41E2 C0 01
+D 41E4 10 00 00
+D 41E7 09
+D 41E8 1A 08
+D 41EA A0 01 D1
+D 41ED 0A 00
+D 41EF F1 43 00
+D 41F2 B0 01 80
+D 41F5 CB
+D 41F6 21 07
+D 41F8 86 07 00 71
+D 41FC A0 02 10
+D 41FF 86 07 00 51
+D 4203 A0 02 10
+D 4206 86 07 00 1B
+D 420A A0 02 10
+D 420D B0 01 84
+D 4210 2E 0B 0B 10
+D 4214 81 00 00
+D 4217 A0 02 3E
+D 421A 11 0E 09 6C
+D 421E C1 0E
+D 4220 2E 0B 0B 10
+D 4224 4E 00 30
+D 4227 C9
+D 4228 11 0E 09 85
+D 422C C1 0E
+D 422E 2E 0B 0B 16
+D 4232 81 00 00
+D 4235 A0 02 3E
+D 4238 11 0E 09 B1
+D 423C C1 0E
+D 423E 11 0E 08 7A
+D 4242 C1 0E
+D 4244 0A 00
+D 4246 00
+D 4247 F0 00 00
+D 424A 10 00 2A
+D 424D 11 07 00 80
+D 4251 89 57
+D 4253 A1 02 63
+D 4256 2E 05 0C 00
+D 425A 81 00 00
+D 425D A1 02 63
+D 4260 10 00 2A
+D 4263 C9
+D 4264 05 00
+D 4266 BD 02 98
+D 4269 42 08
+D 426B 11 05 00 01
+D 426F 11 06 00 01
+D 4273 BE 00
+D 4275 10 00 20
+D 4278 BD 02 98
+D 427B 11 06 00 00
+D 427F 11 07 00 40
+D 4283 89 87
+D 4285 A1 02 8E
+D 4288 CA 20
+D 428A 42 08
+D 428C BE 00
+D 428E 11 08 00 00
+D 4292 CA 0D
+D 4294 CA 0A
+D 4296 BE 00
+D 4298 2F 0B 0B 11
+D 429C 2E 0B 0B 10
+D 42A0 81 00 00
+D 42A3 A0 02 A9
+D 42A6 F1 4D E0
+D 42A9 BE 00
+
+D 4300 E2 F8 4B B8 F8 02 A8 08 FB 06 C2 43 18 08 FC 01
+D 4310 58 18 F8 01 58 C0 43 1C 18 F8 00 58 F8 30 B8 F8
+D 4320 02 A8 48 B7 08 A7 F8 04 A8 48 BB 08 AB F8 08 A8
+D 4330 48 BD 08 AD F8 0A A8 48 BE 08 AE 8E 52 8E F4 AE
+D 4340 9E 52 9E 74 BE 9D BF 8D AF 8D 52 8F F4 AF 9D 52
+D 4350 9F 74 BF 97 B9 87 A9 8B 52 89 F4 A9 9B 52 99 74
+D 4360 B9 89 52 8F F7 99 52 9F 77 CB 44 02 1E F8 4B B8
+D 4370 F8 03 A8 08 C2 43 92 9B BF 8B AF 8D 52 8F F4 AF
+D 4380 9D 52 9F 74 BF 9F F6 BF 8F 76 AF 9F BB 8F AB C0
+D 4390 43 C4 9B BF 8B AF 8B 52 8F F4 AF 9B 52 9F 74 BF
+D 43A0 8B 52 8F F4 AF 9B 52 9F 74 BF 8D 52 8F F4 AF 9D
+D 43B0 52 9F 74 BF 9F F6 BF 8F 76 AF 9F F6 BF 8F 76 AF
+D 43C0 9F BB 8F AB 97 BF 87 AF 87 52 8F F4 AF 97 52 9F
+D 43D0 74 BF 8F 52 8F F4 AF 9F 52 9F 74 BF 8B 52 8F F7
+D 43E0 9B 52 9F 77 C3 44 62 97 BB 87 AB 87 52 8B F4 AB
+D 43F0 97 52 9B 74 BB 87 52 8B F4 AB 97 52 9B 74 BB C0
+D 4400 44 62 F8 4B B8 F8 03 A8 08 C2 44 27 97 BF 87 AF
+D 4410 8D 52 8F F4 AF 9D 52 9F 74 BF 9F F6 BF 8F 76 AF
+D 4420 9F B7 8F A7 C0 44 59 97 BF 87 AF 87 52 8F F4 AF
+D 4430 97 52 9F 74 BF 87 52 8F F4 AF 97 52 9F 74 BF 8D
+D 4440 52 8F F4 AF 9D 52 9F 74 BF 9F F6 BF 8F 76 AF 9F
+D 4450 F6 BF 8F 76 AF 9F B7 8F A7 97 CA 44 62 87 CA 44
+D 4460 62 17 F8 30 B8 F8 02 A8 97 58 18 87 58 F8 04 A8
+D 4470 9B 58 18 8B 58 9E CA 44 7F 8E FA 80 C2 44 85 F8
+D 4480 00 BE F8 80 AE F8 30 B8 F8 0A A8 9E 58 18 8E 58
+D 4490 F8 4B B8 F8 02 A8 08 FB 01 C2 46 27 F8 30 B8 F8
+D 44A0 1A A8 48 BD 08 AD F8 1C A8 48 BE 08 AE F8 1E A8
+D 44B0 48 BF 08 AF F8 18 A8 48 B9 08 A9 89 52 8D F7 99
+D 44C0 52 9D 77 C3 45 2B F8 4B B8 F8 03 A8 08 C2 44 EB
+D 44D0 9E B9 8E A9 8D 52 89 F4 A9 9D 52 99 74 B9 99 F6
+D 44E0 B9 89 76 A9 99 BE 89 AE C0 45 1D 9E B9 8E A9 8E
+D 44F0 52 89 F4 A9 9E 52 99 74 B9 8E 52 89 F4 A9 9E 52
+D 4500 99 74 B9 8D 52 89 F4 A9 9D 52 99 74 B9 99 F6 B9
+D 4510 89 76 A9 99 F6 B9 89 76 A9 99 BE 89 AE F8 30 B8
+D 4520 F8 1C A8 9E 58 18 8E 58 C0 46 27 F8 30 B8 F8 12
+D 4530 A8 48 B9 08 A9 89 52 8D F7 99 52 9D 77 C3 45 A5
+D 4540 F8 4B B8 F8 03 A8 08 C2 45 65 9F B9 8F A9 8D 52
+D 4550 89 F4 A9 9D 52 99 74 B9 99 F6 B9 89 76 A9 99 BF
+D 4560 89 AF C0 45 97 9F B9 8F A9 8F 52 89 F4 A9 9F 52
+D 4570 99 74 B9 8F 52 89 F4 A9 9F 52 99 74 B9 8D 52 89
+D 4580 F4 A9 9D 52 99 74 B9 99 F6 B9 89 76 A9 99 F6 B9
+D 4590 89 76 A9 99 BF 89 AF F8 30 B8 F8 1E A8 9F 58 18
+D 45A0 8F 58 C0 46 27 F8 4B B8 F8 00 A8 48 B9 08 A9 99
+D 45B0 BB 89 AB 89 52 8B F4 AB 99 52 9B 74 BB 8B 52 8D
+D 45C0 F7 9B 52 9D 77 C3 46 27 F8 03 A8 08 C2 45 EA 99
+D 45D0 BB 89 AB 8D 52 8B F4 AB 9D 52 9B 74 BB 9B F6 BB
+D 45E0 8B 76 AB 9B B9 8B A9 C0 46 1C 99 BB 89 AB 89 52
+D 45F0 8B F4 AB 99 52 9B 74 BB 89 52 8B F4 AB 99 52 9B
+D 4600 74 BB 8D 52 8B F4 AB 9D 52 9B 74 BB 9B F6 BB 8B
+D 4610 76 AB 9B F6 BB 8B 76 AB 9B B9 8B A9 F8 4B B8 F8
+D 4620 00 A8 99 58 18 89 58 F8 30 B8 F8 02 A8 48 B7 08
+D 4630 A7 F8 04 A8 48 BB 08 AB F8 1C A8 48 BE 08 AE F8
+D 4640 1E A8 48 BF 08 AF 97 BD 87 AD 8B 52 8D F4 AD 9B
+D 4650 52 9D 74 BD F8 06 A8 9D 58 18 8D 58 9E BD 8E AD
+D 4660 8F 52 8D F4 AD 9F 52 9D 74 BD 9D F6 BD 8D 76 AD
+D 4670 97 BB 87 AB 87 52 8B F4 AB 97 52 9B 74 BB 8B 52
+D 4680 8B F4 AB 9B 52 9B 74 BB 97 B9 87 A9 99 F6 B9 89
+D 4690 76 A9 87 52 89 F4 A9 97 52 99 74 B9 8B 52 89 F4
+D 46A0 A9 9B 52 99 74 B9 89 52 8D F7 99 52 9D 77 CB 46
+D 46B0 B5 99 BD 89 AD F8 30 B8 F8 18 A8 9D 58 18 8D 58
+D 46C0 F8 4B B8 F8 00 A8 48 B9 08 A9 9F BD 8F AD 89 52
+D 46D0 8D F4 AD 99 52 9D 74 BD 9D F6 BD 8D 76 AD 9B B9
+D 46E0 8B A9 8B 52 89 F4 A9 9B 52 99 74 B9 87 52 89 F4
+D 46F0 A9 97 52 99 74 B9 89 52 8D F7 99 52 9D 77 C3 47
+D 4700 05 99 BD 89 AD 8B 52 89 F4 A9 9B 52 99 74 B9 89
+D 4710 52 8D F7 99 52 9D 77 CB 47 1E 99 BD 89 AD F8 30
+D 4720 B8 F8 12 A8 9D 58 18 8D 58 E2 D5
+
+D 4780 0D 0A 53 54 45 4C 4C 41 52 20 4D 4F 52 53 45 20
+D 4790 52 45 43 45 49 56 45 52 20 76 31 31 0D 0A 4B 65
+D 47A0 79 20 4D 6F 72 73 65 20 6F 6E 20 74 68 65 20 49
+D 47B0 6E 70 75 74 20 73 77 69 74 63 68 3B 20 69 74 20
+D 47C0 6C 65 61 72 6E 73 20 79 6F 75 72 20 73 70 65 65
+D 47D0 64 20 61 73 20 79 6F 75 20 67 6F 2E 0D 0A 51 20
+D 47E0 66 6F 6C 6C 6F 77 73 20 74 68 65 20 6B 65 79 20
+D 47F0 28 61 20 73 69 64 65 74 6F 6E 65 20 69 66 20 61
+D 4800 20 73 6F 75 6E 64 65 72 20 69 73 20 6F 6E 20 51
+D 4810 29 2E 20 51 20 6F 72 20 45 53 43 20 68 65 72 65
+D 4820 20 71 75 69 74 73 2E 0D 0A 57 68 61 74 20 69 74
+D 4830 20 72 65 63 65 69 76 65 73 20 63 61 6E 20 67 6F
+D 4840 20 69 6E 74 6F 20 61 20 4C 69 74 65 2D 57 72 69
+D 4850 74 65 72 20 32 20 73 6C 6F 74 2C 20 74 6F 20 6C
+D 4860 6F 61 64 20 74 68 65 72 65 20 77 69 74 68 20 5E
+D 4870 4C 2E 0D 0A 0D 0A 00 0D 0A 00 0D 0A 0D 0A 37 33
+D 4880 20 2D 20 62 79 65 2E 0D 0A 00 41 62 6F 75 74 20
+D 4890 68 6F 77 20 66 61 73 74 20 77 69 6C 6C 20 79 6F
+D 48A0 75 20 6B 65 79 2C 20 35 2D 32 35 20 77 6F 72 64
+D 48B0 73 20 70 65 72 20 6D 69 6E 75 74 65 20 28 45 6E
+D 48C0 74 65 72 20 3D 20 31 32 29 3F 20 00 0D 0A 4C 69
+D 48D0 73 74 65 6E 69 6E 67 20 2D 20 6B 65 79 20 61 77
+D 48E0 61 79 2E 0D 0A 0D 0A 00 53 61 76 65 20 74 6F 20
+D 48F0 4C 69 74 65 2D 57 72 69 74 65 72 20 32 20 73 6C
+D 4900 6F 74 20 31 2D 34 20 28 6F 6C 64 20 74 65 78 74
+D 4910 20 72 65 70 6C 61 63 65 64 3B 20 45 6E 74 65 72
+D 4920 20 3D 20 64 6F 20 6E 6F 74 20 73 61 76 65 29 3F
+D 4930 20 00 54 68 65 20 4C 69 74 65 2D 57 72 69 74 65
+D 4940 72 20 73 6C 6F 74 73 20 61 72 65 20 66 75 6C 6C
+D 4950 20 2D 20 6E 6F 74 68 69 6E 67 20 77 69 6C 6C 20
+D 4960 62 65 20 73 61 76 65 64 2E 0D 0A 00 0D 0A 0D 0A
+D 4970 54 68 65 20 74 65 78 74 20 69 73 20 69 6E 20 73
+D 4980 6C 6F 74 20 00 3A 20 69 6E 20 4C 69 74 65 2D 57
+D 4990 72 69 74 65 72 20 32 20 70 72 65 73 73 20 5E 4C
+D 49A0 20 61 6E 64 20 74 68 65 20 6E 75 6D 62 65 72 2E
+D 49B0 00 0D 0A 28 54 68 65 20 73 6C 6F 74 73 20 66 69
+D 49C0 6C 6C 65 64 20 75 70 20 2D 20 74 68 65 20 65 6E
+D 49D0 64 20 6F 66 20 74 68 65 20 74 65 78 74 20 77 61
+D 49E0 73 20 6E 6F 74 20 73 61 76 65 64 2E 29 00
+
+D 4C00 00 00 45 54 49 41 4E 4D 53 55 52 57 44 4B 47 4F
+D 4C10 48 56 46 00 4C 00 50 4A 42 58 43 59 5A 51 00 00
+D 4C20 35 34 00 33 00 00 00 32 26 00 2B 00 00 00 00 31
+D 4C30 36 3D 2F 00 00 00 28 00 37 00 00 00 38 00 39 30
+D 4C40 00 00 00 00 00 00 00 00 00 00 00 00 3F 5F 00 00
+D 4C50 00 00 22 00 00 2E 00 00 00 00 40 00 00 00 27 00
+D 4C60 00 2D 00 00 00 00 00 00 00 00 3B 21 00 29 00 00
+D 4C70 00 00 00 2C 00 00 00 00 3A 00 00 00 00 00 00 00
+
+D 4D00 E2 F8 4B B8 F8 12 A8 F8 00 58 18 58 18 58 18 58
+D 4D10 18 58 F8 10 A8 08 AF F8 00 BE AE F8 70 B7 F8 01
+D 4D20 A7 97 B9 87 A9 07 C2 4D 62 FF 05 C3 4D 5F 17 47
+D 4D30 BB 47 AB 8B 52 87 F4 A7 9B 52 97 74 B7 C3 4D 5B
+D 4D40 87 52 F8 FF F7 97 52 F8 7E 77 CB 4D 5B 09 52 8F
+D 4D50 F3 CA 4D 21 99 BE 89 AE C0 4D 21 99 B7 89 A7 F8
+D 4D60 00 57 9E CA 4D 6A 8E C2 4D 9B 9E B8 BD 8E A8 AD
+D 4D70 1D 4D BB 4D AB 8B 52 8D F4 AD 9B 52 9D 74 BD 8D
+D 4D80 52 87 F7 AB 9D 52 97 77 BB 1B 4D 58 18 2B 8B CA
+D 4D90 4D 8A 9B CA 4D 8A 28 98 B7 88 A7 87 FC 03 52 97
+D 4DA0 7C 00 B9 F8 FF F7 99 52 F8 7E 77 CB 4D C7 8F 57
+D 4DB0 17 F8 00 57 17 57 17 57 27 27 27 F8 4B B8 F8 12
+D 4DC0 A8 97 58 18 87 58 D5 F8 4B B8 F8 16 A8 F8 01 58
+D 4DD0 D5 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+D 4DE0 E2 F8 4B B8 F8 16 A8 08 CA 4E 37 F8 12 A8 48 B7
+D 4DF0 48 A7 97 C2 4E 37 48 BB 08 AB 87 FC 03 A9 97 7C
+D 4E00 00 B9 8B 52 89 F4 A9 9B 52 99 74 B9 89 FC 01 52
+D 4E10 99 7C 00 BD F8 FF F7 9D 52 F8 7E 77 CB 4E 38 F8
+D 4E20 11 A8 08 59 19 F8 00 59 1B F8 14 A8 9B 58 18 8B
+D 4E30 58 17 9B 57 17 8B 57 D5 F8 16 A8 F8 01 58 D5
+D 5000 00
+D 6000 00
+D 7000 00

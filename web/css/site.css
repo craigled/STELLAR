@@ -472,3 +472,8 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .crt.tz-lifted .crt-screen{flex:1; min-height:0; display:flex; flex-direction:column}
 .crt.tz-lifted .vt{flex:1; min-height:0; height:auto}
 .tz-lifted .tz-btn{display:none}
+/* INPUT switch (EF4) and the microphone, under the front panel */
+.fp-sound{margin-top:8px; flex-wrap:wrap}
+#inKey{touch-action:none; user-select:none; -webkit-user-select:none}
+#inKey.on{background:#ff4436; color:#fff; border-color:#ff4436; box-shadow:0 0 8px rgba(255,68,54,.5)}
+#listen[aria-pressed="true"], #sound[aria-pressed="true"]{border-color:var(--accent, #c8743a)}

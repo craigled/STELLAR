@@ -9,6 +9,12 @@
 
   var ENTRY = 0x4000;
   var CPI = 375000 / 170000;   // Elf2K machine cycles a second / ClockRow's instructions a second
+  // Lite-Writer 2's slot pool ($7001-$7EFF, VM4's block): kept across loads and resets.
+  var POOL = 0x7001, POOL_END = 0x7F00;
+  // EF4 edges (the Input key, or a tone heard by the microphone) are replayed this long
+  // after they happened, at the machine cycle that moment maps to - so the gaps between
+  // them stay exact although the machine only runs in ~16 ms ticks.
+  var KEY_LAG = 40;
   function hx(v, n) { return v.toString(16).toUpperCase().padStart(n, '0'); }
 
   // opts: { coreEl, disasmEl, terminalEl, statusEl } (any subset)
@@ -26,7 +32,19 @@
     this.breaks = {};        // absolute address -> true
     this._skipBreak = false; // don't re-trigger on the address we just resumed from
     this.onState = opts.onState || function () {};
+    this.efQ = [];           // EF4 edges waiting: {t: Date.now() ms, v: 0/1, cyc}
+    this._anchor = null;     // {wall, cyc}: a moment of wall time and the cycle it is
   }
+
+  // The Input switch (EF4) changed at wall time t (Date.now() ms; default now).
+  SimApp.prototype.keyEdge = function (v, t) {
+    if (!this.vm) return;
+    if (!this.running || !this.instrPerSec) { this.vm.cpu.EF[3] = v ? 1 : 0; return; }
+    this.efQ.push({ t: t === undefined ? Date.now() : t, v: v ? 1 : 0, cyc: null });
+  };
+  SimApp.prototype._keepPool = function () {
+    return this.vm ? { addr: POOL, bytes: this.vm.cpu.M.slice(POOL, POOL_END) } : null;
+  };
 
   // Program Location, as the firmware maintains it at core+$31/$32 — the same
   // value the disassembly highlights. Read directly rather than via snapshot()
@@ -60,8 +78,9 @@
     this.input = input || '';
     this.vm = new window.StellarVM({
       firmware: window.STELLAR_FIRMWARE, program: programText, input: this.input,
-      coldBoot: !!this.opts.coldBoot
+      coldBoot: !!this.opts.coldBoot, keepRam: this._keepPool()
     });
+    this.efQ = []; this._anchor = null;
     // run the label pre-pass so stepping starts at the first real instruction
     this.vm.prime();
     this._buildDisasm();
@@ -191,7 +210,15 @@
         budget = credit;
       }
       last = now;
+      var q = self.efQ, rate = self.instrPerSec * CPI / 1000;      // cycles a millisecond
+      if (!self.instrPerSec) { while (q.length) c.EF[3] = q.shift().v; }
+      else {
+        if (!self._anchor) self._anchor = { wall: now, cyc: c.cycles };
+        for (var e = 0; e < q.length; e++) if (q[e].cyc === null)
+          q[e].cyc = Math.max(c.cycles, self._anchor.cyc + (q[e].t + KEY_LAG - self._anchor.wall) * rate);
+      }
       for (var i = 0; self.instrPerSec ? c.cycles - c0 < budget : i < self.opsPerTick; i++) {
+        while (q.length && q[0].cyc <= c.cycles) c.EF[3] = q.shift().v;
         var r = self.vm.stepOpcode();
         // stop() before _render(): the render fires onState, and the page decides
         // the Run/Step/Pause button states from this.running — rendering first
@@ -208,6 +235,9 @@
         }
       }
       if (self.instrPerSec) credit -= c.cycles - c0;
+      // nothing waiting: re-anchor wall time to the machine's clock here, so a pause
+      // (a hidden tab, a stall) never pushes later key edges into the far future
+      if (!q.length) self._anchor = { wall: now, cyc: c.cycles };
       self._render();
       if (self.opts.onTick) self.opts.onTick(self.vm, self.instrPerSec);
     }, this.tickMs);
@@ -215,13 +245,17 @@
 
   SimApp.prototype.stop = function () {
     this.running = false;
+    if (this.efQ.length && this.vm) this.vm.cpu.EF[3] = this.efQ[this.efQ.length - 1].v;
+    this.efQ = []; this._anchor = null;
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
   };
 
   SimApp.prototype.reset = function () {
     if (!this.vm) return;
     this.stop();
+    this.vm.keepRam = this._keepPool();
     this.vm.reset();
+    this.efQ = []; this._anchor = null;
     this.vm.prime();
     if (this.coreView) this.coreView.reset();
     this.serialLen = 0;

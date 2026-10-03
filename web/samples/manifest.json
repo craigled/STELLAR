@@ -102,7 +102,7 @@
     "name": "Lite-Writer 2 (word processor)",
     "file": "Lite-Writer-2.lst",
     "input": " Welcome to Lite-Writer 2, a word processor for the RCA 1802.",
-    "blurb": "A full-screen word processor. Click the terminal and type: words wrap at column 72, and the status bar on line 24 shows the slot, line, column, bytes free and MODIFIED. Arrows move; Home/End, PgUp/PgDn and Delete work; Backspace and ^D delete; ^K cuts a line and ^U pastes it; ^F finds text; ^S and ^L save to and load from four slots; ^N starts a new document; ^G shows all the keys; ^X leaves. (On Windows and Linux the browser keeps Ctrl-N and Ctrl-T for itself.) The editor is STELLAR bytecode; a native 1802 engine called through RUNMC runs the terminal and the text buffer, and reads the keyboard while it writes to the screen, so no key is lost. Uses SETSIZE and VM4's memory. Verified on the Elf2K.",
+    "blurb": "A full-screen word processor. Click the terminal and type: words wrap at column 72, and the status bar on line 24 shows the slot, line, column, bytes free and MODIFIED. Arrows move; Home/End, PgUp/PgDn and Delete work; Backspace and ^D delete; ^K cuts a line and ^U pastes it; ^F finds text; ^S and ^L save to and load from four slots; ^N starts a new document; ^G shows all the keys; ^X leaves. (On Windows and Linux the browser keeps Ctrl-N and Ctrl-T for itself.) The editor is STELLAR bytecode; a native 1802 engine called through RUNMC runs the terminal and the text buffer, and reads the keyboard while it writes to the screen, so no key is lost. Uses SETSIZE and VM4's memory. Verified on the Elf2K. Its four slots stay in memory when you load another program - so text left by Morse Receiver v11 opens here with ^L.",
     "maxSteps": 6000000,
     "halts": false,
     "speed": "flat out"
@@ -137,6 +137,15 @@
     "file": "Morse-Sender-v18.lst",
     "input": "12\rCQ DE STELLAR\r",
     "blurb": "Sends what you type as Morse code on the Q line - every dot and dash a 700 Hz tone, made by a little raw-1802 loop run through RUNMC. Click \ud83d\udd08 Sound under the Front Panel to hear it (the clock must be at Elf2K). The input box pre-loads 12 WPM and 'CQ DE STELLAR'; then click the terminal and type more lines. Speeds 5-25 WPM; Enter on an empty line quits. The pitch byte is at $4E42 (2A = 700 Hz; bigger = lower). For keying real Morse equipment use v17 (in the downloads), which holds Q steady. Verified on the Elf2K.",
+    "speed": "Elf2K",
+    "maxSteps": 14000000,
+    "halts": false
+  },
+  {
+    "name": "Morse Receiver v11 (key INPUT, or \ud83c\udfa4 Listen)",
+    "file": "Morse-Receiver-v11.lst",
+    "input": "",
+    "blurb": "Reads Morse from the INPUT switch (EF4) and learns the sender's speed as it goes. Click the terminal: choose a Lite-Writer 2 slot for the text (1-4, Enter = do not save), then a speed (Enter = 12). Key it by holding \u23fa INPUT under the Front Panel - or click \ud83c\udfa4 Listen and let it hear a 700 Hz tone: Morse Sender v18 with Sound on, on another computer. Keep the clock at Elf2K and the room quiet. Q or Esc quits; then load 'Lite-Writer 2' and press ^L and the slot number to edit what was received. Simulator-verified; not yet run on the Elf2K.",
     "speed": "Elf2K",
     "maxSteps": 14000000,
     "halts": false

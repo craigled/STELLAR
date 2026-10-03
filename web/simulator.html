@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Simulator</title>
 <meta name="description" content="Run STELLAR programs in the browser on the real firmware — step through the disassembly and watch the core update live.">
-<link rel="stylesheet" href="css/site.css?v=90">
+<link rel="stylesheet" href="css/site.css?v=91">
 </head>
 <body>
 <main class="wrap">
@@ -59,6 +59,11 @@
             <button id="sound" aria-pressed="false" title="Play the Q line as a speaker would - at the Elf2K speed">🔈 Sound off</button>
           </div>
           <p class="arrow-note" id="soundNote">Q through a speaker: the program's own pitch, at the Elf2K clock only.</p>
+          <div class="sim-controls fp-sound">
+            <button id="inKey" title="The Elf2K's INPUT switch (EF4): hold it down to key Morse. Space works too while it has focus.">⏺ INPUT</button>
+            <button id="listen" aria-pressed="false" title="Hear a Morse tone through the microphone: the tone holds INPUT (EF4) down">🎤 Listen</button>
+          </div>
+          <p class="arrow-note" id="listenNote">INPUT is EF4. 🎤 Listen keys it from a tone the microphone hears - another computer running Morse Sender v18, say.</p>
         </div>
       </div>
     </div>
@@ -100,20 +105,21 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=90"></script>
-<script src="js/firmware-0061-34.js?v=90"></script>
-<script src="js/stellar-vm.js?v=90"></script>
-<script src="js/disasm.js?v=90"></script>
-<script src="js/core-view.js?v=90"></script>
-<script src="js/mem-view.js?v=90"></script>
-<script src="js/front-panel.js?v=90"></script>
-<script src="js/vt100.js?v=90"></script>
-<script src="js/term-zoom.js?v=90"></script>
-<script src="js/term-input.js?v=90"></script>
-<script src="js/sim-app.js?v=90"></script>
-<script src="js/q-audio.js?v=90"></script>
-<script src="js/clock-row.js?v=90"></script>
-<script src="js/simulator-page.js?v=90"></script>
-<script src="js/nav.js?v=90"></script>
+<script src="js/opcodes.js?v=91"></script>
+<script src="js/firmware-0061-34.js?v=91"></script>
+<script src="js/stellar-vm.js?v=91"></script>
+<script src="js/disasm.js?v=91"></script>
+<script src="js/core-view.js?v=91"></script>
+<script src="js/mem-view.js?v=91"></script>
+<script src="js/front-panel.js?v=91"></script>
+<script src="js/vt100.js?v=91"></script>
+<script src="js/term-zoom.js?v=91"></script>
+<script src="js/term-input.js?v=91"></script>
+<script src="js/sim-app.js?v=91"></script>
+<script src="js/q-audio.js?v=91"></script>
+<script src="js/tone-listen.js?v=91"></script>
+<script src="js/clock-row.js?v=91"></script>
+<script src="js/simulator-page.js?v=91"></script>
+<script src="js/nav.js?v=91"></script>
 </body>
 </html>
