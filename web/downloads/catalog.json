@@ -113,9 +113,9 @@
  },
  {
   "group": "Clock",
-  "name": "Big Clock",
-  "what": "The time in big seven-segment digits, the day of the week and the date, from the RTC ($07). VT100.",
-  "href": "samples/Big-Clock.lst",
+  "name": "Big Clock v2",
+  "what": "Big seven-segment time, the day and the date from the RTC ($07); hourly chime and alarm on Q. VT100.",
+  "href": "samples/Big-Clock-v2.lst",
   "note": "simulator-verified, not yet run on hardware; needs firmware V0061.35"
  },
  {
