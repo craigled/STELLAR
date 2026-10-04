@@ -26,7 +26,8 @@
   inner.innerHTML = '<a class="brand" href="index.html">STELLAR<span class="dot">·</span>VM</a>';
   TABS.forEach(function (t) {
     var a = document.createElement('a');
-    a.className = 'tab' + (t[0].replace(/\.html$/, '') === here ? ' active' : '');
+    var tab = t[0].replace(/\.html$/, '');
+    a.className = 'tab' + (tab === here || here.indexOf(tab + '-') === 0 ? ' active' : '');
     a.href = t[0]; a.textContent = t[1];
     inner.appendChild(a);
   });

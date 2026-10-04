@@ -397,11 +397,24 @@ class Compiler:
         if e[0] == 'flip': return (s.const(e[1], ln) + 0x8000) & 0xFFFF
         if e[0] == 'var' and e[1] in getattr(s, 'consts', {}): return s.consts[e[1]]
         if e[0] == 'neg': return (-s.const(e[1], ln)) & 0xFFFF
+        if e[0] == 'bin' and e[1] in ('/', '%', '>>') and (s.has_neg(e[2]) or s.has_neg(e[3])):
+            # a constant with a minus sign in it is folded the way C does: signed
+            sg = lambda v: v - 0x10000 if v & 0x8000 else v
+            a, b = sg(s.const(e[2], ln)), sg(s.const(e[3], ln))
+            if e[1] == '>>': return (a >> b) & 0xFFFF
+            if b == 0: raise Error('line %d: division by zero' % ln)
+            q = abs(a) // abs(b) * (1 if (a < 0) == (b < 0) else -1)
+            return (q if e[1] == '/' else a - b * q) & 0xFFFF
         if e[0] == 'bin' and e[1] in '+-*/%&|^<<>>':
             a, b = s.const(e[2], ln), s.const(e[3], ln)
             return {'+': a + b, '-': a - b, '*': a * b, '/': a // max(b, 1), '%': a % max(b, 1),
                     '&': a & b, '|': a | b, '^': a ^ b, '<<': a << b, '>>': a >> b}[e[1]] & 0xFFFF
         raise Error('line %d: not a constant' % ln)
+
+    def has_neg(s, e):
+        if not isinstance(e, tuple): return False
+        if e[0] == 'neg': return True
+        return any(s.has_neg(x) for x in e[1:] if isinstance(x, tuple))
 
     def isconst(s, e):
         try: s.const(e, 0); return True
@@ -703,6 +716,7 @@ class Compiler:
 
     def reg(s, e):
         """A register holding e: the variable's own, or a temporary (free it with untemp)."""
+        if e[0] == 'rreg': return e[1]
         if e[0] == 'var' and e[1] not in s.consts and e[1] not in s.arrays:
             loc = s.where(e[1])
             if loc[0] == 'r': return loc[1]
@@ -729,6 +743,8 @@ class Compiler:
         if s.isconst(e): return s.emit(ldx(d, s.const(e, s.ln)))
         k = e[0]
         if k == 'var': return s.load(e[1], d)
+        if k == 'rreg':                                # a value already in register e[1]
+            return s.emit(cpxy(e[1], d)) if e[1] != d else None
         if k == 'flip':                                # e + $8000: a signed value, for an unsigned compare
             s.value(e[1], d); return s.emit(addxi(d, 0x8000, 'signed: + $8000'))
         if k == 'idx' and s.wide(e[1]):                # the pointer in d itself, then d = the word it points at
@@ -778,7 +794,11 @@ class Compiler:
                 rb = s.reg(b); s.emit(x2acc(rb)); s.untemp(rb)
                 s.emit(('%s 0%X' % (code, ra), '%s R%d Acc' % (name, ra), ''))
             s.untemp(ra); return s.emit(ma2x(d))
-        ra = s.reg(a); rb = s.reg(b)
+        if d in TEMPS and not s.uses(b, d) and a[0] not in ('var', 'num') and not s.isconst(a):
+            # a is worked out in d itself (the result goes there anyway): one temporary fewer
+            s.value(a, d); ra = d
+        else: ra = s.reg(a)
+        rb = s.reg(b)
         if op == '+': s.emit(addxyz(ra, rb, d))
         elif op == '-': s.emit(subxyz(ra, rb, d))
         elif op == '*': s.emit(multxy(ra, rb)); s.emit(ma2x(d))
@@ -787,7 +807,15 @@ class Compiler:
             if op == '/': s.emit(ma2x(d))
             else: s.emit(rema()); s.emit(acc2x(d))
         else: raise Error('line %d: operator %s' % (s.ln, op))
-        s.untemp(ra); s.untemp(rb)
+        if ra != d: s.untemp(ra)                          # d is the caller's: still in use
+        s.untemp(rb)
+
+    def side_effects(s, e):
+        """Does evaluating e do something (a call to a function, rand(), getc(), an input)?"""
+        found = []
+        s.walk(e, lambda x: found.append(x) if x[0] == 'call' and (x[1] in s.funcs or
+               x[1] in ('rand', 'getc', 'getin', 'scanin', 'getline', 'peek', 'peekw', 'rtcset')) else None)
+        return bool(found)
 
     def wptr(s, name, ie, t=None):
         """A register (t, else a new temporary) pointing at a 16-bit array element (base + 2 x index)."""
@@ -1421,6 +1449,18 @@ class Compiler:
                     rb = s.reg(e[3])
                     s.emit(addxyz(d, rb, d) if e[1] == '+' else subxyz(d, rb, d)); s.untemp(rb); return
             return s.store(target[1], e)
+        if (target[0] == 'idx' and e[0] == 'bin' and len(e) > 2 and e[2] == target
+                and s.side_effects(target[2])):
+            # a[f()] += k  (and a[rand() % 6]++): the index is worked out ONCE, as in C - not once
+            # to read and again to write
+            t = s.temp(); s.value(target[2], t); v = s.temp()
+            if s.wide(target[1]):
+                s.emit(addxyz(t, t, t)); s.emit(addxi(t, s.addr(target[1]))); s.emit(mxy2(t, v))
+                s.value(('bin', e[1], ('rreg', v), e[3]), v); s.emit(xmy2(v, t))
+            else:
+                s.emit(rdidx(t, s.addr(target[1]))); s.emit(acc2x(v))
+                s.value(('bin', e[1], ('rreg', v), e[3]), v); s.emit(x2acc(v)); s.emit(wridx(t, s.addr(target[1])))
+            s.untemp(v); s.untemp(t); s.acc = None; return
         if target[0] == 'idx' and s.wide(target[1]):
             v = s.reg(e); p = s.wptr(target[1], target[2])
             s.emit(xmy2(v, p)); s.untemp(p); s.untemp(v); return

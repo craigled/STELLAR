@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=99';
+  var V = '?v=100';
   var PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/';
   var DRAFT = 'stellarc-draft';
 
@@ -173,7 +173,7 @@
   var halted = true, loaded = null;
 
   function loadIntoMachine() {
-    app.load(lst, $('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n'));
+    app.load(lst, $('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n').replace(/\\e|\\x1b/g, '\x1b'));
     loaded = lst;
   }
 
@@ -218,6 +218,23 @@
       var o = document.createElement('option');
       o.value = i; o.textContent = ex.name; $('example').appendChild(o);
     });
+    // stellarc.html#guide=NAME: an example from the Stellar C guide (stellarc-guide.html)
+    var g = /^#guide=([\w-]+)$/.exec(location.hash);
+    if (g) {
+      showExample(0, true);
+      Promise.all([fetch('sc/guide/manifest.json' + V).then(function (r) { return r.json(); }),
+                   fetch('sc/guide/' + g[1] + '.sc' + V).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })])
+        .then(function (res) {
+          var ex = res[0][g[1]] || {};
+          setSource(res[1]);
+          $('input').value = ex.input || '';
+          lstName = g[1];
+          $('blurb').innerHTML = 'From the <a href="stellarc-guide.html">Stellar C guide</a>: <b>' + g[1] +
+            '.sc</b>. Press Compile, then Run.' + (ex.input ? ' The input box types the keys the guide used.' : '');
+        })
+        .catch(function () { showExample(0); });
+      return;
+    }
     var draft = null;
     try { draft = JSON.parse(localStorage.getItem(DRAFT) || 'null'); } catch (e) {}
     if (draft && examples[draft.example] && typeof draft.src === 'string') {

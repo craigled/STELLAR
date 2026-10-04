@@ -1,0 +1,62 @@
+{
+ "hello": {
+  "input": "",
+  "line": 42
+ },
+ "numbers": {
+  "input": "",
+  "line": 68
+ },
+ "fizzbuzz": {
+  "input": "",
+  "line": 103
+ },
+ "loops": {
+  "input": "",
+  "line": 130
+ },
+ "functions": {
+  "input": "",
+  "line": 154
+ },
+ "echo": {
+  "input": "Hello\\r",
+  "line": 199
+ },
+ "names": {
+  "input": "Ada Lovelace\\r",
+  "line": 229
+ },
+ "arrays": {
+  "input": "",
+  "line": 256
+ },
+ "signed": {
+  "input": "",
+  "line": 298
+ },
+ "switch": {
+  "input": "+-*/x",
+  "line": 336
+ },
+ "screen": {
+  "input": "",
+  "line": 372
+ },
+ "game": {
+  "input": "\\x1b[C\\x1b[C\\x1b[C\\x1b[Bq",
+  "line": 420
+ },
+ "clock": {
+  "input": "",
+  "line": 491
+ },
+ "asmdemo": {
+  "input": "",
+  "line": 549
+ },
+ "hilo": {
+  "input": "50\\r25\\rabc\\r12\\r18\\r21\\r23\\rn\\r",
+  "line": 637
+ }
+}

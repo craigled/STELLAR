@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stellar C guide</title>
+<meta name="description" content="Programming in Stellar C: the language taught step by step, from the first line to a finished game - every example checked by compiling and running it.">
+<link rel="stylesheet" href="css/site.css?v=100">
+<style>
+.guide{max-width:82ch}
+.guide h2{margin-top:2.2em; border-top:1px solid var(--line); padding-top:.9em}
+.guide hr{display:none}
+.guide pre{margin:.4em 0 1em; padding:12px 14px; overflow-x:auto; font-size:13px; line-height:1.45}
+.guide li{margin:.25em 0}
+.g-ex .g-exh{display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px; color:var(--ink-soft); margin-top:1.2em}
+.g-ex pre{margin-top:.25em}
+.g-try{font-family:var(--mono); font-size:12.5px}
+.g-out .g-lbl,.g-exh .g-lbl{font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent)}
+.g-out pre{background:var(--bg-sunk); color:var(--ink); border:1px solid var(--line)}
+.g-screen pre{background:var(--code-bg); color:var(--code-ink)}
+.g-table{overflow-x:auto}
+.g-table table{border-collapse:collapse; font-size:14px; margin:.6em 0 1.2em}
+.g-table th,.g-table td{border:1px solid var(--line); padding:5px 9px; text-align:left; vertical-align:top}
+.g-toc{columns:2; font-size:14.5px; margin:1em 0 2em; padding-left:1.2em}
+@media(max-width:700px){.g-toc{columns:1}}
+</style>
+</head>
+<body>
+<main class="wrap guide">
+  <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Language &middot; guide</div>
+  <h1>Programming in Stellar C</h1>
+  <p class="muted">The compiler and its examples are on the <a href="stellarc.html">Stellar C page</a>; each <b>Try it</b> link below opens an example there, ready to compile and run.</p>
+  <ol class="g-toc"><li><a href="#0-compiling-and-running-your-own-programs">Compiling and running your own programs</a></li><li><a href="#1-your-first-program">Your first program</a></li><li><a href="#2-numbers-and-variables">Numbers and variables</a></li><li><a href="#3-decisions-and-loops">Decisions and loops</a></li><li><a href="#4-functions">Functions</a></li><li><a href="#5-characters-strings-and-reading-the-keyboard">Characters, strings and reading the keyboard</a></li><li><a href="#6-arrays">Arrays</a></li><li><a href="#7-signed-numbers">Signed numbers</a></li><li><a href="#8-choosing-with-switch">Choosing with <code>switch</code></a></li><li><a href="#9-the-terminal-screen">The terminal screen</a></li><li><a href="#10-keys-time-and-games">Keys, time and games</a></li><li><a href="#11-the-elf2k-s-hardware">The Elf2K's hardware</a></li><li><a href="#12-how-stellar-shapes-the-language">How STELLAR shapes the language</a></li><li><a href="#13-faster-code-asm-and-native">Faster code: <code>asm { }</code> and <code>native { }</code></a></li><li><a href="#14-when-the-compiler-says-no">When the compiler says no</a></li><li><a href="#15-a-complete-program-hi-lo">A complete program: Hi-Lo</a></li></ol>
+  
+<p>Stellar C is a small C-like language for the RCA 1802. A Stellar C program compiles to STELLAR bytecode - the same <code>.lst</code> file a hand-written STELLAR program is - so it loads on an Elf2K running the STELLAR firmware, or runs in the web Simulator. This guide teaches it from the first line to a finished game. Every example in it is a complete program, and every one is compiled and run by <code>SC/guide_check.py</code> with the output shown here - so what you read is what you get.</p>
+<p>If you know C, most of Stellar C will look familiar; the differences are the ones the 1802 and STELLAR impose, and section 12 explains them. If you do not know C, start at section 1.</p>
+<h2 id="0-compiling-and-running-your-own-programs">0. Compiling and running your own programs</h2>
+<p>A Stellar C program is a plain text file, by convention named <code>something.sc</code>.</p>
+<p><b>On the website - nothing to install.</b> Open the Stellar C page on stellar-1802.dev.</p>
+<ol><li>Type or paste your program into the Source box (it replaces the example; your edits are kept in the browser if you leave and come back - Revert brings the example back).</li><li>Press <b>Compile</b> (Ctrl/Cmd+Enter compiles and runs). Errors show with their line number.</li><li>Press <b>Run</b>. A program that reads keys: click the terminal and type. The input box under the example menu types keys for you before the program starts.</li><li><b>Download .lst</b> saves the compiled program for a real Elf2K.</li></ol>
+<p>Every example in this guide has a <b>Try it</b> link that opens it there.</p>
+<p><b>On your computer</b> - Python 3 and the work repository (<code>stellar-1802</code>):</p>
+<pre><code>python3 SC/scc.py myprog.sc          # writes myprog.lst beside it (and myprog.sym.json)</code></pre>
+<p>Then either load <code>myprog.lst</code> into the Elf2K - its D-lines go to the monitor like any STELLAR app - and cold-boot STELLAR; or open it in the web Simulator (<b>Open .lst...</b>, or drag the file onto the page) and press <b>Run</b>. The <code>.lst</code> header says how many STELLAR commands it compiled to and how much memory it uses; below that is the compiled program, each command beside the source line it came from.</p>
+<hr>
+<h2 id="1-your-first-program">1. Your first program</h2>
+<div class="g-ex"><div class="g-exh"><span class="mono">hello.sc</span><a class="g-try" href="stellarc.html#guide=hello">Try it &rarr;</a></div><pre><code>void main() {
+    print(&quot;Hello from the 1802!\r\n&quot;);
+    print(&quot;2 + 3 = &quot;);
+    printu(2 + 3);
+    print(&quot;\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>Hello from the 1802!
+2 + 3 = 5</pre></div>
+<ul><li>Every program has a <code>main()</code>; the program starts there and ends when <code>main()</code> ends.</li><li><code>print("...")</code> sends text to the terminal; <code>printu(e)</code> prints a number.</li><li>A statement ends with <code>;</code>. Comments are <code>// to the end of the line</code> or <code>/* ... */</code>.</li><li><code>\r\n</code> is a new line: carriage return (back to column 1) and line feed (down a row). A terminal needs both - <code>\n</code> alone moves down without going back to the left edge.</li><li>Other escapes in strings and characters: <code>\t</code> tab, <code>\b</code> backspace, <code>\e</code> escape (for terminal codes), <code>\0</code>, <code>\\</code>, <code>\'</code>, <code>\"</code>.</li></ul>
+<hr>
+<h2 id="2-numbers-and-variables">2. Numbers and variables</h2>
+<div class="g-ex"><div class="g-exh"><span class="mono">numbers.sc</span><a class="g-try" href="stellarc.html#guide=numbers">Try it &rarr;</a></div><pre><code>const DOZEN = 12;
+u16 eggs, boxes, left;
+
+void main() {
+    eggs = 100;
+    boxes = eggs / DOZEN;
+    left = eggs % DOZEN;
+    printu(eggs); print(&quot; eggs make &quot;); printu(boxes);
+    print(&quot; boxes, with &quot;); printu(left); print(&quot; left over.\r\n&quot;);
+    eggs = 65535;
+    eggs = eggs + 1;
+    print(&quot;65535 + 1 = &quot;); printu(eggs); print(&quot;\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>100 eggs make 8 boxes, with 4 left over.
+65535 + 1 = 0</pre></div>
+<ul><li><code>u16</code> is a 16-bit unsigned number, 0 to 65535. It is the everyday type: most variables are <code>u16</code>, and the compiler keeps the busiest ones in the 1802's registers.</li><li>Arithmetic is <code>+ - * / %</code>; <code>/</code> drops the remainder and <code>%</code> is the remainder. A result too big for 16 bits wraps round (65535 + 1 is 0).</li><li>Bit operations are <code>&amp; | ^ ~</code> and shifts <code>&lt;&lt;</code> <code>&gt;&gt;</code> by a constant number of places.</li><li><code>const NAME = value;</code> gives a value a name; it costs nothing at run time.</li><li>Variables declared outside a function are global (every function sees them); variables declared inside a function are local to it.</li><li>Short forms: <code>x += 5;</code> <code>x -= e;</code> <code>x *= e;</code> (and <code>/= %= &amp;= |= ^=</code>), <code>x++;</code> <code>x--;</code>.</li></ul>
+<hr>
+<h2 id="3-decisions-and-loops">3. Decisions and loops</h2>
+<div class="g-ex"><div class="g-exh"><span class="mono">fizzbuzz.sc</span><a class="g-try" href="stellarc.html#guide=fizzbuzz">Try it &rarr;</a></div><pre><code>u16 n;
+
+void main() {
+    for (n = 1; n &lt;= 15; n++) {
+        if (n % 15 == 0) print(&quot;FizzBuzz&quot;);
+        else if (n % 3 == 0) print(&quot;Fizz&quot;);
+        else if (n % 5 == 0) print(&quot;Buzz&quot;);
+        else printu(n);
+        print(&quot; &quot;);
+    }
+    print(&quot;\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz </pre></div>
+<ul><li><code>if (condition) statement else statement</code> - braces <code>{ }</code> group several statements.</li><li>Comparisons: <code>== != &lt; &lt;= &gt; &gt;=</code>. Combine them with <code>&amp;&amp;</code> (and), <code>||</code> (or), <code>!</code> (not); <code>&amp;&amp;</code> and <code>||</code> stop as soon as the answer is known.</li><li>Any number can be a condition: 0 is false, anything else is true.</li><li><code>while (condition) statement</code> repeats while the condition is true.</li><li><code>for (start; condition; step) statement</code> is the counting loop.</li><li><code>break;</code> leaves the loop at once; <code>continue;</code> skips to its next turn.</li></ul>
+<div class="g-ex"><div class="g-exh"><span class="mono">loops.sc</span><a class="g-try" href="stellarc.html#guide=loops">Try it &rarr;</a></div><pre><code>u16 i, total;
+
+void main() {
+    total = 0;
+    i = 0;
+    while (1) {
+        i++;
+        if (i &gt; 20) break;
+        if (i % 2 == 1) continue;
+        total += i;
+    }
+    print(&quot;2 + 4 + ... + 20 = &quot;); printu(total); print(&quot;\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>2 + 4 + ... + 20 = 110</pre></div>
+<hr>
+<h2 id="4-functions">4. Functions</h2>
+<div class="g-ex"><div class="g-exh"><span class="mono">functions.sc</span><a class="g-try" href="stellarc.html#guide=functions">Try it &rarr;</a></div><pre><code>u16 gcd(u16 a, u16 b) {
+    u16 t;
+    while (b != 0) {
+        t = a % b;
+        a = b;
+        b = t;
+    }
+    return a;
+}
+
+u16 isprime(u16 n) {
+    u16 d;
+    if (n &lt; 2) return 0;
+    for (d = 2; d * d &lt;= n; d++)
+        if (n % d == 0) return 0;
+    return 1;
+}
+
+void main() {
+    u16 n;
+    print(&quot;gcd(1071, 462) = &quot;); printu(gcd(1071, 462)); print(&quot;\r\n&quot;);
+    print(&quot;primes below 40:&quot;);
+    for (n = 1; n &lt; 40; n++)
+        if (isprime(n)) { print(&quot; &quot;); printu(n); }
+    print(&quot;\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>gcd(1071, 462) = 21
+primes below 40: 2 3 5 7 11 13 17 19 23 29 31 37</pre></div>
+<ul><li>A function names its result type (<code>u16</code>, <code>i16</code>, or <code>void</code> for none), then its parameters.</li><li><code>return e;</code> hands back a value; <code>return;</code> (or the end of the function) leaves a <code>void</code> one.</li><li>Functions can call other functions, and calls can be used inside expressions.</li><li><b>No recursion</b>: a function may not call itself, directly or through another. STELLAR has no stack frames, so every variable has one fixed home; the compiler refuses a recursive call (section 14). Loops do the same work.</li></ul>
+<hr>
+<h2 id="5-characters-strings-and-reading-the-keyboard">5. Characters, strings and reading the keyboard</h2>
+<div class="g-ex"><div class="g-exh"><span class="mono">echo.sc</span><a class="g-try" href="stellarc.html#guide=echo">Try it &rarr;</a></div><pre><code>u16 k, count;
+
+void main() {
+    print(&quot;Type, and press Enter: &quot;);
+    count = 0;
+    while (1) {
+        k = getc();
+        if (k == &#x27;\r&#x27;) break;
+        if (k &gt;= &#x27;a&#x27; &amp;&amp; k &lt;= &#x27;z&#x27;) k = k - &#x27;a&#x27; + &#x27;A&#x27;;
+        putc(k);
+        count++;
+    }
+    print(&quot;\r\n&quot;); printu(count); print(&quot; characters\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>Type, and press Enter: HELLO
+5 characters</pre></div>
+<ul><li>A character in single quotes, <code>'A'</code>, is its number (65). <code>putc(e)</code> prints one character.</li><li><code>getc()</code> waits for a key and returns it. While it waits, the other VMs keep running.</li><li><code>keyready()</code> is true if a key is waiting - for a loop that must keep going (a game) - and <code>getc()</code> then takes it without waiting.</li></ul>
+<p>A string is an array of <code>u8</code> (bytes) ending with a 0. <code>getline</code> reads a whole line into one, with Backspace working, and stops at the array's size so a long line cannot overrun it:</p>
+<div class="g-ex"><div class="g-exh"><span class="mono">names.sc</span><a class="g-try" href="stellarc.html#guide=names">Try it &rarr;</a></div><pre><code>u8 name[16];
+u16 n, i;
+
+void main() {
+    print(&quot;Your name? &quot;);
+    n = getline(name);
+    print(&quot;Hello, &quot;); print(name); print(&quot; - backwards: &quot;);
+    i = n;
+    while (i &gt; 0) { i--; putc(name[i]); }
+    print(&quot;\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>Your name? Ada Lovelace
+Hello, Ada Lovelace - backwards: ecalevoL adA</pre></div>
+<ul><li><code>print(name)</code> prints a string array up to its 0.</li><li><code>getline(buf)</code> takes at most <code>size - 1</code> characters (here 15) and adds the 0; <code>getline(buf, max)</code> takes fewer. It returns the length. Enter ends the line.</li></ul>
+<hr>
+<h2 id="6-arrays">6. Arrays</h2>
+<div class="g-ex"><div class="g-exh"><span class="mono">arrays.sc</span><a class="g-try" href="stellarc.html#guide=arrays">Try it &rarr;</a></div><pre><code>u8  counts[6];
+u16 scores[] = { 300, 1200, 50, 700, 950 };
+u16 i, j, t;
+
+void main() {
+    // a histogram of 600 dice rolls
+    for (i = 0; i &lt; 600; i++) counts[rand() % 6]++;
+    t = 0;
+    for (i = 0; i &lt; 6; i++) t += counts[i];
+    print(&quot;rolls counted: &quot;); printu(t); print(&quot;\r\n&quot;);
+    // sort the scores, smallest first (a bubble sort)
+    for (i = 0; i &lt; 5; i++)
+        for (j = 0; j + 1 &lt; 5 - i; j++)
+            if (scores[j] &gt; scores[j + 1]) {
+                t = scores[j]; scores[j] = scores[j + 1]; scores[j + 1] = t;
+            }
+    for (i = 0; i &lt; 5; i++) { printu(scores[i]); print(&quot; &quot;); }
+    print(&quot;\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>rolls counted: 600
+50 300 700 950 1200 </pre></div>
+<ul><li><code>u8 a[n]</code> is n bytes (0-255 each); <code>u16 a[n]</code> is n 16-bit numbers; <code>i16 a[n]</code> n signed ones (section 7). Indexes start at 0. <code>a[] = { ... }</code> sets starting values (and the size).</li><li><code>rand()</code> is a pseudo-random 16-bit number; <code>rand() % 6</code> is 0 to 5.</li><li><code>&amp;a[i]</code> is the address of an element; <code>fill(&amp;a[0], value, count)</code> and <code>copy(&amp;dst[0], &amp;src[0], count)</code> set or copy bytes in one STELLAR command each.</li><li><b>Arrays the program changes are set back to their starting values when it starts</b> - so running a program again without reloading it (the Elf2K way) starts it clean. (<code>patched u8 a[] = ...</code> turns that off for an array whose bytes are always written before they are read: a template string, say.)</li><li>There are no bounds checks: <code>a[10]</code> of a 10-element array is the next thing in memory.</li></ul>
+<hr>
+<h2 id="7-signed-numbers">7. Signed numbers</h2>
+<div class="g-ex"><div class="g-exh"><span class="mono">signed.sc</span><a class="g-try" href="stellarc.html#guide=signed">Try it &rarr;</a></div><pre><code>i16 t[] = { -12, 5, -3, 20, -8, 0, 15 };
+i16 low, high, sum, x;
+u16 i;
+
+void main() {
+    low = t[0]; high = t[0]; sum = 0;
+    for (i = 0; i &lt; 7; i++) {
+        if (t[i] &lt; low) low = t[i];
+        if (t[i] &gt; high) high = t[i];
+        sum += t[i];
+    }
+    print(&quot;lowest &quot;); printi(low); print(&quot;, highest &quot;); printi(high);
+    print(&quot;, average &quot;); printi(sum / 7); print(&quot; remainder &quot;); printi(sum % 7); print(&quot;\r\n&quot;);
+    x = -7;
+    print(&quot;x / 2 = &quot;); printi(x / 2); print(&quot;, x % 2 = &quot;); printi(x % 2);
+    print(&quot;, x &gt;&gt; 1 = &quot;); printi(x &gt;&gt; 1); print(&quot;, -7 / 2 = &quot;); printi(-7 / 2); print(&quot;\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>lowest -12, highest 20, average 2 remainder 3
+x / 2 = -3, x % 2 = -1, x &gt;&gt; 1 = -4, -7 / 2 = -3</pre></div>
+<ul><li><code>i16</code> is a signed 16-bit number, -32768 to 32767. Use it wherever a value can go below zero.</li><li><code>printi(e)</code> prints it with its sign (<code>printu</code> would show -1 as 65535).</li><li>Where the sign matters, Stellar C uses it: comparisons, <code>/</code>, <code>%</code> and <code>&gt;&gt;</code>. <code>/</code> rounds toward zero and <code>%</code> takes the sign of the number divided (C's rules); <code>&gt;&gt;</code> keeps the sign.</li><li><code>x &gt;&gt; 1</code> of -7 is -4, not -3: a shift rounds down, where <code>/</code> rounds toward zero.</li><li>An expression is signed if any variable, array or function result in it is <code>i16</code>, or if it is made only of constants and has a minus sign in it (<code>-7 / 2</code> is -3). Comparing an <code>i16</code> with a <code>u16</code> is a signed comparison.</li></ul>
+<hr>
+<h2 id="8-choosing-with-switch">8. Choosing with <code>switch</code></h2>
+<div class="g-ex"><div class="g-exh"><span class="mono">switch.sc</span><a class="g-try" href="stellarc.html#guide=switch">Try it &rarr;</a></div><pre><code>u16 k, a, b;
+
+void main() {
+    a = 20; b = 4;
+    while (1) {
+        k = getc();
+        switch (k) {
+            case &#x27;+&#x27;: printu(a + b); break;
+            case &#x27;-&#x27;: printu(a - b); break;
+            case &#x27;*&#x27;: printu(a * b); break;
+            case &#x27;/&#x27;: printu(a / b); break;
+            case &#x27;q&#x27;: case &#x27;x&#x27;: print(&quot;bye&quot;); return;
+            default: print(&quot;?&quot;);
+        }
+        print(&quot; &quot;);
+    }
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>24 16 80 5 bye</pre></div>
+<ul><li><code>switch (e)</code> jumps to the <code>case</code> with e's value, or to <code>default:</code> if none matches (and past the switch if there is no default).</li><li>Cases are constants: numbers or characters. Several cases can share one body.</li><li><code>break;</code> leaves the switch. Without it, the next case's statements run too ("fall through").</li><li>Inside a loop, <code>continue;</code> in a switch goes to the loop's next turn.</li></ul>
+<hr>
+<h2 id="9-the-terminal-screen">9. The terminal screen</h2>
+<p>The Elf2K's terminal is a VT100: text can be placed anywhere, shown in reverse video, erased.</p>
+<div class="g-ex"><div class="g-exh"><span class="mono">screen.sc</span><a class="g-try" href="stellarc.html#guide=screen">Try it &rarr;</a></div><pre><code>u16 r, n;
+
+void main() {
+    cls();
+    at(1, 1); rev(1); print(&quot; REPORT &quot;); rev(0);
+    at(3, 3); print(&quot;row   value   padded   hex&quot;);
+    for (r = 0; r &lt; 4; r++) {
+        n = r * 1234 + 5;
+        at(4 + r, 3); printu(r);
+        at(4 + r, 9); printw(n, 5);
+        at(4 + r, 17); printz(n, 5);
+        at(4 + r, 26); printh(n);
+    }
+    at(9, 1);
+}</code></pre></div>
+<div class="g-out g-screen"><div class="g-lbl">The screen</div><pre> REPORT
+
+  row   value   padded   hex
+  0         5   00005    0005
+  1      1239   01239    04D7
+  2      2473   02473    09A9
+  3      3707   03707    0E7B</pre></div>
+<div class="g-table"><table><thead><tr><th>call</th><th>does</th></tr></thead><tbody><tr><td><code>cls()</code></td><td>clear the screen, cursor to the top left</td></tr><tr><td><code>at(row, col)</code></td><td>move the cursor (rows 1-24, columns 1-80)</td></tr><tr><td><code>rev(1)</code> / <code>rev(0)</code></td><td>reverse video on / off</td></tr><tr><td><code>eol()</code></td><td>erase from the cursor to the end of the line</td></tr><tr><td><code>cursor(0)</code> / <code>cursor(1)</code></td><td>hide / show the cursor (hide it while a game draws)</td></tr><tr><td><code>printw(e, n)</code></td><td>e right-aligned in n columns</td></tr><tr><td><code>printz(e, n)</code></td><td>e as n digits with leading zeros: <code>printz(7, 2)</code> is <code>07</code></td></tr><tr><td><code>printh(e)</code> / <code>printh(e, n)</code></td><td>e in hexadecimal, 4 or n digits</td></tr></tbody></table></div>
+<p>The terminal does NOT scroll when something is written on the bottom row - draw a full-screen program with <code>at()</code> rather than by printing new lines.</p>
+<hr>
+<h2 id="10-keys-time-and-games">10. Keys, time and games</h2>
+<p>A game is a loop: look for a key without waiting, move things, draw, wait a little, repeat.</p>
+<div class="g-ex"><div class="g-exh"><span class="mono">game.sc</span><a class="g-try" href="stellarc.html#guide=game">Try it &rarr;</a></div><pre><code>u16 x, y, k;
+
+u16 key() {                     // a key: &#x27;U&#x27; &#x27;D&#x27; &#x27;L&#x27; &#x27;R&#x27; for the arrows, 0 if none
+    if (!keyready()) return 0;
+    k = getc();
+    if (k != 27) return k;      // not ESC: an ordinary key
+    k = getc();
+    if (k == &#x27;[&#x27;) k = getc();   // ESC [ A ... - the &#x27;[&#x27; may have been lost (see below)
+    switch (k) {
+        case &#x27;A&#x27;: return &#x27;U&#x27;;
+        case &#x27;B&#x27;: return &#x27;D&#x27;;
+        case &#x27;C&#x27;: return &#x27;R&#x27;;
+        case &#x27;D&#x27;: return &#x27;L&#x27;;
+    }
+    return 0;
+}
+
+void main() {
+    x = 10; y = 5;
+    cls(); cursor(0);
+    at(1, 1); print(&quot;Arrows move the star, q quits&quot;);
+    while (1) {
+        at(y, x); putc(&#x27;*&#x27;);
+        delay(10);
+        k = key();
+        if (k == &#x27;q&#x27;) break;
+        if (k == 0) continue;
+        at(y, x); putc(&#x27; &#x27;);
+        switch (k) {
+            case &#x27;U&#x27;: if (y &gt; 2) y--; break;
+            case &#x27;D&#x27;: if (y &lt; 23) y++; break;
+            case &#x27;L&#x27;: if (x &gt; 1) x--; break;
+            case &#x27;R&#x27;: if (x &lt; 79) x++; break;
+        }
+    }
+    cursor(1); at(24, 1);
+}</code></pre></div>
+<div class="g-out g-screen"><div class="g-lbl">The screen</div><pre>Arrows move the star, q quits
+
+
+
+
+            *</pre></div>
+<ul><li><code>keyready()</code> tests for a key without waiting; <code>getc()</code> takes it.</li><li>An arrow key sends three characters: ESC, <code>[</code> and a letter (<code>A</code> up, <code>B</code> down, <code>C</code> right, <code>D</code> left). They arrive about 1 ms apart and the Elf2K's serial chip holds only one, so a busy program can find the <code>[</code> overwritten - which is why <code>key()</code> above accepts ESC followed straight by the letter too.</li><li><code>delay(k)</code> waits about 4 ms per unit at the Elf2K's 3 MHz. It holds the whole 1802 while it waits (other VMs stop), so keep delays short in a program that shares the machine.</li><li><code>rand()</code> gives a different sequence in each VM; call it while waiting for a key to stir it.</li></ul>
+<hr>
+<h2 id="11-the-elf2k-s-hardware">11. The Elf2K's hardware</h2>
+<p><b>The front panel.</b> <code>out(e)</code> shows a byte on the two-digit hex display; <code>q(1)</code> / <code>q(0)</code> turns the Q lamp (and anything wired to Q - a speaker) on and off.</p>
+<p><b>The INPUT switch</b> is EF line 4: <code>ef(4)</code> is 1 while it is held; <code>waitef(4)</code> waits for one press and release (the other VMs keep running meanwhile).</p>
+<p><b>The clock.</b> <code>rtcget(t)</code> fills an 8-byte <code>u8</code> array with the date and time from the Elf2K's DS12887 clock chip (firmware V0061.35 or later):</p>
+<div class="g-ex"><div class="g-exh"><span class="mono">clock.sc</span><a class="g-try" href="stellarc.html#guide=clock">Try it &rarr;</a></div><pre><code>u8 t[8];
+
+void main() {
+    rtcget(t);
+    print(&quot;Today is &quot;);
+    printu(t[6] * 256 + t[7]); putc(&#x27;-&#x27;); printz(t[5], 2); putc(&#x27;-&#x27;); printz(t[4], 2);
+    print(&quot;, the time is &quot;);
+    printz(t[2], 2); putc(&#x27;:&#x27;); printz(t[1], 2); putc(&#x27;:&#x27;); printz(t[0], 2);
+    print(&quot;\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>Today is 2026-10-04, the time is 14:23:07</pre></div>
+<div class="g-table"><table><thead><tr><th><code>t[0]</code></th><th><code>t[1]</code></th><th><code>t[2]</code></th><th><code>t[3]</code></th><th><code>t[4]</code></th><th><code>t[5]</code></th><th><code>t[6]</code>, <code>t[7]</code></th></tr></thead><tbody><tr><td>second</td><td>minute</td><td>hour</td><td>weekday, 0 = Sunday</td><td>day</td><td>month</td><td>year, high and low byte</td></tr></tbody></table></div>
+<p><code>ok = rtcset(t)</code> sets the clock from the same layout and returns 1 - or 0 if the date is impossible (31 February), in which case nothing is changed.</p>
+<p><b>Memory outside the program.</b> <code>peek(a)</code> and <code>poke(a, v)</code> read and write a byte at an absolute address; <code>peekw</code> / <code>pokew</code> a 16-bit word. Programs normally never need them - they are for sharing data with other programs (Time Grab Store's log at <code>$4B00</code>, say). Never write at <code>$8000</code> or above: that is the Elf2K's own firmware.</p>
+<hr>
+<h2 id="12-how-stellar-shapes-the-language">12. How STELLAR shapes the language</h2>
+<p>Stellar C is small because the machine is small. Knowing why saves surprises.</p>
+<ul><li><b>No recursion, fixed homes.</b> Every variable lives in one place for the whole run - one of the VM's 16 registers, or two bytes of memory. The compiler gives registers to the busiest variables and lets two variables share a register when they are never in use at the same time.</li><li><b>Three scratch registers.</b> An expression is worked out in at most three temporary registers. A very long expression is refused ("expression too deep") - split it into two statements: <code>t = a * b + c; x = t / (d + e);</code></li><li><b><code>u8</code> variables cost more than <code>u16</code>.</b> A <code>u8</code> lives in memory and goes through the accumulator; use <code>u8</code> for arrays and for saving space, <code>u16</code> for the variables you work with.</li><li><b>Program size.</b> A VM's program block is 4 KB. A bigger program automatically takes two or three blocks (<code>SETSIZE</code>), leaving fewer VMs free - the <code>.lst</code> header says how much it uses.</li><li><b>Rerun without reloading.</b> The Elf2K runs a program again from memory as the last run left it; Stellar C resets the arrays a program changes and sets variables in code, so a rerun starts clean.</li><li><b>Sharing the machine.</b> <code>getc()</code>, <code>getline()</code> and <code>waitef()</code> let the other VMs run while they wait; <code>delay()</code>, a <code>native { }</code> block and long <code>rtcget</code> waits do not.</li></ul>
+<hr>
+<h2 id="13-faster-code-asm-and-native">13. Faster code: <code>asm { }</code> and <code>native { }</code></h2>
+<p>Most programs never need these. When one inner loop must be faster, you can write it in STELLAR commands (<code>asm</code>) or in raw 1802 machine code (<code>native</code>, about 70 times faster than compiled code).</p>
+<div class="g-ex"><div class="g-exh"><span class="mono">asmdemo.sc</span><a class="g-try" href="stellarc.html#guide=asmdemo">Try it &rarr;</a></div><pre><code>u16 n, total;
+
+void main() {
+    n = 10; total = 0;
+    asm {
+    loop:
+        ADDXYZ {total}{n} 0{total}     // total = total + n
+        DECX 0{n}
+        TESTXZ 0{n}
+        IFFALSEI @loop
+    }
+    print(&quot;10 + 9 + ... + 1 = &quot;); printu(total); print(&quot;\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>10 + 9 + ... + 1 = 55</pre></div>
+<ul><li>In <code>asm { }</code>, one STELLAR command a line: the mnemonic, then its operand bytes in hex as the COMMANDS table lays them out. <code>{x}</code> is the register variable <code>x</code> lives in (one hex digit), <code>@label</code> an address, <code>#e</code> a two-byte constant or <code>&amp;array</code>, <code>%e</code> a one-byte constant.</li><li><code>native { }</code> is raw 1802 assembly, run with <code>RUNMC</code>. Free registers: R7 R8 R9 RB RD RE RF; set X with <code>SEX</code> before using memory; a native block holds the whole CPU while it runs. See <code>SC/README.md</code> and <code>examples/nativedemo.sc</code>.</li><li>The compiler checks each command's length and refuses registers that are not safe to use.</li></ul>
+<hr>
+<h2 id="14-when-the-compiler-says-no">14. When the compiler says no</h2>
+<p>Compile errors name the line and say what is wrong. The common ones:</p>
+<div class="g-ex"><div class="g-exh"><span class="mono">recursion.sc</span><span class="g-lbl">does not compile</span></div><pre><code>u16 fact(u16 n) {
+    if (n &lt; 2) return 1;
+    return n * fact(n - 1);
+}
+void main() { printu(fact(5)); }</code></pre></div>
+<div class="g-out g-error"><div class="g-lbl">The compiler says</div><pre>fact() is recursive</pre></div>
+<p>A function that calls itself - write it as a loop instead.</p>
+<div class="g-ex"><div class="g-exh"><span class="mono">toodeep.sc</span><span class="g-lbl">does not compile</span></div><pre><code>u16 a, b, c, d, e, f, x;
+void main() { x = (a * b + c) / (d * e + f * (a + b)); }</code></pre></div>
+<div class="g-out g-error"><div class="g-lbl">The compiler says</div><pre>expression too deep</pre></div>
+<p>More than three temporary results at once - split the expression with a helper variable.</p>
+<div class="g-ex"><div class="g-exh"><span class="mono">badcase.sc</span><span class="g-lbl">does not compile</span></div><pre><code>u16 k;
+void main() {
+    k = 1;
+    switch (k) { case 1: k = 2; case 1: k = 3; }
+}</code></pre></div>
+<div class="g-out g-error"><div class="g-lbl">The compiler says</div><pre>case 1 twice</pre></div>
+<div class="g-table"><table><thead><tr><th>message</th><th>means</th></tr></thead><tbody><tr><td><code>expected ;, found ...</code></td><td>a missing <code>;</code>, <code>)</code> or <code>}</code> just before that point</td></tr><tr><td><code>unknown variable 'x'</code></td><td>not declared (or declared in another function)</td></tr><tr><td><code>no function f()</code></td><td>a call to a function that does not exist</td></tr><tr><td><code>f() takes 2 arguments</code></td><td>the wrong number of arguments</td></tr><tr><td><code>... can only be a statement of its own</code></td><td><code>at()</code>, <code>printz()</code>, <code>printw()</code>, <code>printh()</code> inside an expression</td></tr><tr><td><code>getline(buf): buf must be a u8 array</code></td><td><code>getline</code> and <code>rtcget</code> need a byte array</td></tr><tr><td><code>break outside a loop</code></td><td><code>break</code> / <code>continue</code> with no loop (or <code>continue</code> in a switch with no loop)</td></tr><tr><td><code>the program needs 16 KB</code></td><td>the program is bigger than three 4 KB blocks</td></tr></tbody></table></div>
+<hr>
+<h2 id="15-a-complete-program-hi-lo">15. A complete program: Hi-Lo</h2>
+<p>Everything together: a function, a loop, <code>getline</code>, a <code>switch</code>, the terminal.</p>
+<div class="g-ex"><div class="g-exh"><span class="mono">hilo.sc</span><a class="g-try" href="stellarc.html#guide=hilo">Try it &rarr;</a></div><pre><code>u8  line[6];
+u16 secret, guess, tries, n, i, ok;
+
+u16 number() {                  // the digits typed, as a number (65535 if there are none)
+    n = 0; ok = 0;
+    for (i = 0; line[i] != 0; i++)
+        if (line[i] &gt;= &#x27;0&#x27; &amp;&amp; line[i] &lt;= &#x27;9&#x27;) { n = n * 10 + line[i] - &#x27;0&#x27;; ok = 1; }
+    if (!ok) return 65535;
+    return n;
+}
+
+void main() {
+    while (1) {
+        secret = rand() % 100 + 1;
+        tries = 0;
+        print(&quot;\r\nI have a number from 1 to 100.\r\n&quot;);
+        while (1) {
+            print(&quot;Your guess? &quot;);
+            getline(line);
+            guess = number();
+            if (guess == 65535) continue;
+            tries++;
+            if (guess &lt; secret) print(&quot;  higher\r\n&quot;);
+            else if (guess &gt; secret) print(&quot;  lower\r\n&quot;);
+            else break;
+        }
+        print(&quot;Yes! &quot;); printu(secret); print(&quot; in &quot;); printu(tries); print(&quot; tries.\r\n&quot;);
+        print(&quot;Again (y/n)? &quot;);
+        getline(line);
+        switch (line[0]) {
+            case &#x27;y&#x27;: case &#x27;Y&#x27;: continue;
+        }
+        print(&quot;Bye.\r\n&quot;);
+        return;
+    }
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>
+I have a number from 1 to 100.
+Your guess? 50
+  lower
+Your guess? 25
+  lower
+Your guess? abc
+Your guess? 12
+  higher
+Your guess? 18
+  higher
+Your guess? 21
+  higher
+Your guess? 23
+Yes! 23 in 6 tries.
+Again (y/n)? n
+Bye.</pre></div>
+<p>That game was played by the guide's checker, typing the guesses in. <code>rand()</code> decides the secret, so a game on your machine will be a different one. Notice that <code>abc</code> was simply asked again: <code>number()</code> returns 65535 when no digit was typed, and <code>continue</code> goes round for another guess without counting it as a try.</p>
+<hr>
+<h2 id="quick-reference">Quick reference</h2>
+<ul><li>Types: <code>u16</code>, <code>i16</code>, <code>u8</code> (and arrays of each); <code>const</code>; <code>patched</code> arrays.</li><li>Statements: <code>if</code>/<code>else</code>, <code>while</code>, <code>for</code>, <code>switch</code>/<code>case</code>/<code>default</code>, <code>break</code>, <code>continue</code>, <code>return</code>; assignment <code>= += -= *= /= %= &amp;= |= ^=</code>, <code>++</code>, <code>--</code>.</li><li>Operators: <code>+ - * / %  &amp; | ^ ~  &lt;&lt; &gt;&gt;</code> (by a constant)  <code>== != &lt; &lt;= &gt; &gt;=  &amp;&amp; || !</code>, unary <code>-</code>.</li><li>Output: <code>putc print printu printi printw printz printh</code>; screen: <code>cls at rev eol cursor</code>.</li><li>Input: <code>getc keyready getline</code>. Other: <code>rand delay halt fill copy</code>.</li><li>Hardware: <code>out q ef waitef getin scanin outport inport efsource rtcget rtcset peek poke peekw pokew</code>.</li><li>Full details, the inline <code>asm</code> / <code>native</code> rules and how the compiler works: <code>SC/README.md</code>.</li></ul>
+</main>
+<footer class="foot">STELLAR for the RCA COSMAC 1802 &middot; <a href="stellarc.html">Stellar C</a> &middot; <a href="index.html">home</a></footer>
+<script src="js/nav.js?v=100"></script>
+</body>
+</html>
