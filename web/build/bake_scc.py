@@ -27,6 +27,11 @@ EXAMPLES = [
      'characters, Backspace works), today\'s date and time from the clock chip with rtcget(), '
      'and a table in the three number formats - printz, printw, printh - each column placed '
      'with at(row, col). The input box types "Craig"; empty it to type your own name.'),
+    ('types', 'Signed numbers, 16-bit arrays, switch', '', 'flat out',
+     'The newest parts of the language, checked line by line against Python: 16-bit arrays (u16 / i16), '
+     'every signed comparison between seven values from -32768 to 32767 (each digit is four bits: <, <=, >, >=), '
+     'signed / % and >> (C\'s rules: the quotient rounds toward zero), a signed divide inside a bigger '
+     'expression, and a switch with fall-through, default, break and continue.'),
     ('primes', 'Prime generator', '3\r60\r', 'Elf2K',
      'Asks for a low and a high limit and prints the primes between them - the same program as '
      'the hand-written Prime-Gen v07, and 35% smaller. The input box answers 3 and 60; '

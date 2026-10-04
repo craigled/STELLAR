@@ -53,7 +53,7 @@ TOK = re.compile(r'''
   | (?P<chr>'(?:\\.|[^\\'])')
   | (?P<str>"(?:\\.|[^\\"])*")
   | (?P<id>[A-Za-z_]\w*)
-  | (?P<op><<=|>>=|==|!=|<=|>=|&&|\|\||\+\+|--|\+=|-=|\*=|/=|%=|&=|\|=|\^=|<<|>>|[-+*/%&|^!<>=(){}\[\];,~])
+  | (?P<op><<=|>>=|==|!=|<=|>=|&&|\|\||\+\+|--|\+=|-=|\*=|/=|%=|&=|\|=|\^=|<<|>>|[-+*/%&|^!<>=(){}\[\];,~:])
 ''', re.S | re.X)
 ESCAPES = {'n': 10, 'r': 13, 't': 9, 'b': 8, 'e': 27, '0': 0, '\\': 92, "'": 39, '"': 34}
 
@@ -169,8 +169,10 @@ def native_parse(first, text):
 PREC = [('||',), ('&&',), ('==', '!='), ('<', '<=', '>', '>='), ('|',), ('^',), ('&',),
         ('<<', '>>'), ('+', '-'), ('*', '/', '%')]
 
+TYPES = ('u16', 'u8', 'i16')
+
 class Parser:
-    def __init__(s, toks): s.t = toks; s.i = 0
+    def __init__(s, toks): s.t = toks; s.i = 0; s.signed = set(); s.cur = None
     def peek(s, k=0): return s.t[s.i + k]
     def line(s): return s.t[s.i][2]
     def take(s, v=None, kind=None):
@@ -191,17 +193,21 @@ class Parser:
                 items.append(('const', ln, n, e)); continue
             patched = s.peek()[1] == 'patched' and s.take()
             ty = s.take(kind='id')[1]
-            if ty not in ('u16', 'u8', 'void'): raise Error('line %d: unknown type %r' % (ln, ty))
+            if ty not in TYPES + ('void',): raise Error('line %d: unknown type %r' % (ln, ty))
             name = s.take(kind='id')[1]
             if patched:
                 d = s.decl_rest(ty, name, ln, top=True)
                 items += [x + ('patched',) for x in d]; continue
             if s.accept('('):
-                params = []
+                params = []; s.cur = name
                 while not s.accept(')'):
-                    s.take(kind='id'); params.append(s.take(kind='id')[1]); s.accept(',')
-                items.append(('func', ln, ty, name, params, s.block())); continue
+                    pty = s.take(kind='id')[1]
+                    if pty not in TYPES: raise Error('line %d: unknown type %r' % (ln, pty))
+                    params.append(s.take(kind='id')[1]); s.accept(',')
+                    if pty == 'i16': s.signed.add((name, params[-1]))
+                items.append(('func', ln, ty, name, params, s.block())); s.cur = None; continue
             items += s.decl_rest(ty, name, ln, top=True)
+        items.append(('signed', ln, s.signed))
         return items
 
     def decl_rest(s, ty, name, ln, top=False):
@@ -216,11 +222,12 @@ class Parser:
                     else:
                         s.take('{'); init = []
                         while not s.accept('}'): init.append(s.expr()); s.accept(',')
-                if ty != 'u8': raise Error('line %d: arrays are u8 in this prototype' % ln)
-                out.append(('array', ln, name, size, init))
+                if ty == 'i16': s.signed.add((None, name))
+                out.append(('array', ln, name, size, init, ty))
             else:
                 init = s.expr() if s.accept('=') else None
-                out.append(('scalar', ln, name, init, ty))
+                if ty == 'i16': s.signed.add((s.cur if not top else None, name))
+                out.append(('scalar', ln, name, init, 'u16' if ty == 'i16' else ty))
             if s.accept(';'): return out
             s.take(','); name = s.take(kind='id')[1]
 
@@ -232,10 +239,20 @@ class Parser:
     def stmt(s):
         ln = s.line(); t = s.peek()
         if t[1] == '{': return s.block()
-        if t[0] == 'id' and t[1] in ('u16', 'u8'):
+        if t[0] == 'id' and t[1] in TYPES:
             s.take(); name = s.take(kind='id')[1]
             decls = s.decl_rest(t[1], name, ln)
+            if any(d[0] == 'array' for d in decls): raise Error('line %d: arrays are declared outside functions' % ln)
             return ('block', [('local', d[1], d[2], d[3]) for d in decls])
+        if t[1] == 'switch':
+            s.take(); s.take('('); e = s.expr(); s.take(')'); s.take('{'); items = []
+            while not s.accept('}'):
+                if s.peek()[1] == 'case':
+                    cl = s.line(); s.take(); v = s.expr(); s.take(':'); items.append(('case', cl, v))
+                elif s.peek()[1] == 'default':
+                    cl = s.line(); s.take(); s.take(':'); items.append(('default', cl))
+                else: items.append(s.stmt())
+            return ('switch', ln, e, items)
         if t[1] == 'if':
             s.take(); s.take('('); c = s.expr(); s.take(')'); a = s.stmt()
             b = s.stmt() if s.peek()[1] == 'else' and s.take() else None
@@ -302,7 +319,8 @@ ZERO = 0xC                        # holds 0 when the program needs it: a[k], u8 
 BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'halt', 'fill', 'copy',
             'out', 'outmem', 'outport', 'inport', 'getin', 'scanin', 'ef', 'efsource', 'waitef', 'q',
             'cls', 'eol', 'rev', 'cursor', 'at', 'printz', 'printw', 'printh', 'getline',
-            'rtcget', 'rtcset', 'peek', 'poke', 'peekw', 'pokew'}
+            'rtcget', 'rtcset', 'peek', 'poke', 'peekw', 'pokew', 'printi'}
+#   printi(e)       e as a SIGNED number: a '-' and its size if negative
 # Terminal, number formatting, line input, the RTC and absolute memory (2026-10-04):
 #   cls() eol() rev(on) cursor(on)   VT100: clear + home, erase to end of line, reverse video,
 #                                    show/hide the cursor - each one PRINTSTR of a constant string
@@ -356,6 +374,8 @@ class Compiler:
             elif it[0] == 'scalar': s.globals[it[2]] = it
             elif it[0] == 'array': s.arrays[it[2]] = it
             elif it[0] == 'func': s.funcs[it[3]] = it
+            elif it[0] == 'signed': s.signed = it[2]
+        if not hasattr(s, 'signed'): s.signed = set()
         if 'main' not in s.funcs: raise Error('no main()')
         for n, fn in list(s.funcs.items()):                     # u8 variable x  ->  x[0]
             s.funcs[n] = fn[:5] + (s.desugar(fn[5]),)
@@ -369,11 +389,12 @@ class Compiler:
     def desugar(s, node):
         if isinstance(node, list): return [s.desugar(x) for x in node]
         if not isinstance(node, tuple): return node
-        if node[0] == 'var' and node[1] in s.bytevars: return ('idx', node[1], ('num', 0))
+        if node[0] == 'var' and node[1] in s.bytevars and node[1] not in s.arrays_wide(): return ('idx', node[1], ('num', 0))
         return tuple(s.desugar(x) if isinstance(x, (tuple, list)) else x for x in node)
 
     def const(s, e, ln):
         if e[0] == 'num': return e[1]
+        if e[0] == 'flip': return (s.const(e[1], ln) + 0x8000) & 0xFFFF
         if e[0] == 'var' and e[1] in getattr(s, 'consts', {}): return s.consts[e[1]]
         if e[0] == 'neg': return (-s.const(e[1], ln)) & 0xFFFF
         if e[0] == 'bin' and e[1] in '+-*/%&|^<<>>':
@@ -385,6 +406,25 @@ class Compiler:
     def isconst(s, e):
         try: s.const(e, 0); return True
         except (Error, KeyError, TypeError, IndexError): return False
+
+    def arrays_wide(s):
+        return {n for n, it in s.arrays.items() if len(it) > 5 and it[5] in ('u16', 'i16')}
+    def wide(s, name): return name in s.arrays and len(s.arrays[name]) > 5 and s.arrays[name][5] in ('u16', 'i16')
+
+    def is_signed(s, e):
+        """Does e have a signed (i16) value? Then <, <=, >, >=, /, %, >> and printing treat it as signed."""
+        k = e[0]
+        if k == 'var':
+            if e[1] in s.consts or e[1] in s.arrays: return False
+            if s.fn is not None and (s.fn, e[1]) in s.signed: return True
+            if s.fn is not None and e[1] in s.fvars_of(s.fn): return False
+            return (None, e[1]) in s.signed
+        if k == 'idx': return (None, e[1]) in s.signed
+        if k == 'call': return e[1] in s.funcs and s.funcs[e[1]][2] == 'i16'
+        if k == 'neg': return s.is_signed(e[1])
+        if k == 'bin' and e[1] in ('+', '-', '*', '/', '%', '&', '|', '^', '<<', '>>'):
+            return s.is_signed(e[2]) or s.is_signed(e[3])
+        return False
 
     # ---------------------------------------------------------- analysis
     def walk(s, node, fn):
@@ -438,6 +478,10 @@ class Compiler:
             elif k == 'if':
                 count(st[2]); cnt(st[3])
                 if st[4]: cnt(st[4])
+            elif k == 'switch':
+                count(st[2])
+                for x in st[3]:
+                    if x[0] not in ('case', 'default'): cnt(x)
             elif k == 'local':
                 weight[st[2]] = weight.get(st[2], 0) + 10 ** min(loops[0], 3)
                 if st[3]: count(st[3])
@@ -499,6 +543,17 @@ class Compiler:
                     if new == head: break
                     head = new
                 return head
+            if k == 'switch':
+                items = st[3]
+                body = [x for x in items if x[0] not in ('case', 'default')]
+                ctx2 = ctx + [(out, ctx[-1][1] if ctx else out)]           # break: past the switch
+                acc = set() if any(x[0] == 'default' for x in items) else set(out)
+                for i, x in enumerate(items):
+                    if x[0] in ('case', 'default'):
+                        rest = [y for y in items[i + 1:] if y[0] not in ('case', 'default')]
+                        acc |= live(('block', rest), out, ctx2)
+                if has_call(st[2]): mark(acc | out, st[2])
+                return s.vars_in(st[2]) | acc
             if k == 'break': return set(ctx[-1][0]) if ctx else out
             if k == 'continue': return set(ctx[-1][1]) if ctx else out
             return out
@@ -559,10 +614,10 @@ class Compiler:
             if e[0] == 'call': return n + sum(count(a, False) for a in e[2])
             return n + sum(count(x, False) for x in e[1:] if isinstance(x, tuple))
         def f(st):
-            if st[0] in ('assign', 'expr', 'return', 'local', 'if', 'while'):
+            if st[0] in ('assign', 'expr', 'return', 'local', 'if', 'while', 'switch'):
                 for x in st[2:]:
                     if isinstance(x, tuple) and x[0] in EXPRS:
-                        most[0] = max(most[0], count(x, st[0] not in ('if', 'while')))
+                        most[0] = max(most[0], count(x, st[0] not in ('if', 'while', 'switch')))
         s.walk(fn[5], f)
         return most[0]
 
@@ -674,11 +729,18 @@ class Compiler:
         if s.isconst(e): return s.emit(ldx(d, s.const(e, s.ln)))
         k = e[0]
         if k == 'var': return s.load(e[1], d)
+        if k == 'flip':                                # e + $8000: a signed value, for an unsigned compare
+            s.value(e[1], d); return s.emit(addxi(d, 0x8000, 'signed: + $8000'))
+        if k == 'idx' and s.wide(e[1]):                # the pointer in d itself, then d = the word it points at
+            s.wptr(e[1], e[2], d); return s.emit(mxy2(d, d))
         if k == 'idx':
             ri, base = s.index(e[1], e[2]); s.emit(rdidx(ri, base)); s.untemp(ri); return s.emit(acc2x(d))
         if k == 'addr':
-            if s.isconst(e[2]): return s.emit(ldx(d, (s.addr(e[1]) + s.const(e[2], s.ln)) & 0xFFFF, '&' + e[1]))
-            s.value(e[2], d); return s.emit(addxi(d, s.addr(e[1])))
+            w = 2 if s.wide(e[1]) else 1
+            if s.isconst(e[2]): return s.emit(ldx(d, (s.addr(e[1]) + w * s.const(e[2], s.ln)) & 0xFFFF, '&' + e[1]))
+            s.value(e[2], d)
+            if w == 2: s.emit(addxyz(d, d, d))
+            return s.emit(addxi(d, s.addr(e[1])))
         if k == 'call': return s.call(e, d)
         if k == 'neg':
             r = s.reg(e[1]); t = s.temp(); s.emit(ldx(t, 0)); s.emit(subxyz(t, r, d)); s.untemp(t); s.untemp(r); return
@@ -703,6 +765,8 @@ class Compiler:
             s.value(a, d)
             for _ in range(n): s.emit(addxyz(d, d, d))
             return
+        if op == '>>' and s.isconst(b) and s.is_signed(a): return s.sshift(a, s.const(b, s.ln), d)
+        if op in ('/', '%') and (s.is_signed(a) or s.is_signed(b)): return s.sdiv(a, b, d, op)
         if op == '>>' and s.isconst(b): op, b = '/', ('num', 1 << s.const(b, s.ln))
         if op in ('&', '|', '^'):
             code = {'|': '63', '^': '64', '&': '65'}[op]; name = {'|': 'OR', '^': 'XOR', '&': 'AND'}[op]
@@ -725,6 +789,38 @@ class Compiler:
         else: raise Error('line %d: operator %s' % (s.ln, op))
         s.untemp(ra); s.untemp(rb)
 
+    def wptr(s, name, ie, t=None):
+        """A register (t, else a new temporary) pointing at a 16-bit array element (base + 2 x index)."""
+        if t is None: t = s.temp()
+        if s.isconst(ie): s.emit(ldx(t, (s.addr(name) + 2 * s.const(ie, s.ln)) & 0xFFFF, '&%s[%d]' % (name, s.const(ie, s.ln))))
+        else:
+            s.value(ie, t); s.emit(addxyz(t, t, t, 'x 2: two bytes an element')); s.emit(addxi(t, s.addr(name)))
+        return t
+
+    def sshift(s, a, k, d):
+        """Signed >> k: arithmetic (rounds down): a negative a is ~(~a >> k)."""
+        s.value(a, d); t = s.temp(); pos, end = s.new(), s.new()
+        s.emit(ldx(t, 0x8000)); s.emit(testlt(d, t)); s.emit(ift(pos, 'not negative'))
+        s.emit(ldx(t, 0xFFFF)); s.emit(subxyz(t, d, d, '~a'))
+        s.emit(ldx(t, 1 << k)); s.emit(divxy(d, t)); s.emit(ma2x(d))
+        s.emit(ldx(t, 0xFFFF)); s.emit(subxyz(t, d, d, '~ again')); s.emit(gal(end))
+        s.label(pos); s.emit(ldx(t, 1 << k)); s.emit(divxy(d, t)); s.emit(ma2x(d))
+        s.label(end); s.untemp(t); s.ma = None
+
+    def sdiv(s, a, b, d, op):
+        """Signed / and % (C: the quotient rounds toward zero, the remainder takes a's sign), by LIB_SDIV
+        (RF / RE -> RF quotient, RE remainder). Any temporaries in use are kept on the VM stack."""
+        keep = [t for t in TEMPS if t in s.tbusy and t != d]
+        for t in keep: s.emit(('72 0%X' % t, 'PUSHX R%d' % t, 'kept across the signed divide'))
+        for x, what in ((a, 'the dividend'), (b, 'the divisor')):   # each onto the stack as soon as it is made
+            r = s.reg(x); s.emit(('72 0%X' % r, 'PUSHX R%d' % r, what)); s.untemp(r)
+        s.emit(('73 0E', 'POPX R14', 'the divisor')); s.emit(('73 0F', 'POPX R15', 'the dividend'))
+        s.libs.add('LIB_SDIV'); s.emit(call('LIB_SDIV', 'signed ' + op))
+        r = 0xF if op == '/' else 0xE
+        s.emit(('72 0%X' % r, 'PUSHX R%d' % r, '')); s.emit(('73 0%X' % d, 'POPX R%d' % d, ''))
+        for t in reversed(keep): s.emit(('73 0%X' % t, 'POPX R%d' % t, ''))
+        s.ma = None; s.kreg = {}; s.acc = None
+
     def uses(s, e, r):
         """Does evaluating e read register r (so r must not be written first)?"""
         found = []
@@ -741,7 +837,7 @@ class Compiler:
         """Code that leaves e in the Acc (for WRITEIDX, SEROUT, printu, TESTAI)."""
         if s.isconst(e): return s.emit(ldai(s.const(e, s.ln)))
         if e[0] == 'var' and s.where(e[1])[0] == 'r': return s.emit(x2acc(s.where(e[1])[1]))
-        if e[0] == 'idx':
+        if e[0] == 'idx' and not s.wide(e[1]):
             ri, base = s.index(e[1], e[2]); s.emit(rdidx(ri, base)); s.untemp(ri); return
         if e[0] == 'call' and e[1] == 'getc': return s.emit(('CB', 'SERIN', ''))
         if e[0] == 'call' and e[1] == 'rand': return s.emit(('C3', 'RAND', ''))
@@ -749,7 +845,7 @@ class Compiler:
             s.emit(ldai(0)); return s.emit(('0C 00', 'SIPA', 'scan the input port') if e[1] == 'scanin'
                                            else ('0D 00', 'GIPA', 'wait for EF, then read the input port'))
         if e[0] == 'call' and e[1] == 'ef' and not e[2]: return s.emit(('09', 'GETEFA', 'EF1-4 as a mask'))
-        if e[0] == 'bin' and e[1] in ('%', '/'):
+        if e[0] == 'bin' and e[1] in ('%', '/') and not s.is_signed(e):
             ra, rb = s.reg(e[2]), s.reg(e[3]); s.divide(ra, rb)
             s.emit(rema() if e[1] == '%' else maa()); s.untemp(ra); s.untemp(rb); return
         if e[0] == 'bin' and e[1] in ('+', '-') and s.isconst(e[3]):
@@ -788,6 +884,12 @@ class Compiler:
         if name == 'printu':
             s.to_acc(args[0]); s.emit(('24', 'COPYAMA', '')); s.emit(('6B 00', 'CVT2DEC Acc', ''))
             return s.emit(('6E', 'OUTDEC', ''))
+        if name == 'printi':
+            t = s.temp(); s.value(args[0], t); c = s.temp(); pos = s.new()
+            s.emit(ldx(c, 0x8000)); s.emit(testlt(t, c)); s.emit(ift(pos, 'not negative'))
+            s.emit(serouti('-')); s.emit(ldx(c, 0)); s.emit(subxyz(c, t, t, 'its size'))
+            s.label(pos); s.emit(x2acc(t)); s.emit(('24', 'COPYAMA', '')); s.emit(('6B 00', 'CVT2DEC Acc', ''))
+            s.emit(('6E', 'OUTDEC', '')); s.untemp(c); s.untemp(t); return
         if name == 'delay': return s.emit(('C0 %02X' % s.const(args[0], s.ln), 'DLYI %02X' % s.const(args[0], s.ln), ''))
         if name == 'halt': return s.emit(gal('QUIT'))
         if name in ARITY: return s.io(name, args, d)
@@ -872,7 +974,7 @@ class Compiler:
             return s.lib_call('LIB_PRZ' if name == 'printz' else 'LIB_PRW', '%d digits' % n)
         if name == 'getline':
             s.nargs(name, args, 1, 2)
-            if args[0][0] != 'var' or args[0][1] not in s.arrays or args[0][1] in s.bytevars:
+            if args[0][0] != 'var' or args[0][1] not in s.arrays or args[0][1] in s.bytevars or s.wide(args[0][1]):
                 raise Error('line %d: getline(buf): buf must be a u8 array' % s.ln)
             size = len(s.array_bytes(s.arrays[args[0][1]]))
             mx = s.const(args[1], s.ln) if len(args) == 2 else size - 1
@@ -897,7 +999,7 @@ class Compiler:
             return
         if name in ('rtcget', 'rtcset'):
             s.nargs(name, args, 1)
-            if args[0][0] != 'var' or args[0][1] not in s.arrays or len(s.array_bytes(s.arrays[args[0][1]])) < 8:
+            if args[0][0] != 'var' or args[0][1] not in s.arrays or s.wide(args[0][1]) or len(s.array_bytes(s.arrays[args[0][1]])) < 8:
                 raise Error('line %d: %s(t): t must be a u8 array of 8 bytes' % (s.ln, name))
             t = s.temp(); s.emit(ldx(t, s.addr(args[0][1])))
             s.emit(('07 %X%X' % (0 if name == 'rtcget' else 1, t), '%s R%d' % (name.upper(), t),
@@ -944,6 +1046,18 @@ class Compiler:
                     serouti(' '), gal(NX),
                     lbl(DG), ldx(0, 1), x2acc(0xD), addai(0x30), serout(),
                     lbl(NX), ldx(0xD, 10), divxy(0xE, 0xD), maa(), acc2x(0xE), testxz(0xE), iff(L), pop, ret()]
+        if name == 'LIB_SDIV':
+            # RF / RE signed -> RF quotient (toward zero), RE remainder (a's sign). R0: 1 = a < 0, +2 = b < 0
+            A1, A2, Q, R, RM, DONE = [name + x for x in ('_A1', '_A2', '_Q', '_R', '_RM', '_D')]
+            return [lbl(name, 'signed RF / RE'), push, ldx(0, 0),
+                    ldx(0xD, 0x8000), testlt(0xF, 0xD), ift(A1), ldx(0xD, 0), subxyz(0xD, 0xF, 0xF, '|a|'), incx(0),
+                    lbl(A1), ldx(0xD, 0x8000), testlt(0xE, 0xD), ift(A2), ldx(0xD, 0), subxyz(0xD, 0xE, 0xE, '|b|'), addxi(0, 2),
+                    lbl(A2), divxy(0xF, 0xE), ma2x(0xF), rema(), acc2x(0xE),
+                    testxi(0, 1), ift(Q), testxi(0, 2), iff(R),
+                    lbl(Q), ldx(0xD, 0), subxyz(0xD, 0xF, 0xF, 'the quotient is negative'),
+                    lbl(R), testxi(0, 1), ift(RM), testxi(0, 3), iff(DONE),
+                    lbl(RM), ldx(0xD, 0), subxyz(0xD, 0xE, 0xE, 'the remainder takes a\'s sign'),
+                    lbl(DONE), pop, ret()]
         if name == 'LIB_HEX':
             L = name + '_L'; hx = s.layout.get(s.string(('str', list(b'0123456789ABCDEF'))), 0)
             return [lbl(name, 'RF in hex from place RE'),
@@ -1071,10 +1185,10 @@ class Compiler:
         if op in ('==', '!='):
             if op == '!=': sense = not sense
             br = lambda: s.emit(ift(target) if sense else iff(target))
-            if a[0] == 'bin' and a[1] == '%' and s.isconst(b) and s.const(b, s.ln) == 0:
+            if a[0] == 'bin' and a[1] == '%' and s.isconst(b) and s.const(b, s.ln) == 0 and not s.is_signed(a):
                 ra, rb = s.reg(a[2]), s.reg(a[3]); s.divide(ra, rb); s.untemp(ra); s.untemp(rb)
                 s.emit(('8E', 'TESTREMZ', '')); return br()
-            if s.isconst(b) and (a[0] == 'idx' or (a[0] == 'call' and a[1] in ('getc', 'rand', 'ef', 'scanin', 'getin'))):
+            if s.isconst(b) and ((a[0] == 'idx' and not s.wide(a[1])) or (a[0] == 'call' and a[1] in ('getc', 'rand', 'ef', 'scanin', 'getin'))):
                 s.to_acc(a); s.emit(testai(s.const(b, s.ln))); return br()
             ra = s.reg(a)
             if s.isconst(b):
@@ -1083,6 +1197,7 @@ class Compiler:
             else:
                 rb = s.reg(b); s.emit(testxy(ra, rb)); s.untemp(rb)
             s.untemp(ra); return br()
+        if s.is_signed(a) or s.is_signed(b): a, b = ('flip', a), ('flip', b)   # signed: compare a+$8000, b+$8000
         ra, rb = s.reg(a), s.reg(b)
         # $88 TESTGXY: RX >= RY.  $89 TESTLXY: RX < RY (strictly - the COMMANDS row says <=)
         s.emit({'<': testlt(ra, rb), '>=': testge(ra, rb), '>': testlt(rb, ra), '<=': testge(rb, ra)}[op])
@@ -1132,13 +1247,44 @@ class Compiler:
             if forever: s.emit(gal(top))
             else: s.label(test); s.hidden[s.fn] = 0; s.cond(s.hoist(c, False), top, True)
             s.label(end); return
+        if k == 'switch': return s.switch(st)
         if k in ('break', 'continue'):
-            if not s.loops: raise Error('line %d: %s outside a loop' % (st[1], k))
+            if not s.loops or s.loops[-1][0 if k == 'break' else 1] is None:
+                raise Error('line %d: %s outside a loop' % (st[1], k))
             return s.emit(gal(s.loops[-1][0 if k == 'break' else 1]))
         if k == 'return':
             if st[2] is not None: s.value(s.hoist(st[2]), RV)
             return s.emit(ret())
         raise Error('line %d: %s' % (st[1], k))
+
+    def switch(s, st):
+        """switch (e) { case k: ... default: ... }: the tests first (TESTXI each case), then the bodies in
+        order - C's fall-through; break leaves the switch, continue goes to the enclosing loop."""
+        _, ln, e, items = st
+        e = s.hoist(e, False)
+        r = s.reg(e)
+        end, dflt, seen = s.new(), None, {}
+        labels = []
+        for it in items:
+            if it[0] == 'case':
+                s.ln = it[1]
+                if not s.isconst(it[2]): raise Error('line %d: case needs a constant' % it[1])
+                v = s.const(it[2], it[1])
+                if v in seen: raise Error('line %d: case %d twice (line %d)' % (it[1], v, seen[v]))
+                seen[v] = it[1]; L = s.new(); labels.append(L)
+                s.emit(testxz(r) if v == 0 else testxi(r, v)); s.emit(ift(L, 'case %d' % v))
+            elif it[0] == 'default':
+                if dflt: raise Error('line %d: two defaults' % it[1])
+                dflt = s.new(); labels.append(dflt)
+        s.untemp(r)
+        s.emit(gal(dflt or end, 'default' if dflt else 'no case: past the switch'))
+        s.loops.append((end, s.loops[-1][1] if s.loops else None))
+        i = 0
+        for it in items:
+            if it[0] in ('case', 'default'): s.label(labels[i]); i += 1
+            else: s.stmt(it)
+        s.loops.pop()
+        s.label(end)
 
     def asm_value(s, e, n):
         """#e / %e: a constant or an array address, as n bytes."""
@@ -1229,8 +1375,8 @@ class Compiler:
                 if e[1] in s.arrays: return 0x4000 + s.addr(e[1])
                 if labels is None: return 0
                 raise Error('line %d: unknown name %r' % (s.ln, e[1]))
-            if k == 'addr': return 0x4000 + s.addr(e[1]) + ev(e[2])
-            if k == 'idx' and e[1] in s.arrays: return 0x4000 + s.addr(e[1]) + ev(e[2])
+            if k == 'addr': return 0x4000 + s.addr(e[1]) + (2 if s.wide(e[1]) else 1) * ev(e[2])
+            if k == 'idx' and e[1] in s.arrays: return 0x4000 + s.addr(e[1]) + (2 if s.wide(e[1]) else 1) * ev(e[2])
             if k == 'call' and e[1] in ('hi', 'lo') and len(e[2]) == 1:
                 v = ev(e[2][0]); return (v >> 8) & 255 if e[1] == 'hi' else v & 255
             if k == 'neg': return -ev(e[1])
@@ -1275,6 +1421,9 @@ class Compiler:
                     rb = s.reg(e[3])
                     s.emit(addxyz(d, rb, d) if e[1] == '+' else subxyz(d, rb, d)); s.untemp(rb); return
             return s.store(target[1], e)
+        if target[0] == 'idx' and s.wide(target[1]):
+            v = s.reg(e); p = s.wptr(target[1], target[2])
+            s.emit(xmy2(v, p)); s.untemp(p); s.untemp(v); return
         if target[0] == 'idx':
             ri, base = s.index(target[1], target[2])
             s.to_acc(e)
@@ -1330,6 +1479,8 @@ class Compiler:
         init = it[4] or []
         vals = [x if isinstance(x, int) else s.const(x, it[1]) for x in init]
         if len(vals) > size: raise Error('line %d: too many initialisers' % it[1])
+        if len(it) > 5 and it[5] in ('u16', 'i16'):          # two bytes an element, high byte first
+            return b''.join(bytes([(v >> 8) & 255, v & 255]) for v in vals) + bytes(2 * (size - len(vals)))
         return bytes(v & 255 for v in vals) + bytes(size - len(vals))
 
 

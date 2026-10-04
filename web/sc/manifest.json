@@ -15,6 +15,13 @@
    "blurb": "A title bar in reverse video, your name read with getline() (bounded: it stops at 20 characters, Backspace works), today's date and time from the clock chip with rtcget(), and a table in the three number formats - printz, printw, printh - each column placed with at(row, col). The input box types \"Craig\"; empty it to type your own name."
   },
   {
+   "name": "Signed numbers, 16-bit arrays, switch",
+   "file": "types.sc",
+   "input": "",
+   "speed": "flat out",
+   "blurb": "The newest parts of the language, checked line by line against Python: 16-bit arrays (u16 / i16), every signed comparison between seven values from -32768 to 32767 (each digit is four bits: <, <=, >, >=), signed / % and >> (C's rules: the quotient rounds toward zero), a signed divide inside a bigger expression, and a switch with fall-through, default, break and continue."
+  },
+  {
    "name": "Prime generator",
    "file": "primes.sc",
    "input": "3\r60\r",
