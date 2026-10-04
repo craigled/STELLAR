@@ -300,7 +300,25 @@ TEMPS = [0xF, 0xE, 0xD]           # expression temporaries
 RV = 0xD                          # return values
 ZERO = 0xC                        # holds 0 when the program needs it: a[k], u8 variables
 BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'halt', 'fill', 'copy',
-            'out', 'outmem', 'outport', 'inport', 'getin', 'scanin', 'ef', 'efsource', 'waitef', 'q'}
+            'out', 'outmem', 'outport', 'inport', 'getin', 'scanin', 'ef', 'efsource', 'waitef', 'q',
+            'cls', 'eol', 'rev', 'cursor', 'at', 'printz', 'printw', 'printh', 'getline',
+            'rtcget', 'rtcset', 'peek', 'poke', 'peekw', 'pokew'}
+# Terminal, number formatting, line input, the RTC and absolute memory (2026-10-04):
+#   cls() eol() rev(on) cursor(on)   VT100: clear + home, erase to end of line, reverse video,
+#                                    show/hide the cursor - each one PRINTSTR of a constant string
+#   at(row, col)    cursor to row, col (1-based): constants -> one string; else LIB_AT (decimal)
+#   printz(e, n)    e as exactly n digits, zero-padded (n 1-5; a larger e shows its low n digits)
+#   printw(e, n)    e right-aligned in n columns, space-padded (same rule)
+#   printh(e[, n])  e as n hex digits (1-4, default 4)
+#   getline(buf[, max])  a line of at most max characters (default: the array's size - 1) into the
+#                   u8 array buf, NUL-terminated, echoed, Backspace works, Enter echoes CR LF;
+#                   returns its length. Bounded - unlike $C2 GETSTR, which has no limit.
+#   rtcget(t) / rtcset(t)  $07 RTCGET / RTCSET with the 8-byte u8 array t: sec min hour weekday(0=Sun)
+#                   day month year-hi year-lo. rtcset returns 1 if the firmware wrote it, 0 if refused.
+#                   Needs firmware V0061.35.
+#   peek(a) poke(a, v) peekw(a) pokew(a, v)   a byte / 16-bit word at the ABSOLUTE address a
+#                   (MEMMODE 00 for those few opcodes, no branch while absolute)
+LIBS = {}   # library routines a program uses: emitted once, after its functions
 # The Elf2K I/O group, $01-$0F, on V0061.34 + the DEFEF DZ, WIP and WIP Z patches (HW-verified 2026-09-30):
 #   outport(p)  $01 DEFOUT 0p   output port 1-7; 2 and 3 are the serial chip, so refused
 #   inport(p)   $02 DEFIN 0Z    input port 1-7 (Z = p + 8)
@@ -381,6 +399,8 @@ class Compiler:
         def f(n):
             if n[0] == 'assign' and n[2][0] == 'idx': s.written.add(n[2][1])
             if n[0] == 'call' and n[1] in ('fill', 'copy') and n[2] and n[2][0][0] == 'addr':
+                s.written.add(n[2][0][1])
+            if n[0] == 'call' and n[1] in ('getline', 'rtcget') and n[2] and n[2][0][0] == 'var':
                 s.written.add(n[2][0][1])
         for fn in s.funcs.values(): s.walk(fn[5], f)
 
@@ -793,6 +813,143 @@ class Compiler:
             s.value(args[1], x); s.value(args[0], y)
             s.emit(('3B %X%X %02X' % (x, y, n), 'COPYMXMY R%d -> R%d %d' % (x, y, n), ''))
             s.untemp(x); s.untemp(y); return
+        if name in ('cls', 'eol', 'rev', 'cursor', 'at', 'printz', 'printw', 'printh', 'getline',
+                    'rtcget', 'rtcset', 'peek', 'poke', 'peekw', 'pokew'):
+            return s.builtin2(name, args, d)
+        raise Error(name)
+
+    # ---------------------------------------------------------- terminal, numbers, input, RTC, memory
+    def nargs(s, name, args, *ok):
+        if len(args) not in ok:
+            raise Error('line %d: %s() takes %s argument%s' % (s.ln, name, ' or '.join(map(str, ok)),
+                                                                '' if ok == (1,) else 's'))
+    def conststr(s, text, note=''):
+        t = s.temp(); s.emit(ldx(t, s.layout.get(s.string(('str', list(text.encode('latin1')))), 0), note))
+        s.emit(printstr(t)); s.untemp(t)
+    def free_for_lib(s, name):
+        if s.tbusy: raise Error('line %d: %s() can only be a statement of its own' % (s.ln, name))
+    def into(s, e, r):
+        """e into temporary r, which then stays reserved (the next argument cannot use it)."""
+        s.tbusy.add(r); s.value(e, r)
+    def lib_call(s, name, note=''):
+        s.libs.add(name); s.emit(call(name, note)); s.tbusy.clear(); s.kreg = {}; s.ma = None; s.acc = None
+
+    def builtin2(s, name, args, d):
+        E = '\x1b'
+        if name in ('cls', 'eol'):
+            s.nargs(name, args, 0)
+            return s.conststr(E + '[0m' + E + '[2J' + E + '[H' if name == 'cls' else E + '[K', name + '()')
+        if name in ('rev', 'cursor'):
+            s.nargs(name, args, 1)
+            on, off = (E + '[7m', E + '[0m') if name == 'rev' else (E + '[?25h', E + '[?25l')
+            if s.isconst(args[0]): return s.conststr(on if s.const(args[0], s.ln) else off, '%s(%d)' % (name, s.const(args[0], s.ln)))
+            no, end = s.new(), s.new()
+            s.cond(s.hoist(args[0], False), no, False); s.conststr(on); s.emit(gal(end))
+            s.label(no); s.conststr(off); s.label(end); return
+        if name == 'at':
+            s.nargs(name, args, 2)
+            if s.isconst(args[0]) and s.isconst(args[1]):
+                r, c = s.const(args[0], s.ln), s.const(args[1], s.ln)
+                return s.conststr(E + '[%d;%dH' % (r, c), 'at(%d, %d)' % (r, c))
+            s.free_for_lib(name); s.into(args[0], 0xF); s.into(args[1], 0xE)
+            return s.lib_call('LIB_AT', 'ESC [ row ; col H')
+        if name in ('printz', 'printw', 'printh'):
+            s.nargs(name, args, *((1, 2) if name == 'printh' else (2,)))
+            n = s.const(args[1], s.ln) if len(args) == 2 else 4
+            if not s.isconst(args[1]) if len(args) == 2 else False:
+                raise Error('line %d: %s(e, n): n must be a constant' % (s.ln, name))
+            top = 4 if name == 'printh' else 5
+            if not 1 <= n <= top: raise Error('line %d: %s(e, %d): n must be 1-%d' % (s.ln, name, n, top))
+            s.free_for_lib(name); s.into(args[0], 0xF)
+            if name == 'printh':
+                if n < 4:
+                    s.emit(ldx(0xE, 16 ** n)); s.emit(divxy(0xF, 0xE)); s.emit(rema()); s.emit(acc2x(0xF, 'its low %d hex digits' % n))
+                s.emit(ldx(0xE, 16 ** (n - 1)))
+                return s.lib_call('LIB_HEX', '%d hex digits' % n)
+            if n < 5:
+                s.emit(ldx(0xE, 10 ** n)); s.emit(divxy(0xF, 0xE)); s.emit(rema()); s.emit(acc2x(0xF, 'its low %d digits' % n))
+            s.emit(ldx(0xE, 10 ** (n - 1)))
+            return s.lib_call('LIB_PRZ' if name == 'printz' else 'LIB_PRW', '%d digits' % n)
+        if name == 'getline':
+            s.nargs(name, args, 1, 2)
+            if args[0][0] != 'var' or args[0][1] not in s.arrays or args[0][1] in s.bytevars:
+                raise Error('line %d: getline(buf): buf must be a u8 array' % s.ln)
+            size = len(s.array_bytes(s.arrays[args[0][1]]))
+            mx = s.const(args[1], s.ln) if len(args) == 2 else size - 1
+            if len(args) == 2 and not s.isconst(args[1]): raise Error('line %d: getline(buf, max): max must be a constant' % s.ln)
+            if not 1 <= mx <= size - 1: raise Error('line %d: getline(): max must be 1-%d (the array\'s size - 1, for the NUL)' % (s.ln, size - 1))
+            base = s.addr(args[0][1])
+            free = [t for t in TEMPS if t not in s.tbusy and t != d]
+            cnt = d if d in TEMPS else free.pop()
+            ch, cmp_ = free.pop(), free.pop()
+            loop, bs, end = s.new(), s.new(), s.new()
+            s.emit(ldx(cnt, 0, 'getline(): at most %d characters' % mx))
+            s.label(loop); s.emit(('CB', 'SERIN', '')); s.emit(acc2x(ch))
+            s.emit(testxi(ch, 13)); s.emit(ift(end)); s.emit(testxi(ch, 8)); s.emit(ift(bs))
+            s.emit(testxi(ch, 0x7F)); s.emit(ift(bs))
+            s.emit(ldx(cmp_, 0x20)); s.emit(testlt(ch, cmp_)); s.emit(ift(loop))
+            s.emit(ldx(cmp_, mx)); s.emit(testlt(cnt, cmp_)); s.emit(iff(loop, 'full: ignored'))
+            s.emit(x2acc(ch)); s.emit(wridx(cnt, base)); s.emit(serout('echo')); s.emit(incx(cnt)); s.emit(gal(loop))
+            s.label(bs); s.emit(testxz(cnt)); s.emit(ift(loop)); s.emit(decx(cnt))
+            s.emit(serouti(8)); s.emit(serouti(' ')); s.emit(serouti(8)); s.emit(gal(loop))
+            s.label(end); s.emit(ldai(0)); s.emit(wridx(cnt, base, 'NUL')); s.emit(serouti(13)); s.emit(serouti(10))
+            if d is not None and d != cnt: s.emit(cpxy(cnt, d))
+            return
+        if name in ('rtcget', 'rtcset'):
+            s.nargs(name, args, 1)
+            if args[0][0] != 'var' or args[0][1] not in s.arrays or len(s.array_bytes(s.arrays[args[0][1]])) < 8:
+                raise Error('line %d: %s(t): t must be a u8 array of 8 bytes' % (s.ln, name))
+            t = s.temp(); s.emit(ldx(t, s.addr(args[0][1])))
+            s.emit(('07 %X%X' % (0 if name == 'rtcget' else 1, t), '%s R%d' % (name.upper(), t),
+                    'sec min hour wday day month yearhi yearlo'))
+            s.untemp(t)
+            if name == 'rtcset' and d is not None:
+                no = s.new(); s.emit(ldx(d, 0)); s.emit(iff(no, 'refused: nothing written')); s.emit(ldx(d, 1)); s.label(no)
+            return
+        if name in ('peek', 'peekw'):
+            s.nargs(name, args, 1)
+            t = s.temp(); s.value(args[0], t)
+            s.emit(('20 00', 'MEMMODE 00', 'absolute - no branch'))
+            if name == 'peek': s.emit(rdidx(t, 0)); s.emit(('20 01', 'MEMMODE 01', 'relative again'))
+            else:
+                s.emit(mxy2(t, t)); s.emit(('20 01', 'MEMMODE 01', 'relative again'))
+            if d is not None: s.emit(acc2x(d) if name == 'peek' else cpxy(t, d))
+            s.untemp(t); s.acc = None; s.kreg = {}; return
+        if name in ('poke', 'pokew'):
+            s.nargs(name, args, 2)
+            t = s.temp(); s.value(args[0], t)
+            if name == 'poke':
+                s.to_acc(args[1])
+                s.emit(('20 00', 'MEMMODE 00', 'absolute - no branch')); s.emit(wridx(t, 0))
+            else:
+                v = s.temp(); s.value(args[1], v)
+                s.emit(('20 00', 'MEMMODE 00', 'absolute - no branch')); s.emit(xmy2(v, t)); s.untemp(v)
+            s.emit(('20 01', 'MEMMODE 01', 'relative again')); s.untemp(t); s.acc = None; return
+        raise Error(name)
+
+    def lib_rows(s, name):
+        """A library routine (arguments in RF, RE; RD scratch; R0 borrowed through the VM stack)."""
+        push, pop = ('72 00', 'PUSHX R0', 'borrow R0'), ('73 00', 'POPX R0', 'give R0 back')
+        if name == 'LIB_AT':
+            return [lbl(name, 'ESC [ RF ; RE H'), serouti(0x1B), serouti('['), x2acc(0xF), ('24', 'COPYAMA', ''),
+                    ('6B 00', 'CVT2DEC Acc', ''), ('6E', 'OUTDEC', ''), serouti(';'), x2acc(0xE), ('24', 'COPYAMA', ''),
+                    ('6B 00', 'CVT2DEC Acc', ''), ('6E', 'OUTDEC', ''), serouti('H'), ret()]
+        if name in ('LIB_PRZ', 'LIB_PRW'):
+            # RF = the value, RE = the place of its first digit (10^(n-1)); R0 = 1 once a digit is shown
+            L, DG, NX = name + '_L', name + '_D', name + '_N'
+            return [lbl(name, 'RF in decimal from place RE, ' + ('zero' if name == 'LIB_PRZ' else 'space') + '-padded'),
+                    push, ldx(0, 1 if name == 'LIB_PRZ' else 0),
+                    lbl(L), divxy(0xF, 0xE), maa(), acc2x(0xD, 'this digit'), rema(), acc2x(0xF, 'the rest'),
+                    testxz(0xD), iff(DG), testxz(0), iff(DG), testxi(0xE, 1), ift(DG, 'the last digit always shows'),
+                    serouti(' '), gal(NX),
+                    lbl(DG), ldx(0, 1), x2acc(0xD), addai(0x30), serout(),
+                    lbl(NX), ldx(0xD, 10), divxy(0xE, 0xD), maa(), acc2x(0xE), testxz(0xE), iff(L), pop, ret()]
+        if name == 'LIB_HEX':
+            L = name + '_L'; hx = s.layout.get(s.string(('str', list(b'0123456789ABCDEF'))), 0)
+            return [lbl(name, 'RF in hex from place RE'),
+                    lbl(L), divxy(0xF, 0xE), maa(), acc2x(0xD), rema(), acc2x(0xF),
+                    rdidx(0xD, hx, '0-9 A-F'), serout(),
+                    ldx(0xD, 16), divxy(0xE, 0xD), maa(), acc2x(0xE), testxz(0xE), iff(L), ret()]
         raise Error(name)
 
     def io(s, name, args, d):
@@ -1129,7 +1286,7 @@ class Compiler:
         s.lines = src.split('\n')
         if not hasattr(s, 'layout'): s.layout = {}              # pass 1: addresses are placeholders
         s.rows = []; s.n = 0; s.strings = {}; s.ma = None; s.kreg = {}; s.acc = None; s.loops = []
-        s.natives = {}
+        s.natives = {}; s.libs = set()
         s.ln = 1; s.noted = 0; s.fn = None; s.tbusy = set()
         s.rows.append(start('Stellar C: ' + s.name))
         if s.setsize > 1: s.rows.append(('F2 %02X' % s.setsize, 'SETSIZE %02X' % s.setsize, 'the program needs %d KB' % (4 * s.setsize)))
@@ -1164,6 +1321,7 @@ class Compiler:
             if s.rows[-1][1].startswith('RETURN') and not s.rows[-1][2].startswith('~'):
                 s.rows.insert(len(s.rows) - 1, lbl('R_' + n))     # the body's own last RETURN
             else: s.rows.append(lbl('R_' + n)); s.rows.append(ret())
+        for name in sorted(s.libs): s.rows += s.lib_rows(name)
         s.rows.append(brk('end marker: the pre-pass stops here'))
         return s.rows
 

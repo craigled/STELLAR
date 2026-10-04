@@ -22,6 +22,11 @@ SOURCES = ['SC/scc.py', 'SC/asm1802.py', 'Firmware-Math/mini.py',
 
 # The examples, in menu order. input: keys pre-loaded before the program starts.
 EXAMPLES = [
+    ('hello', 'Hello, terminal (the new built-ins)', 'Craig\r', 'Elf2K',
+     'A title bar in reverse video, your name read with getline() (bounded: it stops at 20 '
+     'characters, Backspace works), today\'s date and time from the clock chip with rtcget(), '
+     'and a table in the three number formats - printz, printw, printh - each column placed '
+     'with at(row, col). The input box types "Craig"; empty it to type your own name.'),
     ('primes', 'Prime generator', '3\r60\r', 'Elf2K',
      'Asks for a low and a high limit and prints the primes between them - the same program as '
      'the hand-written Prime-Gen v07, and 35% smaller. The input box answers 3 and 60; '

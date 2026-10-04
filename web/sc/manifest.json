@@ -8,6 +8,13 @@
  ],
  "examples": [
   {
+   "name": "Hello, terminal (the new built-ins)",
+   "file": "hello.sc",
+   "input": "Craig\r",
+   "speed": "Elf2K",
+   "blurb": "A title bar in reverse video, your name read with getline() (bounded: it stops at 20 characters, Backspace works), today's date and time from the clock chip with rtcget(), and a table in the three number formats - printz, printw, printh - each column placed with at(row, col). The input box types \"Craig\"; empty it to type your own name."
+  },
+  {
    "name": "Prime generator",
    "file": "primes.sc",
    "input": "3\r60\r",
