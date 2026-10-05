@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=101';
+  var V = '?v=102';
   // The four programs are drawn at random from samples/home-pool.json (Craig's list) on every
   // visit: EXACTLY ONE "heavy" app - a game, or Sort visualiser - and three others. STELLAR's
   // scheduler is fair by opcode count, so every VM runs at the pace of the round's dearest
@@ -56,7 +56,7 @@
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 
   var m = null, die = null, screens = [], texts = [];
-  var speed = 40, paused = false, frozen = false, focusVM = 0;
+  var speed = 1, paused = false, frozen = false, focusVM = 0;
 
   // ---------------------------------------------------------------- screens
   function buildQuad() {
