@@ -29,7 +29,11 @@ body.home button{font-family:var(--pmono)}
 /* ---------------------------------------------------------------- hero */
 .h-hero{max-width:1320px; margin:0 auto; padding:44px 24px 26px; display:grid;
   grid-template-columns:minmax(0,1.7fr) minmax(0,1fr); gap:18px 48px; align-items:end}
-.h-eyebrow{grid-column:1/-1}
+.h-eyebrow,.h-acro{grid-column:1/-1}
+.h-acro{font-family:var(--serif); font-style:italic; font-size:clamp(17px,1.7vw,22px); color:var(--k-amber); margin:0 0 4px}
+.h-title .h-sub{display:block; font-size:.56em; line-height:1.08; margin-top:.25em}
+.h-more{margin:10px 0 0; font-size:15px}
+.h-more a{color:var(--k-amber)}
 .h-eyebrow{display:flex; flex-wrap:wrap; gap:6px 18px; font-family:var(--pmono); font-size:12px;
   letter-spacing:.14em; text-transform:uppercase; color:var(--k-soft)}
 .h-eyebrow span:first-child{color:var(--k-amber)}

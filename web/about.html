@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What is STELLAR</title>
+<meta name="description" content="STELLAR-1802 in depth: what it is, how a multitasking language layer runs four machines on one RCA 1802, and the Elf 2000 hardware it runs on.">
+<link rel="stylesheet" href="css/site.css?v=101">
+<style>
+.about{max-width:76ch}
+.about h2{margin-top:2em}
+.acro{font-family:var(--serif, Georgia, serif); font-style:italic; font-size:1.15em; color:var(--accent); margin:.2em 0 1.2em}
+.about dl{display:grid; grid-template-columns:max-content 1fr; gap:.45em 1.2em; margin:1em 0 1.4em}
+.about dt{font-family:var(--mono); font-size:.92em; color:var(--accent)}
+.about dd{margin:0}
+@media(max-width:600px){.about dl{grid-template-columns:1fr} .about dd{margin-bottom:.6em}}
+</style>
+</head>
+<body>
+<main class="wrap about">
+  <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">About</div>
+  <h1 style="margin:.1em 0 .2em">What is STELLAR?</h1>
+  <p class="acro">&ldquo;System for Time-shared Execution on Low-Level Architecture Resources&rdquo;</p>
+
+  <p>STELLAR-1802 is a multitasking language layer for the RCA COSMAC 1802, a microprocessor
+  from 1976. It sits between the bare chip and the programs you write: instead of 1802 machine
+  code, a STELLAR program is a list of STELLAR <em>commands</em>, and STELLAR's firmware carries
+  them out. Up to four programs run at once, each in its own virtual machine (VM) with its own
+  registers, memory and position in its code, while one 1802 shares its time among them.</p>
+
+  <p>The 1802 is a spare, unusual chip. It is 8-bit, with sixteen 16-bit registers but no stack
+  instructions, no call or return instruction, no multiply and no divide. STELLAR fills those
+  gaps for its programs: they get calls and returns, stacks, 16- and 32-bit arithmetic with
+  multiply and divide, decimal printing, strings, a terminal, the front panel and the clock,
+  as about two hundred ready-made commands.</p>
+
+  <h2><span class="hx">1</span>How it works</h2>
+
+  <p><b>A program is bytecode.</b> Each STELLAR command is one byte saying what to do, often
+  followed by a byte or two saying what with: <code>11&nbsp;05&nbsp;00&nbsp;0A</code> loads 10
+  into register&nbsp;R5, <code>C1&nbsp;0F</code> prints the string register&nbsp;RF points at.
+  The full set is in the <a href="opcodes.html">opcode reference</a>.</p>
+
+  <p><b>The firmware is an interpreter.</b> It fetches a VM's next command, looks it up in a
+  dispatch table, and runs the 1802 routine that carries it out. One command costs the chip
+  roughly 190 of its own instructions: fetching and dispatching, the scheduler's bookkeeping,
+  the calls between routines, and the work itself.</p>
+
+  <p><b>Each VM is a block of memory.</b> Everything a VM knows (sixteen 16-bit registers, its
+  accumulators, its flags, its place in its code) lives in a 256-byte <em>core</em>. Its program
+  lives in its own 4&nbsp;KB <em>program block</em>. Switching from one VM to another is just
+  pointing the firmware at a different core. The <a href="core.html">VM Core</a> page shows one
+  core live.</p>
+
+  <p><b>The scheduler takes turns.</b> Each running VM gets a short turn of a few commands (its
+  <em>quantum</em>), then the scheduler hands the chip to the next. A VM waiting for a key gives
+  up its turn at once instead of stalling the others. A shared page of memory, the CIDP, holds
+  each VM's state and lets the VMs see and signal each other. Watch it happen on the
+  <a href="scheduler.html">Multitasking</a> page.</p>
+
+  <p><b>A way out to the bare chip.</b> When a program needs raw speed, one command
+  (<code>RUNMC</code>) runs a piece of 1802 machine code directly and comes back, about a
+  hundred times faster than the same work in commands, at the cost of holding the chip while
+  it runs.</p>
+
+  <p>The <a href="architecture.html">Architecture</a> page has the detail: the memory map, the
+  jobs the 1802's own registers are given, RCA's call-and-return technique, and the CIDP.</p>
+
+  <h2><span class="hx">2</span>What it runs on</h2>
+
+  <p>STELLAR runs on a <b>COSMAC Elf 2000</b> (the &ldquo;Elf2K&rdquo;), Spare Time Gizmos'
+  modern build of the classic 1970s COSMAC Elf hobby computer:</p>
+
+  <dl>
+    <dt>CPU</dt><dd>an RCA CDP1802 microprocessor.</dd>
+    <dt>Memory</dt><dd>32&nbsp;KB of battery-backed RAM (<code>$0000</code>&ndash;<code>$7FFF</code>), which
+      holds STELLAR and its programs; 32&nbsp;KB of EPROM above it with the Elf2K's own monitor and BIOS.</dd>
+    <dt>Front panel</dt><dd>eight toggle switches, a two-digit hex display, the INPUT, LOAD and RUN
+      switches, and the Q light. STELLAR programs can read the switches and INPUT, and drive the
+      display and Q.</dd>
+    <dt>Disk/UART/RTC card</dt><dd>a serial port (a 16C450 UART) for the terminal every STELLAR
+      program talks through, and a DS12887 real-time clock that STELLAR can read and set.</dd>
+    <dt>Terminal</dt><dd>any serial terminal or terminal program, VT100-style for the
+      full-screen programs.</dd>
+  </dl>
+
+  <p>STELLAR itself fills about 12&nbsp;KB at the bottom of RAM. Above it sit the shared CIDP
+  page, the four VM cores, and the four 4&nbsp;KB program blocks at <code>$4000</code>,
+  <code>$5000</code>, <code>$6000</code> and <code>$7000</code>. Firmware and programs are
+  loaded the same way, as lines of hex bytes (<code>D</code>-lines) that the Elf2K's monitor
+  types into memory.</p>
+
+  <p>You don't need an Elf2K to try it: every page on this site runs STELLAR's real firmware on
+  an emulated 1802 in your browser. Start with the <a href="simulator.html">Simulator</a>.</p>
+
+  <h2><span class="hx">3</span>How STELLAR programs are written</h2>
+
+  <p>STELLAR's firmware was written straight in hex, with no assembler: every 1802 instruction
+  worked out by hand, typed as bytes, and tested on a real Elf2K. Most STELLAR programs on this
+  site were written the same way, command by command. Programs can also be written in
+  <a href="stellarc.html">Stellar C</a>, a small C-like language that compiles to STELLAR
+  commands, with a <a href="stellarc-guide.html">step-by-step guide</a>.</p>
+
+  <h2><span class="hx">4</span>History</h2>
+
+  <p class="muted">Why STELLAR was created, and how it came to be, will be told here.</p>
+
+  <div class="note" style="margin-top:34px">
+    <div class="lbl">See it run</div>
+    <p class="small" style="margin:.3em 0 0">The <a href="index.html">home page</a> runs four
+    STELLAR programs at once, with the chip's memory lit up beside them.</p>
+  </div>
+</main>
+
+<footer class="foot">STELLAR for the RCA COSMAC 1802 · built by Craig Ledbetter · <a href="index.html">home</a></footer>
+<script src="js/nav.js?v=101"></script>
+</body>
+</html>
