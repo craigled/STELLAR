@@ -44,6 +44,14 @@ from mini import assemble, claim_vms_text
 from stellar_ops import *
 
 
+
+def st2(x, y, note=''):
+    """COPYXMY x -> M(y), 2 bytes. V0061.34/.35 refuse R0 as COPYXMY's SOURCE (a leftover 'no R0'
+    guard at $04C4 - the program silently stops); so R0 goes through the Acc (same byte order).
+    Fix for the firmware: Firmware-Math/COPYXMY-R0-fix.dlines.txt (D 04C4 C4 C4)."""
+    if x: return [xmy2(x, y, note)]
+    return [x2acc(0, 'R0 via the Acc: COPYXMY cannot store from R0'), ('34 0%X' % y, 'COPYAMX Acc -> M(R%d)' % y, note)]
+
 class Error(Exception): pass
 
 # ====================================================================== lexer
@@ -664,6 +672,8 @@ class Compiler:
             if s.acc and int(s.acc.split()[1], 16) & 15 == r: s.acc = None
             if mn == 'LOADXI': b = [int(x, 16) for x in row[0].split()]; s.kreg[r] = b[2] << 8 | b[3]
             else: s.kreg.pop(r, None)
+    def emits(s, rows):
+        for r in rows: s.emit(r)
     def label(s, name): s.rows.append(lbl(name)); s.ma = None; s.kreg = {}; s.acc = None
     def src_note(s):
         if s.ln != s.noted: s.noted = s.ln; return s.lines[s.ln - 1].strip()[:60]
@@ -689,7 +699,7 @@ class Compiler:
         if loc[0] == 'r':
             if loc[1] != r: s.emit(cpxy(r, loc[1]))
         else:
-            p = s.temp(); s.emit(ldx(p, s.maddr(loc), name)); s.emit(xmy2(r, p)); s.untemp(p)
+            p = s.temp(); s.emit(ldx(p, s.maddr(loc), name)); s.emits(st2(r, p)); s.untemp(p)
 
     def store(s, name, e, fn=None):
         """Variable <- expression."""
@@ -1053,7 +1063,7 @@ class Compiler:
                 s.emit(('20 00', 'MEMMODE 00', 'absolute - no branch')); s.emit(wridx(t, 0))
             else:
                 v = s.temp(); s.value(args[1], v)
-                s.emit(('20 00', 'MEMMODE 00', 'absolute - no branch')); s.emit(xmy2(v, t)); s.untemp(v)
+                s.emit(('20 00', 'MEMMODE 00', 'absolute - no branch')); s.emits(st2(v, t)); s.untemp(v)
             s.emit(('20 01', 'MEMMODE 01', 'relative again')); s.untemp(t); s.acc = None; return
         raise Error(name)
 
@@ -1456,14 +1466,14 @@ class Compiler:
             t = s.temp(); s.value(target[2], t); v = s.temp()
             if s.wide(target[1]):
                 s.emit(addxyz(t, t, t)); s.emit(addxi(t, s.addr(target[1]))); s.emit(mxy2(t, v))
-                s.value(('bin', e[1], ('rreg', v), e[3]), v); s.emit(xmy2(v, t))
+                s.value(('bin', e[1], ('rreg', v), e[3]), v); s.emits(st2(v, t))
             else:
                 s.emit(rdidx(t, s.addr(target[1]))); s.emit(acc2x(v))
                 s.value(('bin', e[1], ('rreg', v), e[3]), v); s.emit(x2acc(v)); s.emit(wridx(t, s.addr(target[1])))
             s.untemp(v); s.untemp(t); s.acc = None; return
         if target[0] == 'idx' and s.wide(target[1]):
             v = s.reg(e); p = s.wptr(target[1], target[2])
-            s.emit(xmy2(v, p)); s.untemp(p); s.untemp(v); return
+            s.emits(st2(v, p)); s.untemp(p); s.untemp(v); return
         if target[0] == 'idx':
             ri, base = s.index(target[1], target[2])
             s.to_acc(e)
