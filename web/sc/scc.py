@@ -528,7 +528,9 @@ class Compiler:
                 use = s.vars_in(e) | (s.vars_in(tgt[2]) if tgt[0] == 'idx' else set())
                 if has_call(e):
                     rest = s.vars_in(e[2]) if e[0] == 'call' and e[1] in s.funcs else set()
-                    mark(((out - kill) | use) - rest if e[0] == 'call' else (out - kill) | use, e)
+                    # the call's own arguments are used up before it runs - unless they are
+                    # still live after it (then they must survive it like anything else)
+                    mark((out - kill) | (use - rest) if e[0] == 'call' else (out - kill) | use, e)
                 return (out - kill) | use
             if k == 'expr':
                 if st[2][1] in s.funcs: mark(out, st[2])
