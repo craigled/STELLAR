@@ -36,6 +36,20 @@
  },
  {
   "group": "Games",
+  "name": "CanonBall",
+  "what": "Your castle and cannon against the computer's: aim, fire, mind the wind; three levels. VT100. Stellar C.",
+  "href": "samples/CanonBall.lst",
+  "note": null
+ },
+ {
+  "group": "Games",
+  "name": "CanonBall Solo",
+  "what": "Aim the great cannon and knock down the castle in as few shots as you can. VT100. Stellar C.",
+  "href": "samples/CanonBall-Solo.lst",
+  "note": null
+ },
+ {
+  "group": "Games",
   "name": "Getting Warmer",
   "what": "Guess the number from 1 to 1000 in ten tries: higher or lower, warmer or colder. Plain text.",
   "href": "samples/Getting-Warmer.lst",

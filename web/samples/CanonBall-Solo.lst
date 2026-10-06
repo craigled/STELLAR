@@ -1,0 +1,1778 @@
+; ==========================================================================
+; CanonBall-v01  -  compiled from CanonBall-v01.sc by scc (Stellar C, prototype)   loads at $4000
+; ==========================================================================
+; 809 STELLAR commands, 2436 bytes of code, 970 bytes of data.
+; registers: castle.c R0, fly.c R0, blast.k R0, play.k R0, barrel.a R0, erasetrail.i R0, scene.c R0, kwait.n R0, space.k R0, key.k R0, shot.m R0, message.m R0, castle.r R1, fly.r R1, blast.a R1, barrel.dc R1, fly.yy R10, fly.vx R11, fly.t R2, blast.hitc R2, barrel.dr R2, cell.c R2, fly.or R3, barrel.r R3, blast.d R3, cell.r R3, fly.m R4, barrel.cs R4, fly.n R5, barrel.sn R5, cx R6, fly.oc R7, barrel.ch R7, fly.vy R8, fly.x R9
+; in memory: ntr, col, row, shots, land, cell.ch
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 4000 CD             START                          Stellar C: CanonBall-v01
+; D 4001 11 0C 00 00    LOADXI R12 0000                // CANONBALL v01 (solo) - a Stellar C game for the STELLAR V   RC = 0: the index for a[k] and the u8 variables
+; D 4005 11 0E 0B FF    LOADXI R14 0BFF                u8 h[10];                                     // what is lef
+; D 4009 11 0F 0C 08    LOADXI R15 0C08
+; D 400D FB EF 00       FILLMEMXY RE..RF 00
+; D 4010 11 0E 0C 09    LOADXI R14 0C09                u8 trr[120];  u8 trc[120];                    // the last sh
+; D 4014 11 0F 0C 80    LOADXI R15 0C80
+; D 4018 FB EF 00       FILLMEMXY RE..RF 00
+; D 401B 11 0E 0C 81    LOADXI R14 0C81                u8 trr[120];  u8 trc[120];                    // the last sh
+; D 401F 11 0F 0C F8    LOADXI R15 0CF8
+; D 4023 FB EF 00       FILLMEMXY RE..RF 00
+; D 4026 BD 08 DA       CALL F_main                    run main()
+; QUIT:
+; D 4029 00             HALT
+; quit():
+; D 402A 11 0F 0E 26    LOADXI R15 0E26                void quit() { print(bye); halt(); }
+; D 402E C1 0F          PRINTSTR R15
+; D 4030 B0 00 29       GAL QUIT
+; D 4033 BE 00          RETURN
+; kwait():
+; D 4035 B0 00 43       GAL L2                         while (n != 0) { if (keyready()) return getc(); n--; }
+; D 4038 CC             SERST
+; D 4039 A1 00 41       IFFALSEI L6
+; D 403C CB             SERIN
+; D 403D 21 0D          COPYAX Acc -> R13
+; D 403F BE 00          RETURN
+; D 4041 43 00          DECX R0
+; D 4043 8C 00          TESTXZ R0
+; D 4045 A1 00 38       IFFALSEI L1
+; D 4048 11 0D 00 00    LOADXI R13 0000                return 0;
+; D 404C BE 00          RETURN
+; key():
+; D 404E 86 00 00 1B    TESTXI R0 001B                 if (k == 27) {
+; D 4052 A1 00 70       IFFALSEI L8
+; D 4055 11 00 00 08    LOADXI R0 0008                 k = kwait(8);
+; D 4059 BD 00 35       CALL F_kwait
+; D 405C 23 00 D0       COPYXY R13 -> R0
+; D 405F 86 00 00 5B    TESTXI R0 005B                 if (k == '[') k = kwait(8);
+; D 4063 A1 00 70       IFFALSEI L10
+; D 4066 11 00 00 08    LOADXI R0 0008
+; D 406A BD 00 35       CALL F_kwait
+; D 406D 23 00 D0       COPYXY R13 -> R0
+; D 4070 86 00 00 41    TESTXI R0 0041                 if (k == 'A' || k == 'w' || k == 'W') return 'U';   // a lon
+; D 4074 A0 00 85       IFTRUEI L13
+; D 4077 86 00 00 77    TESTXI R0 0077
+; D 407B A0 00 85       IFTRUEI L13
+; D 407E 86 00 00 57    TESTXI R0 0057
+; D 4082 A1 00 8B       IFFALSEI L12
+; D 4085 11 0D 00 55    LOADXI R13 0055
+; D 4089 BE 00          RETURN
+; D 408B 86 00 00 42    TESTXI R0 0042                 if (k == 'B' || k == 's' || k == 'S') return 'D';
+; D 408F A0 00 A0       IFTRUEI L16
+; D 4092 86 00 00 73    TESTXI R0 0073
+; D 4096 A0 00 A0       IFTRUEI L16
+; D 4099 86 00 00 53    TESTXI R0 0053
+; D 409D A1 00 A6       IFFALSEI L15
+; D 40A0 11 0D 00 44    LOADXI R13 0044
+; D 40A4 BE 00          RETURN
+; D 40A6 86 00 00 71    TESTXI R0 0071                 if (k == 'q' || k == 'Q') return 'Q';
+; D 40AA A0 00 B4       IFTRUEI L19
+; D 40AD 86 00 00 51    TESTXI R0 0051
+; D 40B1 A1 00 BA       IFFALSEI L18
+; D 40B4 11 0D 00 51    LOADXI R13 0051
+; D 40B8 BE 00          RETURN
+; D 40BA 86 00 00 20    TESTXI R0 0020                 if (k == ' ') return ' ';
+; D 40BE A1 00 C7       IFFALSEI L21
+; D 40C1 11 0D 00 20    LOADXI R13 0020
+; D 40C5 BE 00          RETURN
+; D 40C7 11 0D 00 00    LOADXI R13 0000                return 0;
+; D 40CB BE 00          RETURN
+; space():
+; D 40CD B0 00 D1       GAL L27                        while (!keyready()) rand();
+; D 40D0 C3             RAND
+; D 40D1 CC             SERST
+; D 40D2 A1 00 D0       IFFALSEI L26
+; D 40D5 CB             SERIN                          k = key(getc());
+; D 40D6 21 00          COPYAX Acc -> R0
+; D 40D8 BD 00 4E       CALL F_key
+; D 40DB 23 00 D0       COPYXY R13 -> R0
+; D 40DE 86 00 00 20    TESTXI R0 0020                 if (k == ' ') return;
+; D 40E2 A0 00 F2       IFTRUEI R_space
+; D 40E5 86 00 00 51    TESTXI R0 0051                 if (k == 'Q') quit();
+; D 40E9 A1 00 EF       IFFALSEI L31
+; D 40EC BD 00 2A       CALL F_quit
+; D 40EF B0 00 CD       GAL L22                        while (1) {
+; D 40F2 BE 00          RETURN
+; cell():
+; D 40F4 2E 03 0B 2B    READIDX R3 0B2B                one[2] = tens[r]; one[3] = ones[r];
+; D 40F8 2F 0C 0D 11    WRITEIDX R12 0D11
+; D 40FC 2E 03 0B 90    READIDX R3 0B90
+; D 4100 2F 0C 0D 12    WRITEIDX R12 0D12
+; D 4104 2E 02 0B 2B    READIDX R2 0B2B                one[5] = tens[c]; one[6] = ones[c];
+; D 4108 2F 0C 0D 14    WRITEIDX R12 0D14
+; D 410C 2E 02 0B 90    READIDX R2 0B90
+; D 4110 2F 0C 0D 15    WRITEIDX R12 0D15
+; D 4114 11 0F 0E 61    LOADXI R15 0E61                one[8] = ch;   ch
+; D 4118 39 02 FF       COPYMXY M(R15) -> R15
+; D 411B 22 0F          COPYXA R15 -> Acc
+; D 411D 2F 0C 0D 17    WRITEIDX R12 0D17
+; D 4121 11 0F 0D 0F    LOADXI R15 0D0F                print(one);
+; D 4125 C1 0F          PRINTSTR R15
+; D 4127 BE 00          RETURN
+; message():
+; D 4129 11 0F 09 90    LOADXI R15 0990                at(MSG, 1); eol();   at(2, 1)
+; D 412D C1 0F          PRINTSTR R15
+; D 412F 11 0F 09 97    LOADXI R15 0997                eol()
+; D 4133 C1 0F          PRINTSTR R15
+; D 4135 11 0F 09 9B    LOADXI R15 099B                at(MSG, 30);   at(2, 30)
+; D 4139 C1 0F          PRINTSTR R15
+; D 413B 86 00 00 01    TESTXI R0 0001                 case 1: print("Too short!"); break;
+; D 413F A0 01 5A       IFTRUEI L33                    case 1
+; D 4142 86 00 00 02    TESTXI R0 0002                 case 2: print("Too long!"); break;
+; D 4146 A0 01 63       IFTRUEI L34                    case 2
+; D 4149 86 00 00 03    TESTXI R0 0003                 case 3: print("Over the top!"); break;
+; D 414D A0 01 6C       IFTRUEI L35                    case 3
+; D 4150 86 00 00 04    TESTXI R0 0004                 case 4: rev(1); print(" * * *  H I T !  * * * "); rev(0); br
+; D 4154 A0 01 75       IFTRUEI L36                    case 4
+; D 4157 B0 01 8A       GAL L32                        no case: past the switch
+; D 415A 11 0F 09 A3    LOADXI R15 09A3                case 1: print("Too short!"); break;   "Too short!"
+; D 415E C1 0F          PRINTSTR R15
+; D 4160 B0 01 8A       GAL L32
+; D 4163 11 0F 09 AE    LOADXI R15 09AE                case 2: print("Too long!"); break;   "Too long!"
+; D 4167 C1 0F          PRINTSTR R15
+; D 4169 B0 01 8A       GAL L32
+; D 416C 11 0F 09 B8    LOADXI R15 09B8                case 3: print("Over the top!"); break;   "Over the top!"
+; D 4170 C1 0F          PRINTSTR R15
+; D 4172 B0 01 8A       GAL L32
+; D 4175 11 0F 09 C6    LOADXI R15 09C6                case 4: rev(1); print(" * * *  H I T !  * * * "); rev(0); br   rev(1)
+; D 4179 C1 0F          PRINTSTR R15
+; D 417B 11 0F 09 CB    LOADXI R15 09CB                " * * *  H I T !  * * * "
+; D 417F C1 0F          PRINTSTR R15
+; D 4181 11 0F 09 E3    LOADXI R15 09E3                rev(0)
+; D 4185 C1 0F          PRINTSTR R15
+; D 4187 B0 01 8A       GAL L32
+; D 418A BE 00          RETURN
+; showang():
+; D 418C 2E 0C 0C FA    READIDX R12 0CFA               angs[8] = tens[ang]; angs[9] = ones[ang];
+; D 4190 21 0F          COPYAX Acc -> R15
+; D 4192 2E 0F 0B 2B    READIDX R15 0B2B
+; D 4196 2F 0C 0D 21    WRITEIDX R12 0D21
+; D 419A 2E 0C 0C FA    READIDX R12 0CFA
+; D 419E 21 0F          COPYAX Acc -> R15
+; D 41A0 2E 0F 0B 90    READIDX R15 0B90
+; D 41A4 2F 0C 0D 22    WRITEIDX R12 0D22
+; D 41A8 11 0F 09 C6    LOADXI R15 09C6                rev(1); print(angs); rev(0);   rev(1)
+; D 41AC C1 0F          PRINTSTR R15
+; D 41AE 11 0F 0D 19    LOADXI R15 0D19
+; D 41B2 C1 0F          PRINTSTR R15
+; D 41B4 11 0F 09 E3    LOADXI R15 09E3                rev(0)
+; D 41B8 C1 0F          PRINTSTR R15
+; D 41BA BE 00          RETURN
+; status():
+; D 41BC 11 0F 09 E8    LOADXI R15 09E8                at(1, 1); rev(1);   at(1, 1)
+; D 41C0 C1 0F          PRINTSTR R15
+; D 41C2 11 0F 09 C6    LOADXI R15 09C6                rev(1)
+; D 41C6 C1 0F          PRINTSTR R15
+; D 41C8 11 0F 09 EF    LOADXI R15 09EF                print(" CANONBALL   Angle "); printz(ang, 2);   " CANONBALL   Angle "
+; D 41CC C1 0F          PRINTSTR R15
+; D 41CE 2E 0C 0C FA    READIDX R12 0CFA
+; D 41D2 21 0F          COPYAX Acc -> R15
+; D 41D4 11 0E 00 64    LOADXI R14 0064
+; D 41D8 4D FE          DIVXY R15 / R14
+; D 41DA 27             COPYREMA
+; D 41DB 21 0F          COPYAX Acc -> R15              its low 2 digits
+; D 41DD 11 0E 00 0A    LOADXI R14 000A
+; D 41E1 BD 09 41       CALL LIB_PRZ                   2 digits
+; D 41E4 11 0F 0A 03    LOADXI R15 0A03                print("   Shots "); printw(shots, 2);   "   Shots "
+; D 41E8 C1 0F          PRINTSTR R15
+; D 41EA 11 0F 0E 5D    LOADXI R15 0E5D                shots
+; D 41EE 39 02 FF       COPYMXY M(R15) -> R15
+; D 41F1 11 0E 00 64    LOADXI R14 0064
+; D 41F5 4D FE          DIVXY R15 / R14
+; D 41F7 27             COPYREMA
+; D 41F8 21 0F          COPYAX Acc -> R15              its low 2 digits
+; D 41FA 11 0E 00 0A    LOADXI R14 000A
+; D 41FE BD 09 01       CALL LIB_PRW                   2 digits
+; D 4201 11 0F 0A 0D    LOADXI R15 0A0D                print("   Castle "); printw(left * 100 / TOTAL, 3);   "   Castle "
+; D 4205 C1 0F          PRINTSTR R15
+; D 4207 2E 0C 0C F9    READIDX R12 0CF9
+; D 420B 21 0F          COPYAX Acc -> R15
+; D 420D 11 0E 00 64    LOADXI R14 0064
+; D 4211 4A FE          MULTXY R15 * R14
+; D 4213 21 1F          COPYAX MA -> R15
+; D 4215 11 0E 00 3A    LOADXI R14 003A
+; D 4219 4D FE          DIVXY R15 / R14
+; D 421B 21 1F          COPYAX MA -> R15
+; D 421D 11 0E 03 E8    LOADXI R14 03E8
+; D 4221 4D FE          DIVXY R15 / R14
+; D 4223 27             COPYREMA
+; D 4224 21 0F          COPYAX Acc -> R15              its low 3 digits
+; D 4226 11 0E 00 64    LOADXI R14 0064
+; D 422A BD 09 01       CALL LIB_PRW                   3 digits
+; D 422D 11 0F 0A 18    LOADXI R15 0A18                print("%   Up/Down aim  SPACE fire  Q quit");   "%   Up/Down aim  SPACE fire  Q quit"
+; D 4231 C1 0F          PRINTSTR R15
+; D 4233 11 0F 09 E3    LOADXI R15 09E3                rev(0);   rev(0)
+; D 4237 C1 0F          PRINTSTR R15
+; D 4239 BE 00          RETURN
+; barrel():
+; D 423B 86 07 00 20    TESTXI R7 0020                 if (ch != ' ') {
+; D 423F A0 02 72       IFTRUEI L38
+; D 4242 2E 0C 0C FB    READIDX R12 0CFB               if (bang < 23) ch = '-'; else if (bang < 68) ch = '/'; else
+; D 4246 21 0F          COPYAX Acc -> R15
+; D 4248 11 0E 00 17    LOADXI R14 0017
+; D 424C 89 FE          TESTLXY R15 < R14
+; D 424E A1 02 58       IFFALSEI L39
+; D 4251 11 07 00 2D    LOADXI R7 002D
+; D 4255 B0 02 72       GAL L40
+; D 4258 2E 0C 0C FB    READIDX R12 0CFB
+; D 425C 21 0F          COPYAX Acc -> R15
+; D 425E 11 0E 00 44    LOADXI R14 0044
+; D 4262 89 FE          TESTLXY R15 < R14
+; D 4264 A1 02 6E       IFFALSEI L41
+; D 4267 11 07 00 2F    LOADXI R7 002F
+; D 426B B0 02 72       GAL L42
+; D 426E 11 07 00 7C    LOADXI R7 007C
+; D 4272 22 07          COPYXA R7 -> Acc               one[8] = ch;
+; D 4274 2F 0C 0D 17    WRITEIDX R12 0D17
+; D 4278 2E 0C 0C FB    READIDX R12 0CFB               a = bang; cs = sint[90 - a]; sn = sint[a];
+; D 427C 21 00          COPYAX Acc -> R0
+; D 427E 11 0E 00 5A    LOADXI R14 005A
+; D 4282 51 E0 0F       SUBXYZ R14 - R0 -> R15
+; D 4285 2E 0F 0A D0    READIDX R15 0AD0
+; D 4289 21 04          COPYAX Acc -> R4
+; D 428B 2E 00 0A D0    READIDX R0 0AD0
+; D 428F 21 05          COPYAX Acc -> R5
+; D 4291 11 01 07 80    LOADXI R1 0780                 dc = PC * 256 + 128; dr = PR * 512 + 256;
+; D 4295 11 02 2B 00    LOADXI R2 2B00
+; D 4299 11 03 00 00    LOADXI R3 0000                 for (r = 0; r < BLEN; r++) {
+; D 429D B0 02 DE       GAL L44
+; D 42A0 50 14 01       ADDXYZ R1 + R4 -> R1           dc += cs; dr -= sn;         // r x cos (in 1/256 col) and r
+; D 42A3 51 25 02       SUBXYZ R2 - R5 -> R2
+; D 42A6 11 0F 02 00    LOADXI R15 0200                a = dr >> 9;
+; D 42AA 4D 2F          DIVXY R2 / R15
+; D 42AC 21 10          COPYAX MA -> R0
+; D 42AE 2E 00 0B 2B    READIDX R0 0B2B                one[2] = tens[a]; one[3] = ones[a];
+; D 42B2 2F 0C 0D 11    WRITEIDX R12 0D11
+; D 42B6 2E 00 0B 90    READIDX R0 0B90
+; D 42BA 2F 0C 0D 12    WRITEIDX R12 0D12
+; D 42BE 11 0F 01 00    LOADXI R15 0100                a = dc >> 8;
+; D 42C2 4D 1F          DIVXY R1 / R15
+; D 42C4 21 10          COPYAX MA -> R0
+; D 42C6 2E 00 0B 2B    READIDX R0 0B2B                one[5] = tens[a]; one[6] = ones[a];
+; D 42CA 2F 0C 0D 14    WRITEIDX R12 0D14
+; D 42CE 2E 00 0B 90    READIDX R0 0B90
+; D 42D2 2F 0C 0D 15    WRITEIDX R12 0D15
+; D 42D6 11 0F 0D 0F    LOADXI R15 0D0F                print(one);
+; D 42DA C1 0F          PRINTSTR R15
+; D 42DC 42 03          INCX R3                        for (r = 0; r < BLEN; r++) {
+; D 42DE 11 0F 00 05    LOADXI R15 0005
+; D 42E2 89 3F          TESTLXY R3 < R15
+; D 42E4 A0 02 A0       IFTRUEI L43
+; D 42E7 BE 00          RETURN
+; cannon():
+; D 42E9 11 0F 0A 3C    LOADXI R15 0A3C                at(PR + 1, PC - 3); print("/###\\");   at(22, 4)
+; D 42ED C1 0F          PRINTSTR R15
+; D 42EF 11 0F 0A 44    LOADXI R15 0A44                "/###\\"
+; D 42F3 C1 0F          PRINTSTR R15
+; D 42F5 11 0F 0A 4A    LOADXI R15 0A4A                at(PR + 2, PC - 3); print("(O)(O)");   at(23, 4)
+; D 42F9 C1 0F          PRINTSTR R15
+; D 42FB 11 0F 0A 52    LOADXI R15 0A52                "(O)(O)"
+; D 42FF C1 0F          PRINTSTR R15
+; D 4301 11 07 00 20    LOADXI R7 0020                 barrel(' '); bang = ang; barrel('#');
+; D 4305 BD 02 3B       CALL F_barrel
+; D 4308 2E 0C 0C FA    READIDX R12 0CFA
+; D 430C 2F 0C 0C FB    WRITEIDX R12 0CFB
+; D 4310 11 07 00 23    LOADXI R7 0023
+; D 4314 BD 02 3B       CALL F_barrel
+; D 4317 BE 00          RETURN
+; castle():
+; D 4319 11 01 00 11    LOADXI R1 0011                 for (r = GROUND - 7; r < GROUND; r++) {
+; D 431D B0 03 66       GAL L48
+; D 4320 23 00 1F       COPYXY R1 -> R15               at(r, cx);
+; D 4323 23 00 6E       COPYXY R6 -> R14
+; D 4326 BD 08 EB       CALL LIB_AT                    ESC [ row ; col H
+; D 4329 11 00 00 00    LOADXI R0 0000                 for (c = 0; c < CW; c++) {
+; D 432D B0 03 5B       GAL L52
+; D 4330 2E 00 0B FF    READIDX R0 0BFF                if (h[c] >= GROUND - r) { if (c & 1) putc(']'); else putc('[
+; D 4334 21 0F          COPYAX Acc -> R15
+; D 4336 11 0D 00 18    LOADXI R13 0018
+; D 433A 51 D1 0E       SUBXYZ R13 - R1 -> R14
+; D 433D 88 FE          TESTGXY R15 >= R14
+; D 433F A1 03 57       IFFALSEI L55
+; D 4342 65 10 00 01    AND R0 0001
+; D 4346 21 1F          COPYAX MA -> R15
+; D 4348 8C 0F          TESTXZ R15
+; D 434A A0 03 52       IFTRUEI L57
+; D 434D CA 5D          SEROUTI 5D ']'
+; D 434F B0 03 54       GAL L58
+; D 4352 CA 5B          SEROUTI 5B '['
+; D 4354 B0 03 59       GAL L56
+; D 4357 CA 20          SEROUTI 20                     else putc(' ');
+; D 4359 42 00          INCX R0                        for (c = 0; c < CW; c++) {
+; D 435B 11 0F 00 0A    LOADXI R15 000A
+; D 435F 89 0F          TESTLXY R0 < R15
+; D 4361 A0 03 30       IFTRUEI L51
+; D 4364 42 01          INCX R1                        for (r = GROUND - 7; r < GROUND; r++) {
+; D 4366 11 0F 00 18    LOADXI R15 0018
+; D 436A 89 1F          TESTLXY R1 < R15
+; D 436C A0 03 20       IFTRUEI L47
+; D 436F BE 00          RETURN
+; scene():
+; D 4371 11 0F 0A 59    LOADXI R15 0A59                cls(); cursor(0);   cls()
+; D 4375 C1 0F          PRINTSTR R15
+; D 4377 11 0F 0A 65    LOADXI R15 0A65                cursor(0)
+; D 437B C1 0F          PRINTSTR R15
+; D 437D 11 0F 0A 6C    LOADXI R15 0A6C                at(GROUND, 1);   at(24, 1)
+; D 4381 C1 0F          PRINTSTR R15
+; D 4383 11 00 00 00    LOADXI R0 0000                 for (c = 0; c < 80; c++) putc('=');
+; D 4387 B0 03 8E       GAL L60
+; D 438A CA 3D          SEROUTI 3D '='
+; D 438C 42 00          INCX R0
+; D 438E 11 0F 00 50    LOADXI R15 0050
+; D 4392 89 0F          TESTLXY R0 < R15
+; D 4394 A0 03 8A       IFTRUEI L59
+; D 4397 BD 02 E9       CALL F_cannon                  cannon();
+; D 439A BD 03 19       CALL F_castle                  castle();
+; D 439D BD 01 BC       CALL F_status                  status();
+; D 43A0 BE 00          RETURN
+; blast():
+; D 43A2 11 00 00 00    LOADXI R0 0000                 for (k = 0; k < CW; k++) {
+; D 43A6 B0 04 07       GAL L64
+; D 43A9 23 00 0F       COPYXY R0 -> R15               if (k + 2 >= hitc && k <= hitc + 2) {
+; D 43AC 52 0F 00 02    ADDXI R15 0002
+; D 43B0 88 F2          TESTGXY R15 >= R2
+; D 43B2 A1 04 05       IFFALSEI L68
+; D 43B5 23 00 2F       COPYXY R2 -> R15
+; D 43B8 52 0F 00 02    ADDXI R15 0002
+; D 43BC 88 F0          TESTGXY R15 >= R0
+; D 43BE A1 04 05       IFFALSEI L68
+; D 43C1 89 20          TESTLXY R2 < R0                if (k > hitc) d = k - hitc; else d = hitc - k;
+; D 43C3 A1 03 CC       IFFALSEI L69
+; D 43C6 51 02 03       SUBXYZ R0 - R2 -> R3
+; D 43C9 B0 03 CF       GAL L70
+; D 43CC 51 20 03       SUBXYZ R2 - R0 -> R3
+; D 43CF 11 0F 00 03    LOADXI R15 0003                a = 3 - d;
+; D 43D3 51 F3 01       SUBXYZ R15 - R3 -> R1
+; D 43D6 2E 00 0B FF    READIDX R0 0BFF                if (h[k] < a) a = h[k];
+; D 43DA 21 0F          COPYAX Acc -> R15
+; D 43DC 89 F1          TESTLXY R15 < R1
+; D 43DE A1 03 E7       IFFALSEI L72
+; D 43E1 2E 00 0B FF    READIDX R0 0BFF
+; D 43E5 21 01          COPYAX Acc -> R1
+; D 43E7 2E 00 0B FF    READIDX R0 0BFF                h[k] -= a;
+; D 43EB 21 0F          COPYAX Acc -> R15
+; D 43ED 51 F1 0F       SUBXYZ R15 - R1 -> R15
+; D 43F0 22 0F          COPYXA R15 -> Acc
+; D 43F2 2F 00 0B FF    WRITEIDX R0 0BFF
+; D 43F6 2E 0C 0C F9    READIDX R12 0CF9               left -= a;
+; D 43FA 21 0F          COPYAX Acc -> R15
+; D 43FC 51 F1 0F       SUBXYZ R15 - R1 -> R15
+; D 43FF 22 0F          COPYXA R15 -> Acc
+; D 4401 2F 0C 0C F9    WRITEIDX R12 0CF9
+; D 4405 42 00          INCX R0                        for (k = 0; k < CW; k++) {
+; D 4407 11 0F 00 0A    LOADXI R15 000A
+; D 440B 89 0F          TESTLXY R0 < R15
+; D 440D A0 03 A9       IFTRUEI L63
+; D 4410 BE 00          RETURN
+; erasetrail():
+; D 4412 11 00 00 00    LOADXI R0 0000                 for (i = 0; i < ntr; i++) cell(trr[i], trc[i], ' ');
+; D 4416 B0 04 35       GAL L74
+; D 4419 2E 00 0C 09    READIDX R0 0C09
+; D 441D 21 03          COPYAX Acc -> R3
+; D 441F 2E 00 0C 81    READIDX R0 0C81
+; D 4423 21 02          COPYAX Acc -> R2
+; D 4425 11 0F 00 20    LOADXI R15 0020
+; D 4429 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 442D 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 4430 BD 00 F4       CALL F_cell
+; D 4433 42 00          INCX R0
+; D 4435 11 0F 0E 57    LOADXI R15 0E57                ntr
+; D 4439 39 02 FF       COPYMXY M(R15) -> R15
+; D 443C 89 0F          TESTLXY R0 < R15
+; D 443E A0 04 19       IFTRUEI L73
+; D 4441 11 0F 00 00    LOADXI R15 0000                ntr = 0;
+; D 4445 11 0E 0E 57    LOADXI R14 0E57                ntr
+; D 4449 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 444C BE 00          RETURN
+; fly():
+; D 444E 2E 0C 0C FA    READIDX R12 0CFA               t = ang; vx = sint[90 - t]; vy = sint[t];
+; D 4452 21 02          COPYAX Acc -> R2
+; D 4454 11 0E 00 5A    LOADXI R14 005A
+; D 4458 51 E2 0F       SUBXYZ R14 - R2 -> R15
+; D 445B 2E 0F 0A D0    READIDX R15 0AD0
+; D 445F 21 0B          COPYAX Acc -> R11
+; D 4461 2E 02 0A D0    READIDX R2 0AD0
+; D 4465 21 08          COPYAX Acc -> R8
+; D 4467 11 0F 00 06    LOADXI R15 0006                t = (BLEN + 1) * vx;
+; D 446B 4A BF          MULTXY R11 * R15
+; D 446D 21 12          COPYAX MA -> R2
+; D 446F 23 00 29       COPYXY R2 -> R9                x = t + (PC * 256 + 128);
+; D 4472 52 09 07 80    ADDXI R9 0780
+; D 4476 4A 8F          MULTXY R8 * R15                t = (BLEN + 1) * vy;
+; D 4478 21 12          COPYAX MA -> R2
+; D 447A 11 0F 00 02    LOADXI R15 0002                t = t >> 1;
+; D 447E 4D 2F          DIVXY R2 / R15
+; D 4480 21 12          COPYAX MA -> R2
+; D 4482 11 0F 15 80    LOADXI R15 1580                yy = (PR * 256 + 128) - t;
+; D 4486 51 F2 0A       SUBXYZ R15 - R2 -> R10
+; D 4489 50 BB 0B       ADDXYZ R11 + R11 -> R11        vx = vx + vx;
+; D 448C 11 03 00 00    LOADXI R3 0000                 or = 0; oc = 0; m = 0; n = 0;
+; D 4490 11 07 00 00    LOADXI R7 0000
+; D 4494 11 04 00 00    LOADXI R4 0000
+; D 4498 11 05 00 00    LOADXI R5 0000
+; D 449C 50 9B 09       ADDXYZ R9 + R11 -> R9          x += vx; yy -= vy; vy -= GY;
+; D 449F 51 A8 0A       SUBXYZ R10 - R8 -> R10
+; D 44A2 53 08 00 06    SUBXI R8 0006
+; D 44A6 11 0F 01 00    LOADXI R15 0100                c = x >> 8; r = yy >> 8;
+; D 44AA 4D 9F          DIVXY R9 / R15
+; D 44AC 21 10          COPYAX MA -> R0
+; D 44AE 4D AF          DIVXY R10 / R15
+; D 44B0 21 11          COPYAX MA -> R1
+; D 44B2 11 0F 00 50    LOADXI R15 0050                if (c > 80) { m = 3; c = 81; break; }
+; D 44B6 89 F0          TESTLXY R15 < R0
+; D 44B8 A1 04 C6       IFFALSEI L82
+; D 44BB 11 04 00 03    LOADXI R4 0003
+; D 44BF 11 00 00 51    LOADXI R0 0051
+; D 44C3 B0 05 C9       GAL L79
+; D 44C6 11 0F 00 C8    LOADXI R15 00C8                if (r < OFF) {
+; D 44CA 89 1F          TESTLXY R1 < R15
+; D 44CC A1 05 AC       IFFALSEI L84
+; D 44CF 11 0F 00 18    LOADXI R15 0018                if (r >= GROUND) {                      // down on the field
+; D 44D3 88 1F          TESTGXY R1 >= R15
+; D 44D5 A1 04 E8       IFFALSEI L86
+; D 44D8 11 04 00 02    LOADXI R4 0002                 m = 2;
+; D 44DC 89 06          TESTLXY R0 < R6                if (c < cx) m = 1;
+; D 44DE A1 04 E5       IFFALSEI L88
+; D 44E1 11 04 00 01    LOADXI R4 0001
+; D 44E5 B0 05 C9       GAL L79                        break;
+; D 44E8 88 06          TESTGXY R0 >= R6               if (c >= cx) {                          // the castle: this
+; D 44EA A1 05 41       IFFALSEI L90
+; D 44ED 51 06 02       SUBXYZ R0 - R6 -> R2           t = c - cx;
+; D 44F0 11 0F 00 0A    LOADXI R15 000A                if (t < CW) { if (r + h[t] >= GROUND) { m = t + 4; break; }
+; D 44F4 89 2F          TESTLXY R2 < R15
+; D 44F6 A1 05 15       IFFALSEI L92
+; D 44F9 2E 02 0B FF    READIDX R2 0BFF
+; D 44FD 21 0E          COPYAX Acc -> R14
+; D 44FF 50 1E 0F       ADDXYZ R1 + R14 -> R15
+; D 4502 11 0E 00 18    LOADXI R14 0018
+; D 4506 88 FE          TESTGXY R15 >= R14
+; D 4508 A1 05 15       IFFALSEI L94
+; D 450B 23 00 24       COPYXY R2 -> R4
+; D 450E 52 04 00 04    ADDXI R4 0004
+; D 4512 B0 05 C9       GAL L79
+; D 4515 8C 02          TESTXZ R2                      if (t != 0 && t <= CW) {
+; D 4517 A0 05 41       IFTRUEI L96
+; D 451A 11 0F 00 0A    LOADXI R15 000A
+; D 451E 88 F2          TESTGXY R15 >= R2
+; D 4520 A1 05 41       IFFALSEI L96
+; D 4523 43 02          DECX R2                        t--;
+; D 4525 2E 02 0B FF    READIDX R2 0BFF                if (r + h[t] >= GROUND) { m = t + 4; break; }
+; D 4529 21 0E          COPYAX Acc -> R14
+; D 452B 50 1E 0F       ADDXYZ R1 + R14 -> R15
+; D 452E 11 0E 00 18    LOADXI R14 0018
+; D 4532 88 FE          TESTGXY R15 >= R14
+; D 4534 A1 05 41       IFFALSEI L98
+; D 4537 23 00 24       COPYXY R2 -> R4
+; D 453A 52 04 00 04    ADDXI R4 0004
+; D 453E B0 05 C9       GAL L79
+; D 4541 11 0F 00 03    LOADXI R15 0003                if (r >= SKY) {
+; D 4545 88 1F          TESTGXY R1 >= R15
+; D 4547 A1 05 AC       IFFALSEI L100
+; D 454A 87 13          TESTXY R1 = R3                 if (r != or || c != oc) {
+; D 454C A1 05 54       IFFALSEI L103
+; D 454F 87 07          TESTXY R0 = R7
+; D 4551 A0 05 A9       IFTRUEI L102
+; D 4554 2E 01 0B 2B    READIDX R1 0B2B                ball[11] = tens[r]; ball[12] = ones[r];
+; D 4558 2F 0C 0D 07    WRITEIDX R12 0D07
+; D 455C 2E 01 0B 90    READIDX R1 0B90
+; D 4560 2F 0C 0D 08    WRITEIDX R12 0D08
+; D 4564 2E 00 0B 2B    READIDX R0 0B2B                ball[14] = tens[c]; ball[15] = ones[c];
+; D 4568 2F 0C 0D 0A    WRITEIDX R12 0D0A
+; D 456C 2E 00 0B 90    READIDX R0 0B90
+; D 4570 2F 0C 0D 0B    WRITEIDX R12 0D0B
+; D 4574 8C 03          TESTXZ R3                      if (or == 0) copy(&ball[2], &ball[11], 5);
+; D 4576 A1 05 84       IFFALSEI L105
+; D 4579 11 0F 0D 07    LOADXI R15 0D07                &ball
+; D 457D 11 0E 0C FE    LOADXI R14 0CFE                &ball
+; D 4581 3B FE 05       COPYMXMY R15 -> R14 5
+; D 4584 11 0F 0C FC    LOADXI R15 0CFC                print(ball);
+; D 4588 C1 0F          PRINTSTR R15
+; D 458A 11 0F 0D 07    LOADXI R15 0D07                copy(&ball[2], &ball[11], 5);   &ball
+; D 458E 11 0E 0C FE    LOADXI R14 0CFE                &ball
+; D 4592 3B FE 05       COPYMXMY R15 -> R14 5
+; D 4595 22 01          COPYXA R1 -> Acc               trr[n] = r; trc[n] = c; n++;
+; D 4597 2F 05 0C 09    WRITEIDX R5 0C09
+; D 459B 22 00          COPYXA R0 -> Acc
+; D 459D 2F 05 0C 81    WRITEIDX R5 0C81
+; D 45A1 42 05          INCX R5
+; D 45A3 23 00 13       COPYXY R1 -> R3                or = r; oc = c;
+; D 45A6 23 00 07       COPYXY R0 -> R7
+; D 45A9 B0 05 C6       GAL L80                        continue;
+; D 45AC 8C 03          TESTXZ R3                      if (or != 0) { cell(or, oc, '.'); or = 0; }  // gone off the
+; D 45AE A0 05 C6       IFTRUEI L107
+; D 45B1 23 00 72       COPYXY R7 -> R2
+; D 45B4 11 0F 00 2E    LOADXI R15 002E
+; D 45B8 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 45BC 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 45BF BD 00 F4       CALL F_cell
+; D 45C2 11 03 00 00    LOADXI R3 0000
+; D 45C6 B0 04 9C       GAL L77                        while (1) {
+; D 45C9 8C 03          TESTXZ R3                      if (or != 0) cell(or, oc, '.');                  // the ball
+; D 45CB A0 05 DF       IFTRUEI L109
+; D 45CE 23 00 72       COPYXY R7 -> R2
+; D 45D1 11 0F 00 2E    LOADXI R15 002E
+; D 45D5 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 45D9 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 45DC BD 00 F4       CALL F_cell
+; D 45DF 11 0F 0E 5B    LOADXI R15 0E5B                row = r; col = c; land = c; ntr = n;   row
+; D 45E3 3A 02 1F       COPYXMY R1 -> M(R15)
+; D 45E6 11 0F 0E 59    LOADXI R15 0E59                col
+; D 45EA 3A 02 0F       COPYXMY R0 -> M(R15)
+; D 45ED 11 0F 0E 5F    LOADXI R15 0E5F                land
+; D 45F1 3A 02 0F       COPYXMY R0 -> M(R15)
+; D 45F4 11 0F 0E 57    LOADXI R15 0E57                ntr
+; D 45F8 3A 02 5F       COPYXMY R5 -> M(R15)
+; D 45FB 23 00 4D       COPYXY R4 -> R13               return m;
+; D 45FE BE 00          RETURN
+; shot():
+; D 4600 11 00 00 00    LOADXI R0 0000                 message(0);
+; D 4604 BD 01 29       CALL F_message
+; D 4607 BD 04 12       CALL F_erasetrail              erasetrail();
+; D 460A BD 02 E9       CALL F_cannon                  cannon();
+; D 460D 11 0F 0E 5D    LOADXI R15 0E5D                shots++;   shots
+; D 4611 39 02 FF       COPYMXY M(R15) -> R15
+; D 4614 42 0F          INCX R15
+; D 4616 11 0E 0E 5D    LOADXI R14 0E5D                shots
+; D 461A 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 461D BD 04 4E       CALL F_fly                     m = fly();
+; D 4620 23 00 D0       COPYXY R13 -> R0
+; D 4623 11 0F 00 04    LOADXI R15 0004                if (m >= 4) {
+; D 4627 88 0F          TESTGXY R0 >= R15
+; D 4629 A1 07 2E       IFFALSEI L110
+; D 462C 11 03 0E 5B    LOADXI R3 0E5B                 cell(row, col, '*'); cell(row - 1, col, '*');   row
+; D 4630 39 02 33       COPYMXY M(R3) -> R3
+; D 4633 11 02 0E 59    LOADXI R2 0E59                 col
+; D 4637 39 02 22       COPYMXY M(R2) -> R2
+; D 463A 11 0F 00 2A    LOADXI R15 002A
+; D 463E 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 4642 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 4645 BD 00 F4       CALL F_cell
+; D 4648 11 03 0E 5B    LOADXI R3 0E5B                 row
+; D 464C 39 02 33       COPYMXY M(R3) -> R3
+; D 464F 43 03          DECX R3
+; D 4651 11 02 0E 59    LOADXI R2 0E59                 col
+; D 4655 39 02 22       COPYMXY M(R2) -> R2
+; D 4658 11 0F 00 2A    LOADXI R15 002A
+; D 465C 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 4660 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 4663 BD 00 F4       CALL F_cell
+; D 4666 11 03 0E 5B    LOADXI R3 0E5B                 cell(row, col - 1, '*'); cell(row, col + 1, '*');   row
+; D 466A 39 02 33       COPYMXY M(R3) -> R3
+; D 466D 11 02 0E 59    LOADXI R2 0E59                 col
+; D 4671 39 02 22       COPYMXY M(R2) -> R2
+; D 4674 43 02          DECX R2
+; D 4676 11 0F 00 2A    LOADXI R15 002A
+; D 467A 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 467E 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 4681 BD 00 F4       CALL F_cell
+; D 4684 11 03 0E 5B    LOADXI R3 0E5B                 row
+; D 4688 39 02 33       COPYMXY M(R3) -> R3
+; D 468B 11 02 0E 59    LOADXI R2 0E59                 col
+; D 468F 39 02 22       COPYMXY M(R2) -> R2
+; D 4692 42 02          INCX R2
+; D 4694 11 0F 00 2A    LOADXI R15 002A
+; D 4698 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 469C 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 469F BD 00 F4       CALL F_cell
+; D 46A2 C0 3C          DLYI 3C                        delay(60);
+; D 46A4 11 03 0E 5B    LOADXI R3 0E5B                 cell(row, col, ' '); cell(row - 1, col, ' '); cell(row, col    row
+; D 46A8 39 02 33       COPYMXY M(R3) -> R3
+; D 46AB 11 02 0E 59    LOADXI R2 0E59                 col
+; D 46AF 39 02 22       COPYMXY M(R2) -> R2
+; D 46B2 11 0F 00 20    LOADXI R15 0020
+; D 46B6 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 46BA 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 46BD BD 00 F4       CALL F_cell
+; D 46C0 11 03 0E 5B    LOADXI R3 0E5B                 row
+; D 46C4 39 02 33       COPYMXY M(R3) -> R3
+; D 46C7 43 03          DECX R3
+; D 46C9 11 02 0E 59    LOADXI R2 0E59                 col
+; D 46CD 39 02 22       COPYMXY M(R2) -> R2
+; D 46D0 11 0F 00 20    LOADXI R15 0020
+; D 46D4 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 46D8 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 46DB BD 00 F4       CALL F_cell
+; D 46DE 11 03 0E 5B    LOADXI R3 0E5B                 row
+; D 46E2 39 02 33       COPYMXY M(R3) -> R3
+; D 46E5 11 02 0E 59    LOADXI R2 0E59                 col
+; D 46E9 39 02 22       COPYMXY M(R2) -> R2
+; D 46EC 43 02          DECX R2
+; D 46EE 11 0F 00 20    LOADXI R15 0020
+; D 46F2 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 46F6 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 46F9 BD 00 F4       CALL F_cell
+; D 46FC 11 03 0E 5B    LOADXI R3 0E5B                 row
+; D 4700 39 02 33       COPYMXY M(R3) -> R3
+; D 4703 11 02 0E 59    LOADXI R2 0E59                 col
+; D 4707 39 02 22       COPYMXY M(R2) -> R2
+; D 470A 42 02          INCX R2
+; D 470C 11 0F 00 20    LOADXI R15 0020
+; D 4710 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 4714 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 4717 BD 00 F4       CALL F_cell
+; D 471A 23 00 02       COPYXY R0 -> R2                blast(m - 4);
+; D 471D 53 02 00 04    SUBXI R2 0004
+; D 4721 BD 03 A2       CALL F_blast
+; D 4724 BD 03 19       CALL F_castle                  castle();
+; D 4727 11 00 00 04    LOADXI R0 0004                 m = 4;
+; D 472B B0 07 69       GAL L111
+; D 472E 86 00 00 03    TESTXI R0 0003                 } else if (m != 3) {
+; D 4732 A0 07 69       IFTRUEI L113
+; D 4735 11 03 00 17    LOADXI R3 0017                 cell(GROUND - 1, land, '*'); delay(30); cell(GROUND - 1, lan
+; D 4739 11 02 0E 5F    LOADXI R2 0E5F                 land
+; D 473D 39 02 22       COPYMXY M(R2) -> R2
+; D 4740 11 0F 00 2A    LOADXI R15 002A
+; D 4744 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 4748 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 474B BD 00 F4       CALL F_cell
+; D 474E C0 1E          DLYI 1E
+; D 4750 11 03 00 17    LOADXI R3 0017
+; D 4754 11 02 0E 5F    LOADXI R2 0E5F                 land
+; D 4758 39 02 22       COPYMXY M(R2) -> R2
+; D 475B 11 0F 00 20    LOADXI R15 0020
+; D 475F 11 0E 0E 61    LOADXI R14 0E61                ch
+; D 4763 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 4766 BD 00 F4       CALL F_cell
+; D 4769 BD 01 29       CALL F_message                 message(m);
+; D 476C BD 02 E9       CALL F_cannon                  cannon();
+; D 476F BD 01 BC       CALL F_status                  status();
+; D 4772 BE 00          RETURN
+; play():
+; D 4774 11 0F 0B F5    LOADXI R15 0BF5                copy(&h[0], &h0[0], CW);   &h0
+; D 4778 11 0E 0B FF    LOADXI R14 0BFF                &h
+; D 477C 3B FE 0A       COPYMXMY R15 -> R14 10
+; D 477F 10 00 3A       LOADAI 003A                    left = TOTAL; shots = 0; ang = 45; bang = 45; ntr = 0;
+; D 4782 2F 0C 0C F9    WRITEIDX R12 0CF9
+; D 4786 11 0F 00 00    LOADXI R15 0000
+; D 478A 11 0E 0E 5D    LOADXI R14 0E5D                shots
+; D 478E 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 4791 10 00 2D       LOADAI 002D
+; D 4794 2F 0C 0C FA    WRITEIDX R12 0CFA
+; D 4798 10 00 2D       LOADAI 002D
+; D 479B 2F 0C 0C FB    WRITEIDX R12 0CFB
+; D 479F 11 0E 0E 57    LOADXI R14 0E57                ntr
+; D 47A3 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 47A6 C3             RAND                           cx = 48 + rand() % 21;              // the castle stands som
+; D 47A7 21 0F          COPYAX Acc -> R15
+; D 47A9 11 0E 00 15    LOADXI R14 0015
+; D 47AD 4D FE          DIVXY R15 / R14
+; D 47AF 27             COPYREMA
+; D 47B0 21 06          COPYAX Acc -> R6
+; D 47B2 52 06 00 30    ADDXI R6 0030
+; D 47B6 BD 03 71       CALL F_scene                   scene();
+; D 47B9 B0 08 5C       GAL L115                       while (left > FALLEN) {
+; D 47BC 11 00 00 19    LOADXI R0 0019                 k = kwait(25);                  // the barrel catches up onc
+; D 47C0 BD 00 35       CALL F_kwait
+; D 47C3 23 00 D0       COPYXY R13 -> R0
+; D 47C6 8C 00          TESTXZ R0                      if (k == 0) {
+; D 47C8 A1 07 EA       IFFALSEI L119
+; D 47CB 2E 0C 0C FB    READIDX R12 0CFB               if (bang != ang) cannon();
+; D 47CF 21 0F          COPYAX Acc -> R15
+; D 47D1 2E 0C 0C FA    READIDX R12 0CFA
+; D 47D5 21 0E          COPYAX Acc -> R14
+; D 47D7 87 FE          TESTXY R15 = R14
+; D 47D9 A0 07 DF       IFTRUEI L121
+; D 47DC BD 02 E9       CALL F_cannon
+; D 47DF B0 07 E3       GAL L123                       while (!keyready()) rand();
+; D 47E2 C3             RAND
+; D 47E3 CC             SERST
+; D 47E4 A1 07 E2       IFFALSEI L122
+; D 47E7 B0 08 5C       GAL L117                       continue;
+; D 47EA BD 00 4E       CALL F_key                     k = key(k);
+; D 47ED 23 00 D0       COPYXY R13 -> R0
+; D 47F0 86 00 00 51    TESTXI R0 0051                 if (k == 'Q') quit();
+; D 47F4 A1 07 FA       IFFALSEI L127
+; D 47F7 BD 00 2A       CALL F_quit
+; D 47FA 86 00 00 55    TESTXI R0 0055                 if (k == 'U' && ang < 90) { ang++; showang(); }
+; D 47FE A1 08 1E       IFFALSEI L129
+; D 4801 2E 0C 0C FA    READIDX R12 0CFA
+; D 4805 21 0F          COPYAX Acc -> R15
+; D 4807 11 0E 00 5A    LOADXI R14 005A
+; D 480B 89 FE          TESTLXY R15 < R14
+; D 480D A1 08 1E       IFFALSEI L129
+; D 4810 2E 0C 0C FA    READIDX R12 0CFA
+; D 4814 4E 00 01       ADDAI 0001
+; D 4817 2F 0C 0C FA    WRITEIDX R12 0CFA
+; D 481B BD 01 8C       CALL F_showang
+; D 481E 86 00 00 44    TESTXI R0 0044                 if (k == 'D' && ang > 0)  { ang--; showang(); }
+; D 4822 A1 08 3E       IFFALSEI L131
+; D 4825 2E 0C 0C FA    READIDX R12 0CFA
+; D 4829 21 0F          COPYAX Acc -> R15
+; D 482B 89 CF          TESTLXY R12 < R15
+; D 482D A1 08 3E       IFFALSEI L131
+; D 4830 2E 0C 0C FA    READIDX R12 0CFA
+; D 4834 4E FF FF       ADDAI FFFF
+; D 4837 2F 0C 0C FA    WRITEIDX R12 0CFA
+; D 483B BD 01 8C       CALL F_showang
+; D 483E 86 00 00 20    TESTXI R0 0020                 if (k == ' ') { if (bang != ang) cannon(); shot(); }
+; D 4842 A1 08 5C       IFFALSEI L133
+; D 4845 2E 0C 0C FB    READIDX R12 0CFB
+; D 4849 21 0F          COPYAX Acc -> R15
+; D 484B 2E 0C 0C FA    READIDX R12 0CFA
+; D 484F 21 0E          COPYAX Acc -> R14
+; D 4851 87 FE          TESTXY R15 = R14
+; D 4853 A0 08 59       IFTRUEI L135
+; D 4856 BD 02 E9       CALL F_cannon
+; D 4859 BD 06 00       CALL F_shot
+; D 485C 2E 0C 0C F9    READIDX R12 0CF9               while (left > FALLEN) {
+; D 4860 21 0F          COPYAX Acc -> R15
+; D 4862 11 0E 00 0F    LOADXI R14 000F
+; D 4866 89 EF          TESTLXY R14 < R15
+; D 4868 A0 07 BC       IFTRUEI L114
+; D 486B 11 0F 09 90    LOADXI R15 0990                at(MSG, 1); eol();   at(2, 1)
+; D 486F C1 0F          PRINTSTR R15
+; D 4871 11 0F 09 97    LOADXI R15 0997                eol()
+; D 4875 C1 0F          PRINTSTR R15
+; D 4877 11 0F 0A 74    LOADXI R15 0A74                at(MSG, 18); rev(1); print("  THE CASTLE HAS FALLEN!  "); re   at(2, 18)
+; D 487B C1 0F          PRINTSTR R15
+; D 487D 11 0F 09 C6    LOADXI R15 09C6                rev(1)
+; D 4881 C1 0F          PRINTSTR R15
+; D 4883 11 0F 0A 7C    LOADXI R15 0A7C                "  THE CASTLE HAS FALLEN!  "
+; D 4887 C1 0F          PRINTSTR R15
+; D 4889 11 0F 09 E3    LOADXI R15 09E3                rev(0)
+; D 488D C1 0F          PRINTSTR R15
+; D 488F 11 0F 0A 97    LOADXI R15 0A97                print("  in "); printu(shots); print(" shots");   "  in "
+; D 4893 C1 0F          PRINTSTR R15
+; D 4895 11 0F 0E 5D    LOADXI R15 0E5D                shots
+; D 4899 39 02 FF       COPYMXY M(R15) -> R15
+; D 489C 22 0F          COPYXA R15 -> Acc
+; D 489E 24             COPYAMA
+; D 489F 6B 00          CVT2DEC Acc
+; D 48A1 6E             OUTDEC
+; D 48A2 11 0F 0A 9D    LOADXI R15 0A9D                " shots"
+; D 48A6 C1 0F          PRINTSTR R15
+; D 48A8 11 0F 0A A4    LOADXI R15 0AA4                at(MSG + 1, 26); print("SPACE: play again    Q: quit");   at(3, 26)
+; D 48AC C1 0F          PRINTSTR R15
+; D 48AE 11 0F 0A AC    LOADXI R15 0AAC                "SPACE: play again    Q: quit"
+; D 48B2 C1 0F          PRINTSTR R15
+; D 48B4 11 00 00 28    LOADXI R0 0028                 for (k = 40; k != 0; k--) { if (keyready()) getc(); delay(12
+; D 48B8 B0 08 C4       GAL L137
+; D 48BB CC             SERST
+; D 48BC A1 08 C0       IFFALSEI L141
+; D 48BF CB             SERIN
+; D 48C0 C0 0C          DLYI 0C
+; D 48C2 43 00          DECX R0
+; D 48C4 8C 00          TESTXZ R0
+; D 48C6 A1 08 BB       IFFALSEI L136
+; D 48C9 BD 00 CD       CALL F_space                   space();
+; D 48CC 11 0F 0A C9    LOADXI R15 0AC9                at(MSG + 1, 1); eol();   at(3, 1)
+; D 48D0 C1 0F          PRINTSTR R15
+; D 48D2 11 0F 09 97    LOADXI R15 0997                eol()
+; D 48D6 C1 0F          PRINTSTR R15
+; D 48D8 BE 00          RETURN
+; main():
+; D 48DA 11 0F 0D 24    LOADXI R15 0D24                print(title);
+; D 48DE C1 0F          PRINTSTR R15
+; D 48E0 BD 00 CD       CALL F_space                   space();
+; D 48E3 BD 07 74       CALL F_play                    while (1) play();
+; D 48E6 B0 08 E3       GAL L142
+; D 48E9 BE 00          RETURN
+; LIB_AT:
+; D 48EB CA 1B          SEROUTI 1B
+; D 48ED CA 5B          SEROUTI 5B '['
+; D 48EF 22 0F          COPYXA R15 -> Acc
+; D 48F1 24             COPYAMA
+; D 48F2 6B 00          CVT2DEC Acc
+; D 48F4 6E             OUTDEC
+; D 48F5 CA 3B          SEROUTI 3B ';'
+; D 48F7 22 0E          COPYXA R14 -> Acc
+; D 48F9 24             COPYAMA
+; D 48FA 6B 00          CVT2DEC Acc
+; D 48FC 6E             OUTDEC
+; D 48FD CA 48          SEROUTI 48 'H'
+; D 48FF BE 00          RETURN
+; LIB_PRW:
+; D 4901 72 00          PUSHX R0                       borrow R0
+; D 4903 11 00 00 00    LOADXI R0 0000
+; LIB_PRW_L:
+; D 4907 4D FE          DIVXY R15 / R14
+; D 4909 25             COPYMAA
+; D 490A 21 0D          COPYAX Acc -> R13              this digit
+; D 490C 27             COPYREMA
+; D 490D 21 0F          COPYAX Acc -> R15              the rest
+; D 490F 8C 0D          TESTXZ R13
+; D 4911 A1 09 25       IFFALSEI LIB_PRW_D
+; D 4914 8C 00          TESTXZ R0
+; D 4916 A1 09 25       IFFALSEI LIB_PRW_D
+; D 4919 86 0E 00 01    TESTXI R14 0001
+; D 491D A0 09 25       IFTRUEI LIB_PRW_D              the last digit always shows
+; D 4920 CA 20          SEROUTI 20
+; D 4922 B0 09 2F       GAL LIB_PRW_N
+; LIB_PRW_D:
+; D 4925 11 00 00 01    LOADXI R0 0001
+; D 4929 22 0D          COPYXA R13 -> Acc
+; D 492B 4E 00 30       ADDAI 0030
+; D 492E C9             SEROUT
+; LIB_PRW_N:
+; D 492F 11 0D 00 0A    LOADXI R13 000A
+; D 4933 4D ED          DIVXY R14 / R13
+; D 4935 25             COPYMAA
+; D 4936 21 0E          COPYAX Acc -> R14
+; D 4938 8C 0E          TESTXZ R14
+; D 493A A1 09 07       IFFALSEI LIB_PRW_L
+; D 493D 73 00          POPX R0                        give R0 back
+; D 493F BE 00          RETURN
+; LIB_PRZ:
+; D 4941 72 00          PUSHX R0                       borrow R0
+; D 4943 11 00 00 01    LOADXI R0 0001
+; LIB_PRZ_L:
+; D 4947 4D FE          DIVXY R15 / R14
+; D 4949 25             COPYMAA
+; D 494A 21 0D          COPYAX Acc -> R13              this digit
+; D 494C 27             COPYREMA
+; D 494D 21 0F          COPYAX Acc -> R15              the rest
+; D 494F 8C 0D          TESTXZ R13
+; D 4951 A1 09 65       IFFALSEI LIB_PRZ_D
+; D 4954 8C 00          TESTXZ R0
+; D 4956 A1 09 65       IFFALSEI LIB_PRZ_D
+; D 4959 86 0E 00 01    TESTXI R14 0001
+; D 495D A0 09 65       IFTRUEI LIB_PRZ_D              the last digit always shows
+; D 4960 CA 20          SEROUTI 20
+; D 4962 B0 09 6F       GAL LIB_PRZ_N
+; LIB_PRZ_D:
+; D 4965 11 00 00 01    LOADXI R0 0001
+; D 4969 22 0D          COPYXA R13 -> Acc
+; D 496B 4E 00 30       ADDAI 0030
+; D 496E C9             SEROUT
+; LIB_PRZ_N:
+; D 496F 11 0D 00 0A    LOADXI R13 000A
+; D 4973 4D ED          DIVXY R14 / R13
+; D 4975 25             COPYMAA
+; D 4976 21 0E          COPYAX Acc -> R14
+; D 4978 8C 0E          TESTXZ R14
+; D 497A A1 09 47       IFFALSEI LIB_PRZ_L
+; D 497D 73 00          POPX R0                        give R0 back
+; D 497F BE 00          RETURN
+; D 4981 F0 00 00       BREAK                          end marker: the pre-pass stops here
+
+; CODE  -  download this block
+
+D 4000 CD
+D 4001 11 0C 00 00
+D 4005 11 0E 0B FF
+D 4009 11 0F 0C 08
+D 400D FB EF 00
+D 4010 11 0E 0C 09
+D 4014 11 0F 0C 80
+D 4018 FB EF 00
+D 401B 11 0E 0C 81
+D 401F 11 0F 0C F8
+D 4023 FB EF 00
+D 4026 BD 08 DA
+D 4029 00
+D 402A 11 0F 0E 26
+D 402E C1 0F
+D 4030 B0 00 29
+D 4033 BE 00
+D 4035 B0 00 43
+D 4038 CC
+D 4039 A1 00 41
+D 403C CB
+D 403D 21 0D
+D 403F BE 00
+D 4041 43 00
+D 4043 8C 00
+D 4045 A1 00 38
+D 4048 11 0D 00 00
+D 404C BE 00
+D 404E 86 00 00 1B
+D 4052 A1 00 70
+D 4055 11 00 00 08
+D 4059 BD 00 35
+D 405C 23 00 D0
+D 405F 86 00 00 5B
+D 4063 A1 00 70
+D 4066 11 00 00 08
+D 406A BD 00 35
+D 406D 23 00 D0
+D 4070 86 00 00 41
+D 4074 A0 00 85
+D 4077 86 00 00 77
+D 407B A0 00 85
+D 407E 86 00 00 57
+D 4082 A1 00 8B
+D 4085 11 0D 00 55
+D 4089 BE 00
+D 408B 86 00 00 42
+D 408F A0 00 A0
+D 4092 86 00 00 73
+D 4096 A0 00 A0
+D 4099 86 00 00 53
+D 409D A1 00 A6
+D 40A0 11 0D 00 44
+D 40A4 BE 00
+D 40A6 86 00 00 71
+D 40AA A0 00 B4
+D 40AD 86 00 00 51
+D 40B1 A1 00 BA
+D 40B4 11 0D 00 51
+D 40B8 BE 00
+D 40BA 86 00 00 20
+D 40BE A1 00 C7
+D 40C1 11 0D 00 20
+D 40C5 BE 00
+D 40C7 11 0D 00 00
+D 40CB BE 00
+D 40CD B0 00 D1
+D 40D0 C3
+D 40D1 CC
+D 40D2 A1 00 D0
+D 40D5 CB
+D 40D6 21 00
+D 40D8 BD 00 4E
+D 40DB 23 00 D0
+D 40DE 86 00 00 20
+D 40E2 A0 00 F2
+D 40E5 86 00 00 51
+D 40E9 A1 00 EF
+D 40EC BD 00 2A
+D 40EF B0 00 CD
+D 40F2 BE 00
+D 40F4 2E 03 0B 2B
+D 40F8 2F 0C 0D 11
+D 40FC 2E 03 0B 90
+D 4100 2F 0C 0D 12
+D 4104 2E 02 0B 2B
+D 4108 2F 0C 0D 14
+D 410C 2E 02 0B 90
+D 4110 2F 0C 0D 15
+D 4114 11 0F 0E 61
+D 4118 39 02 FF
+D 411B 22 0F
+D 411D 2F 0C 0D 17
+D 4121 11 0F 0D 0F
+D 4125 C1 0F
+D 4127 BE 00
+D 4129 11 0F 09 90
+D 412D C1 0F
+D 412F 11 0F 09 97
+D 4133 C1 0F
+D 4135 11 0F 09 9B
+D 4139 C1 0F
+D 413B 86 00 00 01
+D 413F A0 01 5A
+D 4142 86 00 00 02
+D 4146 A0 01 63
+D 4149 86 00 00 03
+D 414D A0 01 6C
+D 4150 86 00 00 04
+D 4154 A0 01 75
+D 4157 B0 01 8A
+D 415A 11 0F 09 A3
+D 415E C1 0F
+D 4160 B0 01 8A
+D 4163 11 0F 09 AE
+D 4167 C1 0F
+D 4169 B0 01 8A
+D 416C 11 0F 09 B8
+D 4170 C1 0F
+D 4172 B0 01 8A
+D 4175 11 0F 09 C6
+D 4179 C1 0F
+D 417B 11 0F 09 CB
+D 417F C1 0F
+D 4181 11 0F 09 E3
+D 4185 C1 0F
+D 4187 B0 01 8A
+D 418A BE 00
+D 418C 2E 0C 0C FA
+D 4190 21 0F
+D 4192 2E 0F 0B 2B
+D 4196 2F 0C 0D 21
+D 419A 2E 0C 0C FA
+D 419E 21 0F
+D 41A0 2E 0F 0B 90
+D 41A4 2F 0C 0D 22
+D 41A8 11 0F 09 C6
+D 41AC C1 0F
+D 41AE 11 0F 0D 19
+D 41B2 C1 0F
+D 41B4 11 0F 09 E3
+D 41B8 C1 0F
+D 41BA BE 00
+D 41BC 11 0F 09 E8
+D 41C0 C1 0F
+D 41C2 11 0F 09 C6
+D 41C6 C1 0F
+D 41C8 11 0F 09 EF
+D 41CC C1 0F
+D 41CE 2E 0C 0C FA
+D 41D2 21 0F
+D 41D4 11 0E 00 64
+D 41D8 4D FE
+D 41DA 27
+D 41DB 21 0F
+D 41DD 11 0E 00 0A
+D 41E1 BD 09 41
+D 41E4 11 0F 0A 03
+D 41E8 C1 0F
+D 41EA 11 0F 0E 5D
+D 41EE 39 02 FF
+D 41F1 11 0E 00 64
+D 41F5 4D FE
+D 41F7 27
+D 41F8 21 0F
+D 41FA 11 0E 00 0A
+D 41FE BD 09 01
+D 4201 11 0F 0A 0D
+D 4205 C1 0F
+D 4207 2E 0C 0C F9
+D 420B 21 0F
+D 420D 11 0E 00 64
+D 4211 4A FE
+D 4213 21 1F
+D 4215 11 0E 00 3A
+D 4219 4D FE
+D 421B 21 1F
+D 421D 11 0E 03 E8
+D 4221 4D FE
+D 4223 27
+D 4224 21 0F
+D 4226 11 0E 00 64
+D 422A BD 09 01
+D 422D 11 0F 0A 18
+D 4231 C1 0F
+D 4233 11 0F 09 E3
+D 4237 C1 0F
+D 4239 BE 00
+D 423B 86 07 00 20
+D 423F A0 02 72
+D 4242 2E 0C 0C FB
+D 4246 21 0F
+D 4248 11 0E 00 17
+D 424C 89 FE
+D 424E A1 02 58
+D 4251 11 07 00 2D
+D 4255 B0 02 72
+D 4258 2E 0C 0C FB
+D 425C 21 0F
+D 425E 11 0E 00 44
+D 4262 89 FE
+D 4264 A1 02 6E
+D 4267 11 07 00 2F
+D 426B B0 02 72
+D 426E 11 07 00 7C
+D 4272 22 07
+D 4274 2F 0C 0D 17
+D 4278 2E 0C 0C FB
+D 427C 21 00
+D 427E 11 0E 00 5A
+D 4282 51 E0 0F
+D 4285 2E 0F 0A D0
+D 4289 21 04
+D 428B 2E 00 0A D0
+D 428F 21 05
+D 4291 11 01 07 80
+D 4295 11 02 2B 00
+D 4299 11 03 00 00
+D 429D B0 02 DE
+D 42A0 50 14 01
+D 42A3 51 25 02
+D 42A6 11 0F 02 00
+D 42AA 4D 2F
+D 42AC 21 10
+D 42AE 2E 00 0B 2B
+D 42B2 2F 0C 0D 11
+D 42B6 2E 00 0B 90
+D 42BA 2F 0C 0D 12
+D 42BE 11 0F 01 00
+D 42C2 4D 1F
+D 42C4 21 10
+D 42C6 2E 00 0B 2B
+D 42CA 2F 0C 0D 14
+D 42CE 2E 00 0B 90
+D 42D2 2F 0C 0D 15
+D 42D6 11 0F 0D 0F
+D 42DA C1 0F
+D 42DC 42 03
+D 42DE 11 0F 00 05
+D 42E2 89 3F
+D 42E4 A0 02 A0
+D 42E7 BE 00
+D 42E9 11 0F 0A 3C
+D 42ED C1 0F
+D 42EF 11 0F 0A 44
+D 42F3 C1 0F
+D 42F5 11 0F 0A 4A
+D 42F9 C1 0F
+D 42FB 11 0F 0A 52
+D 42FF C1 0F
+D 4301 11 07 00 20
+D 4305 BD 02 3B
+D 4308 2E 0C 0C FA
+D 430C 2F 0C 0C FB
+D 4310 11 07 00 23
+D 4314 BD 02 3B
+D 4317 BE 00
+D 4319 11 01 00 11
+D 431D B0 03 66
+D 4320 23 00 1F
+D 4323 23 00 6E
+D 4326 BD 08 EB
+D 4329 11 00 00 00
+D 432D B0 03 5B
+D 4330 2E 00 0B FF
+D 4334 21 0F
+D 4336 11 0D 00 18
+D 433A 51 D1 0E
+D 433D 88 FE
+D 433F A1 03 57
+D 4342 65 10 00 01
+D 4346 21 1F
+D 4348 8C 0F
+D 434A A0 03 52
+D 434D CA 5D
+D 434F B0 03 54
+D 4352 CA 5B
+D 4354 B0 03 59
+D 4357 CA 20
+D 4359 42 00
+D 435B 11 0F 00 0A
+D 435F 89 0F
+D 4361 A0 03 30
+D 4364 42 01
+D 4366 11 0F 00 18
+D 436A 89 1F
+D 436C A0 03 20
+D 436F BE 00
+D 4371 11 0F 0A 59
+D 4375 C1 0F
+D 4377 11 0F 0A 65
+D 437B C1 0F
+D 437D 11 0F 0A 6C
+D 4381 C1 0F
+D 4383 11 00 00 00
+D 4387 B0 03 8E
+D 438A CA 3D
+D 438C 42 00
+D 438E 11 0F 00 50
+D 4392 89 0F
+D 4394 A0 03 8A
+D 4397 BD 02 E9
+D 439A BD 03 19
+D 439D BD 01 BC
+D 43A0 BE 00
+D 43A2 11 00 00 00
+D 43A6 B0 04 07
+D 43A9 23 00 0F
+D 43AC 52 0F 00 02
+D 43B0 88 F2
+D 43B2 A1 04 05
+D 43B5 23 00 2F
+D 43B8 52 0F 00 02
+D 43BC 88 F0
+D 43BE A1 04 05
+D 43C1 89 20
+D 43C3 A1 03 CC
+D 43C6 51 02 03
+D 43C9 B0 03 CF
+D 43CC 51 20 03
+D 43CF 11 0F 00 03
+D 43D3 51 F3 01
+D 43D6 2E 00 0B FF
+D 43DA 21 0F
+D 43DC 89 F1
+D 43DE A1 03 E7
+D 43E1 2E 00 0B FF
+D 43E5 21 01
+D 43E7 2E 00 0B FF
+D 43EB 21 0F
+D 43ED 51 F1 0F
+D 43F0 22 0F
+D 43F2 2F 00 0B FF
+D 43F6 2E 0C 0C F9
+D 43FA 21 0F
+D 43FC 51 F1 0F
+D 43FF 22 0F
+D 4401 2F 0C 0C F9
+D 4405 42 00
+D 4407 11 0F 00 0A
+D 440B 89 0F
+D 440D A0 03 A9
+D 4410 BE 00
+D 4412 11 00 00 00
+D 4416 B0 04 35
+D 4419 2E 00 0C 09
+D 441D 21 03
+D 441F 2E 00 0C 81
+D 4423 21 02
+D 4425 11 0F 00 20
+D 4429 11 0E 0E 61
+D 442D 3A 02 FE
+D 4430 BD 00 F4
+D 4433 42 00
+D 4435 11 0F 0E 57
+D 4439 39 02 FF
+D 443C 89 0F
+D 443E A0 04 19
+D 4441 11 0F 00 00
+D 4445 11 0E 0E 57
+D 4449 3A 02 FE
+D 444C BE 00
+D 444E 2E 0C 0C FA
+D 4452 21 02
+D 4454 11 0E 00 5A
+D 4458 51 E2 0F
+D 445B 2E 0F 0A D0
+D 445F 21 0B
+D 4461 2E 02 0A D0
+D 4465 21 08
+D 4467 11 0F 00 06
+D 446B 4A BF
+D 446D 21 12
+D 446F 23 00 29
+D 4472 52 09 07 80
+D 4476 4A 8F
+D 4478 21 12
+D 447A 11 0F 00 02
+D 447E 4D 2F
+D 4480 21 12
+D 4482 11 0F 15 80
+D 4486 51 F2 0A
+D 4489 50 BB 0B
+D 448C 11 03 00 00
+D 4490 11 07 00 00
+D 4494 11 04 00 00
+D 4498 11 05 00 00
+D 449C 50 9B 09
+D 449F 51 A8 0A
+D 44A2 53 08 00 06
+D 44A6 11 0F 01 00
+D 44AA 4D 9F
+D 44AC 21 10
+D 44AE 4D AF
+D 44B0 21 11
+D 44B2 11 0F 00 50
+D 44B6 89 F0
+D 44B8 A1 04 C6
+D 44BB 11 04 00 03
+D 44BF 11 00 00 51
+D 44C3 B0 05 C9
+D 44C6 11 0F 00 C8
+D 44CA 89 1F
+D 44CC A1 05 AC
+D 44CF 11 0F 00 18
+D 44D3 88 1F
+D 44D5 A1 04 E8
+D 44D8 11 04 00 02
+D 44DC 89 06
+D 44DE A1 04 E5
+D 44E1 11 04 00 01
+D 44E5 B0 05 C9
+D 44E8 88 06
+D 44EA A1 05 41
+D 44ED 51 06 02
+D 44F0 11 0F 00 0A
+D 44F4 89 2F
+D 44F6 A1 05 15
+D 44F9 2E 02 0B FF
+D 44FD 21 0E
+D 44FF 50 1E 0F
+D 4502 11 0E 00 18
+D 4506 88 FE
+D 4508 A1 05 15
+D 450B 23 00 24
+D 450E 52 04 00 04
+D 4512 B0 05 C9
+D 4515 8C 02
+D 4517 A0 05 41
+D 451A 11 0F 00 0A
+D 451E 88 F2
+D 4520 A1 05 41
+D 4523 43 02
+D 4525 2E 02 0B FF
+D 4529 21 0E
+D 452B 50 1E 0F
+D 452E 11 0E 00 18
+D 4532 88 FE
+D 4534 A1 05 41
+D 4537 23 00 24
+D 453A 52 04 00 04
+D 453E B0 05 C9
+D 4541 11 0F 00 03
+D 4545 88 1F
+D 4547 A1 05 AC
+D 454A 87 13
+D 454C A1 05 54
+D 454F 87 07
+D 4551 A0 05 A9
+D 4554 2E 01 0B 2B
+D 4558 2F 0C 0D 07
+D 455C 2E 01 0B 90
+D 4560 2F 0C 0D 08
+D 4564 2E 00 0B 2B
+D 4568 2F 0C 0D 0A
+D 456C 2E 00 0B 90
+D 4570 2F 0C 0D 0B
+D 4574 8C 03
+D 4576 A1 05 84
+D 4579 11 0F 0D 07
+D 457D 11 0E 0C FE
+D 4581 3B FE 05
+D 4584 11 0F 0C FC
+D 4588 C1 0F
+D 458A 11 0F 0D 07
+D 458E 11 0E 0C FE
+D 4592 3B FE 05
+D 4595 22 01
+D 4597 2F 05 0C 09
+D 459B 22 00
+D 459D 2F 05 0C 81
+D 45A1 42 05
+D 45A3 23 00 13
+D 45A6 23 00 07
+D 45A9 B0 05 C6
+D 45AC 8C 03
+D 45AE A0 05 C6
+D 45B1 23 00 72
+D 45B4 11 0F 00 2E
+D 45B8 11 0E 0E 61
+D 45BC 3A 02 FE
+D 45BF BD 00 F4
+D 45C2 11 03 00 00
+D 45C6 B0 04 9C
+D 45C9 8C 03
+D 45CB A0 05 DF
+D 45CE 23 00 72
+D 45D1 11 0F 00 2E
+D 45D5 11 0E 0E 61
+D 45D9 3A 02 FE
+D 45DC BD 00 F4
+D 45DF 11 0F 0E 5B
+D 45E3 3A 02 1F
+D 45E6 11 0F 0E 59
+D 45EA 3A 02 0F
+D 45ED 11 0F 0E 5F
+D 45F1 3A 02 0F
+D 45F4 11 0F 0E 57
+D 45F8 3A 02 5F
+D 45FB 23 00 4D
+D 45FE BE 00
+D 4600 11 00 00 00
+D 4604 BD 01 29
+D 4607 BD 04 12
+D 460A BD 02 E9
+D 460D 11 0F 0E 5D
+D 4611 39 02 FF
+D 4614 42 0F
+D 4616 11 0E 0E 5D
+D 461A 3A 02 FE
+D 461D BD 04 4E
+D 4620 23 00 D0
+D 4623 11 0F 00 04
+D 4627 88 0F
+D 4629 A1 07 2E
+D 462C 11 03 0E 5B
+D 4630 39 02 33
+D 4633 11 02 0E 59
+D 4637 39 02 22
+D 463A 11 0F 00 2A
+D 463E 11 0E 0E 61
+D 4642 3A 02 FE
+D 4645 BD 00 F4
+D 4648 11 03 0E 5B
+D 464C 39 02 33
+D 464F 43 03
+D 4651 11 02 0E 59
+D 4655 39 02 22
+D 4658 11 0F 00 2A
+D 465C 11 0E 0E 61
+D 4660 3A 02 FE
+D 4663 BD 00 F4
+D 4666 11 03 0E 5B
+D 466A 39 02 33
+D 466D 11 02 0E 59
+D 4671 39 02 22
+D 4674 43 02
+D 4676 11 0F 00 2A
+D 467A 11 0E 0E 61
+D 467E 3A 02 FE
+D 4681 BD 00 F4
+D 4684 11 03 0E 5B
+D 4688 39 02 33
+D 468B 11 02 0E 59
+D 468F 39 02 22
+D 4692 42 02
+D 4694 11 0F 00 2A
+D 4698 11 0E 0E 61
+D 469C 3A 02 FE
+D 469F BD 00 F4
+D 46A2 C0 3C
+D 46A4 11 03 0E 5B
+D 46A8 39 02 33
+D 46AB 11 02 0E 59
+D 46AF 39 02 22
+D 46B2 11 0F 00 20
+D 46B6 11 0E 0E 61
+D 46BA 3A 02 FE
+D 46BD BD 00 F4
+D 46C0 11 03 0E 5B
+D 46C4 39 02 33
+D 46C7 43 03
+D 46C9 11 02 0E 59
+D 46CD 39 02 22
+D 46D0 11 0F 00 20
+D 46D4 11 0E 0E 61
+D 46D8 3A 02 FE
+D 46DB BD 00 F4
+D 46DE 11 03 0E 5B
+D 46E2 39 02 33
+D 46E5 11 02 0E 59
+D 46E9 39 02 22
+D 46EC 43 02
+D 46EE 11 0F 00 20
+D 46F2 11 0E 0E 61
+D 46F6 3A 02 FE
+D 46F9 BD 00 F4
+D 46FC 11 03 0E 5B
+D 4700 39 02 33
+D 4703 11 02 0E 59
+D 4707 39 02 22
+D 470A 42 02
+D 470C 11 0F 00 20
+D 4710 11 0E 0E 61
+D 4714 3A 02 FE
+D 4717 BD 00 F4
+D 471A 23 00 02
+D 471D 53 02 00 04
+D 4721 BD 03 A2
+D 4724 BD 03 19
+D 4727 11 00 00 04
+D 472B B0 07 69
+D 472E 86 00 00 03
+D 4732 A0 07 69
+D 4735 11 03 00 17
+D 4739 11 02 0E 5F
+D 473D 39 02 22
+D 4740 11 0F 00 2A
+D 4744 11 0E 0E 61
+D 4748 3A 02 FE
+D 474B BD 00 F4
+D 474E C0 1E
+D 4750 11 03 00 17
+D 4754 11 02 0E 5F
+D 4758 39 02 22
+D 475B 11 0F 00 20
+D 475F 11 0E 0E 61
+D 4763 3A 02 FE
+D 4766 BD 00 F4
+D 4769 BD 01 29
+D 476C BD 02 E9
+D 476F BD 01 BC
+D 4772 BE 00
+D 4774 11 0F 0B F5
+D 4778 11 0E 0B FF
+D 477C 3B FE 0A
+D 477F 10 00 3A
+D 4782 2F 0C 0C F9
+D 4786 11 0F 00 00
+D 478A 11 0E 0E 5D
+D 478E 3A 02 FE
+D 4791 10 00 2D
+D 4794 2F 0C 0C FA
+D 4798 10 00 2D
+D 479B 2F 0C 0C FB
+D 479F 11 0E 0E 57
+D 47A3 3A 02 FE
+D 47A6 C3
+D 47A7 21 0F
+D 47A9 11 0E 00 15
+D 47AD 4D FE
+D 47AF 27
+D 47B0 21 06
+D 47B2 52 06 00 30
+D 47B6 BD 03 71
+D 47B9 B0 08 5C
+D 47BC 11 00 00 19
+D 47C0 BD 00 35
+D 47C3 23 00 D0
+D 47C6 8C 00
+D 47C8 A1 07 EA
+D 47CB 2E 0C 0C FB
+D 47CF 21 0F
+D 47D1 2E 0C 0C FA
+D 47D5 21 0E
+D 47D7 87 FE
+D 47D9 A0 07 DF
+D 47DC BD 02 E9
+D 47DF B0 07 E3
+D 47E2 C3
+D 47E3 CC
+D 47E4 A1 07 E2
+D 47E7 B0 08 5C
+D 47EA BD 00 4E
+D 47ED 23 00 D0
+D 47F0 86 00 00 51
+D 47F4 A1 07 FA
+D 47F7 BD 00 2A
+D 47FA 86 00 00 55
+D 47FE A1 08 1E
+D 4801 2E 0C 0C FA
+D 4805 21 0F
+D 4807 11 0E 00 5A
+D 480B 89 FE
+D 480D A1 08 1E
+D 4810 2E 0C 0C FA
+D 4814 4E 00 01
+D 4817 2F 0C 0C FA
+D 481B BD 01 8C
+D 481E 86 00 00 44
+D 4822 A1 08 3E
+D 4825 2E 0C 0C FA
+D 4829 21 0F
+D 482B 89 CF
+D 482D A1 08 3E
+D 4830 2E 0C 0C FA
+D 4834 4E FF FF
+D 4837 2F 0C 0C FA
+D 483B BD 01 8C
+D 483E 86 00 00 20
+D 4842 A1 08 5C
+D 4845 2E 0C 0C FB
+D 4849 21 0F
+D 484B 2E 0C 0C FA
+D 484F 21 0E
+D 4851 87 FE
+D 4853 A0 08 59
+D 4856 BD 02 E9
+D 4859 BD 06 00
+D 485C 2E 0C 0C F9
+D 4860 21 0F
+D 4862 11 0E 00 0F
+D 4866 89 EF
+D 4868 A0 07 BC
+D 486B 11 0F 09 90
+D 486F C1 0F
+D 4871 11 0F 09 97
+D 4875 C1 0F
+D 4877 11 0F 0A 74
+D 487B C1 0F
+D 487D 11 0F 09 C6
+D 4881 C1 0F
+D 4883 11 0F 0A 7C
+D 4887 C1 0F
+D 4889 11 0F 09 E3
+D 488D C1 0F
+D 488F 11 0F 0A 97
+D 4893 C1 0F
+D 4895 11 0F 0E 5D
+D 4899 39 02 FF
+D 489C 22 0F
+D 489E 24
+D 489F 6B 00
+D 48A1 6E
+D 48A2 11 0F 0A 9D
+D 48A6 C1 0F
+D 48A8 11 0F 0A A4
+D 48AC C1 0F
+D 48AE 11 0F 0A AC
+D 48B2 C1 0F
+D 48B4 11 00 00 28
+D 48B8 B0 08 C4
+D 48BB CC
+D 48BC A1 08 C0
+D 48BF CB
+D 48C0 C0 0C
+D 48C2 43 00
+D 48C4 8C 00
+D 48C6 A1 08 BB
+D 48C9 BD 00 CD
+D 48CC 11 0F 0A C9
+D 48D0 C1 0F
+D 48D2 11 0F 09 97
+D 48D6 C1 0F
+D 48D8 BE 00
+D 48DA 11 0F 0D 24
+D 48DE C1 0F
+D 48E0 BD 00 CD
+D 48E3 BD 07 74
+D 48E6 B0 08 E3
+D 48E9 BE 00
+D 48EB CA 1B
+D 48ED CA 5B
+D 48EF 22 0F
+D 48F1 24
+D 48F2 6B 00
+D 48F4 6E
+D 48F5 CA 3B
+D 48F7 22 0E
+D 48F9 24
+D 48FA 6B 00
+D 48FC 6E
+D 48FD CA 48
+D 48FF BE 00
+D 4901 72 00
+D 4903 11 00 00 00
+D 4907 4D FE
+D 4909 25
+D 490A 21 0D
+D 490C 27
+D 490D 21 0F
+D 490F 8C 0D
+D 4911 A1 09 25
+D 4914 8C 00
+D 4916 A1 09 25
+D 4919 86 0E 00 01
+D 491D A0 09 25
+D 4920 CA 20
+D 4922 B0 09 2F
+D 4925 11 00 00 01
+D 4929 22 0D
+D 492B 4E 00 30
+D 492E C9
+D 492F 11 0D 00 0A
+D 4933 4D ED
+D 4935 25
+D 4936 21 0E
+D 4938 8C 0E
+D 493A A1 09 07
+D 493D 73 00
+D 493F BE 00
+D 4941 72 00
+D 4943 11 00 00 01
+D 4947 4D FE
+D 4949 25
+D 494A 21 0D
+D 494C 27
+D 494D 21 0F
+D 494F 8C 0D
+D 4951 A1 09 65
+D 4954 8C 00
+D 4956 A1 09 65
+D 4959 86 0E 00 01
+D 495D A0 09 65
+D 4960 CA 20
+D 4962 B0 09 6F
+D 4965 11 00 00 01
+D 4969 22 0D
+D 496B 4E 00 30
+D 496E C9
+D 496F 11 0D 00 0A
+D 4973 4D ED
+D 4975 25
+D 4976 21 0E
+D 4978 8C 0E
+D 497A A1 09 47
+D 497D 73 00
+D 497F BE 00
+D 4981 F0 00 00
+
+D 4990 1B 5B 32 3B 31 48 00
+
+D 4997 1B 5B 4B 00
+
+D 499B 1B 5B 32 3B 33 30 48 00
+
+D 49A3 54 6F 6F 20 73 68 6F 72 74 21 00
+
+D 49AE 54 6F 6F 20 6C 6F 6E 67 21 00
+
+D 49B8 4F 76 65 72 20 74 68 65 20 74 6F 70 21 00
+
+D 49C6 1B 5B 37 6D 00
+
+D 49CB 20 2A 20 2A 20 2A 20 20 48 20 49 20 54 20 21 20
+D 49DB 20 2A 20 2A 20 2A 20 00
+
+D 49E3 1B 5B 30 6D 00
+
+D 49E8 1B 5B 31 3B 31 48 00
+
+D 49EF 20 43 41 4E 4F 4E 42 41 4C 4C 20 20 20 41 6E 67
+D 49FF 6C 65 20 00
+
+D 4A03 20 20 20 53 68 6F 74 73 20 00
+
+D 4A0D 20 20 20 43 61 73 74 6C 65 20 00
+
+D 4A18 25 20 20 20 55 70 2F 44 6F 77 6E 20 61 69 6D 20
+D 4A28 20 53 50 41 43 45 20 66 69 72 65 20 20 51 20 71
+D 4A38 75 69 74 00
+
+D 4A3C 1B 5B 32 32 3B 34 48 00
+
+D 4A44 2F 23 23 23 5C 00
+
+D 4A4A 1B 5B 32 33 3B 34 48 00
+
+D 4A52 28 4F 29 28 4F 29 00
+
+D 4A59 1B 5B 30 6D 1B 5B 32 4A 1B 5B 48 00
+
+D 4A65 1B 5B 3F 32 35 6C 00
+
+D 4A6C 1B 5B 32 34 3B 31 48 00
+
+D 4A74 1B 5B 32 3B 31 38 48 00
+
+D 4A7C 20 20 54 48 45 20 43 41 53 54 4C 45 20 48 41 53
+D 4A8C 20 46 41 4C 4C 45 4E 21 20 20 00
+
+D 4A97 20 20 69 6E 20 00
+
+D 4A9D 20 73 68 6F 74 73 00
+
+D 4AA4 1B 5B 33 3B 32 36 48 00
+
+D 4AAC 53 50 41 43 45 3A 20 70 6C 61 79 20 61 67 61 69
+D 4ABC 6E 20 20 20 20 51 3A 20 71 75 69 74 00
+
+D 4AC9 1B 5B 33 3B 31 48 00
+
+D 4AD0 00 04 09 0D 12 16 1B 1F 23 28 2C 31 35 39 3E 42
+D 4AE0 46 4B 4F 53 57 5B 60 64 68 6C 70 74 78 7C 7F 83
+D 4AF0 87 8B 8F 92 96 99 9D A0 A4 A7 AB AE B1 B4 B7 BA
+D 4B00 BE C0 C3 C6 C9 CC CE D1 D3 D6 D8 DB DD DF E1 E3
+D 4B10 E5 E7 E9 EB EC EE F0 F1 F3 F4 F5 F6 F7 F8 F9 FA
+D 4B20 FB FC FD FD FE FE FE FF FF FF FF
+
+D 4B2B 30 30 30 30 30 30 30 30 30 30 31 31 31 31 31 31
+D 4B3B 31 31 31 31 32 32 32 32 32 32 32 32 32 32 33 33
+D 4B4B 33 33 33 33 33 33 33 33 34 34 34 34 34 34 34 34
+D 4B5B 34 34 35 35 35 35 35 35 35 35 35 35 36 36 36 36
+D 4B6B 36 36 36 36 36 36 37 37 37 37 37 37 37 37 37 37
+D 4B7B 38 38 38 38 38 38 38 38 38 38 39 39 39 39 39 39
+D 4B8B 39 39 39 39 00
+
+D 4B90 30 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35
+D 4BA0 36 37 38 39 30 31 32 33 34 35 36 37 38 39 30 31
+D 4BB0 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 37
+D 4BC0 38 39 30 31 32 33 34 35 36 37 38 39 30 31 32 33
+D 4BD0 34 35 36 37 38 39 30 31 32 33 34 35 36 37 38 39
+D 4BE0 30 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35
+D 4BF0 36 37 38 39 00
+
+D 4BF5 07 07 05 05 05 05 05 05 07 07
+
+D 4CFC 1B 5B 72 72 3B 63 63 48 2E 1B 5B 52 52 3B 43 43
+D 4D0C 48 6F 00
+
+D 4D0F 1B 5B 72 72 3B 63 63 48 78 00
+
+D 4D19 1B 5B 30 31 3B 32 30 48 61 61 00
+
+D 4D24 1B 5B 30 6D 1B 5B 32 4A 1B 5B 3F 32 35 6C 1B 5B
+D 4D34 30 35 3B 33 32 48 43 20 41 20 4E 20 4F 20 4E 20
+D 4D44 42 20 41 20 4C 20 4C 1B 5B 30 38 3B 31 36 48 52
+D 4D54 61 69 73 65 20 61 6E 64 20 6C 6F 77 65 72 20 74
+D 4D64 68 65 20 62 61 72 72 65 6C 20 6F 66 20 79 6F 75
+D 4D74 72 20 67 72 65 61 74 20 63 61 6E 6E 6F 6E 2C 20
+D 4D84 74 68 65 6E 1B 5B 30 39 3B 31 36 48 66 69 72 65
+D 4D94 20 74 6F 20 6B 6E 6F 63 6B 20 64 6F 77 6E 20 74
+D 4DA4 68 65 20 63 61 73 74 6C 65 20 61 63 72 6F 73 73
+D 4DB4 20 74 68 65 20 66 69 65 6C 64 2E 1B 5B 31 32 3B
+D 4DC4 32 36 48 55 70 20 2F 20 44 6F 77 6E 20 61 72 72
+D 4DD4 6F 77 73 20 28 6F 72 20 57 20 2F 20 53 29 3A 20
+D 4DE4 61 69 6D 1B 5B 31 33 3B 32 36 48 53 50 41 43 45
+D 4DF4 3A 20 66 69 72 65 1B 5B 31 34 3B 32 36 48 51 3A
+D 4E04 20 71 75 69 74 1B 5B 31 38 3B 32 39 48 50 72 65
+D 4E14 73 73 20 53 50 41 43 45 20 74 6F 20 73 74 61 72
+D 4E24 74 00
+
+D 4E26 1B 5B 30 6D 1B 5B 32 4A 1B 5B 48 1B 5B 3F 32 35
+D 4E36 68 54 68 61 6E 6B 73 20 66 6F 72 20 70 6C 61 79
+D 4E46 69 6E 67 20 43 41 4E 4F 4E 42 41 4C 4C 2E 0D 0A
+D 4E56 00
+D 5000 00
+D 6000 00
+D 7000 00

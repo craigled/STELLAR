@@ -15,6 +15,8 @@ has most of them as samples, and its download list is built from the same copies
 |---|---|---|
 | Battleship | [`Battleship.lst`](Games/Battleship.lst) | You against the computer on two 10 x 10 seas; arrow-key aim or typed squares. VT100. |
 | Breakout | [`Breakout.lst`](Games/Breakout.lst) | Knock out the wall of bricks; three balls, faster each wall. VT100, arrow keys. |
+| CanonBall | [`CanonBall.lst`](Games/CanonBall.lst) | Your castle and great cannon against the computer's: aim, fire, mind the wind; Easy, Normal, Hard. VT100. Written in Stellar C ([source](Games/CanonBall.sc), [notes](Games/CanonBall.md)). |
+| CanonBall Solo | [`CanonBall-Solo.lst`](Games/CanonBall-Solo.lst) | Aim the cannon and knock down the castle in as few shots as you can. VT100. Stellar C ([source](Games/CanonBall-Solo.sc)). |
 | Getting Warmer | [`Getting-Warmer.lst`](Games/Getting-Warmer.lst) | Guess the number from 1 to 1000 in ten tries: higher or lower, warmer or colder. Plain text. |
 | Invaders | [`Invaders.lst`](Games/Invaders.lst) | Two rows of six invaders and an arrow-key gun. VT100. |
 | Lunar Lander | [`Lunar-Lander.lst`](Games/Lunar-Lander.lst) | Land on the pad before the fuel runs out. Easy and Hard. VT100, arrow keys. |

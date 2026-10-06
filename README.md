@@ -72,7 +72,7 @@ There is no assembler, no compiler, no toolchain. Every byte of machine code is 
 
 Programs written in the STELLAR VM instruction set, as D-line hex for the Elf2K monitor, grouped by kind (games, text, Morse, math, graphics, multitasking) in [`APPLICATIONS/`](APPLICATIONS/) - see its [index](APPLICATIONS/README.md). Most load at `$4000` (VM1) and run over the terminal; the multitasking ones use several VMs.
 
-40 programs: Games 12, Clock 1, Text 6, Morse 2, Math 7, Graphics 7, Multitasking 5 - Tetris, Breakout, Battleship, MOONBASE, Lite-Writer 2, ELIZA, Morse code, pi to 1,526 digits, Mandelbrot, four-VM races and more.
+42 programs: Games 14, Clock 1, Text 6, Morse 2, Math 7, Graphics 7, Multitasking 5 - Tetris, Breakout, Battleship, CanonBall, MOONBASE, Lite-Writer 2, ELIZA, Morse code, pi to 1,526 digits, Mandelbrot, four-VM races and more.
 
 ## Code Format
 

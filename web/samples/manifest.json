@@ -229,6 +229,24 @@
     "speed": "Elf2K"
   },
   {
+    "name": "CanonBall (VT100, you vs the computer)",
+    "file": "CanonBall.lst",
+    "input": "",
+    "blurb": "Your castle and great cannon on the left, the computer's on the right. Click the terminal and choose 1 Easy, 2 Normal or 3 Hard. Up / Down arrows (or W / S) raise and lower your barrel a degree at a time; SPACE fires. The ball flies in a real arc and leaves a trail of dots to aim by; the wind, different every game, pushes every ball. Then the computer fires back - it watches where its last ball came down and corrects. The first castle knocked down loses. Written in Stellar C. Verified on the Elf2K.",
+    "maxSteps": 14000000,
+    "halts": false,
+    "speed": "Elf2K"
+  },
+  {
+    "name": "CanonBall Solo (VT100, target practice)",
+    "file": "CanonBall-Solo.lst",
+    "input": "",
+    "blurb": "Knock down the castle across the field in as few shots as you can. Click the terminal and press SPACE; Up / Down arrows (or W / S) aim the barrel, SPACE fires, and the last shot's trail of dots shows where you went wrong. A hit knocks bricks off five columns; the castle falls when three quarters of it is gone. Written in Stellar C. Verified on the Elf2K.",
+    "maxSteps": 8000000,
+    "halts": false,
+    "speed": "Elf2K"
+  },
+  {
     "name": "Getting Warmer (guess the number)",
     "file": "Getting-Warmer.lst",
     "input": "",

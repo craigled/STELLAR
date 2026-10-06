@@ -4,9 +4,9 @@
     ['index.html',        'The machine'],
     ['architecture.html', 'Architecture'],
     ['core.html',         'VM Core'],
+    ['simulator.html',    'Simulator'],
     ['scheduler.html',    'Multitasking'],
     ['opcodes.html',      'Opcodes'],
-    ['simulator.html',    'Simulator'],
     ['stellarc.html',     'Stellar C'],
   ];
   // Cloudflare Pages serves /simulator.html as /simulator, so compare without .html
