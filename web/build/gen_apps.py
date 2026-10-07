@@ -107,7 +107,8 @@ APPS = [
   [8 * M, b'I am worried about my computer\r', 10 * M, b'It is very old\r', 10 * M]),
  ('Lite-Writer-2.lst', 'Text', 'Lite-Writer 2',
   'A full-screen word processor: type, move the cursor, insert and delete, and keep documents in memory slots.',
-  [4 * M, b'\r\rIt runs on a 1976 CPU at 3 MHz, inside a\rmultitasking virtual machine.\r', 6 * M]),
+  [4 * M, b'Welcome to Lite-Writer 2, a word processor for the RCA 1802.\r\r', 6 * M,      # (its key queue holds 127)
+   b'It runs on a 1976 CPU at 3 MHz, inside a\rmultitasking virtual machine.\r', 8 * M]),
  ('Banner.lst', 'Text', 'Banner',
   'Type a word and it prints in big block letters.',
   [4 * M]),

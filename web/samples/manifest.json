@@ -101,7 +101,7 @@
   {
     "name": "Lite-Writer 2 (word processor)",
     "file": "Lite-Writer-2.lst",
-    "input": " Welcome to Lite-Writer 2, a word processor for the RCA 1802.",
+    "input": " ",
     "blurb": "A full-screen word processor. Click the terminal and type: words wrap at column 72, and the status bar on line 24 shows the slot, line, column, bytes free and MODIFIED. Arrows move; Home/End, PgUp/PgDn and Delete work; Backspace and ^D delete; ^K cuts a line and ^U pastes it; ^F finds text; ^S and ^L save to and load from four slots; ^N starts a new document; ^G shows all the keys; ^X leaves. (On Windows and Linux the browser keeps Ctrl-N and Ctrl-T for itself.) The editor is STELLAR bytecode; a native 1802 engine called through RUNMC runs the terminal and the text buffer, and reads the keyboard while it writes to the screen, so no key is lost. Uses SETSIZE and VM4's memory. Verified on the Elf2K. Its four slots stay in memory when you load another program - so text left by Morse Receiver v11 opens here with ^L.",
     "maxSteps": 6000000,
     "halts": false,
