@@ -541,7 +541,9 @@
   // caller can start stepping at "VMs ready" (analogous to the pre-pass prime).
   MultiVM.prototype.bootUntilReady = function (cap) {
     cap = cap || 800000;
-    var c = this.cpu, g = 0, want = this.programs.length;
+    // how many VMs the scan should find: the programs that have code (an empty slot - the
+    // block a two-block app borrows on the home page - makes no VM)
+    var c = this.cpu, g = 0, want = this.programs.filter(function (p) { return p.length; }).length;
     while (g++ < cap) {
       if (!c.step()) return false;
       if (this.cpu.M[0x2F54] >= want && this.currentVM() >= 1 && this.anyActive()) {

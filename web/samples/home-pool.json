@@ -7,6 +7,7 @@
   {"file": "Racer.lst", "name": "Racer", "game": true, "input": "", "what": "a game: click, press a key", "heavy": true},
   {"file": "Snake.lst", "name": "Snake", "game": true, "input": "", "what": "a game: click, press a key", "heavy": true},
   {"file": "Life-Lab.lst", "name": "Life Lab", "game": false, "input": " r\r", "what": "Game of Life: click, SPACE to edit", "heavy": true, "blocks": 2},
+  {"file": "Tetris.lst", "name": "Tetris", "game": true, "input": "", "what": "a game: click, press SPACE", "heavy": true, "blocks": 2},
   {"file": "Bouncing-Ball.lst", "name": "Bouncing Ball", "game": false, "input": " ", "what": "VT100 animation", "heavy": false},
   {"file": "Mandelbrot.lst", "name": "Mandelbrot", "game": false, "input": "", "what": "fixed-point maths", "heavy": false},
   {"file": "Pi-Stellar-Only.lst", "name": "Pi digits", "game": false, "input": "\r", "what": "pi by the spigot, all bytecode", "heavy": false},
