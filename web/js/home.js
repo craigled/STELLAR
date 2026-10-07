@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=115';
+  var V = '?v=116';
   // The four programs are drawn at random from samples/home-pool.json (Craig's list) on every
   // visit: EXACTLY ONE "heavy" app - a game, or Sort visualiser - and three others. STELLAR's
   // scheduler is fair by opcode count, so every VM runs at the pace of the round's dearest
@@ -18,7 +18,8 @@
       return pool.filter(function (p) { return p.name.toLowerCase() === w || p.file.toLowerCase().replace('.lst', '') === w; })[0];
     };
     var pinned = want.map(find).filter(Boolean);
-    if (pinned.length === 4) return pinned;
+    if (pinned.length === 4) return lend(pinned);
+    if (pinned.length === 3 && pinned.some(function (p) { return p.blocks === 2; })) return lend(pinned);
     var pick = function (list) { return list[Math.floor(Math.random() * list.length)]; };
     var heavy = pool.filter(function (p) { return p.heavy; }), light = pool.filter(function (p) { return !p.heavy; });
     var four = [pick(heavy)];
@@ -29,7 +30,17 @@
     for (var i = 3; i > 0; i--) {                       // which slot each lands in, at random too
       var j = Math.floor(Math.random() * (i + 1)), t = four[i]; four[i] = four[j]; four[j] = t;
     }
-    return four;
+    return lend(four);
+  }
+  // A two-block app (SETSIZE 2: Life Lab) runs in VM1 and borrows VM2's 4 KB, as it does on the
+  // Elf2K: it goes first, VM2 gets a placeholder that says so, and two of the others follow.
+  var LENT = { name: 'lent to VM1', file: null, input: '', game: false, lent: true,
+               what: 'its 4 KB holds the rest of VM1\'s program' };
+  function lend(list) {
+    var big = list.filter(function (p) { return p.blocks === 2; })[0];
+    if (!big) return list;
+    var rest = list.filter(function (p) { return p !== big; }).slice(0, 2);
+    return [big, LENT].concat(rest);
   }
   function nameGames() {
     var g = LINEUP.filter(function (p) { return p.game; }).map(function (p) { return p.name; });
@@ -103,7 +114,7 @@
   }
   function checkFinished() {
     for (var v = 1; v <= 4; v++) {
-      if (prompted[v] || !m.vmFinished(v)) continue;
+      if (prompted[v] || LINEUP[v - 1].lent || !m.vmFinished(v)) continue;
       var b = m.drain(v);
       if (b) screens[v - 1].write(b);
       prompted[v] = true; runLine[v] = '';
@@ -393,6 +404,7 @@
       b.type = 'button'; b.setAttribute('role', 'tab');
       b.style.setProperty('--vm', VMC[i + 1]);
       b.innerHTML = '<span class="dot"></span>VM' + (i + 1) + ' <span class="t-n">' + p.name + '</span>';
+      if (p.lent) { b.disabled = true; b.title = 'No program runs in VM' + (i + 1) + ' this time'; }
       b.addEventListener('click', function () {
         m.setTraceVM(i + 1);
         markTabs();
@@ -641,13 +653,24 @@
   function boot() {
     m = new Machine({
       firmware: window.STELLAR_FIRMWARE,
-      programs: LINEUP.map(function (p, i) { return { text: sources[i], input: p.input }; }),
+      programs: LINEUP.map(function (p, i) { return { text: sources[i], input: p.input, blocks: p.blocks || 1 }; }),
       traceVM: m ? m.traceVM : 3
     });
     if (die) die.setMachine(m); else die = new Die($('die'), m);
     if (zoomOpen) die.mirrorTo($('dieBig'));
     screens.forEach(function (s) { s.reset(); });
     for (var v = 1; v <= 4; v++) { prompted[v] = false; runLine[v] = ''; }
+    LINEUP.forEach(function (p, i) {
+      if (!p.lent) return;
+      var big = LINEUP[i - 1];
+      say(i + 1, '\r\n\r\n\r\n   No program in VM' + (i + 1) + ' this time.\r\n\r\n' +
+        '   Its 4 KB block, $' + h4(0x4000 + i * 0x1000) + '-$' + h4(0x4FFF + i * 0x1000) + ', is lent to\r\n' +
+        '   ' + big.name + ' in VM' + i + ': the program asks for two blocks\r\n' +
+        '   (SETSIZE 2) - its board alone takes 3.5 KB - and\r\n' +
+        '   STELLAR gives it this one too, just as on the Elf2K.\r\n\r\n' +
+        '   The scheduler shares the 1802 three ways instead of four.');
+      screens[i].render();
+    });
     lastInstr = 0; lastTelT = 0; lastCyc = 0; shownRec = null;
     markTabs();
   }
@@ -674,6 +697,7 @@
     buildCoreGrid();
     buildFacts();
     Promise.all(LINEUP.map(function (p) {
+      if (p.lent) return '';
       return fetch('samples/' + p.file + V).then(function (r) {
         if (!r.ok) throw new Error(p.file + ': HTTP ' + r.status);
         return r.text();

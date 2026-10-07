@@ -56,8 +56,11 @@
     // finishes (which reloads it) would clear the running VMs' START bytes and stop them.
     this.mvm = new LIB.MultiVM({
       firmware: this.firmware,
+      // each program keeps its own block - or blocks: a SETSIZE 2 app (Life Lab) sits in VM1 and
+      // keeps $5000-$5FFF too, and VM2's slot is then empty ({ text: '' }), as on the Elf2K
       programs: this.programs.map(function (p) {
-        return LIB.parseLst(p.text).filter(function (q) { return q[0] >= 0x4000 && q[0] <= 0x4FFF; });
+        var end = 0x4000 + (p.blocks || 1) * 0x1000;
+        return p.text ? LIB.parseLst(p.text).filter(function (q) { return q[0] >= 0x4000 && q[0] < end; }) : [];
       })
     });
     var c = this.cpu = this.mvm.cpu, M = this.M = c.M;
