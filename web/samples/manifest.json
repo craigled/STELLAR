@@ -290,6 +290,15 @@
     "halts": false
   },
   {
+    "name": "Life Lab (VT100: draw your own Game of Life)",
+    "file": "Life-Lab.lst",
+    "input": "",
+    "blurb": "Conway's Game of Life that you seed yourself. Click the terminal and press any key. EDIT: the arrow keys (or W A S D) move the cursor, SPACE turns a cell on or off, 1-9 stamp a pattern at the cursor (1 glider, 2 spaceship, 3 R-pentomino, 4 acorn, 5 glider gun, 6 pulsar, 7 diehard, 8 ten in a row, 9 infinite growth), C clears, R fills the board at random, T steps one generation. ENTER runs it; SPACE or ENTER stops and goes back to editing with the board kept; + and - change the speed. The 78 x 20 board wraps round. Written in Stellar C, with the generation in native 1802 code. Verified on the Elf2K.",
+    "maxSteps": 14000000,
+    "halts": false,
+    "speed": "Elf2K"
+  },
+  {
     "name": "Sort visualiser (VT100)",
     "file": "Sort-Visualiser.lst",
     "input": "",

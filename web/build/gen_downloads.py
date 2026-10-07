@@ -69,6 +69,8 @@ CATALOG = [
   'samples/Prime-Gen-v04.lst', None),
  ('Graphics', 'Mandelbrot', 'The Mandelbrot set in ASCII.', 'samples/Mandelbrot.lst', None),
  ('Graphics', 'Game of Life', "Conway's Life on a 40x20 grid: a blinker and a glider. VT100.", 'samples/Game-of-Life.lst', None),
+ ('Graphics', 'Life Lab', 'Game of Life you seed yourself: draw cells, stamp 9 patterns, run and edit. VT100. Stellar C.',
+  'samples/Life-Lab.lst', None),
  ('Graphics', 'Sort visualiser', 'Watch a bubble sort as VT100 bars.', 'samples/Sort-Visualiser.lst', None),
  ('Graphics', 'Starfield', 'Stars streaming outward; you pick how many. VT100.', 'samples/Starfield.lst', None),
  ('Graphics', 'Bouncing Ball', 'Two balls bouncing around the screen and off each other. VT100.',

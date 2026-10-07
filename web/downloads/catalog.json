@@ -232,6 +232,13 @@
  },
  {
   "group": "Graphics",
+  "name": "Life Lab",
+  "what": "Game of Life you seed yourself: draw cells, stamp 9 patterns, run and edit. VT100. Stellar C.",
+  "href": "samples/Life-Lab.lst",
+  "note": null
+ },
+ {
+  "group": "Graphics",
   "name": "Sort visualiser",
   "what": "Watch a bubble sort as VT100 bars.",
   "href": "samples/Sort-Visualiser.lst",

@@ -71,6 +71,7 @@ has most of them as samples, and its download list is built from the same copies
 | Bouncing Ball | [`Bouncing-Ball.lst`](Graphics/Bouncing-Ball.lst) | Two balls bouncing around the screen and off each other. VT100. |
 | Front panel | [`Front-Panel.lst`](Graphics/Front-Panel.lst) | Lights the Q lamp and counts $00-$1F on the hex display. |
 | Game of Life | [`Game-of-Life.lst`](Graphics/Game-of-Life.lst) | Conway's Life on a 40x20 grid: a blinker and a glider. VT100. |
+| Life Lab | [`Life-Lab.lst`](Graphics/Life-Lab.lst) | Game of Life you seed yourself: draw cells, stamp 9 classic patterns, run, stop and edit. 78x20, wraps round. VT100. Stellar C ([source](Graphics/Life-Lab.sc), [notes](Graphics/Life-Lab.md)). |
 | Mandelbrot | [`Mandelbrot.lst`](Graphics/Mandelbrot.lst) | The Mandelbrot set in ASCII. |
 | Sort visualiser | [`Sort-Visualiser.lst`](Graphics/Sort-Visualiser.lst) | Watch a bubble sort as VT100 bars. |
 | Starfield | [`Starfield.lst`](Graphics/Starfield.lst) | Stars streaming outward; you pick how many. VT100. |

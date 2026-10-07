@@ -96,6 +96,11 @@ APPS = [
  ('Starship.lst', 'Graphics', 'Starship',
   'The COSMAC ELF logo starship, drawn in text on the terminal.',
   [9 * M]),
+ ('Life-Lab.lst', 'Graphics', 'Life Lab',
+  'The Game of Life that you seed yourself: draw cells with the cursor, stamp classic patterns - a glider gun, '
+  'a pulsar, spaceships - then run it, stop it, add more and watch them evolve on a board that wraps round.',
+  [b' ', 2 * M, UP * 9 + LEFT * 36, 2 * M, b'5', 3 * M, DOWN * 4 + RIGHT * 52, 2 * M, b'6', 3 * M,
+   b'\r', 7 * M, b' ', 3 * M]),
  ('Game-of-Life.lst', 'Graphics', 'Game of Life',
   'Conway\'s Game of Life, animated: a blinker and a glider on a 20 x 10 world.',
   [10 * M]),
