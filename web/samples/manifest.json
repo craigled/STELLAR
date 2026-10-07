@@ -220,6 +220,15 @@
     "speed": "Elf2K"
   },
   {
+    "name": "Tetris (VT100, arrow keys)",
+    "file": "Tetris.lst",
+    "input": "",
+    "blurb": "Steer the falling pieces and clear the rows. Click the terminal and press SPACE (or a digit 0-9 to start at that level). Left / right arrows (or a / d) move the piece, up (or w) rotates it, z rotates it back, down (or s) moves it down a row, SPACE drops it. 1-4 rows at once score 10 / 30 / 50 / 80 points times the level + 1; every 10 rows the level goes up and the pieces fall faster. P pauses, ESC quits. Verified on the Elf2K.",
+    "maxSteps": 14000000,
+    "halts": false,
+    "speed": "Elf2K"
+  },
+  {
     "name": "Battleship (VT100, arrow keys)",
     "file": "Battleship.lst",
     "input": "",

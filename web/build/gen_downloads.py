@@ -22,6 +22,8 @@ CATALOG = [
   'samples/Lunar-Lander.lst', None),
  ('Games', 'Snake', 'Eat the food, grow, and do not hit the wall or yourself. Ten speed levels. VT100, arrow keys.',
   'samples/Snake.lst', None),
+ ('Games', 'Tetris', 'Steer the falling pieces and clear the rows; levels speed up. VT100, arrow keys.',
+  'samples/Tetris.lst', None),
  ('Games', 'Breakout', 'Knock out the wall of bricks; three balls, faster each wall. VT100, arrow keys.',
   'samples/Breakout.lst', None),
  ('Games', 'Battleship', 'You against the computer on two 10 x 10 seas; arrow-key aim or typed squares. VT100.',
