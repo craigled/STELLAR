@@ -27,8 +27,9 @@ M = 1_000_000
 # many 1802 instructions; bytes = type them (queued: the program reads them as it gets to them).
 # The Simulator sample's own pre-typed input (manifest.json "input") is typed first.
 # A multi-VM app (the Multitasking page's demos): file = its Elf2K download (every program at its
-# own VM block, as the Multitasking page places them) and href = its link there,
-# scheduler.html#app=<the scenario's id>.
+# own VM block), or a LIST of the page's sched-*.lst files - each written for $4000, program k is
+# placed at $4000 + k x $1000 as the page does - and href = its link there,
+# scheduler.html#app=<the scenario's id in js/scheduler-page.js>.
 APPS = [
  # ---------------------------------------------------------------- games
  ('CanonBall.lst', 'Games', 'CanonBall',
@@ -106,7 +107,7 @@ APPS = [
   'The famous 1966 chatbot therapist, running on the 1802. Tell it your troubles.',
   [8 * M, b'I am worried about my computer\r', 10 * M, b'It is very old\r', 10 * M]),
  ('Lite-Writer-2.lst', 'Text', 'Lite-Writer 2',
-  'A full-screen word processor: type, move the cursor, insert and delete, and keep documents in memory slots.',
+  'A full-screen word processor: type, move the cursor, insert and delete, and keep documents in memory slots. Press Ctrl-G (^G) for the help screen: every key it knows.',
   [4 * M, b'Welcome to Lite-Writer 2, a word processor for the RCA 1802.\r\r', 6 * M,      # (its key queue holds 127)
    b'It runs on a 1976 CPU at 3 MHz, inside a\rmultitasking virtual machine.\r', 8 * M]),
  ('Banner.lst', 'Text', 'Banner',
@@ -122,6 +123,31 @@ APPS = [
  ('Simple-Calc-8.lst', 'Math', 'Simple-Calc',
   'A pocket calculator on the terminal: 8-digit add, subtract, multiply and divide, with the answer carried on.',
   [3 * M, b'355/113\r', 4 * M, b'*2\r', 4 * M]),
+ # ---------------------------------------------------------------- multitasking (the Multitasking page)
+ (['sched-mandel1.lst', 'sched-mandel2.lst', 'sched-mandel3.lst', 'sched-mandel4.lst'], 'Multitasking', 'Mandelbrot x 4',
+  'The Mandelbrot set drawn by all four VMs at once, a quarter each: one 1802, four programs, '
+  'all four quarters growing together as the scheduler shares the chip.',
+  [30 * M], 'scheduler.html#app=mandel4'),
+ (['sched-life1.lst', 'sched-life2.lst'], 'Multitasking', 'Game of Life race',
+  'The same Game of Life on two VMs side by side: VM1 in STELLAR bytecode, VM2 in raw 1802 code '
+  'through RUNMC - and the native side runs about 71 times as many generations.',
+  [20 * M], 'scheduler.html#app=liferace'),
+ (['sched-race1.lst', 'sched-race2.lst'], 'Multitasking', 'Race condition',
+  'Two VMs add to one shared counter 500 times each. Without a lock, 200 of the 1,000 updates are '
+  'lost; with multitasking switched off round the update, the count is exact.',
+  [30 * M], 'scheduler.html#app=race'),
+ (['sched-echo-tick.lst', 'sched-echo-read.lst'], 'Multitasking', 'Typing while it runs',
+  'One VM prints a row of dots while the other waits for your keys: waiting for a key yields the CPU, '
+  'so the dots never stop and your letters land among them.',
+  [3_000, b'S', 6_000, b'T', 6_000, b'A', 6_000, b'R', 3 * M], 'scheduler.html#app=typing'),
+ (['sched-count1.lst', 'sched-count2.lst', 'sched-count3.lst'], 'Multitasking', 'Three counters',
+  'Three VMs count at once, each by its own step, printing as they go - the scheduler interleaves them '
+  'on the one terminal.',
+  [10 * M], 'scheduler.html#app=counters'),
+ (['sched-tick1.lst', 'sched-tick2.lst', 'sched-tick3.lst', 'sched-tick4.lst'], 'Multitasking', 'Four tickers',
+  'The simplest picture of multitasking: four VMs each print their own number, and the output 1 2 3 4 1 2 3 4 '
+  'is the scheduler handing the CPU round.',
+  [3 * M], 'scheduler.html#app=tickers'),
  # ---------------------------------------------------------------- morse + clock
  ('Morse-Sender-v18.lst', 'Morse', 'Morse Sender',
   'Type a message and it is sent in Morse code on the Q line - turn the Sound on and listen to it at 700 Hz.',
@@ -161,9 +187,10 @@ def screen_of(app):
 
     man = {m['file']: m for m in json.load(open(os.path.join(WEB, 'samples', 'manifest.json')))}
     pokes = []
-    for f in files:
+    for k, f in enumerate(files):
         text = open(os.path.join(WEB, f if '/' in f else os.path.join('samples', f))).read()
-        pokes += S.parse_dlines([l for l in text.split('\n') if l.startswith('D ')])
+        off = k * 0x1000 if isinstance(file, list) else 0
+        pokes += [((a + off) & 0xFFFF, b) for a, b in S.parse_dlines([l for l in text.split('\n') if l.startswith('D ')])]
     c = S.boot(bytes(build_image()), pokes, keys=b'')
     rtc = V.DS12887(c)                         # Big Clock: a clock chip set to a fixed time
     for n, v in {0x00: 7, 0x02: 10, 0x04: 10, 0x06: 3, 0x07: 7, 0x08: 10, 0x09: 54,

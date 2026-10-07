@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   var grid = document.getElementById('grid'), chips = document.getElementById('chips');
-  var ORDER = ['Games', 'Graphics', 'Text', 'Math', 'Morse', 'Clock'];
+  var ORDER = ['Games', 'Graphics', 'Text', 'Math', 'Multitasking', 'Morse', 'Clock'];
 
   function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
@@ -53,7 +53,7 @@
     try { history.replaceState(null, '', g === 'All' ? location.pathname : '#' + g.toLowerCase()); } catch (e) {}
   }
 
-  fetch('apps/apps.json?v=113')
+  fetch('apps/apps.json?v=114')
     .then(function (r) { return r.json(); })
     .then(function (apps) {
       apps.sort(function (x, y) { return ORDER.indexOf(x.group) - ORDER.indexOf(y.group); });
