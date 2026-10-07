@@ -9,6 +9,8 @@
 
   var ENTRY = 0x4000;
   var CPI = 375000 / 170000;   // Elf2K machine cycles a second / ClockRow's instructions a second
+  var FLAT_PIECE = 100000;     // flat out: the most 1802 instructions run before looking up
+  var FLAT_MS = 20;            // flat out: wall time a tick may take (the page stays responsive)
   // Lite-Writer 2's slot pool ($7001-$7EFF, VM4's block): kept across loads and resets.
   var POOL = 0x7001, POOL_END = 0x7F00;
   // EF4 edges (the Input key, or a tone heard by the microphone) are replayed this long
@@ -217,9 +219,18 @@
         for (var e = 0; e < q.length; e++) if (q[e].cyc === null)
           q[e].cyc = Math.max(c.cycles, self._anchor.cyc + (q[e].t + KEY_LAG - self._anchor.wall) * rate);
       }
-      for (var i = 0; self.instrPerSec ? c.cycles - c0 < budget : i < self.opsPerTick; i++) {
+      // A program can wait INSIDE one opcode - a RUNMC routine polling the UART for a key
+      // (Lite-Writer 2's N_W) - and that opcode only ends when a key comes. So an opcode is
+      // run in pieces: at most what is left of this tick's budget (real-time speeds), or
+      // FLAT_PIECE instructions with ~FLAT_MS of wall time a tick (flat out). The piece
+      // resumes on the next call, keys typed in between reach it, and the page never
+      // freezes - before this a waiting Lite-Writer ran 200 x 2,000,000 instructions a tick.
+      var t0 = Date.now();
+      for (var i = 0; self.instrPerSec ? c.cycles - c0 < budget : i < self.opsPerTick && Date.now() - t0 < FLAT_MS; i++) {
         while (q.length && q[0].cyc <= c.cycles) c.EF[3] = q.shift().v;
-        var r = self.vm.stepOpcode();
+        var cap = self.instrPerSec ? Math.max(500, Math.ceil((budget - (c.cycles - c0)) / CPI)) : FLAT_PIECE;
+        var r = self.vm.stepOpcode(cap);
+        if (r.capped && !r.halted) continue;            // part of a long opcode: no breakpoint check mid-way
         // stop() before _render(): the render fires onState, and the page decides
         // the Run/Step/Pause button states from this.running — rendering first
         // would leave them disabled after we have already stopped.
