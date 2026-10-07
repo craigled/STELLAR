@@ -7,6 +7,7 @@
     ['simulator.html',    'Simulator'],
     ['scheduler.html',    'Multitasking'],
     ['opcodes.html',      'Opcodes'],
+    ['apps.html',         'Apps'],
     ['stellarc.html',     'Stellar C'],
   ];
   // Cloudflare Pages serves /simulator.html as /simulator, so compare without .html

@@ -50,6 +50,20 @@
       close.setAttribute('aria-label', 'Close the enlarged terminal');
       var panel = document.createElement('div');
       panel.className = 'tz-panel';
+      if (overlay.requestFullscreen) {
+        var fs = document.createElement('button');
+        fs.type = 'button';
+        fs.className = 'tz-full';
+        fs.textContent = '⛶';
+        fs.title = 'Full screen (Esc or this button leaves it)';
+        fs.setAttribute('aria-label', 'Full screen');
+        fs.addEventListener('click', function () {
+          if (document.fullscreenElement) document.exitFullscreen();
+          else overlay.requestFullscreen().then(refit, function () {});
+          setTimeout(function () { focusEl.focus({ preventScroll: true }); }, 0);
+        });
+        overlay.appendChild(fs);
+      }
       overlay.appendChild(close);
       overlay.appendChild(panel);
       panel.appendChild(lift);
@@ -65,6 +79,7 @@
     }
     function shut() {
       if (!overlay) return;
+      if (document.fullscreenElement === overlay) document.exitFullscreen();
       lift.classList.remove('tz-lifted');
       holder.parentNode.replaceChild(lift, holder);
       overlay.parentNode.removeChild(overlay);
@@ -74,7 +89,8 @@
       focusEl.focus({ preventScroll: true });
     }
     btn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); open(); });
-    return { open: open, close: shut };
+    lift._tz = { open: open, close: shut, button: btn };
+    return lift._tz;
   }
 
   // Every page terminal (.term) gets a button in its heading (.term-wrap h4) - not inside

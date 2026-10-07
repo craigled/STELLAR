@@ -53,8 +53,18 @@
 
   function btn(id) { return document.getElementById(id); }
   var samples = [];
+  var autoRun = false;          // set by a #app= link: run the app once it is loaded
 
-  fetch('samples/manifest.json?v=108')
+  function runEnlarged() {
+    app.run();
+    var t = document.getElementById('term');
+    // enlarge where the Enlarge button is offered (not on phones: there the page's own
+    // keyboard row is the way to play); otherwise just bring the terminal into view
+    if (t._tz && t._tz.button && t._tz.button.offsetParent !== null) t._tz.open();
+    else { t.scrollIntoView({ block: 'center' }); t.focus({ preventScroll: true }); }
+  }
+
+  fetch('samples/manifest.json?v=109')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       samples = list;
@@ -64,7 +74,15 @@
         o.value = i; o.textContent = s.name;
         sel.appendChild(o);
       });
-      selectSample(0);
+      // simulator.html#app=Snake.lst (the Apps page): that app, running, terminal enlarged
+      var m = /(?:^#|&)app=([^&]+)/.exec(location.hash), want = m ? decodeURIComponent(m[1]) : null;
+      var at = -1;
+      list.forEach(function (s, i) { if (want && s.file.toLowerCase() === want.toLowerCase()) at = i; });
+      if (at >= 0) {
+        sel.value = at;
+        autoRun = true;
+      }
+      selectSample(at >= 0 ? at : 0);
     })
     .catch(function (e) {
     // Opened as a file:// URL the sample fetches are blocked as cross-origin, so the
@@ -90,11 +108,12 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=108')
+    fetch('samples/' + s.file + '?v=109')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
         app.load(text, input);
+        if (autoRun) { autoRun = false; runEnlarged(); }
       })
       .catch(function (e) { btn('status').textContent = 'load failed: ' + e; });
   }
@@ -211,7 +230,7 @@
 
   // The full catalogue (web/build/gen_downloads.py): every finished app, grouped.
   var catalog = [];
-  fetch('downloads/catalog.json?v=108')
+  fetch('downloads/catalog.json?v=109')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       catalog = list;
@@ -238,7 +257,7 @@
     var a = catalog[+btn('dlPick').value];
     if (!a) return;
     var fn = a.href.split('/').pop();
-    fetch(a.href + '?v=108')
+    fetch(a.href + '?v=109')
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         saveFile(fn, text);
@@ -316,7 +335,7 @@
     });
     b.textContent = '🎤 Listening…'; b.setAttribute('aria-pressed', 'true');
     note.textContent = 'Allow the microphone, then send a tone (another laptop, Sound on, Morse Sender v18).';
-    listener.start('js/tone-detect.js?v=108').catch(function (e) {
+    listener.start('js/tone-detect.js?v=109').catch(function (e) {
       listener = null; b.textContent = '🎤 Listen'; b.setAttribute('aria-pressed', 'false');
       note.textContent = 'Could not listen: ' + (e && e.message || e);
     });

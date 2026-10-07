@@ -466,6 +466,10 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
   border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.06); color:#eee;
   font-size:20px; line-height:1; cursor:pointer}
 .tz-close:hover{background:rgba(255,255,255,.16)}
+.tz-full{position:absolute; top:8px; right:56px; width:34px; height:30px; border-radius:7px;
+  border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.06); color:#eee;
+  font-size:17px; line-height:1; cursor:pointer}
+.tz-full:hover{background:rgba(255,255,255,.16)}
 .tz-lifted{flex:1; min-height:0}
 .term.tz-lifted{height:auto; width:100%; max-width:none; overflow:hidden}
 .crt.tz-lifted{border-radius:10px; overflow:hidden}
@@ -477,3 +481,33 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 #inKey{touch-action:none; user-select:none; -webkit-user-select:none}
 #inKey.on{background:#ff4436; color:#fff; border-color:#ff4436; box-shadow:0 0 8px rgba(255,68,54,.5)}
 #listen[aria-pressed="true"], #sound[aria-pressed="true"]{border-color:var(--accent, #c8743a)}
+
+/* ---- Apps page (apps.html, js/apps-page.js) ---- */
+.app-chips{display:flex; flex-wrap:wrap; gap:6px; margin:22px 0 18px}
+.app-chips button{font-family:var(--mono); font-size:12.5px; padding:5px 12px; border-radius:999px; cursor:pointer;
+  border:1px solid var(--line); background:var(--bg-panel); color:var(--ink-soft)}
+.app-chips button:hover{border-color:var(--accent); color:var(--ink)}
+.app-chips button[aria-selected="true"]{background:var(--accent); border-color:var(--accent); color:var(--bg)}
+.app-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:18px}
+.app-card{display:flex; flex-direction:column; background:var(--bg-panel); border:1px solid var(--line);
+  border-radius:12px; overflow:hidden; color:var(--ink); transition:border-color .15s, transform .15s, box-shadow .15s}
+.app-card[hidden]{display:none}
+.app-card:hover, .app-card:focus-visible{text-decoration:none; border-color:var(--accent);
+  transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.18); outline:none}
+/* the screen: always 80 columns - the text is sized from the card's width */
+.app-shot{position:relative; container-type:inline-size; background:#0a0906; border-bottom:1px solid var(--line)}
+.app-scr{margin:0; padding:3.5cqw 2.5cqw; font-family:var(--mono); font-size:calc(95cqw / 48.6); line-height:1.32;
+  color:#ffd07a; white-space:pre; overflow:hidden; aspect-ratio:auto; text-shadow:0 0 3px rgba(255,176,0,.35)}
+.app-scr .rv{background:#ffd07a; color:#0a0906; text-shadow:none}
+.app-play{position:absolute; right:10px; bottom:9px; font-family:var(--mono); font-size:12px; padding:4px 10px;
+  border-radius:7px; background:var(--accent); color:#0a0906; font-weight:600; opacity:0; transform:translateY(4px);
+  transition:opacity .15s, transform .15s}
+.app-card:hover .app-play, .app-card:focus-visible .app-play{opacity:1; transform:none}
+@media (pointer:coarse){ .app-play{opacity:1; transform:none} }
+.app-txt{padding:12px 16px 16px}
+.app-h{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+.app-h h3{margin:0; font-size:18px}
+.app-grp{font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent-2)}
+.app-txt p{margin:6px 0 0; font-size:14.5px; line-height:1.55; color:var(--ink-soft)}
+.app-more{margin-top:44px; max-width:72ch}
+.app-more h2{margin:0 0 .3em}
