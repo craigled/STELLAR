@@ -19,9 +19,9 @@
     { name: 'Game of Life race — bytecode vs native', blurb: 'The same Game of Life board (an acorn, 24 × 10) on both sides, under the same scheduler. VM1 on the left computes every generation in STELLAR bytecode — with running column sums, so each cell costs one new 3-cell column sum instead of 8 neighbour reads (about 6,300 opcodes a generation). VM2 on the right calls raw 1802 code with RUNMC. Each board row is a ready-made string printed with ONE PRINTSTR, and a single opcode is never cut by the scheduler, so the two boards never garble each other. After 8 generations VM1 sets its RB to 2 — "stop"; VM2 writes its generation count into VM1\'s R5 with COPYVXY and halts, and VM1 prints the score: about 71 times as many generations. Click the terminal and press ESC to quit early. At Elf2K speed the run takes about 3½ minutes (the real machine, with its 9600-baud terminal, about 7); 10× shows it in well under a minute. The score is the same at any speed: the scheduler switches VMs on an opcode count, not a clock.',
       programs: ['sched-life1.lst', 'sched-life2.lst'] },
     { name: 'Maze — VM1 builds it, VM2 solves it', blurb: 'Press Run, then click the shared terminal and press any key (how long you wait decides the maze). VM1 switches multitasking off — VM2 has nothing to do yet — and carves a random 25 × 10 maze as you watch. Then it copies the whole 1,196-byte grid into VM2\'s memory with COPYBVMXVMY ($DC, 240 bytes at a time) and triggers VM2 by writing 1 into VM2\'s register RB with COPYVXY ($D3). VM2 walks it keeping its right hand on the wall: o marks the path, and a dead end it backs out of turns to dots, so the o\'s left at the end are the way through.',
-      programs: ['sched-maze1.lst', 'sched-maze2.lst'] },
+      programs: ['sched-maze1.lst', 'sched-maze2.lst'], id: 'maze' },
     { name: 'Maze race — right hand vs left hand (3 VMs)', blurb: 'Press Run, click the shared terminal and press any key. VM1 carves a random maze (multitasking off) and draws it twice, then copies it into VM2 and VM3 ($DC) and triggers both ($D3). VM2 on the left keeps its right hand on the wall; VM3 on the right keeps its left hand on the wall; the scheduler runs them at the same time. Neither hand is better in general — each maze is a new race. The finish is decided with multitasking off for a moment, so exactly one of them is 1st: it writes "you are 2nd" and its step count into the other\'s registers, and the 2nd prints the score. Every cursor move is drawn with multitasking off too — otherwise the two solvers\' escape sequences would interleave.',
-      programs: ['sched-mrace1.lst', 'sched-mrace2.lst', 'sched-mrace3.lst'] },
+      programs: ['sched-mrace1.lst', 'sched-mrace2.lst', 'sched-mrace3.lst'], id: 'mazerace' },
     { name: 'Mandelbrot × 4 — one quarter per VM', blurb: 'The same 40 × 24 Mandelbrot as the Simulator sample, drawn by all four VMs at once: VM1 top-left, VM2 top-right, VM3 bottom-left, VM4 bottom-right. There is still one 1802, so four VMs are not faster than one — what you see is the scheduler sharing it, all four quarters growing together. Each pixel is ONE PRINTSTR (cursor position and character together), so the VMs never garble each other. VM1 clears the screen and then opens itself with SHAREVM, which is the others\' start signal; the last one to finish reads the four VM states in the CIDP page and puts the cursor back. About 6½ minutes at Elf2K speed — try 10× or flat out.',
       programs: ['sched-mandel1.lst', 'sched-mandel2.lst', 'sched-mandel3.lst', 'sched-mandel4.lst'] }
   ];
@@ -43,12 +43,12 @@
   var serialLen = 0, prevRegs = {}, built = 0, vt = null;
   var expandedVM = null, coreView = null;
 
-  function loadScenario(i) {
+  function loadScenario(i, then) {
     var s = SCENARIOS[i];
     byId('blurb').textContent = s.blurb;
     byId('status').textContent = 'loading ' + s.name + '…';
     Promise.all(s.programs.map(function (f) {
-      return fetch('samples/' + f + '?v=110').then(function (r) { return r.text(); });
+      return fetch('samples/' + f + '?v=111').then(function (r) { return r.text(); });
     })).then(function (texts) {
       mv = new window.StellarMultiVM({ firmware: window.STELLAR_FIRMWARE, programs: texts });
       mv.bootUntilReady();      // run CREATE_CIDP + scheduler so VMs are active
@@ -57,6 +57,7 @@
       byId('cores').innerHTML = '';
       render();
       byId('status').textContent = 'ready — ' + mv.cidp().totalVMs + ' VMs booted';
+      if (then) then();
     }).catch(function (e) { byId('status').textContent = 'load failed: ' + e; });
   }
 
@@ -275,5 +276,16 @@
     opsPerTick = sp.ops || 0; tickMs = sp.ms; instrPerSec = sp.ips || 0;
     if (running) { stop(); run(); }
   });
-  loadScenario(0);
+  // scheduler.html#app=maze (the Apps page): that demo, running, the shared terminal enlarged
+  var m = /(?:^#|&)app=([^&]+)/.exec(location.hash), at = -1;
+  if (m) SCENARIOS.forEach(function (s, i) { if (s.id && s.id === decodeURIComponent(m[1]).toLowerCase()) at = i; });
+  if (at >= 0) {
+    sel.value = at;
+    loadScenario(at, function () {
+      run();
+      var t = byId('term');
+      if (t._tz && t._tz.button && t._tz.button.offsetParent !== null) t._tz.open();
+      else { t.scrollIntoView({ block: 'center' }); t.focus({ preventScroll: true }); }
+    });
+  } else loadScenario(0);
 })();

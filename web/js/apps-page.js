@@ -31,9 +31,9 @@
   function card(app) {
     var a = document.createElement('a');
     a.className = 'app-card';
-    a.href = 'simulator.html#app=' + encodeURIComponent(app.file);
+    a.href = app.href || ('simulator.html#app=' + encodeURIComponent(app.file));
     a.dataset.group = app.group;
-    a.setAttribute('aria-label', app.name + ' - run it in the Simulator');
+    a.setAttribute('aria-label', app.name + (app.href ? ' - run it on the Multitasking page' : ' - run it in the Simulator'));
     a.innerHTML =
       '<div class="app-shot"><pre class="app-scr" aria-hidden="true">' + screen(app) + '</pre>' +
       '<span class="app-play">&#9654; Run it</span></div>' +
@@ -53,7 +53,7 @@
     try { history.replaceState(null, '', g === 'All' ? location.pathname : '#' + g.toLowerCase()); } catch (e) {}
   }
 
-  fetch('apps/apps.json?v=110')
+  fetch('apps/apps.json?v=111')
     .then(function (r) { return r.json(); })
     .then(function (apps) {
       apps.sort(function (x, y) { return ORDER.indexOf(x.group) - ORDER.indexOf(y.group); });

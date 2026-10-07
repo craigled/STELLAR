@@ -23,9 +23,12 @@ sys.path.insert(0, FMATH); sys.path.insert(0, HERE)
 UP, DOWN, LEFT, RIGHT = b'\x1b[A', b'\x1b[B', b'\x1b[D', b'\x1b[C'
 M = 1_000_000
 
-# (file, group, name, description, script). A script is a list of: an int = run that many
-# 1802 instructions; bytes = type them (queued: the program reads them as it gets to them).
+# (file, group, name, description, script[, href]). A script is a list of: an int = run that
+# many 1802 instructions; bytes = type them (queued: the program reads them as it gets to them).
 # The Simulator sample's own pre-typed input (manifest.json "input") is typed first.
+# A multi-VM app (the Multitasking page's demos): file = its Elf2K download (every program at its
+# own VM block, as the Multitasking page places them) and href = its link there,
+# scheduler.html#app=<the scenario's id>.
 APPS = [
  # ---------------------------------------------------------------- games
  ('CanonBall.lst', 'Games', 'CanonBall',
@@ -65,6 +68,14 @@ APPS = [
  ('Tic-Tac-Toe.lst', 'Games', 'Tic-Tac-Toe',
   'You are X against the computer\'s O. Type a square to play.',
   [b'5\r', 3 * M, b'9\r', 3 * M, b'2\r', 3 * M]),
+ ('downloads/Maze.lst', 'Games', 'Maze',
+  'Two VMs at work: VM1 carves a random maze as you watch, copies it into VM2, and VM2 finds the way '
+  'through with its right hand on the wall. Runs on the Multitasking page.',
+  [b' ', 30 * M], 'scheduler.html#app=maze'),
+ ('downloads/MazeRace.lst', 'Games', 'Maze Race',
+  'Three VMs: VM1 carves a maze and draws it twice; VM2 (right hand on the wall) and VM3 (left hand) '
+  'race through it at the same time on the one 1802. Runs on the Multitasking page.',
+  [b' ', 40 * M], 'scheduler.html#app=mazerace'),
  ('Moonbase.lst', 'Games', 'MOONBASE',
   'A text adventure: escape the damaged moon base. Two-word commands, ten rooms, and every game is shuffled.',
   [b'\r', 4 * M, b'LOOK\r', 6 * M, b'INVENTORY\r', 6 * M]),
@@ -121,7 +132,9 @@ APPS = [
 
 
 def screen_of(app):
-    file, group, name, desc, script = app
+    file, group, name, desc, script = app[:5]
+    href = app[5] if len(app) > 5 else None
+    files = file if isinstance(file, list) else [file]
     import opcode_sweep as S
     import rtc_verify as V
     import litewriter2_verify as LW
@@ -146,8 +159,10 @@ def screen_of(app):
             super().esc(e)
 
     man = {m['file']: m for m in json.load(open(os.path.join(WEB, 'samples', 'manifest.json')))}
-    text = open(os.path.join(WEB, 'samples', file)).read()
-    pokes = S.parse_dlines([l for l in text.split('\n') if l.startswith('D ')])
+    pokes = []
+    for f in files:
+        text = open(os.path.join(WEB, f if '/' in f else os.path.join('samples', f))).read()
+        pokes += S.parse_dlines([l for l in text.split('\n') if l.startswith('D ')])
     c = S.boot(bytes(build_image()), pokes, keys=b'')
     rtc = V.DS12887(c)                         # Big Clock: a clock chip set to a fixed time
     for n, v in {0x00: 7, 0x02: 10, 0x04: 10, 0x06: 3, 0x07: 7, 0x08: 10, 0x09: 54,
@@ -155,7 +170,7 @@ def screen_of(app):
     c.io_in[3] = V.Port3In(c.io_in[3], c.io_out[2], rtc)
     c.io_out[3] = V.Port3Out(c.io_out[2], rtc)
     q = c.io_in[3].u.q
-    q.extend(man[file]['input'].encode('latin1'))
+    if files[0] in man: q.extend(man[files[0]]['input'].encode('latin1'))
     for item in script:
         if isinstance(item, bytes): q.extend(item); continue
         for _ in range(item):
@@ -171,8 +186,10 @@ def screen_of(app):
             if not on and start is not None: spans.append([start, col]); start = None
         if spans: rev.append([r] + spans)
     while rows and not rows[-1]: rows.pop()
-    return {'file': file, 'group': group, 'name': name, 'desc': desc, 'rows': rows, 'rev': rev,
-            'blank': not any(rows) and not rev}
+    out = {'file': files[0], 'group': group, 'name': name, 'desc': desc, 'rows': rows, 'rev': rev,
+           'blank': not any(rows) and not rev}
+    if href: out['href'] = href
+    return out
 
 
 def main():
@@ -180,7 +197,7 @@ def main():
     if '--show' in sys.argv:
         want = sys.argv[sys.argv.index('--show') + 1]
         for a in APPS:
-            if want.lower() in (a[0].lower(), a[2].lower()):
+            if want.lower() in (str(a[0]).lower(), a[2].lower()):
                 s = screen_of(a)
                 print('+' + '-' * 80 + '+')
                 for r in range(24):
