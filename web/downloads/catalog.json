@@ -288,6 +288,13 @@
  },
  {
   "group": "Multitasking",
+  "name": "STELLAR ORBIT",
+  "what": "Fly Apollo 7: launch, orbit, a timed de-orbit burn, the chutes, the recovery ship. Three VMs, one file. VT100, real-time clock.",
+  "href": "downloads/Stellar-Orbit.lst",
+  "note": null
+ },
+ {
+  "group": "Multitasking",
   "name": "Life Race",
   "what": "Game of Life in bytecode against native 1802, side by side. One file.",
   "href": "downloads/Life-Race.lst",
