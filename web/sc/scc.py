@@ -139,7 +139,19 @@ def asm_parse(first, text):
 # before any STR, OUT or ALU-with-memory. RUNMC does not yield: other VMs wait.
 from asm1802 import assemble as assemble1802, register, AsmError
 NATIVE_FREE = {7, 8, 9, 0xB, 0xD, 0xE, 0xF}
-VM1_REGS = 0x3000
+# Where the program runs: VM1 by default; scc --vm N builds it for VM N's block (program at
+# $4000 + (N-1) x $1000, registers at $3000 + (N-1) x $400) - the absolute addresses (D-lines,
+# native code, RUNMC, {var}) move, the bytecode itself is relative anyway.
+ORG = 0x4000
+REGS = 0x3000
+VM = 1
+TOP = 0x7F00          # programs end below this: the Elf2K's $7Fxx page is not available
+
+
+def set_vm(n):
+    global ORG, REGS, VM
+    if n not in (1, 2, 3, 4): raise Error('--vm must be 1-4')
+    VM, ORG, REGS = n, 0x4000 + (n - 1) * 0x1000, 0x3000 + (n - 1) * 0x400
 
 def strip_comment(line):
     q = None
@@ -595,13 +607,30 @@ class Compiler:
         for n, fn in s.funcs.items():
             info = s.usage(n, fn)
             for v, (w, cross) in info.items():
+                if v not in s.globals and v not in s.fvars_of(n) and not v.startswith('.'):
+                    raise Error('%s(): %r is not declared' % (n, v))   # (it used to become a silent local)
                 if v in s.globals and (n, v) not in items and v not in s.fvars_of(n):
                     g = items.setdefault((None, v), [0, None]); g[0] += w
                 else: items[(n, v)] = [w, cross]
             for i in range(s.nested(fn)): items[(n, '.h%d' % i)] = [10 ** 4, set(s.desc[n])]
         for g in s.globals: items.setdefault((None, g), [0, None])
+        # A call stores its arguments into the callee's parameters one by one: a variable that argument
+        # j reads must not share a register with parameters 0 .. j-1 (stored before it is read) - e.g.
+        # put(r) calling dig2(&cell[2], r) with dig2.a in put.r's register passed the address as v.
+        pairs = set()
+        for n, fn in s.funcs.items():
+            fv = s.fvars_of(n)
+            def f(x, n=n, fv=fv):
+                if x[0] == 'call' and x[1] in s.funcs:
+                    params = s.funcs[x[1]][4]
+                    for j, a in enumerate(x[2]):
+                        for v in s.vars_in(a):
+                            for p in params[:j]:
+                                pairs.add(((n if v in fv else None, v), (x[1], p)))
+            s.walk(fn[5], f)
         regs = [r for r in range(0, 0xD) if not (s.need_zero and r == ZERO)]   # R0 works (V0061.34)
         def conflict(a, b):
+            if (a, b) in pairs or (b, a) in pairs: return True
             if a[0] is None or b[0] is None or a[0] == b[0]: return True
             (fa, _), (fb, _) = a, b
             return fb in items[a][1] or fa in items[b][1]
@@ -1390,7 +1419,7 @@ class Compiler:
 
     def native_value(s, text, labels):
         """An operand of a native block, as a number (0 for a label on the sizing pass)."""
-        t = re.sub(r'\{([\w.]+)\}', lambda m: str(VM1_REGS + 2 * int(s.asm_reg(m), 16)), text)
+        t = re.sub(r'\{([\w.]+)\}', lambda m: str(REGS + 2 * int(s.asm_reg(m), 16)), text)
         t = re.sub(r'\$([0-9A-Fa-f]+)', r'0x\1', t)
         try:
             p = Parser(lex(t)); e = p.expr()
@@ -1400,13 +1429,16 @@ class Compiler:
             k = e[0]
             if k == 'num': return e[1]
             if k == 'var':
-                if labels is not None and e[1] in labels: return labels[e[1]]
+                if labels is not None and e[1] in labels:
+                    if e[1] in s.consts:                          # (KEY was both: &W+KEY took the label)
+                        raise Error('line %d: %r is both a label in the block and a const' % (s.ln, e[1]))
+                    return labels[e[1]]
                 if e[1] in s.consts: return s.consts[e[1]]
-                if e[1] in s.arrays: return 0x4000 + s.addr(e[1])
+                if e[1] in s.arrays: return ORG + s.addr(e[1])
                 if labels is None: return 0
                 raise Error('line %d: unknown name %r' % (s.ln, e[1]))
-            if k == 'addr': return 0x4000 + s.addr(e[1]) + (2 if s.wide(e[1]) else 1) * ev(e[2])
-            if k == 'idx' and e[1] in s.arrays: return 0x4000 + s.addr(e[1]) + (2 if s.wide(e[1]) else 1) * ev(e[2])
+            if k == 'addr': return ORG + s.addr(e[1]) + (2 if s.wide(e[1]) else 1) * ev(e[2])
+            if k == 'idx' and e[1] in s.arrays: return ORG + s.addr(e[1]) + (2 if s.wide(e[1]) else 1) * ev(e[2])
             if k == 'call' and e[1] in ('hi', 'lo') and len(e[2]) == 1:
                 v = ev(e[2][0]); return (v >> 8) & 255 if e[1] == 'hi' else v & 255
             if k == 'neg': return -ev(e[1])
@@ -1426,6 +1458,9 @@ class Compiler:
                 try: r = register(arg, ln)
                 except AsmError as e: raise Error(str(e))
                 ok = r in NATIVE_FREE or (r == 2 and mn in ('INC', 'DEC', 'LDA'))
+                # LDA R6: inline parameters - inside a routine reached by CALL, R6 is the SCRT return link
+                # (the call saved the outer one); at the block's top level it is the way home: don't
+                ok = ok or (r == 6 and mn == 'LDA')
                 if not ok:
                     why = {3: 'R3 is the PC', 6: 'R6 is the way home', 2: 'R2 is the stack',
                            0xA: "RA's low byte is not restored by the RUNMC handler"}.get(r, 'the RUNMC handler does not save it')
@@ -1433,7 +1468,7 @@ class Compiler:
         end = lines[-1][0] if lines else s.ln
         body = list(lines) + [(end, 'exit', 'SEX', 'R2'), (end, None, 'RETN', '')]
         key = '.native_%d' % len(s.natives)
-        base = 0x4000 + s.layout.get(key, 0)
+        base = ORG + s.layout.get(key, 0)
         try: bs, listing, _, shorts = assemble1802(body, base, lambda t, l: s.native_value(t, l))
         except AsmError as e: raise Error(str(e))
         s.natives[key] = (bs, listing, shorts)
@@ -1535,8 +1570,8 @@ def compile_source(src, name):
     for _ in range(4):
         # pass 1 sizes the code; pass 2 places the data after it
         c.compile(src)
-        em, _ = assemble(c.rows, base=0x4000)
-        code_len = em[-1][0] + len(em[-1][1]) - 0x4000
+        em, _ = assemble(c.rows, base=ORG)
+        code_len = em[-1][0] + len(em[-1][1]) - ORG
         data, a = {}, (code_len + 15) & ~15
         for b, lab in c.strings.items(): c.layout[lab] = a; data[a] = b; a += len(b)
         for n, it in c.arrays.items():
@@ -1551,10 +1586,11 @@ def compile_source(src, name):
         c.data_end = a
         blocks = (a + 0xFFF) // 0x1000
         if blocks > 3: raise Error('the program needs %d KB: more than SETSIZE 3 gives' % (4 * blocks))
+        if blocks > 5 - VM: raise Error('the program needs %d KB: VM%d has only %d KB above it' % (4 * blocks, VM, 4 * (5 - VM)))
         if blocks > c.setsize: c.setsize = blocks; continue
         c.compile(src)
-        em, labels = assemble(c.rows, base=0x4000)
-        if em[-1][0] + len(em[-1][1]) - 0x4000 == code_len:
+        em, labels = assemble(c.rows, base=ORG)
+        if em[-1][0] + len(em[-1][1]) - ORG == code_len:
             for key, (bs, _, shorts) in c.natives.items():       # as assembled for the final layout
                 assert len(bs) == len(data[c.layout[key]])
                 data[c.layout[key]] = bytes(bs)
@@ -1562,29 +1598,32 @@ def compile_source(src, name):
                     if op >> 8 != t >> 8:
                         raise Error('line %d: short branch at $%04X to $%04X leaves its page: '
                                     'use the long form (LBR, LBZ, ...)' % (ln, op - 1, t))
+            if ORG + c.data_end > TOP:          # Craig's Elf2K: $7F00-$7FFF is not free RAM
+                raise Error('the program ends at $%04X: past $%04X ($7F00-$7FFF is not available - %d bytes too many)'
+                            % (ORG + c.data_end - 1, TOP - 1, ORG + c.data_end - TOP))
             return c, em, labels, {k: v for k, v in data.items() if v}
     raise Error('the layout did not settle')
 
 
 def symbols(c, labels):
     """Where everything went - for a debugger or a test harness."""
-    out = {'vars': {}, 'arrays': {k: 0x4000 + c.layout[k] for k in c.arrays},
+    out = {'vars': {}, 'arrays': {k: ORG + c.layout[k] for k in c.arrays},
            'labels': {k: v for k, v in labels.items() if not re.match(r'L\d+$', k)}}
     for (fn, v), loc in c.loc.items():
         key = v if fn is None else '%s.%s' % (fn, v)
-        out['vars'][key] = {'reg': loc[1]} if loc[0] == 'r' else {'mem': 0x4000 + c.layout[loc[1]]}
-    if c.natives: out['natives'] = [0x4000 + c.layout[k] for k in c.natives]
+        out['vars'][key] = {'reg': loc[1]} if loc[0] == 'r' else {'mem': ORG + c.layout[loc[1]]}
+    if c.natives: out['natives'] = [ORG + c.layout[k] for k in c.natives]
     return out
 
 
 def render_lst(path, c, em, labels, data, extra=''):
     """The .lst text, VM claims included."""
     lines = ['; ' + '=' * 74,
-             '; %s  -  compiled from %s by scc (Stellar C, prototype)   loads at $4000%s'
-             % (c.name, os.path.basename(path), '-$%X' % (0x4000 + 0x1000 * c.setsize - 1) if c.setsize > 1 else ''),
+             '; %s  -  compiled from %s by scc (Stellar C, prototype)   loads at $%04X%s'
+             % (c.name, os.path.basename(path), ORG, '-$%X' % (ORG + 0x1000 * c.setsize - 1) if c.setsize > 1 else ''),
              '; ' + '=' * 74,
              '; %d STELLAR commands, %d bytes of code, %d bytes of data.'
-             % (len(em), em[-1][0] + len(em[-1][1]) - 0x4000, sum(len(d) for d in data.values())),
+             % (len(em), em[-1][0] + len(em[-1][1]) - ORG, sum(len(d) for d in data.values())),
              '; registers: ' + ', '.join('%s R%d' % ((f + '.' if f else '') + v, l[1])
                                           for (f, v), l in sorted(c.loc.items(), key=lambda x: (x[1][0], str(x[1][1])))
                                           if l[0] == 'r' and not v.startswith('.')),
@@ -1599,7 +1638,7 @@ def render_lst(path, c, em, labels, data, extra=''):
         for k in rev.get(a, []): lines.append('; %s:' % (k[2:] + '()' if k.startswith('F_') else k))
         lines.append(('; D %04X %-14s %-30s %s' % (a, ' '.join('%02X' % b for b in bs), asm, note)).rstrip())
     for key, (bs, listing, _) in c.natives.items():
-        lines += [';', '; NATIVE 1802  -  %d bytes at $%04X, run by RUNMC' % (len(bs), 0x4000 + c.layout[key]), ';']
+        lines += [';', '; NATIVE 1802  -  %d bytes at $%04X, run by RUNMC' % (len(bs), ORG + c.layout[key]), ';']
         for a, b, text, ln in listing:
             if not b: lines.append('; %s' % text); continue
             src = c.lines[ln - 1]
@@ -1610,7 +1649,7 @@ def render_lst(path, c, em, labels, data, extra=''):
     for rel, d in sorted(data.items()):
         lines.append('')
         for off in range(0, len(d), 16):
-            lines.append('D %04X %s' % (0x4000 + rel + off, ' '.join('%02X' % b for b in d[off:off + 16])))
+            lines.append('D %04X %s' % (ORG + rel + off, ' '.join('%02X' % b for b in d[off:off + 16])))
     return claim_vms_text('\n'.join(lines) + '\n')[0]
 
 
@@ -1629,7 +1668,7 @@ def compile_text(src, name='program'):
     except (ValueError, KeyError, IndexError, TypeError, RecursionError) as e:
         return {'error': 'scc: internal error (%s: %s) - please report this program' % (type(e).__name__, e)}
     return {'lst': render_lst(name + '.sc', c, em, labels, data),
-            'summary': '%d commands, %d bytes of code, %d in all' % (len(em), em[-1][0] + len(em[-1][1]) - 0x4000, c.data_end)}
+            'summary': '%d commands, %d bytes of code, %d in all' % (len(em), em[-1][0] + len(em[-1][1]) - ORG, c.data_end)}
 
 
 if __name__ == '__main__':
@@ -1637,9 +1676,10 @@ if __name__ == '__main__':
     src = sys.argv[1]
     out = sys.argv[sys.argv.index('-o') + 1] if '-o' in sys.argv else os.path.splitext(src)[0] + '.lst'
     try:
+        if '--vm' in sys.argv: set_vm(int(sys.argv[sys.argv.index('--vm') + 1]))
         c, em, labels, data = compile_file(src)
         write_lst(src, out, c, em, labels, data)
     except Error as e:
         print('scc: %s' % e); sys.exit(1)
     print('%s: %d commands, %d bytes of code, %d in all -> %s'
-          % (src, len(em), em[-1][0] + len(em[-1][1]) - 0x4000, c.data_end, out))
+          % (src, len(em), em[-1][0] + len(em[-1][1]) - ORG, c.data_end, out))
