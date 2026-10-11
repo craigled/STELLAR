@@ -22,6 +22,8 @@ CATALOG = [
   'samples/Lunar-Lander.lst', None),
  ('Games', 'Snake', 'Eat the food, grow, and do not hit the wall or yourself. Ten speed levels. VT100, arrow keys.',
   'samples/Snake.lst', None),
+ ('Games', 'Galaxia', 'Galaxian-style shooter: a swaying swarm, divers that swoop and bomb. VT100, arrow keys. Stellar C.',
+  'samples/Galaxia.lst', None),
  ('Games', 'Tetris', 'Steer the falling pieces and clear the rows; levels speed up. VT100, arrow keys.',
   'samples/Tetris.lst', None),
  ('Games', 'Breakout', 'Knock out the wall of bricks; three balls, faster each wall. VT100, arrow keys.',
@@ -81,6 +83,8 @@ CATALOG = [
   'APPLICATIONS/Mandelbrot-4VM.lst', None),
  ('Multitasking', 'Maze Race', 'VM1 builds a maze; VM2 and VM3 race it, right hand against left. One file.',
   'APPLICATIONS/Maze/MazeRace.lst', None),
+ ('Multitasking', 'STELLAR ORBIT', 'Fly Apollo 7: launch, orbit, random emergencies, a timed de-orbit burn, the chutes, '
+  'the recovery ship. Three VMs, one file. VT100, real-time clock.', 'downloads/Stellar-Orbit.lst', None),
  ('Multitasking', 'Life Race', 'Game of Life in bytecode against native 1802, side by side. One file.',
   'APPLICATIONS/Life-Race/Life-Race.lst', None),
  ('Multitasking', 'Race condition (VM1)', 'Two VMs share a counter: without a lock, counts go missing. '
@@ -104,6 +108,9 @@ def main():
         if src.startswith('samples/'):
             assert os.path.exists(os.path.join(WEB, src)), src
             href = src
+        elif src.startswith('downloads/'):               # built for the web (e.g. ORBIT's three VMs in one file): kept as is
+            assert os.path.exists(os.path.join(WEB, src)), src
+            keep.add(os.path.basename(src)); href = src
         else:
             fn = os.path.basename(src).replace(' ', '-')
             data = committed(src)
@@ -113,7 +120,7 @@ def main():
         out.append({'group': group, 'name': name, 'what': what, 'href': href, 'note': note})
     for fn in os.listdir(OUT):
         if fn.endswith('.lst') and fn not in keep: os.remove(os.path.join(OUT, fn))
-    with open(os.path.join(OUT, 'catalog.json'), 'w') as f: json.dump(out, f, indent=1)
+    with open(os.path.join(OUT, 'catalog.json'), 'w') as f: json.dump(out, f, indent=1); f.write('\n')
     print('%d apps (%d copied from the work repo) -> %s' % (len(out), len(keep), OUT))
 
 

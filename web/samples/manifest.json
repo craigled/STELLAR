@@ -229,6 +229,15 @@
     "speed": "Elf2K"
   },
   {
+    "name": "Galaxia (VT100, arrow keys)",
+    "file": "Galaxia.lst",
+    "input": "",
+    "blurb": "A Galaxian-style shooter. Click the terminal and press any key. Left / right arrows (or a / d) move your ship, SPACE fires. The swarm sways overhead: flagships 60, reds 50, purples 40, blues 30. Divers swoop down, chase you and drop bombs - shoot one in flight for double points. Three ships; each wave dives more often. P pauses, R restarts, Q quits. Stellar C with a native frame engine. Verified on the Elf2K.",
+    "maxSteps": 14000000,
+    "halts": false,
+    "speed": "Elf2K"
+  },
+  {
     "name": "Battleship (VT100, arrow keys)",
     "file": "Battleship.lst",
     "input": "",

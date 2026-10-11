@@ -48,6 +48,10 @@ APPS = [
   'Steer the falling pieces, turn them, and clear the rows. Every ten rows the level goes up and the pieces fall faster.',
   [b' ', 1 * M, LEFT * 3 + b' ', 1 * M, RIGHT * 2 + b' ', 1 * M, UP + LEFT + b' ', 1 * M, RIGHT * 4 + b' ', 1 * M,
    UP + RIGHT * 2 + b' ', 1 * M, b' ', 1 * M, LEFT * 4 + b' ', 1 * M, UP + b' ', 1_500_000]),
+ ('Galaxia.lst', 'Games', 'Galaxia',
+  'A Galaxian-style shooter: the swarm sways overhead while divers swoop down, chase your ship and drop bombs. '
+  'Shoot a diver in flight for double points.',
+  [b' ', 500_000, b' ', 200_000, LEFT * 3 + b' ', 200_000, b' ', 450_000]),
  ('Breakout.lst', 'Games', 'Breakout',
   'Knock out the wall of bricks with the paddle: three balls, and every wall comes faster.',
   [b' ', 1_200_000, RIGHT * 4, 300_000]),
