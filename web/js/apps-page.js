@@ -53,7 +53,7 @@
     try { history.replaceState(null, '', g === 'All' ? location.pathname : '#' + g.toLowerCase()); } catch (e) {}
   }
 
-  fetch('apps/apps.json?v=119')
+  fetch('apps/apps.json?v=120')
     .then(function (r) { return r.json(); })
     .then(function (apps) {
       apps.sort(function (x, y) { return ORDER.indexOf(x.group) - ORDER.indexOf(y.group); });

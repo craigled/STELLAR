@@ -131,7 +131,7 @@ APPS = [
  # ---------------------------------------------------------------- multitasking (the Multitasking page)
  ('downloads/Stellar-Orbit.lst', 'Multitasking', 'STELLAR ORBIT',
   'Fly Apollo 7 on three VMs: the Saturn V to orbit (watch the g, drop the tower, cut off at 7,800 m/s), '
-  'a de-orbit burn timed to land by the recovery ship, then the drogues and the mains. VM1 flies it in raw '
+  'a de-orbit burn timed to land by the recovery ship, then the drogues and the mains - with random emergencies on the way. VM1 flies it in raw '
   '1802 code; VM3 draws the map and VM4 the flight data, each woken by VM1 once a second.',
   [b' ', 2 * M, b'..', 40 * M], 'scheduler.html#app=orbit'),
  (['sched-mandel1.lst', 'sched-mandel2.lst', 'sched-mandel3.lst', 'sched-mandel4.lst'], 'Multitasking', 'Mandelbrot x 4',

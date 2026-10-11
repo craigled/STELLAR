@@ -289,7 +289,7 @@
  {
   "group": "Multitasking",
   "name": "STELLAR ORBIT",
-  "what": "Fly Apollo 7: launch, orbit, a timed de-orbit burn, the chutes, the recovery ship. Three VMs, one file. VT100, real-time clock.",
+  "what": "Fly Apollo 7: launch, orbit, random emergencies, a timed de-orbit burn, the chutes, the recovery ship. Three VMs, one file. VT100, real-time clock.",
   "href": "downloads/Stellar-Orbit.lst",
   "note": null
  },
