@@ -100,9 +100,9 @@ body.home button{font-family:var(--pmono)}
 .die-cap{display:flex; justify-content:space-between; align-items:baseline; font-size:12px; color:var(--k-dim)}
 .die-cap b{font-family:var(--serif); font-weight:400; font-size:22px; color:var(--k-ink); font-style:italic}
 .die-frame{position:relative; display:grid; grid-template-columns:auto 1fr; gap:8px; flex:1; min-height:0}
-#die{width:224px; height:448px; image-rendering:pixelated; border:1px solid var(--k-line2); border-radius:3px;
+#die{width:224px; height:479.5px; image-rendering:pixelated; border:1px solid var(--k-line2); border-radius:3px;
   display:block; box-shadow:0 0 0 4px #0a0c10, 0 0 0 5px var(--k-line)}
-.die-labels{position:relative; height:448px}
+.die-labels{position:relative; height:479.5px}
 .dl{position:absolute; left:0; right:0; border-top:1px solid var(--k-line2); font-size:11px; color:var(--k-soft)}
 /* the label: sits on its line, or is nudged below a thin band's neighbour (home.js layoutLabels) */
 /* 12px left margin: the CIDP block's dashed leader runs down this gutter, past the cores label */
@@ -112,6 +112,16 @@ body.home button{font-family:var(--pmono)}
 .dl i{font-style:normal; color:var(--k-dim); font-size:10px}
 .dl.vm span{color:var(--vm)}
 .dl.vm{border-top-color:color-mix(in srgb, var(--vm) 40%, transparent)}
+.dl.endgap{border-bottom:1px solid var(--k-line2)}
+.dl.vm .dlt{background:transparent}
+.dl.vm .dla{display:block; padding:1px 0 0 12px; font-size:10.5px; color:var(--k-ink); line-height:1.3;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:relative; z-index:1}
+.dl.vm .dla em{font-style:normal; color:var(--k-dim)}
+.dl.vm.lent .dla{color:var(--k-dim)}
+/* a VM's panel glows with its share of the 1802 over the last frame (home.js) */
+.dl.vm::after{content:""; position:absolute; inset:0; background:var(--vm); opacity:calc(var(--act, 0) * .22);
+  transition:opacity .25s; pointer-events:none}
+.dl.vm{box-shadow:inset 3px 0 0 color-mix(in srgb, var(--vm) calc(var(--act, 0) * 100%), transparent)}
 .die-read{font-size:11px; color:var(--k-soft); min-height:2.6em; line-height:1.3}
 .die-read b{color:var(--k-ink)}
 
@@ -254,8 +264,8 @@ pre.lst .c{color:#b9b4a8}
 }
 @media (max-width:720px){
   .h-hero{padding:32px 16px 20px}
-  #die{width:128px; height:256px}
-  .die-labels{height:256px}
+  #die{width:128px; height:274px}
+  .die-labels{height:274px}
   .cidp-grid{font-size:9.5px}
   .console, .h-main{padding-left:16px; padding-right:16px}
   .quad{grid-template-columns:1fr}
@@ -309,10 +319,10 @@ body.home .nav-inner{max-width:1320px; padding-left:24px; padding-right:24px}
 .dz-close{margin-left:auto; align-self:center; border:1px solid var(--k-line2); background:var(--k-panel2);
   color:var(--k-soft); font-size:20px; line-height:1; width:34px; height:34px; border-radius:8px; cursor:pointer}
 .dz-close:hover{color:var(--k-ink); border-color:var(--k-soft)}
-/* as tall as the screen allows, keeping the die's 1:2 shape; the labels take a fixed column */
-.dz-body{--lab:170px; --h:min(calc(100vh - 150px), calc((100vw - 90px - var(--lab)) * 2));
+/* as tall as the screen allows, keeping the die's 128:274 shape; the labels take a fixed column */
+.dz-body{--lab:170px; --h:min(calc(100vh - 150px), calc((100vw - 90px - var(--lab)) * 274 / 128));
   display:grid; grid-template-columns:auto var(--lab); gap:10px}
-#dieBig{height:var(--h); width:calc(var(--h) / 2); image-rendering:pixelated; display:block;
+#dieBig{height:var(--h); width:calc(var(--h) * 128 / 274); image-rendering:pixelated; display:block;
   border:1px solid var(--k-line2); border-radius:3px; box-shadow:0 0 0 4px #0a0c10, 0 0 0 5px var(--k-line)}
 .dz-labels{height:var(--h)}
 .dz-labels .dl{font-size:13px; line-height:1.25}
@@ -322,7 +332,7 @@ body.home .nav-inner{max-width:1320px; padding-left:24px; padding-right:24px}
   .die-zoom{padding:8px}
   .dz-panel{padding:10px 10px 12px}
   .dz-head span{display:none}
-  .dz-body{--lab:78px; --h:min(calc(100vh - 130px), calc((100vw - 52px - var(--lab)) * 2)); gap:8px}
+  .dz-body{--lab:78px; --h:min(calc(100vh - 130px), calc((100vw - 52px - var(--lab)) * 274 / 128)); gap:8px}
   .dz-labels .dl{font-size:10.5px} .dz-labels .dl i{display:none}   /* names only: no room for addresses */
 }
 

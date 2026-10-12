@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=121';
+  var V = '?v=122';
   // The four programs are drawn at random from samples/home-pool.json (Craig's list) on every
   // visit: EXACTLY ONE "heavy" app - a game, or Sort visualiser - and three others. STELLAR's
   // scheduler is fair by opcode count, so every VM runs at the pace of the round's dearest
@@ -169,13 +169,15 @@
     ];
     marks.forEach(function (mk) {
       var d = document.createElement('div');
-      d.className = 'dl' + (mk[3] ? ' vm' : '');
-      d.style.top = (mk[0] / 0x8000 * 100) + '%';
-      d.style.height = ((mk[1] - mk[0]) / 0x8000 * 100) + '%';
-      if (mk[3]) d.style.setProperty('--vm', VMC[mk[3]]);
+      var sp = Die.span(mk[0], mk[1]);
+      d.className = 'dl' + (mk[3] ? ' vm' : '') + (mk[1] === 0x2F00 || mk[1] === 0x3000 || mk[1] === 0x4000 ? ' endgap' : '');
+      d.style.top = (sp[0] * 100) + '%';
+      d.style.height = ((sp[1] - sp[0]) * 100) + '%';
+      if (mk[3]) { d.style.setProperty('--vm', VMC[mk[3]]); d.dataset.vm = mk[3]; }
       // the cores band lists all four 1 KB cores' start addresses
       var addr = mk[0] === 0x3000 ? '$3000<br>$3400<br>$3800<br>$3C00' : '$' + h4(mk[0]);
-      d.innerHTML = '<div class="dlt"><span>' + mk[2] + '</span><i class="mono">' + addr + '</i></div>';
+      d.innerHTML = '<div class="dlt"><span>' + mk[2] + '</span><i class="mono">' + addr + '</i></div>' +
+        (mk[3] ? '<span class="dla"></span>' : '');
       // the CIDP is 2 px of the die: its label points to the byte-by-byte CIDP table under it
       if (mk[0] === 0x2F00 && host.id === 'dieLabels') {
         var lt = d.firstChild;
@@ -190,13 +192,46 @@
     layoutLabels(host);
     cv.addEventListener('mousemove', function (e) {
       var r = cv.getBoundingClientRect();
-      var x = Math.floor((e.clientX - r.left) / r.width * 128);
-      var y = Math.floor((e.clientY - r.top) / r.height * 256);
-      if (x < 0 || y < 0 || x > 127 || y > 255 || !m) return;
-      var a = y * 128 + x;
+      var a = Die.addrAt((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+      if (!m) return;
+      if (a < 0) { read.textContent = idle; return; }
       read.innerHTML = '<b>$' + h4(a) + '</b> = ' + h2(m.M[a]) + ' · ' + Die.region(a);
     });
     cv.addEventListener('mouseleave', function () { read.textContent = idle; });
+  }
+
+  // Each VM panel names its app and its size: the bytes its .lst loads into its block(s).
+  function labelApps() {
+    var lib = window.StellarVMLib;
+    ['dieLabels', 'dieBigLabels'].forEach(function (id) {
+      var host = $(id); if (!host) return;
+      Array.prototype.forEach.call(host.querySelectorAll('.dl.vm'), function (d) {
+        var i = +d.dataset.vm - 1, p = LINEUP[i], el = d.querySelector('.dla');
+        if (!p || !el) return;
+        d.classList.toggle('lent', !!p.lent);
+        if (p.lent) { el.textContent = 'lent to VM' + i; el.title = p.what; return; }
+        var lo = 0x4000, hi = lo + (p.blocks || 1) * 0x1000, n = 0;
+        if (sources && sources[i]) lib.parseLst(sources[i]).forEach(function (q) { if (q[0] >= lo && q[0] < hi) n++; });
+        var size = n >= 1000 ? (n / 1024).toFixed(1) + ' KB' : n + ' B';
+        el.innerHTML = esc(p.name) + (n ? ' <em>· ' + size + (p.blocks === 2 ? ', 2 blocks' : '') + '</em>' : '');
+        el.title = p.name + ': ' + n.toLocaleString('en-US') + ' bytes of program' + (p.blocks === 2 ? ' in VM' + (i + 1) + ' and VM' + (i + 2) + '\'s blocks' : '');
+      });
+    });
+  }
+
+  // Each VM panel glows with its share of the 1802 since the last frame (the machine already counts
+  // cycles per VM, so this is four subtractions and, only when a share moves, a style write).
+  var lastVmCyc = [0, 0, 0, 0, 0], shownAct = [-1, -1, -1, -1, -1], vmBands = null;
+  function glowVMs() {
+    if (!vmBands) vmBands = Array.prototype.slice.call(document.querySelectorAll('.dl.vm'));
+    var c = m.vmCycles, d = [0, 0, 0, 0, 0], sum = 0;
+    for (var v = 1; v <= 4; v++) { d[v] = Math.max(0, c[v] - lastVmCyc[v]); lastVmCyc[v] = c[v]; sum += d[v]; }
+    for (v = 1; v <= 4; v++) {
+      var act = sum ? Math.round(d[v] / sum * 20) / 20 : 0;     // in steps of 5 %
+      if (act === shownAct[v]) continue;
+      shownAct[v] = act;
+      vmBands.forEach(function (b) { if (+b.dataset.vm === v) b.style.setProperty('--act', act); });
+    }
   }
 
   // Each region's dividing line sits at its true place, but the CIDP is 2 px of the die and
@@ -566,6 +601,7 @@
     if ((consoleVisible || zoomOpen) && !frozen) {
       renderCidp();
       die.render();
+      glowVMs();
       paintScreens();
       checkFinished();
       drawTimeline();
@@ -672,6 +708,8 @@
       screens[i].render();
     });
     lastInstr = 0; lastTelT = 0; lastCyc = 0; shownRec = null;
+    lastVmCyc = [0, 0, 0, 0, 0];
+    labelApps();
     markTabs();
   }
 
