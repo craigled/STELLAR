@@ -28,7 +28,7 @@
   them out. Up to four programs run at once, each in its own virtual machine (VM) with its own
   registers, memory and position in its code, while one 1802 shares its time among them.</p>
 
-  <p>The 1802 is a spare, unusual chip. It is 8-bit, with sixteen 16-bit registers but no stack
+  <p>The 1802 is an unusual microprocessor chip. It is 8-bit, with sixteen 16-bit registers but no stack
   instructions, no call or return instruction, no multiply and no divide. STELLAR fills those
   gaps for its programs: they get calls and returns, stacks, 16- and 32-bit arithmetic with
   multiply and divide, decimal printing, strings, a terminal, the front panel and the clock,
@@ -93,7 +93,7 @@
   <p>You don't need an Elf2K to try it: every page on this site runs STELLAR's real firmware on
   an emulated 1802 in your browser. Start with the <a href="simulator.html">Simulator</a>.</p>
 
-  <h2><span class="hx">3</span>How STELLAR programs are written</h2>
+  <h2><span class="hx">3</span>How STELLAR was written</h2>
 
   <p>STELLAR's firmware was written straight in hex, with no assembler: every 1802 instruction
   worked out by hand, typed as bytes, and tested on a real Elf2K. Most STELLAR programs on this
