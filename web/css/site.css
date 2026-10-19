@@ -134,6 +134,11 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .foot{border-top:1px solid var(--line); color:var(--ink-soft); font-size:13px;
   padding:22px 18px; text-align:center}
 .foot a{color:var(--ink-soft); text-decoration:underline}
+.foot .who{background:none; border:0; padding:0; font:inherit; color:inherit; cursor:pointer;
+  text-decoration:underline dotted; text-underline-offset:3px}
+.foot .who:hover, .foot .who[aria-expanded="true"]{color:var(--ink)}
+.foot .who-card{margin-left:6px}
+.foot .copy{margin-top:6px; font-size:12px; opacity:.8}
 
 /* ---- opcode reference ---- */
 .op-controls{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:18px 0}

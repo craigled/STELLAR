@@ -69,5 +69,37 @@
     tag.style.marginLeft = '8px';
     tag.textContent = ' · build ' + (m ? 'v' + m[1] : 'unversioned');
     foot.appendChild(tag);
+
+    // Contact: the author's name (the page's own, or added here) shows his email and where he is.
+    // The address is put together only on a click, so robots reading the page's text don't collect it.
+    var who = foot.querySelector('.who');
+    if (!who) {
+      who = document.createElement('button');
+      who.type = 'button'; who.className = 'who'; who.textContent = 'Craig Ledbetter';
+      foot.insertBefore(document.createTextNode(' · by '), tag);
+      foot.insertBefore(who, tag);
+    }
+    var card = document.createElement('span');
+    card.className = 'who-card'; card.hidden = true;
+    who.parentNode.insertBefore(card, who.nextSibling);
+    who.setAttribute('aria-expanded', 'false');
+    who.title = 'Contact';
+    who.addEventListener('click', function () {
+      if (!card.firstChild) {
+        var addr = ['craig1611', 'gmail.com'].join('@');
+        var a = document.createElement('a');
+        a.href = 'mailto:' + addr; a.textContent = addr;
+        card.appendChild(document.createTextNode('('));
+        card.appendChild(a);
+        card.appendChild(document.createTextNode(' · Cork, Ireland)'));
+      }
+      card.hidden = !card.hidden;
+      who.setAttribute('aria-expanded', String(!card.hidden));
+    });
+
+    var copy = document.createElement('div');
+    copy.className = 'copy';
+    copy.textContent = '© 2026 Craig Ledbetter. All rights reserved.';
+    foot.appendChild(copy);
   }
 })();
