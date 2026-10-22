@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stellar C guide</title>
 <meta name="description" content="Programming in Stellar C: the language taught step by step, from the first line to a finished game - every example checked by compiling and running it.">
-<link rel="stylesheet" href="css/site.css?v=123">
+<link rel="stylesheet" href="css/site.css?v=124">
 <style>
 .guide{max-width:82ch}
 .guide h2{margin-top:2.2em; border-top:1px solid var(--line); padding-top:.9em}
@@ -30,7 +30,7 @@
   <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Language &middot; guide</div>
   <h1>Programming in Stellar C</h1>
   <p class="muted">The compiler and its examples are on the <a href="stellarc.html">Stellar C page</a>; each <b>Try it</b> link below opens an example there, ready to compile and run.</p>
-  <ol class="g-toc"><li><a href="#0-compiling-and-running-your-own-programs">Compiling and running your own programs</a></li><li><a href="#1-your-first-program">Your first program</a></li><li><a href="#2-numbers-and-variables">Numbers and variables</a></li><li><a href="#3-decisions-and-loops">Decisions and loops</a></li><li><a href="#4-functions">Functions</a></li><li><a href="#5-characters-strings-and-reading-the-keyboard">Characters, strings and reading the keyboard</a></li><li><a href="#6-arrays">Arrays</a></li><li><a href="#7-signed-numbers">Signed numbers</a></li><li><a href="#8-choosing-with-switch">Choosing with <code>switch</code></a></li><li><a href="#9-the-terminal-screen">The terminal screen</a></li><li><a href="#10-keys-time-and-games">Keys, time and games</a></li><li><a href="#11-the-elf2k-s-hardware">The Elf2K's hardware</a></li><li><a href="#12-how-stellar-shapes-the-language">How STELLAR shapes the language</a></li><li><a href="#13-faster-code-asm-and-native">Faster code: <code>asm { }</code> and <code>native { }</code></a></li><li><a href="#14-when-the-compiler-says-no">When the compiler says no</a></li><li><a href="#15-a-complete-program-hi-lo">A complete program: Hi-Lo</a></li></ol>
+  <ol class="g-toc"><li><a href="#0-compiling-and-running-your-own-programs">Compiling and running your own programs</a></li><li><a href="#1-your-first-program">Your first program</a></li><li><a href="#2-numbers-and-variables">Numbers and variables</a></li><li><a href="#3-decisions-and-loops">Decisions and loops</a></li><li><a href="#4-functions">Functions</a></li><li><a href="#5-characters-strings-and-reading-the-keyboard">Characters, strings and reading the keyboard</a></li><li><a href="#6-arrays">Arrays</a></li><li><a href="#7-signed-numbers">Signed numbers</a></li><li><a href="#8-choosing-with-switch">Choosing with <code>switch</code></a></li><li><a href="#9-the-terminal-screen">The terminal screen</a></li><li><a href="#10-keys-time-and-games">Keys, time and games</a></li><li><a href="#11-the-elf2k-s-hardware">The Elf2K's hardware</a></li><li><a href="#12-how-stellar-shapes-the-language">How STELLAR shapes the language</a></li><li><a href="#13-faster-code-asm-and-native">Faster code: <code>asm { }</code> and <code>native { }</code></a></li><li><a href="#14-when-the-compiler-says-no">When the compiler says no</a></li><li><a href="#15-a-complete-program-hi-lo">A complete program: Hi-Lo</a></li><li><a href="#16-several-tasks-at-once">Several tasks at once</a></li></ol>
   
 <p>Stellar C is a small C-like language for the RCA 1802. A Stellar C program compiles to STELLAR bytecode - the same <code>.lst</code> file a hand-written STELLAR program is - so it loads on an Elf2K running the STELLAR firmware, or runs in the web Simulator. This guide teaches it from the first line to a finished game. Every example in it is a complete program, and every one is compiled and run by <code>SC/guide_check.py</code> with the output shown here - so what you read is what you get.</p>
 <p>If you know C, most of Stellar C will look familiar; the differences are the ones the 1802 and STELLAR impose, and section 12 explains them. If you do not know C, start at section 1.</p>
@@ -329,7 +329,7 @@ void main() {
 <hr>
 <h2 id="12-how-stellar-shapes-the-language">12. How STELLAR shapes the language</h2>
 <p>Stellar C is small because the machine is small. Knowing why saves surprises.</p>
-<ul><li><b>No recursion, fixed homes.</b> Every variable lives in one place for the whole run - one of the VM's 16 registers, or two bytes of memory. The compiler gives registers to the busiest variables and lets two variables share a register when they are never in use at the same time.</li><li><b>Three scratch registers.</b> An expression is worked out in at most three temporary registers. A very long expression is refused ("expression too deep") - split it into two statements: <code>t = a * b + c; x = t / (d + e);</code></li><li><b><code>u8</code> variables cost more than <code>u16</code>.</b> A <code>u8</code> lives in memory and goes through the accumulator; use <code>u8</code> for arrays and for saving space, <code>u16</code> for the variables you work with.</li><li><b>Program size.</b> A VM's program block is 4 KB. A bigger program automatically takes two or three blocks (<code>SETSIZE</code>), leaving fewer VMs free - the <code>.lst</code> header says how much it uses.</li><li><b>Rerun without reloading.</b> The Elf2K runs a program again from memory as the last run left it; Stellar C resets the arrays a program changes and sets variables in code, so a rerun starts clean.</li><li><b>Sharing the machine.</b> <code>getc()</code>, <code>getline()</code> and <code>waitef()</code> let the other VMs run while they wait; <code>delay()</code>, a <code>native { }</code> block and long <code>rtcget</code> waits do not.</li></ul>
+<ul><li><b>No recursion, fixed homes.</b> Every variable lives in one place for the whole run - one of the VM's 16 registers, or two bytes of memory. The compiler gives registers to the busiest variables and lets two variables share a register when they are never in use at the same time.</li><li><b>Three scratch registers.</b> An expression is worked out in at most three temporary registers. A very long expression is refused ("expression too deep") - split it into two statements: <code>t = a * b + c; x = t / (d + e);</code></li><li><b><code>u8</code> variables cost more than <code>u16</code>.</b> A <code>u8</code> lives in memory and goes through the accumulator; use <code>u8</code> for arrays and for saving space, <code>u16</code> for the variables you work with.</li><li><b>Program size.</b> A VM's program block is 4 KB. A bigger program automatically takes two or three blocks (<code>SETSIZE</code>), leaving fewer VMs free - the <code>.lst</code> header says how much it uses.</li><li><b>Rerun without reloading.</b> The Elf2K runs a program again from memory as the last run left it; Stellar C resets the arrays a program changes and sets variables in code, so a rerun starts clean.</li><li><b>Sharing the machine.</b> <code>getc()</code>, <code>getline()</code> and <code>waitef()</code> let the other VMs run while they wait; <code>delay()</code>, a <code>native { }</code> block and long <code>rtcget</code> waits do not. Section 16 shows one program running as several tasks.</li></ul>
 <hr>
 <h2 id="13-faster-code-asm-and-native">13. Faster code: <code>asm { }</code> and <code>native { }</code></h2>
 <p>Most programs never need these. When one inner loop must be faster, you can write it in STELLAR commands (<code>asm</code>) or in raw 1802 machine code (<code>native</code>, about 70 times faster than compiled code).</p>
@@ -368,7 +368,7 @@ void main() {
     switch (k) { case 1: k = 2; case 1: k = 3; }
 }</code></pre></div>
 <div class="g-out g-error"><div class="g-lbl">The compiler says</div><pre>case 1 twice</pre></div>
-<div class="g-table"><table><thead><tr><th>message</th><th>means</th></tr></thead><tbody><tr><td><code>expected ;, found ...</code></td><td>a missing <code>;</code>, <code>)</code> or <code>}</code> just before that point</td></tr><tr><td><code>unknown variable 'x'</code></td><td>not declared (or declared in another function)</td></tr><tr><td><code>no function f()</code></td><td>a call to a function that does not exist</td></tr><tr><td><code>f() takes 2 arguments</code></td><td>the wrong number of arguments</td></tr><tr><td><code>... can only be a statement of its own</code></td><td><code>at()</code>, <code>printz()</code>, <code>printw()</code>, <code>printh()</code> inside an expression</td></tr><tr><td><code>getline(buf): buf must be a u8 array</code></td><td><code>getline</code> and <code>rtcget</code> need a byte array</td></tr><tr><td><code>break outside a loop</code></td><td><code>break</code> / <code>continue</code> with no loop (or <code>continue</code> in a switch with no loop)</td></tr><tr><td><code>the program needs 16 KB</code></td><td>the program is bigger than three 4 KB blocks</td></tr></tbody></table></div>
+<div class="g-table"><table><thead><tr><th>message</th><th>means</th></tr></thead><tbody><tr><td><code>expected ;, found ...</code></td><td>a missing <code>;</code>, <code>)</code> or <code>}</code> just before that point</td></tr><tr><td><code>unknown variable 'x'</code></td><td>not declared (or declared in another function)</td></tr><tr><td><code>no function f()</code></td><td>a call to a function that does not exist</td></tr><tr><td><code>f() takes 2 arguments</code></td><td>the wrong number of arguments</td></tr><tr><td><code>... can only be a statement of its own</code></td><td><code>at()</code>, <code>printz()</code>, <code>printw()</code>, <code>printh()</code> inside an expression</td></tr><tr><td><code>getline(buf): buf must be a u8 array</code></td><td><code>getline</code> and <code>rtcget</code> need a byte array</td></tr><tr><td><code>break outside a loop</code></td><td><code>break</code> / <code>continue</code> with no loop (or <code>continue</code> in a switch with no loop)</td></tr><tr><td><code>the program needs 16 KB</code></td><td>the program is bigger than three 4 KB blocks</td></tr><tr><td><code>x is used by main() and t(): make it shared</code></td><td>two tasks use a plain variable</td></tr><tr><td><code>getc() inside atomic { }</code></td><td>a wait inside <code>atomic</code>: every other task would stop</td></tr><tr><td><code>recv() must be a statement of its own</code></td><td>write <code>x = recv(c);</code>, then use <code>x</code></td></tr></tbody></table></div>
 <hr>
 <h2 id="15-a-complete-program-hi-lo">15. A complete program: Hi-Lo</h2>
 <p>Everything together: a function, a loop, <code>getline</code>, a <code>switch</code>, the terminal.</p>
@@ -427,10 +427,72 @@ Again (y/n)? n
 Bye.</pre></div>
 <p>That game was played by the guide's checker, typing the guesses in. <code>rand()</code> decides the secret, so a game on your machine will be a different one. Notice that <code>abc</code> was simply asked again: <code>number()</code> returns 65535 when no digit was typed, and <code>continue</code> goes round for another guess without counting it as a try.</p>
 <hr>
+<h2 id="16-several-tasks-at-once">16. Several tasks at once</h2>
+<p>STELLAR runs up to four virtual machines (VMs) on the one 1802, taking turns a few commands at a time. A Stellar C program can use them: mark a function <code>task</code>, and it runs in a VM of its own beside <code>main()</code>. The compiler places every part, gives them shared variables, and puts it all in one <code>.lst</code>.</p>
+<div class="g-ex"><div class="g-exh"><span class="mono">pipeline.sc</span><a class="g-try" href="stellarc.html#guide=pipeline">Try it &rarr;</a></div><pre><code>chan raw[8];                // keys, from keyboard() to upper()
+chan done[8];               // capital letters, from upper() to main()
+shared u16 letters;         // how many letters upper() changed
+
+task keyboard() {           // VM2: owns the keyboard
+    u16 k;
+    while (1) {
+        k = getc();
+        send(raw, k);
+        if (k == &#x27;\r&#x27;) return;
+    }
+}
+
+task upper() {              // VM3: does the work
+    u16 k;
+    while (1) {
+        k = recv(raw);
+        if (k &gt;= &#x27;a&#x27; &amp;&amp; k &lt;= &#x27;z&#x27;) { k = k - 32; letters++; }
+        send(done, k);
+        if (k == &#x27;\r&#x27;) return;
+    }
+}
+
+void main() {               // VM1: shows the result
+    u16 k;
+    print(&quot;type a line: &quot;);
+    while (1) {
+        k = recv(done);
+        if (k == &#x27;\r&#x27;) break;
+        putc(k);
+    }
+    print(&quot;\r\n&quot;); printu(letters); print(&quot; letters changed\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>type a line: HELLO
+5 letters changed</pre></div>
+<ul><li><b><code>task name() { ... }</code></b> runs in its own VM: <code>main()</code> is VM1, the tasks take VM2-VM4 in the order they are written (<code>task(4) name()</code> asks for a particular VM). At most three tasks, fewer if a part needs more than 4 KB. A task has no parameters; when it returns, it simply stops.</li><li><b><code>shared u16 x;</code></b> (and <code>shared u8 a[n];</code>, <code>i16</code>, initialisers) is one copy that every task reads and writes. Anything else is private to one task: a plain variable used by two tasks is an error. Each VM has its own registers, so a function called by two tasks works in both (it is copied).</li><li><b><code>chan name[n];</code></b> is a queue of up to <code>n</code> bytes. <code>send(c, v)</code> puts one in (and waits while the queue is full); <code>x = recv(c);</code> takes one out (and waits while it is empty); <code>ready(c)</code> says how many are waiting. A task that waits costs nothing: it gets no turns until there is something to do.</li><li><b><code>wait(condition)</code></b> sleeps until the condition (on shared variables) is true. The compiler wakes the task when another task changes one of those variables.</li><li><b><code>atomic { ... }</code></b> lets no other task run until the block ends - for steps that must not be cut, like moving the cursor and printing, or changing two shared variables together. Waiting for a key inside one is refused: everyone would stop.</li><li>When <code>main()</code> ends, the whole program ends.</li></ul>
+<p>STELLAR switches VMs between commands, never in the middle of one. <code>total++</code> on a shared variable is four commands, so another task could change <code>total</code> between the read and the write, and its update would be lost. The compiler makes every update of shared data one step for you:</p>
+<div class="g-ex"><div class="g-exh"><span class="mono">together.sc</span><a class="g-try" href="stellarc.html#guide=together">Try it &rarr;</a></div><pre><code>shared u16 total;
+shared u8 finished;
+
+task helper() {
+    u16 i;
+    for (i = 0; i &lt; 500; i++) total++;
+    finished = 1;
+}
+
+void main() {
+    u16 i;
+    for (i = 0; i &lt; 500; i++) total++;
+    wait(finished == 1);
+    printu(total); print(&quot;\r\n&quot;);
+}</code></pre></div>
+<div class="g-out g-output"><div class="g-lbl">Output</div><pre>1000</pre></div>
+<div class="g-ex"><div class="g-exh"><span class="mono">notshared.sc</span><span class="g-lbl">does not compile</span></div><pre><code>u16 count;
+task helper() { count = 1; }
+void main() { count = 2; }</code></pre></div>
+<div class="g-out g-error"><div class="g-lbl">The compiler says</div><pre>count is used by main() and helper(): make it shared</pre></div>
+<p>Good to know:</p>
+<ul><li><b>Tasks make a program more responsive, not faster.</b> There is still one 1802: splitting a loop in two tasks makes it about 1.5 times *slower* (the switching costs time). Use tasks so one part can wait - for a key, a line, another task - while the others carry on.</li><li><b>Turns.</b> A VM runs 3 commands, then the next one gets a turn. <code>turns(n)</code> changes that for the task that runs it (1-255): longer turns waste less time switching, shorter ones answer sooner. Time inside <code>atomic { }</code> does not count towards a turn.</li><li><b>One keyboard.</b> If two tasks read keys, whichever asks first gets each one - the compiler warns. Give the keyboard to one task, as <code>keyboard()</code> does above.</li><li><b>Printing.</b> One <code>print("...")</code> comes out whole; two prints from two tasks can mix. Put them in <code>atomic { }</code>.</li><li><code>native { }</code> stops every VM while it runs (the compiler warns).</li></ul>
+<hr>
 <h2 id="quick-reference">Quick reference</h2>
-<ul><li>Types: <code>u16</code>, <code>i16</code>, <code>u8</code> (and arrays of each); <code>const</code>; <code>patched</code> arrays.</li><li>Statements: <code>if</code>/<code>else</code>, <code>while</code>, <code>for</code>, <code>switch</code>/<code>case</code>/<code>default</code>, <code>break</code>, <code>continue</code>, <code>return</code>; assignment <code>= += -= *= /= %= &amp;= |= ^=</code>, <code>++</code>, <code>--</code>.</li><li>Operators: <code>+ - * / %  &amp; | ^ ~  &lt;&lt; &gt;&gt;</code> (by a constant)  <code>== != &lt; &lt;= &gt; &gt;=  &amp;&amp; || !</code>, unary <code>-</code>.</li><li>Output: <code>putc print printu printi printw printz printh</code>; screen: <code>cls at rev eol cursor</code>.</li><li>Input: <code>getc keyready getline</code>. Other: <code>rand delay halt fill copy</code>.</li><li>Hardware: <code>out q ef waitef getin scanin outport inport efsource rtcget rtcset peek poke peekw pokew</code>.</li><li>Full details, the inline <code>asm</code> / <code>native</code> rules and how the compiler works: <code>SC/README.md</code>.</li></ul>
+<ul><li>Types: <code>u16</code>, <code>i16</code>, <code>u8</code> (and arrays of each); <code>const</code>; <code>patched</code> arrays.</li><li>Statements: <code>if</code>/<code>else</code>, <code>while</code>, <code>for</code>, <code>switch</code>/<code>case</code>/<code>default</code>, <code>break</code>, <code>continue</code>, <code>return</code>; assignment <code>= += -= *= /= %= &amp;= |= ^=</code>, <code>++</code>, <code>--</code>.</li><li>Operators: <code>+ - * / %  &amp; | ^ ~  &lt;&lt; &gt;&gt;</code> (by a constant)  <code>== != &lt; &lt;= &gt; &gt;=  &amp;&amp; || !</code>, unary <code>-</code>.</li><li>Output: <code>putc print printu printi printw printz printh</code>; screen: <code>cls at rev eol cursor</code>.</li><li>Input: <code>getc keyready getline</code>. Other: <code>rand delay halt fill copy</code>.</li><li>Tasks: <code>task f()</code>, <code>task(N) f()</code>, <code>shared</code>, <code>chan c[n]</code>, <code>send recv ready wait turns</code>, <code>atomic { }</code>.</li><li>Hardware: <code>out q ef waitef getin scanin outport inport efsource rtcget rtcset peek poke peekw pokew</code>.</li><li>Full details, the inline <code>asm</code> / <code>native</code> rules and how the compiler works: <code>SC/README.md</code>.</li></ul>
 </main>
 <footer class="foot">STELLAR for the RCA COSMAC 1802 &middot; <a href="stellarc.html">Stellar C</a> &middot; <a href="index.html">home</a></footer>
-<script src="js/nav.js?v=123"></script>
+<script src="js/nav.js?v=124"></script>
 </body>
 </html>

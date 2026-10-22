@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stellar C</title>
 <meta name="description" content="Stellar C: a small C-like language that compiles to STELLAR bytecode. Write a program, compile it in your browser, and run it on the real firmware.">
-<link rel="stylesheet" href="css/site.css?v=123">
+<link rel="stylesheet" href="css/site.css?v=124">
 </head>
 <body>
 <main class="wrap">
@@ -20,7 +20,7 @@
 
   <div class="note" style="max-width:86ch">
     <div class="lbl">On your own computer</div>
-    <a href="downloads/stellar-c.zip?v=123" download><b>Download Stellar C</b> (stellar-c.zip, about 60&nbsp;KB)</a> &mdash;
+    <a href="downloads/stellar-c.zip?v=124" download><b>Download Stellar C</b> (stellar-c.zip, about 70&nbsp;KB)</a> &mdash;
     the same compiler this page runs, with every example, the <a href="stellarc-guide.html">guide</a> and its examples, and a README.
     It needs only Python&nbsp;3.8 or newer. Unzip it, then <span class="mono">python3 scc.py myprog.sc</span> writes
     <span class="mono">myprog.lst</span>, ready to send to an Elf2K or to open on the <a href="simulator.html">Simulator</a>.
@@ -120,21 +120,21 @@ done:
   <h3>Native 1802: <span class="mono">native { }</span></h3>
   <p style="max-width:76ch">Raw 1802 machine code, assembled by the compiler and run in place by <span class="mono">$F1 RUNMC</span> &mdash; for the inner loop that must be fast. <span class="mono">{x}</span> is the address of variable <span class="mono">x</span>'s VM register (high byte first), <span class="mono">&amp;a</span> an array's address, <span class="mono">hi(e)</span> and <span class="mono">lo(e)</span> its two bytes. The block returns by itself at the end (or <span class="mono">BR exit</span>). Free registers are R7 R8 R9 RB RD RE RF; the compiler refuses writes to the others. Set X with <span class="mono">SEX</span> before any <span class="mono">STR</span>, and remember the other VMs wait while native code runs.</p>
 
-  <p class="small muted" style="margin-top:22px">The compiler's Python source is served with this page, in <a href="sc/scc.py">sc/</a>, and as one download, <a href="downloads/stellar-c.zip?v=123" download>stellar-c.zip</a>. Look up any opcode in the <a href="opcodes.html">reference</a>; load other programs on the <a href="simulator.html">Simulator</a>.</p>
+  <p class="small muted" style="margin-top:22px">The compiler's Python source is served with this page, in <a href="sc/scc.py">sc/</a>, and as one download, <a href="downloads/stellar-c.zip?v=124" download>stellar-c.zip</a>. Look up any opcode in the <a href="opcodes.html">reference</a>; load other programs on the <a href="simulator.html">Simulator</a>.</p>
 </main>
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=123"></script>
-<script src="js/firmware-0061-35.js?v=123"></script>
-<script src="js/stellar-vm.js?v=123"></script>
-<script src="js/disasm.js?v=123"></script>
-<script src="js/front-panel.js?v=123"></script>
-<script src="js/vt100.js?v=123"></script>
-<script src="js/term-input.js?v=123"></script>
-<script src="js/sim-app.js?v=123"></script>
-<script src="js/clock-row.js?v=123"></script>
-<script src="js/stellarc-page.js?v=123"></script>
-<script src="js/nav.js?v=123"></script>
+<script src="js/opcodes.js?v=124"></script>
+<script src="js/firmware-0061-35.js?v=124"></script>
+<script src="js/stellar-vm.js?v=124"></script>
+<script src="js/disasm.js?v=124"></script>
+<script src="js/front-panel.js?v=124"></script>
+<script src="js/vt100.js?v=124"></script>
+<script src="js/term-input.js?v=124"></script>
+<script src="js/sim-app.js?v=124"></script>
+<script src="js/clock-row.js?v=124"></script>
+<script src="js/stellarc-page.js?v=124"></script>
+<script src="js/nav.js?v=124"></script>
 </body>
 </html>

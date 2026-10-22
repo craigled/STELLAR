@@ -54,6 +54,10 @@ EXAMPLES = [
     ('frontpanel', 'Front panel (Q + hex display)', '', 'Elf2K',
      'Counts $00 to $3F on the Elf2K front panel\'s two-digit display with out(n) while q() blinks '
      'the Q lamp. Watch the panel beside the terminal.'),
+    ('tasks', 'Three tasks at once (multitasking)', '', 'Elf2K',
+     'One program, three VMs: keyboard() owns the keyboard and queues every key, counter() adds in the '
+     'background, and main() prints each key with the running total. Click the terminal and type; q quits. '
+     'Shared variables, a chan queue and atomic - see the guide\'s section 16. HW-verified on the Elf2K.'),
     ('nativedemo', 'Native 1802: native { }', '', 'flat out',
      'Raw 1802 machine code run by $F1 RUNMC: sums a 200-byte array (71x faster than the compiled '
      'loop), formats the total as hex, and copies a string kept inside the native block.'),

@@ -21,6 +21,8 @@ Stellar C is a small C-like language shaped to what STELLAR does in one opcode:
                 efsource(n) ef() waitef()      ($01-$0F, see ARITY below)
     asm { }     inline STELLAR, one command per line (see ASM below)
     native { }  raw 1802, run by $F1 RUNMC (see NATIVE below)
+    tasks       task f() { }  shared u16 x;  chan c[n];  send recv ready wait turns  atomic { }
+                - one program in several VMs (see MULTITASKING below; compile_program)
 
 WHAT IT BUYS OVER HAND-ASSEMBLY: every hard-won STELLAR rule is in the compiler, not in
 the programmer's head - address branches only (no label machinery),
@@ -203,6 +205,21 @@ class Parser:
             if s.peek()[1] == 'const':
                 s.take(); n = s.take(kind='id')[1]; s.take('='); e = s.expr(); s.take(';')
                 items.append(('const', ln, n, e)); continue
+            if s.peek()[1] == 'task' and s.peek(1)[0] in ('id', 'op'):      # task [(vm)] [void] name() { }
+                s.take(); pin = None
+                if s.accept('('): pin = s.expr(); s.take(')')
+                if s.peek()[1] == 'void': s.take()
+                name = s.take(kind='id')[1]; s.take('(')
+                if not s.accept(')'): raise Error('line %d: a task takes no parameters' % ln)
+                s.cur = name; body = s.block(); s.cur = None
+                items.append(('task', ln, name, pin, body)); continue
+            if s.peek()[1] == 'chan' and s.peek(1)[0] == 'id':                # chan name[n];
+                s.take(); n = s.take(kind='id')[1]; s.take('['); size = s.expr(); s.take(']'); s.take(';')
+                items.append(('chan', ln, n, size)); continue
+            if s.peek()[1] == 'shared' and s.peek(1)[1] in TYPES:            # shared u16 x;  shared u8 a[n];
+                s.take(); ty = s.take(kind='id')[1]; name = s.take(kind='id')[1]
+                d = s.decl_rest(ty, name, ln, top=True)
+                items += d; items.append(('shared', ln, [x[2] for x in d])); continue
             patched = s.peek()[1] == 'patched' and s.take()
             ty = s.take(kind='id')[1]
             if ty not in TYPES + ('void',): raise Error('line %d: unknown type %r' % (ln, ty))
@@ -279,12 +296,18 @@ class Parser:
             s.take(')')
             return ('block', ([init] if init else []) + [('while', ln, c, s.stmt(), step)])
         if t[1] in ('break', 'continue'): s.take(); s.take(';'); return (t[1], ln)
+        if t[1] == 'atomic' and s.peek(1)[1] == '{':
+            s.take(); return ('atomic', ln, s.block())
         if t[0] == 'asm':
             s.take(); kind, first, text = t[1]
             return (kind, ln) + (asm_parse if kind == 'asm' else native_parse)(first, text)
         if t[1] == 'return':
             s.take(); e = None if s.peek()[1] == ';' else s.expr(); s.take(';'); return ('return', ln, e)
-        st = s.simple(); s.take(';'); return st
+        st = s.simple(); s.take(';')
+        if st[0] == 'expr' and st[2][1] == 'wait':                 # wait(condition): sleep until it is true
+            if len(st[2][2]) != 1: raise Error('line %d: wait(condition) takes one argument' % ln)
+            return ('wait', ln, st[2][2][0])
+        return st
 
     def simple(s):
         ln = s.line(); target = s.unary()
@@ -328,7 +351,7 @@ class Parser:
 TEMPS = [0xF, 0xE, 0xD]           # expression temporaries
 RV = 0xD                          # return values
 ZERO = 0xC                        # holds 0 when the program needs it: a[k], u8 variables
-BUILTINS = {'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'halt', 'fill', 'copy',
+BUILTINS = {'turns', 'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'halt', 'fill', 'copy',
             'out', 'outmem', 'outport', 'inport', 'getin', 'scanin', 'ef', 'efsource', 'waitef', 'q',
             'cls', 'eol', 'rev', 'cursor', 'at', 'printz', 'printw', 'printh', 'getline',
             'rtcget', 'rtcset', 'peek', 'poke', 'peekw', 'pokew', 'printi'}
@@ -376,8 +399,12 @@ EXPRS = ('num', 'var', 'idx', 'call', 'bin', 'neg', 'not', 'addr', 'str')
 
 
 class Compiler:
-    def __init__(s, items, name):
+    def __init__(s, items, name, entry='main', mt=None):
         s.name = name
+        s.entry = entry                  # the function the program starts with: main(), or a task's own
+        s.mt = mt                        # a part of a multitasking program (see compile_program), else None
+        s.shared = set()
+        s.atomic = 0                     # inside atomic { }: SETMULTI 00 is on
         s.consts, s.globals, s.arrays, s.funcs, s.bytevars = {}, {}, {}, {}, {}
         for it in items:
             if it[0] == 'const': s.consts[it[2]] = s.const(it[3], it[1])
@@ -387,12 +414,14 @@ class Compiler:
             elif it[0] == 'array': s.arrays[it[2]] = it
             elif it[0] == 'func': s.funcs[it[3]] = it
             elif it[0] == 'signed': s.signed = it[2]
+            elif it[0] == 'shared': s.shared.update(it[2])
         if not hasattr(s, 'signed'): s.signed = set()
-        if 'main' not in s.funcs: raise Error('no main()')
+        if entry not in s.funcs: raise Error('no main()')
         for n, fn in list(s.funcs.items()):                     # u8 variable x  ->  x[0]
             s.funcs[n] = fn[:5] + (s.desugar(fn[5]),)
         s.written = set()
         s.scan_writes()
+        if mt and mt['role'] == 'main': s.written |= {a for a in s.shared if a in s.arrays}   # set up every run
         s.patched = {n for n, it in s.arrays.items() if it[-1] == 'patched'}
         s.need_zero = bool(s.bytevars) or s.uses_const_index()
         s.setsize = 1
@@ -515,6 +544,9 @@ class Compiler:
                     if isinstance(x, tuple): count(x)
             elif k in ('asm', 'native'):                # these name registers: keep them there
                 for v in s.vars_in(st[3]): weight[v] = weight.get(v, 0) + 10 ** 6
+            elif k == 'atomic': cnt(st[2])
+            elif k == 'wait':
+                loops[0] += 1; count(st[2]); loops[0] -= 1
         for p in fn[4]: weight[p] = weight.get(p, 0) + 1
         cnt(fn[5])
 
@@ -583,6 +615,8 @@ class Compiler:
                 return s.vars_in(st[2]) | acc
             if k == 'break': return set(ctx[-1][0]) if ctx else out
             if k == 'continue': return set(ctx[-1][1]) if ctx else out
+            if k == 'atomic': return live(st[2], out, ctx)
+            if k == 'wait': return s.vars_in(st[2]) | out
             return out
         live(fn[5], set(), [])
         return {v: (w, across.get(v, set())) for v, w in weight.items()}
@@ -637,6 +671,8 @@ class Compiler:
         s.loc = {}
         order = sorted(items, key=lambda k: (-items[k][0], str(k)))
         for k in order:
+            if k[0] is None and k[1] in s.shared:          # one copy for every task: memory, never a register
+                s.loc[k] = ('m', '.v__%s' % k[1]); continue
             taken = {s.loc[o][1] for o in s.loc if s.loc[o][0] == 'r' and conflict(k, o)}
             r = next((r for r in regs if r not in taken), None)
             s.loc[k] = ('r', r) if r is not None else ('m', '.v_%s_%s' % (k[0] or '', k[1]))
@@ -949,6 +985,12 @@ class Compiler:
             s.emit(serouti('-')); s.emit(ldx(c, 0)); s.emit(subxyz(c, t, t, 'its size'))
             s.label(pos); s.emit(x2acc(t)); s.emit(('24', 'COPYAMA', '')); s.emit(('6B 00', 'CVT2DEC Acc', ''))
             s.emit(('6E', 'OUTDEC', '')); s.untemp(c); s.untemp(t); return
+        if name == 'turns':                          # turns(n): $C8 SETCIN - commands this VM runs a turn
+            s.nargs(name, args, 1)
+            if not s.isconst(args[0]) or not 1 <= s.const(args[0], s.ln) <= 255:
+                raise Error('line %d: turns(n): n must be a constant, 1-255' % s.ln)
+            v = s.const(args[0], s.ln)
+            return s.emit(('C8 %02X' % v, 'SETCIN %02X' % v, 'this VM runs %d commands a turn' % v))
         if name == 'delay': return s.emit(('C0 %02X' % s.const(args[0], s.ln), 'DLYI %02X' % s.const(args[0], s.ln), ''))
         if name == 'halt': return s.emit(gal('QUIT'))
         if name in ARITY: return s.io(name, args, d)
@@ -1272,13 +1314,32 @@ class Compiler:
         if k == 'local':
             if st[3] is not None: s.store(st[2], s.hoist(st[3]))
             return
-        if k == 'assign': return s.assign(st[2], st[3])
-        if k == 'expr': return s.call(s.hoist(st[2]))
+        if k == 'assign':
+            w = s.shared_written(st)
+            atom = w and not s.atomic and (s.shared_in(st[3]) or (st[2][0] == 'idx' and s.shared_in(st[2][2])))
+            if atom:                               # read-modify-write of shared data: one step for the others
+                bad = s.unsafe(st[3], True)
+                if bad: raise Error('line %d: %s in an update of shared data: work it out first' % (st[1], bad))
+                s.setmulti(0, 'a shared update: no other task cuts in')
+            s.assign(st[2], st[3])
+            if atom: s.setmulti(1)
+            return s.wakes(w)
+        if k == 'expr': s.call(s.hoist(st[2])); return s.wakes(s.shared_written(st))
+        if k == 'wait': return s.wait(st)
+        if k == 'atomic':
+            if not s.atomic:
+                bad = s.unsafe(st[2])
+                if bad: raise Error('line %d: %s inside atomic { }: every other task would stop with it' % (st[1], bad))
+                s.setmulti(0, 'atomic {: no other task runs'); s.atomic_loops = len(s.loops)
+            s.atomic += 1; s.stmt(st[2]); s.atomic -= 1
+            if not s.atomic: s.ln = st[1]; s.setmulti(1, '} atomic')
+            return
         if k == 'asm': return s.asm(st[2])
         if k == 'native': return s.native(st[2])
         if k == 'if':
             _, _, c, a, b = st
             one = a[1][0] if a[0] == 'block' and len(a[1]) == 1 else a
+            if b is None and one[0] in ('break', 'continue', 'return'): s.leaving(one[0])
             if b is None and one[0] in ('break', 'continue') and s.loops:
                 # if (c) break;  ->  one conditional branch straight out of the loop
                 return s.cond(s.hoist(c, False), s.loops[-1][0 if one[0] == 'break' else 1], True)
@@ -1307,6 +1368,7 @@ class Compiler:
             else: s.label(test); s.hidden[s.fn] = 0; s.cond(s.hoist(c, False), top, True)
             s.label(end); return
         if k == 'switch': return s.switch(st)
+        if k in ('break', 'continue', 'return'): s.leaving(k)
         if k in ('break', 'continue'):
             if not s.loops or s.loops[-1][0 if k == 'break' else 1] is None:
                 raise Error('line %d: %s outside a loop' % (st[1], k))
@@ -1315,6 +1377,91 @@ class Compiler:
             if st[2] is not None: s.value(s.hoist(st[2]), RV)
             return s.emit(ret())
         raise Error('line %d: %s' % (st[1], k))
+
+    # ---------------------------------------------------------- multitasking (see compile_program)
+    def wrap(s, a): return (a - ORG) & 0xFFFF          # an absolute address, as this block's relative one
+    def state(s, vm): return s.wrap(0x2F05 + 0x10 * (vm - 1))   # VM vm's CIDP state byte: 1 run, 4 paused
+    def setmulti(s, on, note=''): s.emit(('C7 0%d' % on, 'SETMULTI 0%d' % on, note))
+    def setstate(s, vm, v, note):
+        r = s.temp(); s.emit(ldx(r, s.state(vm), 'VM%d state' % vm))
+        s.emit(('31 0%X %02X' % (r, v), 'COPYMXI R%d %02X' % (r, v), note)); s.untemp(r)
+
+    def shared_in(s, e):
+        """The shared variables and arrays e reads or names."""
+        out = set()
+        s.walk(e, lambda x: out.add(x[1]) if x[0] in ('var', 'idx', 'addr') and isinstance(x[1], str)
+               and x[1] in s.shared else None)
+        return out
+
+    def shared_written(s, st):
+        """The shared names a statement writes: its target, or the array fill/copy/getline/rtcget fills."""
+        w = set()
+        if st[0] == 'assign' and st[2][0] in ('var', 'idx') and st[2][1] in s.shared: w.add(st[2][1])
+        def f(x):
+            if x[0] == 'call' and x[1] in ('fill', 'copy', 'getline', 'rtcget') and x[2] and \
+                    x[2][0][0] in ('addr', 'var') and x[2][0][1] in s.shared:
+                w.add(x[2][0][1])
+        s.walk(st, f)
+        return w
+
+    def wakes(s, names):
+        """After a write to shared data: wake every other task whose wait() looks at it (if it sleeps)."""
+        if not s.mt or not names: return
+        for vm in sorted({v for n in names for v in s.mt['watch'].get(n, ())} - {VM}):
+            r = s.temp(); skip = s.new()
+            s.emit(ldx(r, s.state(vm), 'VM%d state' % vm))
+            s.emit(('9D 1%X 04' % r, 'TESTMXI R%d 04' % r, 'is VM%d asleep in wait()?' % vm))
+            s.emit(iff(skip)); s.emit(('31 0%X 01' % r, 'COPYMXI R%d 01' % r, 'wake VM%d' % vm))
+            s.untemp(r); s.label(skip)
+
+    def unsafe(s, node, top_updates=False):
+        """Why node cannot run with multitasking off (inside atomic { } or a shared update), or None:
+        a wait, a nested atomic, a key or EF wait, or a function that does one - or that updates
+        shared data itself (its own SETMULTI 01 would end ours early)."""
+        seen, found = set(), []
+        def f(x, inner):
+            if x[0] == 'wait': found.append('wait()')
+            elif x[0] == 'atomic': found.append('atomic { }')
+            elif x[0] == 'call' and x[1] in ('getc', 'getline', 'getin', 'waitef'): found.append(x[1] + '()')
+            elif x[0] == 'call' and x[1] in s.funcs and x[1] not in seen:
+                seen.add(x[1]); s.walk(s.funcs[x[1]][5], lambda y: f(y, True))
+            elif x[0] == 'assign' and (inner or top_updates) and s.shared_written(x) and s.shared_in(x[3]):
+                found.append('a shared update')
+        s.walk(node, lambda x: f(x, False))
+        if top_updates:
+            s.walk(node, lambda x: found.append('%s()' % x[1]) if x[0] == 'call' and x[1] in s.funcs else None)
+        return found[0] if found else None
+
+    def leaving(s, k):
+        if not s.atomic: return
+        if k == 'return' or len(s.loops) <= s.atomic_loops:
+            raise Error('line %d: %s out of atomic { }: multitasking would stay off' % (s.ln, k))
+
+    def wait(s, st):
+        """wait(c): with multitasking off, look at c; if false, mark this VM paused, multitasking on, and
+        spin until a wake-up sets the state back to 1 (the scheduler stops giving us turns meanwhile).
+        Looking and pausing with no other task running means a wake-up cannot fall between them."""
+        ln, c = st[1], st[2]
+        if not s.mt: raise Error('line %d: wait() needs a task to wake it: see task' % ln)
+        if s.atomic: raise Error('line %d: wait() inside atomic { }: nothing could wake it' % ln)
+        if s.calls_in(c):
+            raise Error('line %d: wait(condition): the condition cannot call a function' % ln)
+        if not s.shared_in(c):
+            raise Error('line %d: wait(): the condition reads no shared variable, so nothing would wake it' % ln)
+        top, spin, done = s.new(), s.new(), s.new()
+        s.label(top); s.setmulti(0, 'wait(): look with no other task running')
+        s.cond(c, done, True)
+        r = s.temp(); s.emit(ldx(r, s.state(VM), 'my VM state'))
+        s.emit(('31 0%X 04' % r, 'COPYMXI R%d 04' % r, 'asleep: no more turns until a wake-up'))
+        s.setmulti(1)
+        s.label(spin); s.emit(('9D 1%X 04' % r, 'TESTMXI R%d 04' % r, 'still asleep?')); s.emit(ift(spin))
+        s.emit(gal(top, 'woken: look again')); s.untemp(r)
+        s.label(done); s.setmulti(1)
+
+    def calls_in(s, e):
+        found = []
+        s.walk(e, lambda x: found.append(x) if x[0] == 'call' else None)
+        return found
 
     def switch(s, st):
         """switch (e) { case k: ... default: ... }: the tests first (TESTXI each case), then the bodies in
@@ -1434,11 +1581,11 @@ class Compiler:
                         raise Error('line %d: %r is both a label in the block and a const' % (s.ln, e[1]))
                     return labels[e[1]]
                 if e[1] in s.consts: return s.consts[e[1]]
-                if e[1] in s.arrays: return ORG + s.addr(e[1])
+                if e[1] in s.arrays: return (ORG + s.addr(e[1])) & 0xFFFF
                 if labels is None: return 0
                 raise Error('line %d: unknown name %r' % (s.ln, e[1]))
-            if k == 'addr': return ORG + s.addr(e[1]) + (2 if s.wide(e[1]) else 1) * ev(e[2])
-            if k == 'idx' and e[1] in s.arrays: return ORG + s.addr(e[1]) + (2 if s.wide(e[1]) else 1) * ev(e[2])
+            if k == 'addr': return ((ORG + s.addr(e[1])) & 0xFFFF) + (2 if s.wide(e[1]) else 1) * ev(e[2])
+            if k == 'idx' and e[1] in s.arrays: return ((ORG + s.addr(e[1])) & 0xFFFF) + (2 if s.wide(e[1]) else 1) * ev(e[2])
             if k == 'call' and e[1] in ('hi', 'lo') and len(e[2]) == 1:
                 v = ev(e[2][0]); return (v >> 8) & 255 if e[1] == 'hi' else v & 255
             if k == 'neg': return -ev(e[1])
@@ -1516,13 +1663,20 @@ class Compiler:
         s.ln = 1; s.noted = 0; s.fn = None; s.tbusy = set()
         s.rows.append(start('Stellar C: ' + s.name))
         if s.setsize > 1: s.rows.append(('F2 %02X' % s.setsize, 'SETSIZE %02X' % s.setsize, 'the program needs %d KB' % (4 * s.setsize)))
+        role = s.mt['role'] if s.mt else None
+        if role: s.noted = s.ln                    # (no source line on the start-up code)
+        if role == 'main':                         # before any task has run a command: they wait for us
+            s.setmulti(0, 'no other VM runs until the shared data is set up')
+            for vm in s.mt['tasks']: s.setstate(vm, 4, 'VM%d waits' % vm)
         if s.need_zero: s.emit(ldx(ZERO, 0, 'RC = 0: the index for a[k] and the u8 variables'))
         for a, it in s.arrays.items():             # arrays the program writes are set up again every run
-            if a not in s.written or a in s.patched: continue
+            if a in s.shared and role != 'main': continue          # main() sets up the shared data
+            if (a not in s.written and a not in s.shared) or a in s.patched: continue
             s.ln = it[1]; s.noted = 0
             if a in s.bytevars:
                 if s.bytevars[a][3] is not None:
                     s.emit(ldai(s.const(s.bytevars[a][3], it[1]))); s.emit(wridx(ZERO, s.addr(a)))
+                elif a in s.shared: s.emit(ldai(0)); s.emit(wridx(ZERO, s.addr(a), 'shared: 0 at the start'))
                 continue
             size = len(s.array_bytes(it))
             if it[4] is None:
@@ -1534,9 +1688,25 @@ class Compiler:
                     s.emit(ldx(0xE, s.layout.get('.init_' + a, 0) + off)); s.emit(ldx(0xF, s.addr(a) + off))
                     s.emit(('3B EF %02X' % n, 'COPYMXMY RE -> RF %d' % n, 'from its pristine copy'))
         for g, it in s.globals.items():
-            if it[3] is not None: s.ln = it[1]; s.noted = 0; s.fn = None; s.tbusy = set(); s.store(g, it[3])
-        s.rows.append(call('F_main', 'run main()'))
-        s.rows.append(lbl('QUIT')); s.rows.append(('00', 'HALT', ''))
+            if g in s.shared and role != 'main': continue
+            init = it[3] if it[3] is not None or g not in s.shared else ('num', 0)
+            if init is not None: s.ln = it[1]; s.noted = 0; s.fn = None; s.tbusy = set(); s.store(g, init)
+        s.tbusy = set()
+        if role == 'main':
+            for vm in s.mt['tasks']: s.setstate(vm, 1, 'start VM%d' % vm)
+            s.setmulti(1, 'the tasks run from here')
+        s.rows.append(call('F_' + s.entry, 'run %s()' % s.entry))
+        s.rows.append(lbl('QUIT'))
+        if role == 'main':                         # main() is over: so is the program
+            s.setmulti(0); s.kreg = {}
+            for vm in s.mt['tasks']: s.setstate(vm, 4, 'stop VM%d' % vm)
+            s.setmulti(1); s.rows.append(('00', 'HALT', 'no VM is left running: the program ends'))
+        elif role == 'task':                       # a task that is over parks itself: paused for good
+            s.setmulti(1, 'in case it stopped inside atomic { }'); s.kreg = {}
+            r = s.temp(); s.emit(ldx(r, s.state(VM), 'my VM state')); s.label('PARK')
+            s.emit(('31 0%X 04' % r, 'COPYMXI R%d 04' % r, 'paused - a stray wake-up only brings us back here'))
+            s.emit(gal('PARK')); s.untemp(r)
+        else: s.rows.append(('00', 'HALT', ''))
         for n, fn in s.funcs.items():
             s.fn = n; s.ln = fn[1]; s.noted = 0; s.kreg = {}; s.ma = None; s.acc = None
             s.asm_defs, s.asm_used = set(), {}
@@ -1566,7 +1736,19 @@ def compile_file(path):
 
 
 def compile_source(src, name):
-    c = Compiler(Parser(lex(src)).program(), name)
+    """A one-VM program -> (compiler, emitted rows, labels, data). compile_program takes either kind."""
+    items = Parser(lex(src)).program()
+    if any(it[0] in MULTI for it in items):
+        raise Error('the program has tasks or shared data: compile it with compile_program()')
+    return compile_items(items, src, name)
+
+
+def compile_items(items, src, name, entry='main', mt=None, fixed=None):
+    """One block's program. fixed: layout entries decided elsewhere (a task's shared data, which lives
+    in main()'s block) - not placed again here."""
+    fixed = fixed or {}
+    c = Compiler(items, name, entry, mt)
+    c.layout = dict(fixed)
     for _ in range(4):
         # pass 1 sizes the code; pass 2 places the data after it
         c.compile(src)
@@ -1575,11 +1757,12 @@ def compile_source(src, name):
         data, a = {}, (code_len + 15) & ~15
         for b, lab in c.strings.items(): c.layout[lab] = a; data[a] = b; a += len(b)
         for n, it in c.arrays.items():
+            if n in fixed: continue
             byts = c.array_bytes(it)
             c.layout[n] = a; data[a] = byts if it[4] else b''; a += len(byts)
             if n in c.written and it[4] and n not in c.patched: c.layout['.init_' + n] = a; data[a] = byts; a += len(byts)
         for k, loc in c.loc.items():
-            if loc[0] == 'm': c.layout[loc[1]] = a; a += 2
+            if loc[0] == 'm' and loc[1] not in fixed: c.layout[loc[1]] = a; a += 2
         for key, (bs, _, shorts) in c.natives.items():           # raw 1802 for RUNMC
             if shorts and (a & 255) + len(bs) > 256: a = (a + 255) & ~255   # short branches: one page
             c.layout[key] = a; data[a] = bytes(bs); a += len(bs)
@@ -1605,6 +1788,289 @@ def compile_source(src, name):
     raise Error('the layout did not settle')
 
 
+# ====================================================================== MULTITASKING: one program, several VMs
+# task name() { }  runs in a VM of its own beside main() (VM1); shared variables and arrays live in main()'s
+# block and every part reaches them by absolute address, written as the wrapped relative address (STELLAR adds
+# the block's page with no clamp: VM2's $EF00 is $3F00). chan name[n] is a queue of bytes: a shared ring plus
+# three shared counters, with send / recv / ready rewritten below into wait() and atomic { }.
+MULTI = ('task', 'chan', 'shared')
+
+
+class Part:
+    def __init__(s, title, vm, c, em, labels, data):
+        s.title, s.vm, s.c, s.em, s.labels, s.data = title, vm, c, em, labels, data
+        s.org = 0x4000 + (vm - 1) * 0x1000
+        s.code = em[-1][0] + len(em[-1][1]) - s.org
+
+
+class Program:
+    """A compiled program: one Part per VM it uses (a one-VM program has one, built for VM N by --vm N)."""
+    def __init__(s, name, parts, single, shared=None, warnings=()):
+        s.name, s.parts, s.single, s.shared, s.warnings = name, parts, single, shared or {}, list(warnings)
+
+    def lst(s, path):
+        """The .lst: every part's disassembly, then one block of D-lines for all of them."""
+        old = VM
+        try:
+            if s.single:
+                p = s.parts[0]; set_vm(p.vm)
+                return render_lst(path, p.c, p.em, p.labels, p.data)
+            heads, code = [], []
+            for p in s.parts:
+                set_vm(p.vm)
+                text = render_lst(path, p.c, p.em, p.labels, p.data, claims=False)
+                h, _, d = text.partition('; CODE  -  download this block\n')
+                heads.append(h.rstrip('\n')); code.append(d.strip('\n'))
+        finally: set_vm(old)
+        n = sum(len(p.em) for p in s.parts)
+        top = ['; ' + '=' * 74,
+               '; %s  -  a MULTITASKING program compiled from %s by scc (Stellar C): %d VMs, ONE file'
+               % (s.name, os.path.basename(path), len(s.parts)),
+               '; ' + '=' * 74,
+               '; %d STELLAR commands in all.' % n]
+        for p in s.parts:
+            top.append(';   VM%d $%04X-$%04X  %-14s %4d commands, %5d bytes of code, %5d in all'
+                       % (p.vm, p.org, min(p.org + 0x1000 * p.c.setsize, TOP) - 1, p.title + '()', len(p.em), p.code, p.c.data_end))
+        if s.shared:
+            top.append('; shared (absolute): ' + ', '.join('%s $%04X' % (k, v) for k, v in s.shared.items()
+                                                          if '__' not in k))
+        top += ['; Load this one file, then cold boot: every VM starts at once, and main() holds the tasks',
+                '; until the shared data is set up. When main() ends, the whole program ends.']
+        top += ['; warning: ' + w for w in s.warnings]
+        text = '\n'.join(top + [';'] + heads + ['', '; CODE  -  download this block', ''] +
+                         ['\n\n'.join(code)]) + '\n'
+        return claim_vms_text(text)[0]
+
+    def pokes(s, path='program.sc'):
+        """(address, byte) for every D-line, as Craig loads it."""
+        out = []
+        for ln in s.lst(path).split('\n'):
+            m = re.match(r'D ([0-9A-F]{4}) (.*)$', ln)
+            if m:
+                a = int(m.group(1), 16)
+                out += [(a + i, int(b, 16)) for i, b in enumerate(m.group(2).split())]
+        return out
+
+    def symbols(s):
+        if s.single: return symbols(s.parts[0].c, s.parts[0].labels)
+        old = VM
+        try:
+            out = {'shared': s.shared, 'vms': {}}
+            for p in s.parts:
+                set_vm(p.vm); out['vms'][p.vm] = dict(symbols(p.c, p.labels), part=p.title)
+            return out
+        finally: set_vm(old)
+
+    def summary(s):
+        if s.single:
+            p = s.parts[0]; return '%d commands, %d bytes of code, %d in all' % (len(p.em), p.code, p.c.data_end)
+        return '; '.join('VM%d %s(): %d commands, %d in all' % (p.vm, p.title, len(p.em), p.c.data_end) for p in s.parts)
+
+
+def _walk(node, fn):
+    if isinstance(node, tuple):
+        fn(node)
+        for x in node[1:]:
+            if isinstance(x, (tuple, list)): _walk(x, fn)
+    elif isinstance(node, list):
+        for x in node: _walk(x, fn)
+
+
+def _names(node, names):
+    """The names from `names` that node refers to: variables, arrays, and words of asm / native text."""
+    out = set()
+    def f(x):
+        if x[0] in ('var', 'idx', 'addr') and isinstance(x[1], str) and x[1] in names: out.add(x[1])
+        if x[0] == 'asm':
+            out.update(n for _, _, words in x[2] for w in words for n in re.findall(r'[A-Za-z_]\w*', w) if n in names)
+        if x[0] == 'native':
+            out.update(n for _, _, _, arg in x[2] for n in re.findall(r'[A-Za-z_]\w*', arg) if n in names)
+    _walk(node, f)
+    return out
+
+
+def _chans(items, chans):
+    """send / recv / ready -> wait() and atomic { } on the queue's shared ring and counters."""
+    def parts(ch, ln, what):
+        if ch[0] != 'var' or ch[1] not in chans: raise Error('line %d: %s(c): c must be a chan' % (ln, what))
+        n = ch[1]; return n, chans[n], n + '__h', n + '__t', n + '__n'
+    def inc(v, n, ln):                                  # v = v + 1, back to 0 at n
+        return [('assign', ln, ('var', v), ('bin', '+', ('var', v), ('num', 1))),
+                ('if', ln, ('bin', '==', ('var', v), ('num', n)), ('assign', ln, ('var', v), ('num', 0)), None)]
+    def recv(ch, ln, target):
+        buf, n, h, tl, cnt = parts(ch, ln, 'recv')
+        body = ([('assign', ln, target, ('idx', buf, ('var', tl)))] if target else []) + inc(tl, n, ln) + \
+               [('assign', ln, ('var', cnt), ('bin', '-', ('var', cnt), ('num', 1)))]
+        return [('wait', ln, ('bin', '!=', ('var', cnt), ('num', 0))), ('atomic', ln, ('block', body))]
+    def ex(e, ln):
+        if not isinstance(e, tuple): return e
+        if e[0] == 'call' and e[1] == 'ready':
+            if len(e[2]) != 1: raise Error('line %d: ready(c) takes one argument' % ln)
+            return ('var', parts(e[2][0], ln, 'ready')[4])
+        if e[0] == 'call' and e[1] in ('send', 'recv'):
+            raise Error('line %d: %s() must be a statement of its own: send(c, v);  x = recv(c);' % (ln, e[1]))
+        return tuple(ex(x, ln) if isinstance(x, tuple) else [ex(y, ln) for y in x] if isinstance(x, list) else x
+                     for x in e)
+    def st(x):
+        k = x[0]
+        if k == 'block': return ('block', [st(y) for y in x[1]])
+        if k in ('case', 'default', 'break', 'continue', 'asm', 'native'): return x
+        ln = x[1]
+        if k == 'expr' and x[2][1] == 'send':
+            if len(x[2][2]) != 2: raise Error('line %d: send(c, v) takes two arguments' % ln)
+            buf, n, h, tl, cnt = parts(x[2][2][0], ln, 'send')
+            v = ex(x[2][2][1], ln); pre = []
+            if not (v[0] == 'num' or (v[0] == 'var' and v[1] not in chans)):
+                pre = [('local', ln, '.sv', v)]; v = ('var', '.sv')     # worked out before the queue is locked
+            body = [('assign', ln, ('idx', buf, ('var', h)), v)] + inc(h, n, ln) + \
+                   [('assign', ln, ('var', cnt), ('bin', '+', ('var', cnt), ('num', 1)))]
+            return ('block', pre + [('wait', ln, ('bin', '<', ('var', cnt), ('num', n))), ('atomic', ln, ('block', body))])
+        if k == 'expr' and x[2][1] == 'recv':
+            return ('block', recv(x[2][2][0] if x[2][2] else ('num', 0), ln, None))
+        if k == 'assign' and x[3][0] == 'call' and x[3][1] == 'recv':
+            return ('block', recv(x[3][2][0] if x[3][2] else ('num', 0), ln, ex(x[2], ln)))
+        if k == 'local' and x[3] and x[3][0] == 'call' and x[3][1] == 'recv':
+            return ('block', [('local', ln, x[2], None)] + recv(x[3][2][0] if x[3][2] else ('num', 0), ln, ('var', x[2])))
+        if k == 'if': return ('if', ln, ex(x[2], ln), st(x[3]), st(x[4]) if x[4] else None)
+        if k == 'while': return ('while', ln, ex(x[2], ln), st(x[3]), st(x[4]) if x[4] else None)
+        if k == 'switch': return ('switch', ln, ex(x[2], ln), [st(y) for y in x[3]])
+        if k == 'atomic': return ('atomic', ln, st(x[2]))
+        return tuple(ex(y, ln) if isinstance(y, tuple) else y for y in x)
+    return [it[:5] + (st(it[5]),) if it[0] == 'func' else it for it in items]
+
+
+def compile_program(src, name):
+    """Any program -> Program. Without a task it is compile_source's, for the VM set_vm() chose."""
+    items = Parser(lex(src)).program()
+    if not any(it[0] in MULTI for it in items):
+        c, em, labels, data = compile_items(items, src, name)
+        return Program(name, [Part('main', VM, c, em, labels, data)], True)
+    if VM != 1: raise Error('a program with tasks starts in VM1: build it without --vm')
+    tasks = [it for it in items if it[0] == 'task']
+    if not tasks:
+        ln = next(it[1] for it in items if it[0] in MULTI)
+        raise Error('line %d: shared data and chan need at least one task' % ln)
+    if len(tasks) > 3: raise Error('line %d: at most 3 tasks: VM2-VM4 (main() is VM1)' % tasks[3][1])
+    k = Compiler.__new__(Compiler); k.consts = {}          # the constants, for chan sizes and task(N)
+    for it in items:
+        if it[0] == 'const': k.consts[it[2]] = k.const(it[3], it[1])
+    funcs = {it[3] for it in items if it[0] == 'func'}
+    chans, out = {}, []
+    for it in items:
+        if it[0] == 'chan':
+            n = k.const(it[3], it[1])
+            if not 2 <= n <= 255: raise Error('line %d: chan %s[%d]: the size must be 2-255' % (it[1], it[2], n))
+            chans[it[2]] = n
+            out += [('array', it[1], it[2], ('num', n), None, 'u8')] + \
+                   [('scalar', it[1], it[2] + x, None, 'u8') for x in ('__h', '__t', '__n')] + \
+                   [('shared', it[1], [it[2], it[2] + '__h', it[2] + '__t', it[2] + '__n'])]
+        elif it[0] == 'task':
+            if it[2] in funcs or it[2] == 'main' or any(x[0] == 'task' and x[2] == it[2] for x in out):
+                raise Error('line %d: %s is the name of a function or another task' % (it[1], it[2]))
+            out.append(('func', it[1], 'void', it[2], [], it[4]))
+        else: out.append(it)
+    items = _chans(out, chans)
+    shared = set().union(*[set(it[2]) for it in items if it[0] == 'shared'])
+    fn = {it[3]: it for it in items if it[0] == 'func'}
+    entries = ['main'] + [it[2] for it in tasks]
+    calls = {n: set() for n in fn}
+    for n, it in fn.items():
+        def f(x, n=n):
+            if x[0] == 'call' and x[1] in fn: calls[n].add(x[1])
+        _walk(it[5], f)
+    for n in fn:
+        for m in calls[n]:
+            if m in entries:
+                raise Error('%s() calls %s(), which is %s' % (n, m, 'main()' if m == 'main' else
+                            'a task: it runs by itself in its own VM, it cannot be called'))
+    def reach(e):
+        seen, todo = {e}, [e]
+        while todo:
+            for m in calls[todo.pop()] - seen: seen.add(m); todo.append(m)
+        return seen
+    reached = [reach(e) for e in entries]
+    plain = {it[2] for it in items if it[0] in ('scalar', 'array')} - shared
+    users = {}
+    for i, fs in enumerate(reached):
+        for f in fs:
+            for n in _names(fn[f][5], plain): users.setdefault(n, set()).add(i)
+    for n, us in users.items():
+        if len(us) > 1:
+            who = ' and '.join('%s()' % entries[i] for i in sorted(us))
+            raise Error('%s is used by %s: make it shared, or keep it in one task' % (n, who))
+    watch, keys, natives = {}, [], False                   # what each part's wait()s look at
+    for i, fs in enumerate(reached):
+        reads_keys = False
+        def f(x, i=i):
+            nonlocal reads_keys, natives
+            if x[0] == 'wait':
+                for n in _names(x[2], shared): watch.setdefault(n, set()).add(i)
+            if x[0] == 'call' and x[1] in ('getc', 'getline', 'keyready'): reads_keys = True
+            if x[0] == 'native': natives = True
+        for g in fs: _walk(fn[g][5], f)
+        if reads_keys: keys.append(entries[i])
+    warnings = []
+    if len(keys) > 1:
+        warnings.append('%s all read the keyboard: whichever asks first gets each key'
+                        % ', '.join('%s()' % k for k in keys))
+    if natives: warnings.append('native { } stops every VM while it runs (RUNMC does not yield)')
+    for it in items:
+        if it[0] != 'func': continue
+        def f(x):
+            if x[0] == 'while' and x[3] == ('block', []) and _names(x[2], shared):
+                warnings.append('line %d: a busy wait on shared data takes turns from every other task: '
+                                'use wait(...)' % x[1])
+        _walk(it[5], f)
+    pins = [k.const(it[3], it[1]) if it[3] is not None else None for it in tasks]
+    def part_items(i):
+        fs = reached[i]; mine = {n for n, us in users.items() if i in us}
+        return [it for it in items if it[0] in ('const', 'signed', 'shared') or
+                (it[0] in ('scalar', 'array') and (it[2] in shared or it[2] in mine)) or
+                (it[0] == 'func' and it[3] in fs)]
+    sizes, old = [1] * len(entries), VM
+    try:
+        for _ in range(8):
+            # main() at VM1; pinned tasks where they asked; the rest in the first free VMs, in order
+            used = {v: 'main()' for v in range(1, 1 + sizes[0])}
+            vms = [1] + [None] * len(tasks)
+            def take(i, v):
+                for b in range(v, v + sizes[i + 1]): used[b] = tasks[i][2] + '()'
+                vms[i + 1] = v
+            for i, pin in enumerate(pins):
+                if pin is None: continue
+                if not 2 <= pin <= 4: raise Error('line %d: task(%d): VM2-VM4' % (tasks[i][1], pin))
+                clash = [used[b] for b in range(pin, pin + sizes[i + 1]) if b in used]
+                if clash or pin + sizes[i + 1] > 5:
+                    raise Error('line %d: task(%d) %s(): %s' % (tasks[i][1], pin, tasks[i][2],
+                                'VM%d is taken by %s' % (pin, clash[0]) if clash else 'it needs %d blocks from VM%d'
+                                % (sizes[i + 1], pin)))
+                take(i, pin)
+            for i, pin in enumerate(pins):
+                if pin is not None: continue
+                v = next((v for v in range(2, 6 - sizes[i + 1]) if all(b not in used for b in range(v, v + sizes[i + 1]))), None)
+                if v is None:
+                    raise Error('the program needs %d blocks of 4 KB (%s): there are 4' % (sum(sizes),
+                                ', '.join('%s() %d' % (e, sz) for e, sz in zip(entries, sizes))))
+                take(i, v)
+            mt = {'tasks': vms[1:], 'watch': {n: {vms[i] for i in s} for n, s in watch.items()}}
+            set_vm(1)
+            c, em, labels, data = compile_items(part_items(0), src, name, 'main', dict(mt, role='main'))
+            parts = [Part('main', 1, c, em, labels, data)]
+            addr = {n: 0x4000 + c.layout[n] for n in c.arrays if n in shared}
+            addr.update({n: 0x4000 + c.layout['.v__' + n] for (f, n), loc in c.loc.items() if f is None and n in shared})
+            for i, e in enumerate(entries[1:], 1):
+                set_vm(vms[i])
+                fixed = {(n if n in c.arrays else '.v__' + n): (a - ORG) & 0xFFFF for n, a in addr.items()}
+                ct, emt, lt, dt = compile_items(part_items(i), src, name, e, dict(mt, role='task'), fixed)
+                parts.append(Part(e, vms[i], ct, emt, lt, dt))
+            new = [p.c.setsize for p in parts]
+            if new == sizes:
+                return Program(name, parts, False, dict(sorted(addr.items(), key=lambda x: x[1])), warnings)
+            sizes = new
+        raise Error('the VMs did not settle')
+    finally: set_vm(old)
+
+
 def symbols(c, labels):
     """Where everything went - for a debugger or a test harness."""
     out = {'vars': {}, 'arrays': {k: ORG + c.layout[k] for k in c.arrays},
@@ -1616,7 +2082,7 @@ def symbols(c, labels):
     return out
 
 
-def render_lst(path, c, em, labels, data, extra=''):
+def render_lst(path, c, em, labels, data, extra='', claims=True):
     """The .lst text, VM claims included."""
     lines = ['; ' + '=' * 74,
              '; %s  -  compiled from %s by scc (Stellar C, prototype)   loads at $%04X%s'
@@ -1650,7 +2116,8 @@ def render_lst(path, c, em, labels, data, extra=''):
         lines.append('')
         for off in range(0, len(d), 16):
             lines.append('D %04X %s' % (ORG + rel + off, ' '.join('%02X' % b for b in d[off:off + 16])))
-    return claim_vms_text('\n'.join(lines) + '\n')[0]
+    text = '\n'.join(lines) + '\n'
+    return claim_vms_text(text)[0] if claims else text
 
 
 def write_lst(path, out, c, em, labels, data, extra=''):
@@ -1662,13 +2129,12 @@ def write_lst(path, out, c, em, labels, data, extra=''):
 def compile_text(src, name='program'):
     """For the web page: source text -> {'lst', 'summary'} or {'error'}; no files touched."""
     try:
-        c, em, labels, data = compile_source(src, name)
+        prog = compile_program(src, name)
     except Error as e:
         return {'error': 'scc: %s' % e}
     except (ValueError, KeyError, IndexError, TypeError, RecursionError) as e:
         return {'error': 'scc: internal error (%s: %s) - please report this program' % (type(e).__name__, e)}
-    return {'lst': render_lst(name + '.sc', c, em, labels, data),
-            'summary': '%d commands, %d bytes of code, %d in all' % (len(em), em[-1][0] + len(em[-1][1]) - ORG, c.data_end)}
+    return {'lst': prog.lst(name + '.sc'), 'summary': prog.summary(), 'warnings': prog.warnings}
 
 
 if __name__ == '__main__':
@@ -1677,9 +2143,11 @@ if __name__ == '__main__':
     out = sys.argv[sys.argv.index('-o') + 1] if '-o' in sys.argv else os.path.splitext(src)[0] + '.lst'
     try:
         if '--vm' in sys.argv: set_vm(int(sys.argv[sys.argv.index('--vm') + 1]))
-        c, em, labels, data = compile_file(src)
-        write_lst(src, out, c, em, labels, data)
+        prog = compile_program(open(src).read(), os.path.splitext(os.path.basename(src))[0])
+        import json
+        open(out, 'w').write(prog.lst(src))
+        json.dump(prog.symbols(), open(os.path.splitext(out)[0] + '.sym.json', 'w'), indent=1)
     except Error as e:
         print('scc: %s' % e); sys.exit(1)
-    print('%s: %d commands, %d bytes of code, %d in all -> %s'
-          % (src, len(em), em[-1][0] + len(em[-1][1]) - ORG, c.data_end, out))
+    for w in prog.warnings: print('scc: warning: %s' % w)
+    print('%s: %s -> %s' % (src, prog.summary(), out))

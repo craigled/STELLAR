@@ -53,10 +53,18 @@
  },
  "asmdemo": {
   "input": "",
-  "line": 549
+  "line": 550
  },
  "hilo": {
   "input": "50\\r25\\rabc\\r12\\r18\\r21\\r23\\rn\\r",
-  "line": 637
+  "line": 641
+ },
+ "pipeline": {
+  "input": "hello\\r",
+  "line": 713
+ },
+ "together": {
+  "input": "",
+  "line": 774
  }
 }
