@@ -148,6 +148,7 @@ ORG = 0x4000
 REGS = 0x3000
 VM = 1
 TOP = 0x7F00          # programs end below this: the Elf2K's $7Fxx page is not available
+STOPPED = 0x03        # a VM's CIDP state after stop(): the scheduler skips it, and wake-ups (only of 4) pass it by
 
 
 def set_vm(n):
@@ -307,6 +308,14 @@ class Parser:
         if st[0] == 'expr' and st[2][1] == 'wait':                 # wait(condition): sleep until it is true
             if len(st[2][2]) != 1: raise Error('line %d: wait(condition) takes one argument' % ln)
             return ('wait', ln, st[2][2][0])
+        if st[0] == 'expr' and st[2][1] in ('stop', 'start') and st[2][0] == 'call':   # stop(task) / start(task)
+            a = st[2][2]
+            if len(a) != 1 or a[0][0] != 'var':
+                raise Error('line %d: %s(task) takes the name of a task' % (ln, st[2][1]))
+            return (st[2][1], ln, a[0][1])
+        inner = []
+        _walk(st, lambda x: inner.append(x[1]) if x[0] == 'call' and x[1] in ('stop', 'start') else None)
+        if inner: raise Error('line %d: %s(task) is a statement of its own, not a value' % (ln, inner[0]))
         return st
 
     def simple(s):
@@ -1326,6 +1335,7 @@ class Compiler:
             return s.wakes(w)
         if k == 'expr': s.call(s.hoist(st[2])); return s.wakes(s.shared_written(st))
         if k == 'wait': return s.wait(st)
+        if k in ('stop', 'start'): return s.stopstart(st)
         if k == 'atomic':
             if not s.atomic:
                 bad = s.unsafe(st[2])
@@ -1405,14 +1415,51 @@ class Compiler:
         return w
 
     def wakes(s, names):
-        """After a write to shared data: wake every other task whose wait() looks at it (if it sleeps)."""
+        """After a write to shared data: wake every other task whose wait() looks at it (if it sleeps).
+        A task that stop() can reach is woken with multitasking off, so a stop() cannot fall between the
+        look and the wake and be undone."""
         if not s.mt or not names: return
         for vm in sorted({v for n in names for v in s.mt['watch'].get(n, ())} - {VM}):
+            guard = vm in s.mt.get('stoppable', ()) and not s.atomic
+            if guard: s.setmulti(0, 'wake with no other task running: a stop() cannot cut in')
             r = s.temp(); skip = s.new()
             s.emit(ldx(r, s.state(vm), 'VM%d state' % vm))
             s.emit(('9D 1%X 04' % r, 'TESTMXI R%d 04' % r, 'is VM%d asleep in wait()?' % vm))
             s.emit(iff(skip)); s.emit(('31 0%X 01' % r, 'COPYMXI R%d 01' % r, 'wake VM%d' % vm))
             s.untemp(r); s.label(skip)
+            if guard: s.setmulti(1)
+
+    def stopstart(s, st):
+        """stop(t): t's VM state = STOPPED - the scheduler gives it no turns, and wake-ups (which only wake
+        a VM asleep in wait(), state 4) leave it alone. start(t): a STOPPED task runs again (state 1);
+        one asleep in wait() looks at its condition again. stop() of the task itself waits to be started."""
+        k, ln, name = st
+        if not s.mt: raise Error('line %d: %s(%s): %s is not a task' % (ln, k, name, name))
+        if name == 'main':
+            raise Error('line %d: %s(main): main() cannot be stopped or started - when it ends, the program ends'
+                        % (ln, k))
+        vm = s.mt['vms'].get(name)
+        if vm is None: raise Error('line %d: %s(%s): %s is not a task' % (ln, k, name, name))
+        r = s.temp()
+        if k == 'stop' and vm == VM:
+            if s.atomic: raise Error('line %d: stop(%s) inside atomic { }: nothing else could run to start it' % (ln, name))
+            again = s.new()
+            s.emit(ldx(r, s.state(vm), 'my VM state'))
+            s.emit(('31 0%X %02X' % (r, STOPPED), 'COPYMXI R%d %02X' % (r, STOPPED), 'stop(%s): no more turns' % name))
+            s.label(again); s.emit(('9D 1%X %02X' % (r, STOPPED), 'TESTMXI R%d %02X' % (r, STOPPED), 'still stopped?'))
+            s.emit(ift(again))
+        elif k == 'stop':
+            s.emit(ldx(r, s.state(vm), 'VM%d state' % vm))
+            s.emit(('31 0%X %02X' % (r, STOPPED), 'COPYMXI R%d %02X' % (r, STOPPED), 'stop(%s): no more turns' % name))
+        else:
+            skip = s.new()
+            if not s.atomic: s.setmulti(0, 'start(%s): look and start with no other task running' % name)
+            s.emit(ldx(r, s.state(vm), 'VM%d state' % vm))
+            s.emit(('9D 1%X %02X' % (r, STOPPED), 'TESTMXI R%d %02X' % (r, STOPPED), 'stopped?'))
+            s.emit(iff(skip)); s.emit(('31 0%X 01' % r, 'COPYMXI R%d 01' % r, 'start(%s): it runs again' % name))
+            s.label(skip)
+            if not s.atomic: s.setmulti(1)
+        s.untemp(r)
 
     def unsafe(s, node, top_updates=False):
         """Why node cannot run with multitasking off (inside atomic { } or a shared update), or None:
@@ -1998,7 +2045,7 @@ def compile_program(src, name):
         if len(us) > 1:
             who = ' and '.join('%s()' % entries[i] for i in sorted(us))
             raise Error('%s is used by %s: make it shared, or keep it in one task' % (n, who))
-    watch, keys, natives = {}, [], False                   # what each part's wait()s look at
+    watch, keys, natives, stopped = {}, [], False, set()   # what each part's wait()s look at; tasks stop() names
     for i, fs in enumerate(reached):
         reads_keys = False
         def f(x, i=i):
@@ -2007,6 +2054,10 @@ def compile_program(src, name):
                 for n in _names(x[2], shared): watch.setdefault(n, set()).add(i)
             if x[0] == 'call' and x[1] in ('getc', 'getline', 'keyready'): reads_keys = True
             if x[0] == 'native': natives = True
+            if x[0] in ('stop', 'start'):
+                if x[2] != 'main' and x[2] not in entries:
+                    raise Error('line %d: %s(%s): %s is not a task' % (x[1], x[0], x[2], x[2]))
+                if x[0] == 'stop' and x[2] != 'main': stopped.add(x[2])
         for g in fs: _walk(fn[g][5], f)
         if reads_keys: keys.append(entries[i])
     warnings = []
@@ -2052,7 +2103,8 @@ def compile_program(src, name):
                     raise Error('the program needs %d blocks of 4 KB (%s): there are 4' % (sum(sizes),
                                 ', '.join('%s() %d' % (e, sz) for e, sz in zip(entries, sizes))))
                 take(i, v)
-            mt = {'tasks': vms[1:], 'watch': {n: {vms[i] for i in s} for n, s in watch.items()}}
+            mt = {'tasks': vms[1:], 'watch': {n: {vms[i] for i in s} for n, s in watch.items()},
+                  'vms': dict(zip(entries, vms)), 'stoppable': {vms[entries.index(n)] for n in stopped}}
             set_vm(1)
             c, em, labels, data = compile_items(part_items(0), src, name, 'main', dict(mt, role='main'))
             parts = [Part('main', 1, c, em, labels, data)]

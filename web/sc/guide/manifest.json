@@ -57,14 +57,18 @@
  },
  "hilo": {
   "input": "50\\r25\\rabc\\r12\\r18\\r21\\r23\\rn\\r",
-  "line": 641
+  "line": 642
  },
  "pipeline": {
   "input": "hello\\r",
-  "line": 713
+  "line": 714
  },
  "together": {
   "input": "",
-  "line": 774
+  "line": 776
+ },
+ "pausing": {
+  "input": "",
+  "line": 803
  }
 }

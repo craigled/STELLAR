@@ -58,6 +58,10 @@ EXAMPLES = [
      'One program, three VMs: keyboard() owns the keyboard and queues every key, counter() adds in the '
      'background, and main() prints each key with the running total. Click the terminal and type; q quits. '
      'Shared variables, a chan queue and atomic - see the guide\'s section 16. HW-verified on the Elf2K.'),
+    ('stopstart', 'Stop and start a task', '', 'flat out',
+     'Four VMs check themselves: main() stops a counting task and sees the count hold still, starts it again; '
+     'a stopped task is not woken by the variable it waits for until it is started; a task stops itself and '
+     'carries on only when main() starts it. Each line printed is one check passed. HW-verified on the Elf2K.'),
     ('nativedemo', 'Native 1802: native { }', '', 'flat out',
      'Raw 1802 machine code run by $F1 RUNMC: sums a 200-byte array (71x faster than the compiled '
      'loop), formats the total as hex, and copies a string kept inside the native block.'),
