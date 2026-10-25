@@ -377,7 +377,7 @@ BUILTINS = {'turns', 'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'del
 #                   returns its length. Bounded - unlike $C2 GETSTR, which has no limit.
 #   rtcget(t) / rtcset(t)  $07 RTCGET / RTCSET with the 8-byte u8 array t: sec min hour weekday(0=Sun)
 #                   day month year-hi year-lo. rtcset returns 1 if the firmware wrote it, 0 if refused.
-#                   Needs firmware V0061.35.
+#                   Needs firmware V0061.35 or later (the $07 RTC opcode).
 #   peek(a) poke(a, v) peekw(a) pokew(a, v)   a byte / 16-bit word at the ABSOLUTE address a
 #                   (MEMMODE 00 for those few opcodes, no branch while absolute)
 LIBS = {}   # library routines a program uses: emitted once, after its functions
@@ -697,16 +697,20 @@ class Compiler:
     def nested(s, fn):
         """How many hidden registers a function needs: calls inside expressions."""
         most = [0]
-        def count(e, top):
+        def count(e, top, logic=False):
             if not isinstance(e, tuple): return 0
             n = 1 if e[0] == 'call' and e[1] in s.funcs and not top else 0
             if e[0] == 'call': return n + sum(count(a, False) for a in e[2])
+            if s.lazy(e):                          # a && f() as a value: one more, for its 0 or 1 (see hoist)
+                return (0 if logic else 1) + count(e[2], False, True) + count(e[3], False, True)
+            if e[0] == 'not': return count(e[1], False, logic)
+            if e[0] == 'bin' and e[1] in ('&&', '||'): return count(e[2], False, logic) + count(e[3], False, logic)
             return n + sum(count(x, False) for x in e[1:] if isinstance(x, tuple))
         def f(st):
             if st[0] in ('assign', 'expr', 'return', 'local', 'if', 'while', 'switch'):
                 for x in st[2:]:
                     if isinstance(x, tuple) and x[0] in EXPRS:
-                        most[0] = max(most[0], count(x, st[0] not in ('if', 'while', 'switch')))
+                        most[0] = max(most[0], count(x, st[0] not in ('if', 'while', 'switch'), st[0] in ('if', 'while')))
         s.walk(fn[5], f)
         return most[0]
 
@@ -776,16 +780,36 @@ class Compiler:
         t = s.temp(); s.value(e, t); s.store_reg(name, t, fn); s.untemp(t)
 
     # ---------------------------------------------------------- expressions
-    def hoist(s, e, top=True):
-        """Calls inside an expression are made first, each into a hidden variable."""
+    def lazy(s, e):
+        """a && b or a || b where b calls a function: b must not run unless it is needed."""
+        if e[0] != 'bin' or e[1] not in ('&&', '||'): return False
+        found = []
+        s.walk(e[3], lambda x: found.append(x) if x[0] == 'call' and x[1] in s.funcs else None)
+        return bool(found)
+
+    def hidden_var(s):
+        k = s.hidden[s.fn]; s.hidden[s.fn] += 1
+        h = '.h%d' % k
+        if (s.fn, h) not in s.loc: raise Error('line %d: too many calls in one expression' % s.ln)
+        return h
+
+    def hoist(s, e, top=True, logic=False):
+        """Calls inside an expression are made first, each into a hidden variable.
+        logic: e is a condition (if, while), so cond() makes the right side of a lazy && or || itself,
+        only when it is needed; elsewhere the whole && or || is worked out first, into a hidden variable."""
         if e[0] == 'call' and not top and e[1] not in BUILTINS:
-            k = s.hidden[s.fn]; s.hidden[s.fn] += 1
-            h = '.h%d' % k
-            if (s.fn, h) not in s.loc: raise Error('line %d: too many calls in one expression' % s.ln)
-            s.store(h, e)
+            h = s.hidden_var(); s.store(h, e)
             return ('var', h)
-        if e[0] == 'bin': return ('bin', e[1], s.hoist(e[2], False), s.hoist(e[3], False))
-        if e[0] in ('neg', 'not'): return (e[0], s.hoist(e[1], False))
+        if s.lazy(e):
+            l = ('bin', e[1], s.hoist(e[2], False, True), ('lazy', e[3]))
+            if logic: return l
+            h = s.hidden_var(); s.store(h, l)
+            return ('var', h)
+        if e[0] == 'bin':
+            l = logic and e[1] in ('&&', '||')
+            return ('bin', e[1], s.hoist(e[2], False, l), s.hoist(e[3], False, l))
+        if e[0] == 'not': return ('not', s.hoist(e[1], False, logic))
+        if e[0] == 'neg': return (e[0], s.hoist(e[1], False))
         if e[0] in ('idx', 'addr'): return (e[0], e[1], s.hoist(e[2], False))
         if e[0] == 'call': return ('call', e[1], [s.hoist(a, False) for a in e[2]])
         return e
@@ -1056,7 +1080,7 @@ class Compiler:
             on, off = (E + '[7m', E + '[0m') if name == 'rev' else (E + '[?25h', E + '[?25l')
             if s.isconst(args[0]): return s.conststr(on if s.const(args[0], s.ln) else off, '%s(%d)' % (name, s.const(args[0], s.ln)))
             no, end = s.new(), s.new()
-            s.cond(s.hoist(args[0], False), no, False); s.conststr(on); s.emit(gal(end))
+            s.cond(s.hoist(args[0], False, True), no, False); s.conststr(on); s.emit(gal(end))
             s.label(no); s.conststr(off); s.label(end); return
         if name == 'at':
             s.nargs(name, args, 2)
@@ -1215,7 +1239,7 @@ class Compiler:
                 if v > 3: raise Error('line %d: q(%d): 0 off, 1 on, 2 one blink, 3 two blinks' % (s.ln, v))
                 return s.emit(('0A 0%X' % v, 'SETQ %d' % v, ''))
             off, end = s.new(), s.new()                          # on if non-zero
-            s.cond(s.hoist(e, False), off, False)
+            s.cond(s.hoist(e, False, True), off, False)
             s.emit(('0A 01', 'SETQ 1', '')); s.emit(gal(end))
             s.label(off); s.emit(('0A 00', 'SETQ 0', '')); s.label(end); return
         if name == 'out':
@@ -1271,6 +1295,7 @@ class Compiler:
             if bool(s.const(c, s.ln)) == sense: s.emit(gal(target))
             return
         k = c[0]
+        if k == 'lazy': return s.cond(s.hoist(c[1], False, True), target, sense)   # only now: see hoist
         if k == 'not': return s.cond(c[1], target, not sense)
         if k == 'call' and c[1] == 'keyready': s.emit(('CC', 'SERST', '')); return br()
         if k == 'call' and c[1] == 'ef' and len(c[2]) == 1 and s.isconst(c[2][0]) and 1 <= s.const(c[2][0], s.ln) <= 4:
@@ -1352,11 +1377,11 @@ class Compiler:
             if b is None and one[0] in ('break', 'continue', 'return'): s.leaving(one[0])
             if b is None and one[0] in ('break', 'continue') and s.loops:
                 # if (c) break;  ->  one conditional branch straight out of the loop
-                return s.cond(s.hoist(c, False), s.loops[-1][0 if one[0] == 'break' else 1], True)
+                return s.cond(s.hoist(c, False, True), s.loops[-1][0 if one[0] == 'break' else 1], True)
             if b is None and one[0] == 'return' and one[2] is None:
-                return s.cond(s.hoist(c, False), 'R_' + s.fn, True)    # if (c) return;
+                return s.cond(s.hoist(c, False, True), 'R_' + s.fn, True)    # if (c) return;
             els, end = s.new(), s.new()
-            s.cond(s.hoist(c, False), els if b else end, False)
+            s.cond(s.hoist(c, False, True), els if b else end, False)
             s.stmt(a)
             if b:
                 if not (s.rows and s.rows[-1][1].split()[:1] in (['GAL'], ['RETURN'])): s.emit(gal(end))
@@ -1375,7 +1400,7 @@ class Compiler:
             if step: s.stmt(step)
             s.ln = ln; s.tbusy = set()
             if forever: s.emit(gal(top))
-            else: s.label(test); s.hidden[s.fn] = 0; s.cond(s.hoist(c, False), top, True)
+            else: s.label(test); s.hidden[s.fn] = 0; s.cond(s.hoist(c, False, True), top, True)
             s.label(end); return
         if k == 'switch': return s.switch(st)
         if k in ('break', 'continue', 'return'): s.leaving(k)

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..');
-const FW = require(join(WEB, 'js', 'firmware-0061-35.js'));
+const FW = require(join(WEB, 'js', 'firmware-0061-36.js'));
 const Machine = require(join(WEB, 'js', 'machine.js'));
 const pool = JSON.parse(readFileSync(join(WEB, 'samples', 'home-pool.json'), 'utf8'));
 const text = {};

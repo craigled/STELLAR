@@ -323,9 +323,9 @@
  },
  {
   "group": "Firmware",
-  "name": "FW-Checksum V0061.34",
+  "name": "FW-Checksum V0061.36",
   "what": "Checks the firmware after loading: prints 15 checksums to compare with the list in the file.",
-  "href": "downloads/FW-Checksum-V0061.34.lst",
+  "href": "downloads/FW-Checksum-V0061.36-patchset.lst",
   "note": null
  }
 ]

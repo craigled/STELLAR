@@ -91,8 +91,8 @@ CATALOG = [
   'Load this file first.', 'APPLICATIONS/Race-Condition/Race-VM1.lst', None),
  ('Multitasking', 'Race condition (VM2)', 'The second worker for the race-condition demo. Load after VM1.',
   'APPLICATIONS/Race-Condition/Race-VM2.lst', None),
- ('Firmware', 'FW-Checksum V0061.34', 'Checks the firmware after loading: prints 15 checksums to compare '
-  'with the list in the file.', 'TESTS/FW-Checksum-V0061.34.lst', None),
+ ('Firmware', 'FW-Checksum V0061.36', 'Checks the firmware after loading: prints 15 checksums to compare '
+  'with the list in the file.', 'TESTS/FW-Checksum-V0061.36-patchset.lst', None),
 ]
 
 
