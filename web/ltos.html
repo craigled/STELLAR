@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LTOS on the Elf2K</title>
+<meta name="description" content="LTOS 0.5, the disk operating system for the Elf2K, running in your browser: the real kernel, shell and programs on an emulated RCA 1802 with a CF card.">
+<link rel="stylesheet" href="css/site.css?v=127">
+<style>
+  .ltos-body{display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:18px; align-items:start}
+  @media (max-width:900px){ .ltos-body{grid-template-columns:minmax(0,1fr)} }
+  .try h4{margin:0 0 6px; font-family:var(--mono); font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft)}
+  .try button{display:block; width:100%; text-align:left; margin:0 0 6px; padding:6px 9px; border:1px solid var(--line);
+    background:var(--bg-panel); color:var(--ink); border-radius:8px; font-family:var(--mono); font-size:12.5px; cursor:pointer}
+  .try button:hover{border-color:var(--accent); color:var(--accent)}
+  .try button small{display:block; font-family:var(--sans, inherit); color:var(--ink-soft); font-size:11.5px}
+  #term{min-height:30em}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Interactive</div>
+  <h1 style="margin:.1em 0 .1em">LTOS</h1>
+  <p class="muted" style="max-width:76ch">LTOS 0.5, LiteOS for the Elf2K, booting from a CompactFlash card in your browser. This is the real
+    kernel, shell and programs, the same bytes as on Craig's Elf2K, running on an emulated RCA 1802 with its serial port, CF card and clock.
+    STELLAR apps run on the real STELLAR firmware, and <span class="mono">Q</span> brings you back to LTOS.</p>
+
+  <div class="sim-controls">
+    <button id="boot" class="primary" title="Power on: the BIOS boots LTOS from the card">Boot ⏻</button>
+    <button id="fresh" title="Every file back as it was: removed, changed or new files are undone, and LTOS boots again">Restore the card ↺</button>
+    <button id="saveImg" title="Download the whole card as an 8 MB disk image (a Mac or Linux can mount it)">⤓ Card image</button>
+    <span class="grow"></span>
+    <label class="small mono" title="One received byte at a time, at 19200 baud, as on the Elf2K: a key typed while the 1802 is busy can be lost">
+      <input type="checkbox" id="authentic"> the Elf2K's one-byte UART</label>
+  </div>
+  <div class="clock-row" role="radiogroup" aria-label="Clock speed">
+    <span class="clock-lbl">clock</span>
+    <span id="speeds"></span>
+    <span id="speedLabel" class="mono clock-now"></span>
+  </div>
+  <div class="status-line" id="status">loading…</div>
+
+  <div class="ltos-body">
+    <div class="term-wrap">
+      <h4>Serial terminal</h4>
+      <div class="term" id="term" tabindex="0" role="textbox" aria-label="Serial terminal: click to type"></div>
+      <p class="arrow-note">Click the terminal and type. Enter, Backspace, the arrow keys and Ctrl-keys all go through, as from a VT100 on the Elf2K's serial port.
+        Changes to the card stay in this browser. <b>Restore the card</b> puts every file back as it was and starts the demo over.</p>
+    </div>
+    <div class="try" id="try">
+      <h4>Things to try</h4>
+    </div>
+  </div>
+
+  <section style="margin-top:22px; max-width:80ch">
+    <h2>What is running</h2>
+    <p>The <b>1802</b> is the same emulator as the rest of this site. Around it is an Elf2K: a 16550 UART and a DS12887 clock
+      on ports 2 and 3, and a CompactFlash card on the IDE registers, holding an 8 MB FAT16 image. At power-on the BIOS reads
+      the card's boot sector, which loads the LTOS kernel. Everything after that is LTOS: the shell, the FAT code, the programs
+      in <span class="mono">/BIN</span> and the STELLAR firmware that the STELLAR apps run on.</p>
+    <p>The <b>BIOS</b> is not the Elf2K's ROM. That belongs to Spare Time Gizmos, so this page uses a small stand-in written for
+      the web (<span class="mono">LTOS/webbios.asm</span>). It provides the seven BIOS calls LTOS uses, at the same addresses, and is
+      checked against the real ROM in the simulator: the same LTOS sessions give exactly the same screens and the same card. There is no ROM monitor,
+      so <span class="mono">MON</span> just boots LTOS again.</p>
+    <p>The clock is set to 10× the Elf2K so the demo is quick. Choose <b>Elf2K</b> to feel the real machine:
+      a program loads in a second or two, and <span class="mono">FSCK</span> takes a few minutes.</p>
+  </section>
+</main>
+
+<footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
+
+<script src="js/firmware-0061-36.js?v=127"></script>
+<script src="js/stellar-vm.js?v=127"></script>
+<script src="js/webbios.js?v=127"></script>
+<script src="js/elf2k.js?v=127"></script>
+<script src="js/vt100.js?v=127"></script>
+<script src="js/term-input.js?v=127"></script>
+<script src="js/ltos-page.js?v=127"></script>
+<script src="js/nav.js?v=127"></script>
+</body>
+</html>

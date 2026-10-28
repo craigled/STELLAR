@@ -9,6 +9,7 @@
     ['opcodes.html',      'Opcodes'],
     ['apps.html',         'Apps'],
     ['stellarc.html',     'Stellar C'],
+    ['ltos.html',         'LTOS'],
   ];
   // Cloudflare Pages serves /simulator.html as /simulator, so compare without .html
   var here = (location.pathname.split('/').pop() || 'index').toLowerCase().replace(/\.html$/, '');
