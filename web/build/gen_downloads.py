@@ -84,7 +84,7 @@ CATALOG = [
  ('Multitasking', 'Maze Race', 'VM1 builds a maze; VM2 and VM3 race it, right hand against left. One file.',
   'APPLICATIONS/Maze/MazeRace.lst', None),
  ('Multitasking', 'STELLAR ORBIT', 'Fly Apollo 7: launch, orbit, random emergencies, a timed de-orbit burn, the chutes, '
-  'the recovery ship. Three VMs, one file. VT100, real-time clock.', 'downloads/Stellar-Orbit.lst', None),
+  'the recovery ship, and the rocket and capsule beside the Earth. Two programs, one file. VT100, real-time clock.', 'downloads/Stellar-Orbit.lst', None),
  ('Multitasking', 'Life Race', 'Game of Life in bytecode against native 1802, side by side. One file.',
   'APPLICATIONS/Life-Race/Life-Race.lst', None),
  ('Multitasking', 'Race condition (VM1)', 'Two VMs share a counter: without a lock, counts go missing. '
@@ -108,7 +108,7 @@ def main():
         if src.startswith('samples/'):
             assert os.path.exists(os.path.join(WEB, src)), src
             href = src
-        elif src.startswith('downloads/'):               # built for the web (e.g. ORBIT's three VMs in one file): kept as is
+        elif src.startswith('downloads/'):               # built for the web (e.g. ORBIT's two programs in one file): kept as is
             assert os.path.exists(os.path.join(WEB, src)), src
             keep.add(os.path.basename(src)); href = src
         else:
