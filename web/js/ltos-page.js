@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '131';                                    // the ?v= the card is fetched with
+  var V = '132';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var SPEEDS = [
@@ -40,25 +40,28 @@
 
   // ---- the card in this browser: the sectors written since it was baked ----
   var db = null;
+  // A browser can leave IndexedDB unanswered (Safari, coming back to the page): then LTOS boots without
+  // the saved changes after 2 s, rather than never.
+  function timed(p, v) { return Promise.race([p, new Promise(function (ok) { setTimeout(function () { ok(v); }, 2000); })]); }
   function openDb() {
-    return new Promise(function (ok) {
+    return timed(new Promise(function (ok) {
       try {
         var r = indexedDB.open('ltos-card', 1);
         r.onupgradeneeded = function () { r.result.createObjectStore('sectors'); };
-        r.onsuccess = function () { db = r.result; ok(); };
-        r.onerror = function () { ok(); };
+        r.onsuccess = function () { db = r.result; db.onversionchange = function () { db.close(); db = null; }; ok(); };
+        r.onerror = r.onblocked = function () { ok(); };
       } catch (e) { ok(); }
-    });
+    }));
   }
   function loadSaved() {
-    return new Promise(function (ok) {
+    return timed(new Promise(function (ok) {
       if (!db) return ok(null);
       try {
         var g = db.transaction('sectors').objectStore('sectors').get(KEY);
         g.onsuccess = function () { ok(g.result || null); };
         g.onerror = function () { ok(null); };
       } catch (e) { ok(null); }
-    });
+    }), null);
   }
   function save() {
     if (!db || !KEY || !m || !m.cf.dirty.size) return;
@@ -86,8 +89,9 @@
 
   var last = performance.now(), shown = 0;
   function frame(now) {
+    requestAnimationFrame(frame);                   // first: an error below must not stop the machine for good
     var dt = Math.min(now - last, 100); last = now;
-    if (m && !halted) {
+    if (m && !halted) try {
       var t0 = performance.now();
       if (speed.ips) {
         if (!m.run(Math.round(speed.ips * dt / 1000))) halted = true;
@@ -102,9 +106,9 @@
         shown = now;
         if (!halted && /Booting/.test(statusEl.textContent) && m.instr > 200000) status('Running LTOS 0.5 at ' + speed.label + '.');
       }
-    }
-    requestAnimationFrame(frame);
+    } catch (e) { halted = true; status('The emulator stopped (' + e.message + '). Press Boot to start again.'); }
   }
+  requestAnimationFrame(frame);                     // running from the start: Boot and Restore work whatever the card load does
 
   // ---- the controls ----
   var sp = document.getElementById('speeds');
@@ -124,9 +128,13 @@
   var want = null; try { want = localStorage.getItem('ltos-speed'); } catch (e) {}
   pick(SPEEDS.filter(function (s) { return s.label === want; })[0] || SPEEDS[2]);
 
-  document.getElementById('boot').addEventListener('click', function () { save(); loadSaved().then(power); });
+  document.getElementById('boot').addEventListener('click', function () {
+    if (!base) return status('The card image is still loading…');
+    save(); loadSaved().then(power);
+  });
   document.getElementById('fresh').addEventListener('click', function () {
     if (!confirm('Put every file on the card back as it was, and start LTOS again? Anything you changed or saved on it will be gone.')) return;
+    if (!base) return status('The card image is still loading…');
     forget(); power(null); status('The card is as it was baked. Booting LTOS…');
   });
   document.getElementById('authentic').addEventListener('change', function (e) { if (m) m.authentic = e.target.checked; });
@@ -171,6 +179,5 @@
     return openDb();
   }).then(loadSaved).then(function (saved) {
     power(saved);
-    requestAnimationFrame(frame);
   }).catch(function (e) { status('Could not start: ' + e.message); });
 })();
