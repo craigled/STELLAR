@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LTOS on the Elf2K</title>
 <meta name="description" content="LTOS 0.5, the disk operating system for the Elf2K, running in your browser: the real kernel, shell and programs on an emulated RCA 1802 with a CF card.">
-<link rel="stylesheet" href="css/site.css?v=130">
+<link rel="stylesheet" href="css/site.css?v=131">
 <style>
   .ltos-body{display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:18px; align-items:start}
   @media (max-width:900px){ .ltos-body{grid-template-columns:minmax(0,1fr)} }
@@ -21,9 +21,9 @@
 <main class="wrap">
   <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Interactive</div>
   <h1 style="margin:.1em 0 .1em">LTOS</h1>
-  <p class="muted" style="max-width:76ch">LTOS 0.5, LiteOS for the Elf2K, booting from a CompactFlash card in your browser. This is the real
-    kernel, shell and programs, the same bytes as on Craig's Elf2K, running on an emulated RCA 1802 with its serial port, CF card and clock.
-    STELLAR apps run on the real STELLAR firmware, and <span class="mono">Q</span> brings you back to LTOS.</p>
+  <p class="muted" style="max-width:76ch">LTOS 0.5, (LiteOS) for the Elf2K, booting from a simulated CompactFlash card in your browser. This is the
+    real kernel, shell and programs, running on an emulated Elf2K based on the RCA 1802 with its serial port, CF card and clock.
+    All the STELLAR apps run on the real STELLAR firmware, and they return back to LTOS when completed or exited from.</p>
 
   <div class="sim-controls">
     <button id="boot" class="primary" title="Power on: the BIOS boots LTOS from the card">Boot ⏻</button>
@@ -69,13 +69,13 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/firmware-0061-36.js?v=130"></script>
-<script src="js/stellar-vm.js?v=130"></script>
-<script src="js/webbios.js?v=130"></script>
-<script src="js/elf2k.js?v=130"></script>
-<script src="js/vt100.js?v=130"></script>
-<script src="js/term-input.js?v=130"></script>
-<script src="js/ltos-page.js?v=130"></script>
-<script src="js/nav.js?v=130"></script>
+<script src="js/firmware-0061-36.js?v=131"></script>
+<script src="js/stellar-vm.js?v=131"></script>
+<script src="js/webbios.js?v=131"></script>
+<script src="js/elf2k.js?v=131"></script>
+<script src="js/vt100.js?v=131"></script>
+<script src="js/term-input.js?v=131"></script>
+<script src="js/ltos-page.js?v=131"></script>
+<script src="js/nav.js?v=131"></script>
 </body>
 </html>

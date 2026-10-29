@@ -1,7 +1,7 @@
 ; ==========================================================================
 ; STELLAR ELIZA v3  -  the 1966 chatbot, fast and conversational   (VM1 @ $4000)
 ; ==========================================================================
-; Type normally - lower case is fine. It asks your name first. BYE to quit.
+; Type normally - lower case is fine. It asks your name first. BYE (or Esc) to quit.
 ;
 ;   > hello                   HELLO, CRAIG. WHAT'S ON YOUR MIND?
 ;   > my mother hates me      TELL ME MORE ABOUT YOUR FAMILY.
@@ -32,7 +32,7 @@
 ;
 ; RUN ON THE ELF2K 2026-09-24 (V0061.33) - Craig: "It is much faster. Well done."
 ;
-; 99 STELLAR commands, $4000-$4141 (322 bytes); native code $4C00-$4F61.
+; 136 STELLAR commands, $4000-$419C (413 bytes); native code $4C00-$4F61.
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
@@ -52,15 +52,15 @@
 ; D 401D 2F 0E 21 00    WRITEIDX R14 2100                  and no previous line
 ; D 4021 11 0E 03 00    LOADXI R14 0300
 ; D 4025 C1 0E          PRINTSTR R14                       HI, I'M ELIZA. WHAT'S YOUR NAME?
-; D 4027 BD 00 DB       CALL INPUT
+; D 4027 BD 00 E3       CALL INPUT
 ; D 402A 11 0E 00 00    LOADXI R14 0000
 ; D 402E 10 00 4E       LOADAI 004E
 ; D 4031 2F 0E 2B 00    WRITEIDX R14 2B00
 ; D 4035 F1 4C 00       RUNMC 4C00                         Pick the name out of the reply
 ; D 4038 11 04 00 23    LOADXI R4 0023
-; D 403C BD 00 F3       CALL SAY                           NICE TO MEET YOU, <name>. ...
+; D 403C BD 01 4E       CALL SAY                           NICE TO MEET YOU, <name>. ...
 ; LOOP:
-; D 403F BD 00 DB       CALL INPUT
+; D 403F BD 00 E3       CALL INPUT
 ; D 4042 11 0E 00 00    LOADXI R14 0000
 ; D 4046 10 00 50       LOADAI 0050
 ; D 4049 2F 0E 2B 00    WRITEIDX R14 2B00
@@ -106,49 +106,94 @@
 ; FALL:
 ; D 40C5 11 04 00 1F    LOADXI R4 001F
 ; ANSWER:
-; D 40C9 BD 00 F3       CALL SAY
+; D 40C9 BD 01 4E       CALL SAY
 ; D 40CC B0 00 3F       GAL LOOP
 ; QUIT:
-; D 40CF BD 00 F3       CALL SAY                           Goodbye
+; D 40CF BD 01 4E       CALL SAY                           Goodbye
 ; D 40D2 11 0E 03 31    LOADXI R14 0331
 ; D 40D6 C1 0E          PRINTSTR R14                       and a new line for the monitor
-; D 40D8 F0 00 00       BREAK                              End of program
+; D 40D8 00             HALT
+; ESCQ:
+; D 40D9 11 04 00 00    LOADXI R4 0000
+; D 40DD B0 00 CF       GAL QUIT
+; D 40E0 F0 00 00       BREAK                              End of program
 ; INPUT:
-; D 40DB 11 0E 03 2A    LOADXI R14 032A
-; D 40DF C1 0E          PRINTSTR R14
-; D 40E1 11 0C 2C 00    LOADXI R12 2C00
-; D 40E5 11 0D 2C 00    LOADXI R13 2C00
-; D 40E9 C2 CD          GETSTR R12 R13                     Read the line (echoed; backspace works)
-; D 40EB 11 0E 03 31    LOADXI R14 0331
-; D 40EF C1 0E          PRINTSTR R14
-; D 40F1 BE 00          RETURN
+; D 40E3 11 0E 03 2A    LOADXI R14 032A
+; D 40E7 C1 0E          PRINTSTR R14
+; D 40E9 11 0C 2C 00    LOADXI R12 2C00
+; D 40ED 11 0D 2C 00    LOADXI R13 2C00
+; D 40F1 BD 00 FC       CALL GETL                          Read the line (echoed; backspace works; a lone ESC first quits)
+; D 40F4 11 0E 03 31    LOADXI R14 0331
+; D 40F8 C1 0E          PRINTSTR R14
+; D 40FA BE 00          RETURN
+; GETL:
+; GETLK:
+; D 40FC CB             SERIN                              the first key
+; D 40FD 81 00 1B       TESTAI 001B
+; D 4100 A1 01 14       IFFALSEI GETLN
+; D 4103 BD 01 38       CALL GETLW                         ESC: an arrow following?
+; D 4106 A1 00 D9       IFFALSEI ESCQ                      no: ESC on its own quits
+; D 4109 CB             SERIN                              an arrow (ESC [ x): its two bytes are thrown away
+; D 410A BD 01 38       CALL GETLW
+; D 410D A1 00 FC       IFFALSEI GETLK
+; D 4110 CB             SERIN
+; D 4111 B0 00 FC       GAL GETLK
+; GETLN:
+; D 4114 81 00 0D       TESTAI 000D
+; D 4117 A1 01 22       IFFALSEI GETLC
+; D 411A 10 00 00       LOADAI 0000
+; D 411D 36 01 0C       COPYIAMX 1 byte Acc -> M(R12)      Enter alone: the empty line
+; D 4120 BE 00          RETURN
+; GETLC:
+; D 4122 81 00 08       TESTAI 0008
+; D 4125 A0 00 FC       IFTRUEI GETLK                      nothing to rub out yet
+; D 4128 81 00 7F       TESTAI 007F
+; D 412B A0 00 FC       IFTRUEI GETLK
+; D 412E C9             SEROUT                             the echo
+; D 412F 36 01 0C       COPYIAMX 1 byte Acc -> M(R12)
+; D 4132 42 0C          INCX R12
+; D 4134 C2 CD          GETSTR R12 R13                     the rest of the line (Backspace can rub out the first key too)
+; D 4136 BE 00          RETURN
+; GETLW:
+; D 4138 72 09          PUSHX R9
+; D 413A 11 09 00 08    LOADXI R9 0008
+; GETLW1:
+; D 413E CC             SERST
+; D 413F A0 01 49       IFTRUEI GETLW2
+; D 4142 43 09          DECX R9
+; D 4144 8C 09          TESTXZ R9
+; D 4146 A1 01 3E       IFFALSEI GETLW1
+; GETLW2:
+; D 4149 73 09          POPX R9
+; D 414B CC             SERST                              Test: a key is waiting
+; D 414C BE 00          RETURN
 ; SAY:
-; D 40F3 2E 04 0A 00    READIDX R4 0A00
-; D 40F7 21 05          COPYAX Acc -> R5                   R5 = the group's first reply
-; D 40F9 2E 04 2B 10    READIDX R4 2B10
-; D 40FD 21 06          COPYAX Acc -> R6                   R6 = where its rotation is
-; D 40FF 50 56 07       ADDXYZ R5 + R6 -> R7               R7 = the reply to use
-; D 4102 2E 04 0A 40    READIDX R4 0A40
-; D 4106 21 08          COPYAX Acc -> R8
-; D 4108 42 06          INCX R6                            advance the rotation
-; D 410A 89 68          TESTLXY R6 < R8
-; D 410C A0 01 13       IFTRUEI SAY1
-; D 410F 11 06 00 00    LOADXI R6 0000                     wrapping round
+; D 414E 2E 04 0A 00    READIDX R4 0A00
+; D 4152 21 05          COPYAX Acc -> R5                   R5 = the group's first reply
+; D 4154 2E 04 2B 10    READIDX R4 2B10
+; D 4158 21 06          COPYAX Acc -> R6                   R6 = where its rotation is
+; D 415A 50 56 07       ADDXYZ R5 + R6 -> R7               R7 = the reply to use
+; D 415D 2E 04 0A 40    READIDX R4 0A40
+; D 4161 21 08          COPYAX Acc -> R8
+; D 4163 42 06          INCX R6                            advance the rotation
+; D 4165 89 68          TESTLXY R6 < R8
+; D 4167 A0 01 6E       IFTRUEI SAY1
+; D 416A 11 06 00 00    LOADXI R6 0000                     wrapping round
 ; SAY1:
-; D 4113 22 06          COPYXA R6 -> Acc
-; D 4115 2F 04 2B 10    WRITEIDX R4 2B10
-; D 4119 50 77 09       ADDXYZ R7 + R7 -> R9               R9 = 2 x reply: its pointer
-; D 411C 11 0E 00 00    LOADXI R14 0000
-; D 4120 2E 09 0A 80    READIDX R9 0A80
-; D 4124 2F 0E 2B 05    WRITEIDX R14 2B05
-; D 4128 2E 09 0A 81    READIDX R9 0A81
-; D 412C 2F 0E 2B 06    WRITEIDX R14 2B06
-; D 4130 10 00 42       LOADAI 0042
-; D 4133 2F 0E 2B 00    WRITEIDX R14 2B00
-; D 4137 F1 4C 00       RUNMC 4C00                         Fill it in: * fragment, @ name, & memory
-; D 413A 11 0E 28 00    LOADXI R14 2800
-; D 413E C1 0E          PRINTSTR R14
-; D 4140 BE 00          RETURN
+; D 416E 22 06          COPYXA R6 -> Acc
+; D 4170 2F 04 2B 10    WRITEIDX R4 2B10
+; D 4174 50 77 09       ADDXYZ R7 + R7 -> R9               R9 = 2 x reply: its pointer
+; D 4177 11 0E 00 00    LOADXI R14 0000
+; D 417B 2E 09 0A 80    READIDX R9 0A80
+; D 417F 2F 0E 2B 05    WRITEIDX R14 2B05
+; D 4183 2E 09 0A 81    READIDX R9 0A81
+; D 4187 2F 0E 2B 06    WRITEIDX R14 2B06
+; D 418B 10 00 42       LOADAI 0042
+; D 418E 2F 0E 2B 00    WRITEIDX R14 2B00
+; D 4192 F1 4C 00       RUNMC 4C00                         Fill it in: * fragment, @ name, & memory
+; D 4195 11 0E 28 00    LOADXI R14 2800
+; D 4199 C1 0E          PRINTSTR R14
+; D 419B BE 00          RETURN
 
 ; --------------------------------------------------------------------------
 ; NATIVE ENGINE  -  a18 listing of Firmware-Math/eliza_native.asm
@@ -713,14 +758,14 @@ D 4019 2F 0E 2B 08
 D 401D 2F 0E 21 00
 D 4021 11 0E 03 00
 D 4025 C1 0E
-D 4027 BD 00 DB
+D 4027 BD 00 E3
 D 402A 11 0E 00 00
 D 402E 10 00 4E
 D 4031 2F 0E 2B 00
 D 4035 F1 4C 00
 D 4038 11 04 00 23
-D 403C BD 00 F3
-D 403F BD 00 DB
+D 403C BD 01 4E
+D 403F BD 00 E3
 D 4042 11 0E 00 00
 D 4046 10 00 50
 D 4049 2F 0E 2B 00
@@ -760,45 +805,82 @@ D 40BA 2F 0E 2B 08
 D 40BE 11 04 00 22
 D 40C2 B0 00 C9
 D 40C5 11 04 00 1F
-D 40C9 BD 00 F3
+D 40C9 BD 01 4E
 D 40CC B0 00 3F
-D 40CF BD 00 F3
+D 40CF BD 01 4E
 D 40D2 11 0E 03 31
 D 40D6 C1 0E
-D 40D8 F0 00 00
-D 40DB 11 0E 03 2A
-D 40DF C1 0E
-D 40E1 11 0C 2C 00
-D 40E5 11 0D 2C 00
-D 40E9 C2 CD
-D 40EB 11 0E 03 31
-D 40EF C1 0E
-D 40F1 BE 00
-D 40F3 2E 04 0A 00
-D 40F7 21 05
-D 40F9 2E 04 2B 10
-D 40FD 21 06
-D 40FF 50 56 07
-D 4102 2E 04 0A 40
-D 4106 21 08
-D 4108 42 06
-D 410A 89 68
-D 410C A0 01 13
-D 410F 11 06 00 00
-D 4113 22 06
-D 4115 2F 04 2B 10
-D 4119 50 77 09
-D 411C 11 0E 00 00
-D 4120 2E 09 0A 80
-D 4124 2F 0E 2B 05
-D 4128 2E 09 0A 81
-D 412C 2F 0E 2B 06
-D 4130 10 00 42
-D 4133 2F 0E 2B 00
-D 4137 F1 4C 00
-D 413A 11 0E 28 00
-D 413E C1 0E
-D 4140 BE 00
+D 40D8 00
+D 40D9 11 04 00 00
+D 40DD B0 00 CF
+D 40E0 F0 00 00
+D 40E3 11 0E 03 2A
+D 40E7 C1 0E
+D 40E9 11 0C 2C 00
+D 40ED 11 0D 2C 00
+D 40F1 BD 00 FC
+D 40F4 11 0E 03 31
+D 40F8 C1 0E
+D 40FA BE 00
+D 40FC CB
+D 40FD 81 00 1B
+D 4100 A1 01 14
+D 4103 BD 01 38
+D 4106 A1 00 D9
+D 4109 CB
+D 410A BD 01 38
+D 410D A1 00 FC
+D 4110 CB
+D 4111 B0 00 FC
+D 4114 81 00 0D
+D 4117 A1 01 22
+D 411A 10 00 00
+D 411D 36 01 0C
+D 4120 BE 00
+D 4122 81 00 08
+D 4125 A0 00 FC
+D 4128 81 00 7F
+D 412B A0 00 FC
+D 412E C9
+D 412F 36 01 0C
+D 4132 42 0C
+D 4134 C2 CD
+D 4136 BE 00
+D 4138 72 09
+D 413A 11 09 00 08
+D 413E CC
+D 413F A0 01 49
+D 4142 43 09
+D 4144 8C 09
+D 4146 A1 01 3E
+D 4149 73 09
+D 414B CC
+D 414C BE 00
+D 414E 2E 04 0A 00
+D 4152 21 05
+D 4154 2E 04 2B 10
+D 4158 21 06
+D 415A 50 56 07
+D 415D 2E 04 0A 40
+D 4161 21 08
+D 4163 42 06
+D 4165 89 68
+D 4167 A0 01 6E
+D 416A 11 06 00 00
+D 416E 22 06
+D 4170 2F 04 2B 10
+D 4174 50 77 09
+D 4177 11 0E 00 00
+D 417B 2E 09 0A 80
+D 417F 2F 0E 2B 05
+D 4183 2E 09 0A 81
+D 4187 2F 0E 2B 06
+D 418B 10 00 42
+D 418E 2F 0E 2B 00
+D 4192 F1 4C 00
+D 4195 11 0E 28 00
+D 4199 C1 0E
+D 419B BE 00
 
 D 4300 0D 0A 45 4C 49 5A 41 0D 0A 48 49 2C 20 49 27 4D
 D 4310 20 45 4C 49 5A 41 2E 20 57 48 41 54 27 53 20 59

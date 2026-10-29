@@ -13,7 +13,7 @@
 ;   > -2.5*4           = -10         a leading - is a negative number
 ;   > 99999999*99999999 = 9.9999998E15
 ;   > 5/0              = Err         the last answer is kept
-;   Enter on an empty line quits.  x also means times.
+;   Esc, or Enter on an empty line, quits.  x also means times.
 ;
 ; NUMBERS carry 8 significant digits and a decimal exponent; every result is
 ; the exact answer ROUNDED HALF-UP to 8 digits (so 1/3*3 = 0.99999999, as on a
@@ -21,7 +21,7 @@
 ; Plain display for integers of up to 12 digits and up to 12 decimal places,
 ; d.ddddddd E x otherwise.
 ;
-; THE SPLIT. The STELLAR program ($4000-$42D2) reads the line, keeps the
+; THE SPLIT. The STELLAR program ($4000-$4326) reads the line, keeps the
 ; running answer and prints. All the arithmetic is ONE native routine at
 ; $4800 (Firmware-Math/calc8_native.asm, 770 bytes), entered with RUNMC $4800
 ; and an operation letter at $4D30: N (round a typed number), + - * /.
@@ -52,7 +52,7 @@
 ; HARDWARE-VERIFIED on the Elf2K, 2026-09-24, on firmware V0061.33 - Craig: "works
 ; very well". The first app whose arithmetic runs as native 1802 through RUNMC.
 ;
-; 242 STELLAR commands, $4000-$42D2 (723 bytes); native code $4800-$4B01.
+; 277 STELLAR commands, $4000-$4326 (807 bytes); native code $4800-$4B01.
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
@@ -77,263 +77,305 @@
 ; D 4037 C1 0E          PRINTSTR R14                       >
 ; D 4039 11 0C 0E 00    LOADXI R12 0E00
 ; D 403D 11 0D 0E 00    LOADXI R13 0E00
-; D 4041 C2 CD          GETSTR R12 R13                     Read a line (echoed; backspace works)
-; D 4043 11 0C 0E 00    LOADXI R12 0E00                    Back to the start of it
-; D 4047 BD 01 1E       CALL SKIPSP
-; D 404A 8C 00          TESTXZ R0                          An empty line quits
-; D 404C A0 01 15       IFTRUEI QUIT
-; D 404F 86 00 00 2B    TESTXI R0 002B                     A line that starts with + * / carries on
-; D 4053 A0 00 80       IFTRUEI USEANS
-; D 4056 86 00 00 2A    TESTXI R0 002A                     from the last answer
-; D 405A A0 00 80       IFTRUEI USEANS
-; D 405D 86 00 00 2F    TESTXI R0 002F
-; D 4061 A0 00 80       IFTRUEI USEANS
-; D 4064 BD 01 3F       CALL PARSE                         The first number -> NB
-; D 4067 8C 0A          TESTXZ R10                         No digits: not a number
-; D 4069 A0 00 FD       IFTRUEI SYNERR
-; D 406C BD 01 32       CALL STATUS                        Too big to hold?
-; D 406F A1 01 06       IFFALSEI MATHERR
-; D 4072 11 0D 0D 10    LOADXI R13 0D10                    It becomes the running answer NA
-; D 4076 11 0E 0D 00    LOADXI R14 0D00
-; D 407A 3B DE 0A       COPYMXMY R13 R14 0A                10-byte record
-; D 407D B0 00 8B       GAL OPLOOP
+; D 4041 BD 01 1D       CALL GETL                          Read a line (echoed; backspace works; a lone ESC first quits)
+; D 4044 11 0C 0E 00    LOADXI R12 0E00                    Back to the start of it
+; D 4048 BD 01 72       CALL SKIPSP
+; D 404B 8C 00          TESTXZ R0                          An empty line quits
+; D 404D A0 01 16       IFTRUEI QUIT
+; D 4050 86 00 00 2B    TESTXI R0 002B                     A line that starts with + * / carries on
+; D 4054 A0 00 81       IFTRUEI USEANS
+; D 4057 86 00 00 2A    TESTXI R0 002A                     from the last answer
+; D 405B A0 00 81       IFTRUEI USEANS
+; D 405E 86 00 00 2F    TESTXI R0 002F
+; D 4062 A0 00 81       IFTRUEI USEANS
+; D 4065 BD 01 93       CALL PARSE                         The first number -> NB
+; D 4068 8C 0A          TESTXZ R10                         No digits: not a number
+; D 406A A0 00 FE       IFTRUEI SYNERR
+; D 406D BD 01 86       CALL STATUS                        Too big to hold?
+; D 4070 A1 01 07       IFFALSEI MATHERR
+; D 4073 11 0D 0D 10    LOADXI R13 0D10                    It becomes the running answer NA
+; D 4077 11 0E 0D 00    LOADXI R14 0D00
+; D 407B 3B DE 0A       COPYMXMY R13 R14 0A                10-byte record
+; D 407E B0 00 8C       GAL OPLOOP
 ; USEANS:
-; D 4080 11 0D 0D 20    LOADXI R13 0D20                    Load the last answer
-; D 4084 11 0E 0D 00    LOADXI R14 0D00
-; D 4088 3B DE 0A       COPYMXMY R13 R14 0A                10-byte record
+; D 4081 11 0D 0D 20    LOADXI R13 0D20                    Load the last answer
+; D 4085 11 0E 0D 00    LOADXI R14 0D00
+; D 4089 3B DE 0A       COPYMXMY R13 R14 0A                10-byte record
 ; OPLOOP:
-; D 408B BD 01 1E       CALL SKIPSP
-; D 408E 8C 00          TESTXZ R0                          End of the line: show the answer
-; D 4090 A0 00 E6       IFTRUEI SHOW
-; D 4093 23 00 09       COPYXY R0 -> R9                    R9 = the operator
-; D 4096 86 09 00 2B    TESTXI R9 002B
-; D 409A A0 00 BD       IFTRUEI OPOK
-; D 409D 86 09 00 2D    TESTXI R9 002D
-; D 40A1 A0 00 BD       IFTRUEI OPOK
-; D 40A4 86 09 00 2A    TESTXI R9 002A
-; D 40A8 A0 00 BD       IFTRUEI OPOK
-; D 40AB 86 09 00 2F    TESTXI R9 002F
-; D 40AF A0 00 BD       IFTRUEI OPOK
-; D 40B2 86 09 00 78    TESTXI R9 0078                     x means times
-; D 40B6 A1 00 FD       IFFALSEI SYNERR
-; D 40B9 11 09 00 2A    LOADXI R9 002A
+; D 408C BD 01 72       CALL SKIPSP
+; D 408F 8C 00          TESTXZ R0                          End of the line: show the answer
+; D 4091 A0 00 E7       IFTRUEI SHOW
+; D 4094 23 00 09       COPYXY R0 -> R9                    R9 = the operator
+; D 4097 86 09 00 2B    TESTXI R9 002B
+; D 409B A0 00 BE       IFTRUEI OPOK
+; D 409E 86 09 00 2D    TESTXI R9 002D
+; D 40A2 A0 00 BE       IFTRUEI OPOK
+; D 40A5 86 09 00 2A    TESTXI R9 002A
+; D 40A9 A0 00 BE       IFTRUEI OPOK
+; D 40AC 86 09 00 2F    TESTXI R9 002F
+; D 40B0 A0 00 BE       IFTRUEI OPOK
+; D 40B3 86 09 00 78    TESTXI R9 0078                     x means times
+; D 40B7 A1 00 FE       IFFALSEI SYNERR
+; D 40BA 11 09 00 2A    LOADXI R9 002A
 ; OPOK:
-; D 40BD 42 0C          INCX R12                           Past the operator
-; D 40BF BD 01 1E       CALL SKIPSP
-; D 40C2 BD 01 3F       CALL PARSE                         The next number -> NB
-; D 40C5 8C 0A          TESTXZ R10
-; D 40C7 A0 00 FD       IFTRUEI SYNERR
-; D 40CA BD 01 32       CALL STATUS
-; D 40CD A1 01 06       IFFALSEI MATHERR
-; D 40D0 11 0E 00 00    LOADXI R14 0000
-; D 40D4 22 09          COPYXA R9 -> Acc                   The operation letter for the native code
-; D 40D6 2F 0E 0D 30    WRITEIDX R14 0D30
-; D 40DA F1 48 00       RUNMC 4800                         NA = NA op NB, in raw 1802
-; D 40DD BD 01 32       CALL STATUS                        Divide by zero, or too big?
-; D 40E0 A1 01 06       IFFALSEI MATHERR
-; D 40E3 B0 00 8B       GAL OPLOOP
+; D 40BE 42 0C          INCX R12                           Past the operator
+; D 40C0 BD 01 72       CALL SKIPSP
+; D 40C3 BD 01 93       CALL PARSE                         The next number -> NB
+; D 40C6 8C 0A          TESTXZ R10
+; D 40C8 A0 00 FE       IFTRUEI SYNERR
+; D 40CB BD 01 86       CALL STATUS
+; D 40CE A1 01 07       IFFALSEI MATHERR
+; D 40D1 11 0E 00 00    LOADXI R14 0000
+; D 40D5 22 09          COPYXA R9 -> Acc                   The operation letter for the native code
+; D 40D7 2F 0E 0D 30    WRITEIDX R14 0D30
+; D 40DB F1 48 00       RUNMC 4800                         NA = NA op NB, in raw 1802
+; D 40DE BD 01 86       CALL STATUS                        Divide by zero, or too big?
+; D 40E1 A1 01 07       IFFALSEI MATHERR
+; D 40E4 B0 00 8C       GAL OPLOOP
 ; SHOW:
-; D 40E6 11 0D 0D 00    LOADXI R13 0D00                    Keep it as the last answer
-; D 40EA 11 0E 0D 20    LOADXI R14 0D20
-; D 40EE 3B DE 0A       COPYMXMY R13 R14 0A                10-byte record
-; D 40F1 11 0E 0B 48    LOADXI R14 0B48
-; D 40F5 C1 0E          PRINTSTR R14                        =
-; D 40F7 BD 01 E4       CALL PRINTNUM
-; D 40FA B0 00 33       GAL PROMPT
+; D 40E7 11 0D 0D 00    LOADXI R13 0D00                    Keep it as the last answer
+; D 40EB 11 0E 0D 20    LOADXI R14 0D20
+; D 40EF 3B DE 0A       COPYMXMY R13 R14 0A                10-byte record
+; D 40F2 11 0E 0B 48    LOADXI R14 0B48
+; D 40F6 C1 0E          PRINTSTR R14                        =
+; D 40F8 BD 02 38       CALL PRINTNUM
+; D 40FB B0 00 33       GAL PROMPT
 ; SYNERR:
-; D 40FD 11 0E 0B 58    LOADXI R14 0B58
-; D 4101 C1 0E          PRINTSTR R14                        = ?  (the last answer is kept)
-; D 4103 B0 00 33       GAL PROMPT
+; D 40FE 11 0E 0B 58    LOADXI R14 0B58
+; D 4102 C1 0E          PRINTSTR R14                        = ?  (the last answer is kept)
+; D 4104 B0 00 33       GAL PROMPT
 ; MATHERR:
-; D 4106 11 0E 0B 48    LOADXI R14 0B48
-; D 410A C1 0E          PRINTSTR R14
-; D 410C 11 0E 0B 50    LOADXI R14 0B50
-; D 4110 C1 0E          PRINTSTR R14                       Err
-; D 4112 B0 00 33       GAL PROMPT
+; D 4107 11 0E 0B 48    LOADXI R14 0B48
+; D 410B C1 0E          PRINTSTR R14
+; D 410D 11 0E 0B 50    LOADXI R14 0B50
+; D 4111 C1 0E          PRINTSTR R14                       Err
+; D 4113 B0 00 33       GAL PROMPT
 ; QUIT:
-; D 4115 11 0E 0B 60    LOADXI R14 0B60
-; D 4119 C1 0E          PRINTSTR R14
-; D 411B F0 00 00       BREAK                              End of program
+; D 4116 11 0E 0B 60    LOADXI R14 0B60
+; D 411A C1 0E          PRINTSTR R14
+; D 411C 00             HALT
+; GETL:
+; GETLK:
+; D 411D CB             SERIN                              the first key
+; D 411E 81 00 1B       TESTAI 001B
+; D 4121 A1 01 35       IFFALSEI GETLN
+; D 4124 BD 01 59       CALL GETLW                         ESC: an arrow following?
+; D 4127 A1 01 16       IFFALSEI QUIT                      no: ESC on its own quits
+; D 412A CB             SERIN                              an arrow (ESC [ x): its two bytes are thrown away
+; D 412B BD 01 59       CALL GETLW
+; D 412E A1 01 1D       IFFALSEI GETLK
+; D 4131 CB             SERIN
+; D 4132 B0 01 1D       GAL GETLK
+; GETLN:
+; D 4135 81 00 0D       TESTAI 000D
+; D 4138 A1 01 43       IFFALSEI GETLC
+; D 413B 10 00 00       LOADAI 0000
+; D 413E 36 01 0C       COPYIAMX 1 byte Acc -> M(R12)      Enter alone: the empty line
+; D 4141 BE 00          RETURN
+; GETLC:
+; D 4143 81 00 08       TESTAI 0008
+; D 4146 A0 01 1D       IFTRUEI GETLK                      nothing to rub out yet
+; D 4149 81 00 7F       TESTAI 007F
+; D 414C A0 01 1D       IFTRUEI GETLK
+; D 414F C9             SEROUT                             the echo
+; D 4150 36 01 0C       COPYIAMX 1 byte Acc -> M(R12)
+; D 4153 42 0C          INCX R12
+; D 4155 C2 CD          GETSTR R12 R13                     the rest of the line (Backspace can rub out the first key too)
+; D 4157 BE 00          RETURN
+; GETLW:
+; D 4159 72 09          PUSHX R9
+; D 415B 11 09 00 08    LOADXI R9 0008
+; GETLW1:
+; D 415F CC             SERST
+; D 4160 A0 01 6A       IFTRUEI GETLW2
+; D 4163 43 09          DECX R9
+; D 4165 8C 09          TESTXZ R9
+; D 4167 A1 01 5F       IFFALSEI GETLW1
+; GETLW2:
+; D 416A 73 09          POPX R9
+; D 416C CC             SERST                              Test: a key is waiting
+; D 416D BE 00          RETURN
+; D 416F F0 00 00       BREAK                              End of program
 ; SKIPSP:
-; D 411E 2E 0C 00 00    READIDX R12 0000
-; D 4122 21 00          COPYAX Acc -> R0
-; D 4124 86 00 00 20    TESTXI R0 0020
-; D 4128 A1 01 30       IFFALSEI SKR
-; D 412B 42 0C          INCX R12
-; D 412D B0 01 1E       GAL SKIPSP
+; D 4172 2E 0C 00 00    READIDX R12 0000
+; D 4176 21 00          COPYAX Acc -> R0
+; D 4178 86 00 00 20    TESTXI R0 0020
+; D 417C A1 01 84       IFFALSEI SKR
+; D 417F 42 0C          INCX R12
+; D 4181 B0 01 72       GAL SKIPSP
 ; SKR:
-; D 4130 BE 00          RETURN
+; D 4184 BE 00          RETURN
 ; STATUS:
-; D 4132 11 0E 00 00    LOADXI R14 0000
-; D 4136 2E 0E 0D 31    READIDX R14 0D31
-; D 413A 81 00 00       TESTAI 0000
-; D 413D BE 00          RETURN
+; D 4186 11 0E 00 00    LOADXI R14 0000
+; D 418A 2E 0E 0D 31    READIDX R14 0D31
+; D 418E 81 00 00       TESTAI 0000
+; D 4191 BE 00          RETURN
 ; PARSE:
-; D 413F 11 04 00 00    LOADXI R4 0000
-; D 4143 11 05 00 00    LOADXI R5 0000
-; D 4147 11 06 00 80    LOADXI R6 0080
-; D 414B 11 08 00 00    LOADXI R8 0000
-; D 414F 11 0A 00 00    LOADXI R10 0000
-; D 4153 2E 0C 00 00    READIDX R12 0000
-; D 4157 21 00          COPYAX Acc -> R0
-; D 4159 86 00 00 2D    TESTXI R0 002D                     A leading minus
-; D 415D A1 01 66       IFFALSEI PLOOP
-; D 4160 11 04 00 01    LOADXI R4 0001
-; D 4164 42 0C          INCX R12
+; D 4193 11 04 00 00    LOADXI R4 0000
+; D 4197 11 05 00 00    LOADXI R5 0000
+; D 419B 11 06 00 80    LOADXI R6 0080
+; D 419F 11 08 00 00    LOADXI R8 0000
+; D 41A3 11 0A 00 00    LOADXI R10 0000
+; D 41A7 2E 0C 00 00    READIDX R12 0000
+; D 41AB 21 00          COPYAX Acc -> R0
+; D 41AD 86 00 00 2D    TESTXI R0 002D                     A leading minus
+; D 41B1 A1 01 BA       IFFALSEI PLOOP
+; D 41B4 11 04 00 01    LOADXI R4 0001
+; D 41B8 42 0C          INCX R12
 ; PLOOP:
-; D 4166 2E 0C 00 00    READIDX R12 0000
-; D 416A 21 00          COPYAX Acc -> R0
-; D 416C 86 00 00 2E    TESTXI R0 002E
-; D 4170 A1 01 81       IFFALSEI PDIG
-; D 4173 8C 08          TESTXZ R8                          A second point ends the number
-; D 4175 A1 01 C2       IFFALSEI PEND
-; D 4178 11 08 00 01    LOADXI R8 0001                     Digits from here on are fraction
-; D 417C 42 0C          INCX R12
-; D 417E B0 01 66       GAL PLOOP
+; D 41BA 2E 0C 00 00    READIDX R12 0000
+; D 41BE 21 00          COPYAX Acc -> R0
+; D 41C0 86 00 00 2E    TESTXI R0 002E
+; D 41C4 A1 01 D5       IFFALSEI PDIG
+; D 41C7 8C 08          TESTXZ R8                          A second point ends the number
+; D 41C9 A1 02 16       IFFALSEI PEND
+; D 41CC 11 08 00 01    LOADXI R8 0001                     Digits from here on are fraction
+; D 41D0 42 0C          INCX R12
+; D 41D2 B0 01 BA       GAL PLOOP
 ; PDIG:
-; D 4181 53 00 00 30    SUBXI R0 0030                      A digit is '0'..'9': c-'0' < 10
-; D 4185 89 0F          TESTLXY R0 < R15
-; D 4187 A1 01 C2       IFFALSEI PEND
-; D 418A 42 0C          INCX R12
-; D 418C 11 0A 00 01    LOADXI R10 0001                    Seen a digit
-; D 4190 8C 05          TESTXZ R5                          A leading zero is not kept
-; D 4192 A1 01 9D       IFFALSEI PKEEP
-; D 4195 8C 00          TESTXZ R0
-; D 4197 A1 01 9D       IFFALSEI PKEEP
-; D 419A B0 01 AE       GAL PFRAC                          but after the point it still moves the exponent
+; D 41D5 53 00 00 30    SUBXI R0 0030                      A digit is '0'..'9': c-'0' < 10
+; D 41D9 89 0F          TESTLXY R0 < R15
+; D 41DB A1 02 16       IFFALSEI PEND
+; D 41DE 42 0C          INCX R12
+; D 41E0 11 0A 00 01    LOADXI R10 0001                    Seen a digit
+; D 41E4 8C 05          TESTXZ R5                          A leading zero is not kept
+; D 41E6 A1 01 F1       IFFALSEI PKEEP
+; D 41E9 8C 00          TESTXZ R0
+; D 41EB A1 01 F1       IFFALSEI PKEEP
+; D 41EE B0 02 02       GAL PFRAC                          but after the point it still moves the exponent
 ; PKEEP:
-; D 419D 11 0E 00 14    LOADXI R14 0014                    Keep up to 20 digits
-; D 41A1 89 5E          TESTLXY R5 < R14
-; D 41A3 A1 01 B8       IFFALSEI PFULL
-; D 41A6 22 00          COPYXA R0 -> Acc
-; D 41A8 2F 05 0D 40    WRITEIDX R5 0D40                   W[k] = the digit
-; D 41AC 42 05          INCX R5
+; D 41F1 11 0E 00 14    LOADXI R14 0014                    Keep up to 20 digits
+; D 41F5 89 5E          TESTLXY R5 < R14
+; D 41F7 A1 02 0C       IFFALSEI PFULL
+; D 41FA 22 00          COPYXA R0 -> Acc
+; D 41FC 2F 05 0D 40    WRITEIDX R5 0D40                   W[k] = the digit
+; D 4200 42 05          INCX R5
 ; PFRAC:
-; D 41AE 8C 08          TESTXZ R8                          After the point each digit is a tenth
-; D 41B0 A0 01 66       IFTRUEI PLOOP
-; D 41B3 43 06          DECX R6
-; D 41B5 B0 01 66       GAL PLOOP
+; D 4202 8C 08          TESTXZ R8                          After the point each digit is a tenth
+; D 4204 A0 01 BA       IFTRUEI PLOOP
+; D 4207 43 06          DECX R6
+; D 4209 B0 01 BA       GAL PLOOP
 ; PFULL:
-; D 41B8 8C 08          TESTXZ R8                          A dropped digit before the point is a x10
-; D 41BA A1 01 66       IFFALSEI PLOOP
-; D 41BD 42 06          INCX R6
-; D 41BF B0 01 66       GAL PLOOP
+; D 420C 8C 08          TESTXZ R8                          A dropped digit before the point is a x10
+; D 420E A1 01 BA       IFFALSEI PLOOP
+; D 4211 42 06          INCX R6
+; D 4213 B0 01 BA       GAL PLOOP
 ; PEND:
-; D 41C2 11 0E 00 00    LOADXI R14 0000                    Hand the raw digits to the native code
-; D 41C6 22 05          COPYXA R5 -> Acc
-; D 41C8 2F 0E 0D 33    WRITEIDX R14 0D33
-; D 41CC 22 06          COPYXA R6 -> Acc
-; D 41CE 2F 0E 0D 32    WRITEIDX R14 0D32
-; D 41D2 22 04          COPYXA R4 -> Acc
-; D 41D4 2F 0E 0D 34    WRITEIDX R14 0D34
-; D 41D8 10 00 4E       LOADAI 004E
-; D 41DB 2F 0E 0D 30    WRITEIDX R14 0D30
-; D 41DF F1 48 00       RUNMC 4800                         Round to 8 digits -> NB
-; D 41E2 BE 00          RETURN
+; D 4216 11 0E 00 00    LOADXI R14 0000                    Hand the raw digits to the native code
+; D 421A 22 05          COPYXA R5 -> Acc
+; D 421C 2F 0E 0D 33    WRITEIDX R14 0D33
+; D 4220 22 06          COPYXA R6 -> Acc
+; D 4222 2F 0E 0D 32    WRITEIDX R14 0D32
+; D 4226 22 04          COPYXA R4 -> Acc
+; D 4228 2F 0E 0D 34    WRITEIDX R14 0D34
+; D 422C 10 00 4E       LOADAI 004E
+; D 422F 2F 0E 0D 30    WRITEIDX R14 0D30
+; D 4233 F1 48 00       RUNMC 4800                         Round to 8 digits -> NB
+; D 4236 BE 00          RETURN
 ; PRINTNUM:
-; D 41E4 11 07 00 08    LOADXI R7 0008
+; D 4238 11 07 00 08    LOADXI R7 0008
 ; PNT:
-; D 41E8 8C 07          TESTXZ R7                          All eight zero: the number is 0
-; D 41EA A0 02 CF       IFTRUEI PNZERO
-; D 41ED 43 07          DECX R7
-; D 41EF 2E 07 0D 02    READIDX R7 0D02                    Drop trailing zeros
-; D 41F3 81 00 00       TESTAI 0000
-; D 41F6 A0 01 E8       IFTRUEI PNT
-; D 41F9 42 07          INCX R7
-; D 41FB 11 0E 00 00    LOADXI R14 0000
-; D 41FF 2E 0E 0D 00    READIDX R14 0D00                   The sign
-; D 4203 81 00 00       TESTAI 0000
-; D 4206 A0 02 0B       IFTRUEI PN1
-; D 4209 CA 2D          SEROUTI 2D '-'
+; D 423C 8C 07          TESTXZ R7                          All eight zero: the number is 0
+; D 423E A0 03 23       IFTRUEI PNZERO
+; D 4241 43 07          DECX R7
+; D 4243 2E 07 0D 02    READIDX R7 0D02                    Drop trailing zeros
+; D 4247 81 00 00       TESTAI 0000
+; D 424A A0 02 3C       IFTRUEI PNT
+; D 424D 42 07          INCX R7
+; D 424F 11 0E 00 00    LOADXI R14 0000
+; D 4253 2E 0E 0D 00    READIDX R14 0D00                   The sign
+; D 4257 81 00 00       TESTAI 0000
+; D 425A A0 02 5F       IFTRUEI PN1
+; D 425D CA 2D          SEROUTI 2D '-'
 ; PN1:
-; D 420B 2E 0E 0D 01    READIDX R14 0D01                   e = exponent + 8 - n
-; D 420F 21 03          COPYAX Acc -> R3
-; D 4211 52 03 00 08    ADDXI R3 0008
-; D 4215 51 37 03       SUBXYZ R3 - R7 -> R3
-; D 4218 50 73 08       ADDXYZ R7 + R3 -> R8               p = n + e
-; D 421B 11 06 00 00    LOADXI R6 0000
-; D 421F 11 0E 00 80    LOADXI R14 0080
-; D 4223 88 3E          TESTGXY R3 >= R14                  e >= 0: plain if p <= 12
-; D 4225 A1 02 34       IFFALSEI PNNEG
-; D 4228 11 0E 00 8C    LOADXI R14 008C
-; D 422C 88 E8          TESTGXY R14 >= R8
-; D 422E A0 02 48       IFTRUEI PNFMT
-; D 4231 B0 02 3D       GAL PNSCI
+; D 425F 2E 0E 0D 01    READIDX R14 0D01                   e = exponent + 8 - n
+; D 4263 21 03          COPYAX Acc -> R3
+; D 4265 52 03 00 08    ADDXI R3 0008
+; D 4269 51 37 03       SUBXYZ R3 - R7 -> R3
+; D 426C 50 73 08       ADDXYZ R7 + R3 -> R8               p = n + e
+; D 426F 11 06 00 00    LOADXI R6 0000
+; D 4273 11 0E 00 80    LOADXI R14 0080
+; D 4277 88 3E          TESTGXY R3 >= R14                  e >= 0: plain if p <= 12
+; D 4279 A1 02 88       IFFALSEI PNNEG
+; D 427C 11 0E 00 8C    LOADXI R14 008C
+; D 4280 88 E8          TESTGXY R14 >= R8
+; D 4282 A0 02 9C       IFTRUEI PNFMT
+; D 4285 B0 02 91       GAL PNSCI
 ; PNNEG:
-; D 4234 11 0E 00 74    LOADXI R14 0074                    e < 0: plain if e >= -12
-; D 4238 88 3E          TESTGXY R3 >= R14
-; D 423A A0 02 48       IFTRUEI PNFMT
+; D 4288 11 0E 00 74    LOADXI R14 0074                    e < 0: plain if e >= -12
+; D 428C 88 3E          TESTGXY R3 >= R14
+; D 428E A0 02 9C       IFTRUEI PNFMT
 ; PNSCI:
-; D 423D 11 06 00 01    LOADXI R6 0001                     Otherwise d.ddddddd E x
-; D 4241 23 00 89       COPYXY R8 -> R9
-; D 4244 11 08 00 81    LOADXI R8 0081
+; D 4291 11 06 00 01    LOADXI R6 0001                     Otherwise d.ddddddd E x
+; D 4295 23 00 89       COPYXY R8 -> R9
+; D 4298 11 08 00 81    LOADXI R8 0081
 ; PNFMT:
-; D 4248 11 0E 00 80    LOADXI R14 0080
-; D 424C 88 E8          TESTGXY R14 >= R8                  p <= 0: 0. and zeros first
-; D 424E A1 02 61       IFFALSEI PNDS
-; D 4251 CA 30          SEROUTI 30 '0'
-; D 4253 CA 2E          SEROUTI 2E '.'
+; D 429C 11 0E 00 80    LOADXI R14 0080
+; D 42A0 88 E8          TESTGXY R14 >= R8                  p <= 0: 0. and zeros first
+; D 42A2 A1 02 B5       IFFALSEI PNDS
+; D 42A5 CA 30          SEROUTI 30 '0'
+; D 42A7 CA 2E          SEROUTI 2E '.'
 ; PNZ:
-; D 4255 87 8E          TESTXY R8 = R14
-; D 4257 A0 02 61       IFTRUEI PNDS
-; D 425A CA 30          SEROUTI 30 '0'
-; D 425C 42 08          INCX R8
-; D 425E B0 02 55       GAL PNZ
+; D 42A9 87 8E          TESTXY R8 = R14
+; D 42AB A0 02 B5       IFTRUEI PNDS
+; D 42AE CA 30          SEROUTI 30 '0'
+; D 42B0 42 08          INCX R8
+; D 42B2 B0 02 A9       GAL PNZ
 ; PNDS:
-; D 4261 23 00 8A       COPYXY R8 -> R10
-; D 4264 53 0A 00 80    SUBXI R10 0080                     RA = digits before the point
-; D 4268 11 04 00 00    LOADXI R4 0000
+; D 42B5 23 00 8A       COPYXY R8 -> R10
+; D 42B8 53 0A 00 80    SUBXI R10 0080                     RA = digits before the point
+; D 42BC 11 04 00 00    LOADXI R4 0000
 ; PNL:
-; D 426C 87 47          TESTXY R4 = R7                     Printed them all?
-; D 426E A0 02 91       IFTRUEI PNTAIL
-; D 4271 2E 04 0D 02    READIDX R4 0D02
-; D 4275 4E 00 30       ADDAI 0030
-; D 4278 C9             SEROUT
-; D 4279 42 04          INCX R4
-; D 427B 8C 0A          TESTXZ R10
-; D 427D A0 02 6C       IFTRUEI PNL
-; D 4280 43 0A          DECX R10
-; D 4282 8C 0A          TESTXZ R10
-; D 4284 A1 02 6C       IFFALSEI PNL
-; D 4287 87 47          TESTXY R4 = R7                     the point, if digits follow
-; D 4289 A0 02 6C       IFTRUEI PNL
-; D 428C CA 2E          SEROUTI 2E '.'
-; D 428E B0 02 6C       GAL PNL
-; PNTAIL:
-; D 4291 8C 0A          TESTXZ R10                         Zeros to fill an integer out
-; D 4293 A0 02 9D       IFTRUEI PNEXP
-; D 4296 CA 30          SEROUTI 30 '0'
-; D 4298 43 0A          DECX R10
-; D 429A B0 02 91       GAL PNTAIL
-; PNEXP:
-; D 429D 8C 06          TESTXZ R6
-; D 429F A0 02 CD       IFTRUEI PNRET
-; D 42A2 CA 45          SEROUTI 45 'E'
-; D 42A4 43 09          DECX R9                            x = p - 1
-; D 42A6 11 0E 00 80    LOADXI R14 0080
-; D 42AA 89 9E          TESTLXY R9 < R14
-; D 42AC A1 02 B7       IFFALSEI PNEP
-; D 42AF CA 2D          SEROUTI 2D '-'
-; D 42B1 51 E9 09       SUBXYZ R14 - R9 -> R9
-; D 42B4 B0 02 BB       GAL PNEV
-; PNEP:
-; D 42B7 53 09 00 80    SUBXI R9 0080
-; PNEV:
-; D 42BB 4D 9F          DIVXY R9 / R15
-; D 42BD 25             COPYMAA
-; D 42BE 81 00 00       TESTAI 0000
-; D 42C1 A0 02 C8       IFTRUEI PNEU
-; D 42C4 4E 00 30       ADDAI 0030
-; D 42C7 C9             SEROUT
-; PNEU:
-; D 42C8 27             COPYREMA
+; D 42C0 87 47          TESTXY R4 = R7                     Printed them all?
+; D 42C2 A0 02 E5       IFTRUEI PNTAIL
+; D 42C5 2E 04 0D 02    READIDX R4 0D02
 ; D 42C9 4E 00 30       ADDAI 0030
 ; D 42CC C9             SEROUT
+; D 42CD 42 04          INCX R4
+; D 42CF 8C 0A          TESTXZ R10
+; D 42D1 A0 02 C0       IFTRUEI PNL
+; D 42D4 43 0A          DECX R10
+; D 42D6 8C 0A          TESTXZ R10
+; D 42D8 A1 02 C0       IFFALSEI PNL
+; D 42DB 87 47          TESTXY R4 = R7                     the point, if digits follow
+; D 42DD A0 02 C0       IFTRUEI PNL
+; D 42E0 CA 2E          SEROUTI 2E '.'
+; D 42E2 B0 02 C0       GAL PNL
+; PNTAIL:
+; D 42E5 8C 0A          TESTXZ R10                         Zeros to fill an integer out
+; D 42E7 A0 02 F1       IFTRUEI PNEXP
+; D 42EA CA 30          SEROUTI 30 '0'
+; D 42EC 43 0A          DECX R10
+; D 42EE B0 02 E5       GAL PNTAIL
+; PNEXP:
+; D 42F1 8C 06          TESTXZ R6
+; D 42F3 A0 03 21       IFTRUEI PNRET
+; D 42F6 CA 45          SEROUTI 45 'E'
+; D 42F8 43 09          DECX R9                            x = p - 1
+; D 42FA 11 0E 00 80    LOADXI R14 0080
+; D 42FE 89 9E          TESTLXY R9 < R14
+; D 4300 A1 03 0B       IFFALSEI PNEP
+; D 4303 CA 2D          SEROUTI 2D '-'
+; D 4305 51 E9 09       SUBXYZ R14 - R9 -> R9
+; D 4308 B0 03 0F       GAL PNEV
+; PNEP:
+; D 430B 53 09 00 80    SUBXI R9 0080
+; PNEV:
+; D 430F 4D 9F          DIVXY R9 / R15
+; D 4311 25             COPYMAA
+; D 4312 81 00 00       TESTAI 0000
+; D 4315 A0 03 1C       IFTRUEI PNEU
+; D 4318 4E 00 30       ADDAI 0030
+; D 431B C9             SEROUT
+; PNEU:
+; D 431C 27             COPYREMA
+; D 431D 4E 00 30       ADDAI 0030
+; D 4320 C9             SEROUT
 ; PNRET:
-; D 42CD BE 00          RETURN
+; D 4321 BE 00          RETURN
 ; PNZERO:
-; D 42CF CA 30          SEROUTI 30 '0'
-; D 42D1 BE 00          RETURN
+; D 4323 CA 30          SEROUTI 30 '0'
+; D 4325 BE 00          RETURN
 
 ; --------------------------------------------------------------------------
 ; NATIVE CODE  -  a18 listing of Firmware-Math/calc8_native.asm
@@ -932,230 +974,265 @@ D 4033 11 0E 0B 40
 D 4037 C1 0E
 D 4039 11 0C 0E 00
 D 403D 11 0D 0E 00
-D 4041 C2 CD
-D 4043 11 0C 0E 00
-D 4047 BD 01 1E
-D 404A 8C 00
-D 404C A0 01 15
-D 404F 86 00 00 2B
-D 4053 A0 00 80
-D 4056 86 00 00 2A
-D 405A A0 00 80
-D 405D 86 00 00 2F
-D 4061 A0 00 80
-D 4064 BD 01 3F
-D 4067 8C 0A
-D 4069 A0 00 FD
-D 406C BD 01 32
-D 406F A1 01 06
-D 4072 11 0D 0D 10
-D 4076 11 0E 0D 00
-D 407A 3B DE 0A
-D 407D B0 00 8B
-D 4080 11 0D 0D 20
-D 4084 11 0E 0D 00
-D 4088 3B DE 0A
-D 408B BD 01 1E
-D 408E 8C 00
-D 4090 A0 00 E6
-D 4093 23 00 09
-D 4096 86 09 00 2B
-D 409A A0 00 BD
-D 409D 86 09 00 2D
-D 40A1 A0 00 BD
-D 40A4 86 09 00 2A
-D 40A8 A0 00 BD
-D 40AB 86 09 00 2F
-D 40AF A0 00 BD
-D 40B2 86 09 00 78
-D 40B6 A1 00 FD
-D 40B9 11 09 00 2A
-D 40BD 42 0C
-D 40BF BD 01 1E
-D 40C2 BD 01 3F
-D 40C5 8C 0A
-D 40C7 A0 00 FD
-D 40CA BD 01 32
-D 40CD A1 01 06
-D 40D0 11 0E 00 00
-D 40D4 22 09
-D 40D6 2F 0E 0D 30
-D 40DA F1 48 00
-D 40DD BD 01 32
-D 40E0 A1 01 06
-D 40E3 B0 00 8B
-D 40E6 11 0D 0D 00
-D 40EA 11 0E 0D 20
-D 40EE 3B DE 0A
-D 40F1 11 0E 0B 48
-D 40F5 C1 0E
-D 40F7 BD 01 E4
-D 40FA B0 00 33
-D 40FD 11 0E 0B 58
-D 4101 C1 0E
-D 4103 B0 00 33
-D 4106 11 0E 0B 48
-D 410A C1 0E
-D 410C 11 0E 0B 50
-D 4110 C1 0E
-D 4112 B0 00 33
-D 4115 11 0E 0B 60
-D 4119 C1 0E
-D 411B F0 00 00
-D 411E 2E 0C 00 00
-D 4122 21 00
-D 4124 86 00 00 20
-D 4128 A1 01 30
-D 412B 42 0C
-D 412D B0 01 1E
-D 4130 BE 00
-D 4132 11 0E 00 00
-D 4136 2E 0E 0D 31
-D 413A 81 00 00
-D 413D BE 00
-D 413F 11 04 00 00
-D 4143 11 05 00 00
-D 4147 11 06 00 80
-D 414B 11 08 00 00
-D 414F 11 0A 00 00
-D 4153 2E 0C 00 00
-D 4157 21 00
-D 4159 86 00 00 2D
-D 415D A1 01 66
-D 4160 11 04 00 01
-D 4164 42 0C
-D 4166 2E 0C 00 00
-D 416A 21 00
-D 416C 86 00 00 2E
-D 4170 A1 01 81
-D 4173 8C 08
-D 4175 A1 01 C2
-D 4178 11 08 00 01
-D 417C 42 0C
-D 417E B0 01 66
-D 4181 53 00 00 30
-D 4185 89 0F
-D 4187 A1 01 C2
-D 418A 42 0C
-D 418C 11 0A 00 01
-D 4190 8C 05
-D 4192 A1 01 9D
-D 4195 8C 00
-D 4197 A1 01 9D
-D 419A B0 01 AE
-D 419D 11 0E 00 14
-D 41A1 89 5E
-D 41A3 A1 01 B8
-D 41A6 22 00
-D 41A8 2F 05 0D 40
-D 41AC 42 05
-D 41AE 8C 08
-D 41B0 A0 01 66
-D 41B3 43 06
-D 41B5 B0 01 66
-D 41B8 8C 08
-D 41BA A1 01 66
-D 41BD 42 06
-D 41BF B0 01 66
-D 41C2 11 0E 00 00
-D 41C6 22 05
-D 41C8 2F 0E 0D 33
-D 41CC 22 06
-D 41CE 2F 0E 0D 32
-D 41D2 22 04
-D 41D4 2F 0E 0D 34
-D 41D8 10 00 4E
-D 41DB 2F 0E 0D 30
-D 41DF F1 48 00
-D 41E2 BE 00
-D 41E4 11 07 00 08
-D 41E8 8C 07
-D 41EA A0 02 CF
-D 41ED 43 07
-D 41EF 2E 07 0D 02
-D 41F3 81 00 00
-D 41F6 A0 01 E8
-D 41F9 42 07
-D 41FB 11 0E 00 00
-D 41FF 2E 0E 0D 00
-D 4203 81 00 00
-D 4206 A0 02 0B
-D 4209 CA 2D
-D 420B 2E 0E 0D 01
-D 420F 21 03
-D 4211 52 03 00 08
-D 4215 51 37 03
-D 4218 50 73 08
-D 421B 11 06 00 00
-D 421F 11 0E 00 80
-D 4223 88 3E
-D 4225 A1 02 34
-D 4228 11 0E 00 8C
-D 422C 88 E8
-D 422E A0 02 48
-D 4231 B0 02 3D
-D 4234 11 0E 00 74
-D 4238 88 3E
-D 423A A0 02 48
-D 423D 11 06 00 01
-D 4241 23 00 89
-D 4244 11 08 00 81
-D 4248 11 0E 00 80
-D 424C 88 E8
-D 424E A1 02 61
-D 4251 CA 30
-D 4253 CA 2E
-D 4255 87 8E
-D 4257 A0 02 61
-D 425A CA 30
-D 425C 42 08
-D 425E B0 02 55
-D 4261 23 00 8A
-D 4264 53 0A 00 80
-D 4268 11 04 00 00
-D 426C 87 47
-D 426E A0 02 91
-D 4271 2E 04 0D 02
-D 4275 4E 00 30
-D 4278 C9
-D 4279 42 04
-D 427B 8C 0A
-D 427D A0 02 6C
-D 4280 43 0A
-D 4282 8C 0A
-D 4284 A1 02 6C
-D 4287 87 47
-D 4289 A0 02 6C
-D 428C CA 2E
-D 428E B0 02 6C
-D 4291 8C 0A
-D 4293 A0 02 9D
-D 4296 CA 30
-D 4298 43 0A
-D 429A B0 02 91
-D 429D 8C 06
-D 429F A0 02 CD
-D 42A2 CA 45
-D 42A4 43 09
-D 42A6 11 0E 00 80
-D 42AA 89 9E
-D 42AC A1 02 B7
-D 42AF CA 2D
-D 42B1 51 E9 09
-D 42B4 B0 02 BB
-D 42B7 53 09 00 80
-D 42BB 4D 9F
-D 42BD 25
-D 42BE 81 00 00
-D 42C1 A0 02 C8
-D 42C4 4E 00 30
-D 42C7 C9
-D 42C8 27
+D 4041 BD 01 1D
+D 4044 11 0C 0E 00
+D 4048 BD 01 72
+D 404B 8C 00
+D 404D A0 01 16
+D 4050 86 00 00 2B
+D 4054 A0 00 81
+D 4057 86 00 00 2A
+D 405B A0 00 81
+D 405E 86 00 00 2F
+D 4062 A0 00 81
+D 4065 BD 01 93
+D 4068 8C 0A
+D 406A A0 00 FE
+D 406D BD 01 86
+D 4070 A1 01 07
+D 4073 11 0D 0D 10
+D 4077 11 0E 0D 00
+D 407B 3B DE 0A
+D 407E B0 00 8C
+D 4081 11 0D 0D 20
+D 4085 11 0E 0D 00
+D 4089 3B DE 0A
+D 408C BD 01 72
+D 408F 8C 00
+D 4091 A0 00 E7
+D 4094 23 00 09
+D 4097 86 09 00 2B
+D 409B A0 00 BE
+D 409E 86 09 00 2D
+D 40A2 A0 00 BE
+D 40A5 86 09 00 2A
+D 40A9 A0 00 BE
+D 40AC 86 09 00 2F
+D 40B0 A0 00 BE
+D 40B3 86 09 00 78
+D 40B7 A1 00 FE
+D 40BA 11 09 00 2A
+D 40BE 42 0C
+D 40C0 BD 01 72
+D 40C3 BD 01 93
+D 40C6 8C 0A
+D 40C8 A0 00 FE
+D 40CB BD 01 86
+D 40CE A1 01 07
+D 40D1 11 0E 00 00
+D 40D5 22 09
+D 40D7 2F 0E 0D 30
+D 40DB F1 48 00
+D 40DE BD 01 86
+D 40E1 A1 01 07
+D 40E4 B0 00 8C
+D 40E7 11 0D 0D 00
+D 40EB 11 0E 0D 20
+D 40EF 3B DE 0A
+D 40F2 11 0E 0B 48
+D 40F6 C1 0E
+D 40F8 BD 02 38
+D 40FB B0 00 33
+D 40FE 11 0E 0B 58
+D 4102 C1 0E
+D 4104 B0 00 33
+D 4107 11 0E 0B 48
+D 410B C1 0E
+D 410D 11 0E 0B 50
+D 4111 C1 0E
+D 4113 B0 00 33
+D 4116 11 0E 0B 60
+D 411A C1 0E
+D 411C 00
+D 411D CB
+D 411E 81 00 1B
+D 4121 A1 01 35
+D 4124 BD 01 59
+D 4127 A1 01 16
+D 412A CB
+D 412B BD 01 59
+D 412E A1 01 1D
+D 4131 CB
+D 4132 B0 01 1D
+D 4135 81 00 0D
+D 4138 A1 01 43
+D 413B 10 00 00
+D 413E 36 01 0C
+D 4141 BE 00
+D 4143 81 00 08
+D 4146 A0 01 1D
+D 4149 81 00 7F
+D 414C A0 01 1D
+D 414F C9
+D 4150 36 01 0C
+D 4153 42 0C
+D 4155 C2 CD
+D 4157 BE 00
+D 4159 72 09
+D 415B 11 09 00 08
+D 415F CC
+D 4160 A0 01 6A
+D 4163 43 09
+D 4165 8C 09
+D 4167 A1 01 5F
+D 416A 73 09
+D 416C CC
+D 416D BE 00
+D 416F F0 00 00
+D 4172 2E 0C 00 00
+D 4176 21 00
+D 4178 86 00 00 20
+D 417C A1 01 84
+D 417F 42 0C
+D 4181 B0 01 72
+D 4184 BE 00
+D 4186 11 0E 00 00
+D 418A 2E 0E 0D 31
+D 418E 81 00 00
+D 4191 BE 00
+D 4193 11 04 00 00
+D 4197 11 05 00 00
+D 419B 11 06 00 80
+D 419F 11 08 00 00
+D 41A3 11 0A 00 00
+D 41A7 2E 0C 00 00
+D 41AB 21 00
+D 41AD 86 00 00 2D
+D 41B1 A1 01 BA
+D 41B4 11 04 00 01
+D 41B8 42 0C
+D 41BA 2E 0C 00 00
+D 41BE 21 00
+D 41C0 86 00 00 2E
+D 41C4 A1 01 D5
+D 41C7 8C 08
+D 41C9 A1 02 16
+D 41CC 11 08 00 01
+D 41D0 42 0C
+D 41D2 B0 01 BA
+D 41D5 53 00 00 30
+D 41D9 89 0F
+D 41DB A1 02 16
+D 41DE 42 0C
+D 41E0 11 0A 00 01
+D 41E4 8C 05
+D 41E6 A1 01 F1
+D 41E9 8C 00
+D 41EB A1 01 F1
+D 41EE B0 02 02
+D 41F1 11 0E 00 14
+D 41F5 89 5E
+D 41F7 A1 02 0C
+D 41FA 22 00
+D 41FC 2F 05 0D 40
+D 4200 42 05
+D 4202 8C 08
+D 4204 A0 01 BA
+D 4207 43 06
+D 4209 B0 01 BA
+D 420C 8C 08
+D 420E A1 01 BA
+D 4211 42 06
+D 4213 B0 01 BA
+D 4216 11 0E 00 00
+D 421A 22 05
+D 421C 2F 0E 0D 33
+D 4220 22 06
+D 4222 2F 0E 0D 32
+D 4226 22 04
+D 4228 2F 0E 0D 34
+D 422C 10 00 4E
+D 422F 2F 0E 0D 30
+D 4233 F1 48 00
+D 4236 BE 00
+D 4238 11 07 00 08
+D 423C 8C 07
+D 423E A0 03 23
+D 4241 43 07
+D 4243 2E 07 0D 02
+D 4247 81 00 00
+D 424A A0 02 3C
+D 424D 42 07
+D 424F 11 0E 00 00
+D 4253 2E 0E 0D 00
+D 4257 81 00 00
+D 425A A0 02 5F
+D 425D CA 2D
+D 425F 2E 0E 0D 01
+D 4263 21 03
+D 4265 52 03 00 08
+D 4269 51 37 03
+D 426C 50 73 08
+D 426F 11 06 00 00
+D 4273 11 0E 00 80
+D 4277 88 3E
+D 4279 A1 02 88
+D 427C 11 0E 00 8C
+D 4280 88 E8
+D 4282 A0 02 9C
+D 4285 B0 02 91
+D 4288 11 0E 00 74
+D 428C 88 3E
+D 428E A0 02 9C
+D 4291 11 06 00 01
+D 4295 23 00 89
+D 4298 11 08 00 81
+D 429C 11 0E 00 80
+D 42A0 88 E8
+D 42A2 A1 02 B5
+D 42A5 CA 30
+D 42A7 CA 2E
+D 42A9 87 8E
+D 42AB A0 02 B5
+D 42AE CA 30
+D 42B0 42 08
+D 42B2 B0 02 A9
+D 42B5 23 00 8A
+D 42B8 53 0A 00 80
+D 42BC 11 04 00 00
+D 42C0 87 47
+D 42C2 A0 02 E5
+D 42C5 2E 04 0D 02
 D 42C9 4E 00 30
 D 42CC C9
-D 42CD BE 00
-D 42CF CA 30
-D 42D1 BE 00
+D 42CD 42 04
+D 42CF 8C 0A
+D 42D1 A0 02 C0
+D 42D4 43 0A
+D 42D6 8C 0A
+D 42D8 A1 02 C0
+D 42DB 87 47
+D 42DD A0 02 C0
+D 42E0 CA 2E
+D 42E2 B0 02 C0
+D 42E5 8C 0A
+D 42E7 A0 02 F1
+D 42EA CA 30
+D 42EC 43 0A
+D 42EE B0 02 E5
+D 42F1 8C 06
+D 42F3 A0 03 21
+D 42F6 CA 45
+D 42F8 43 09
+D 42FA 11 0E 00 80
+D 42FE 89 9E
+D 4300 A1 03 0B
+D 4303 CA 2D
+D 4305 51 E9 09
+D 4308 B0 03 0F
+D 430B 53 09 00 80
+D 430F 4D 9F
+D 4311 25
+D 4312 81 00 00
+D 4315 A0 03 1C
+D 4318 4E 00 30
+D 431B C9
+D 431C 27
+D 431D 4E 00 30
+D 4320 C9
+D 4321 BE 00
+D 4323 CA 30
+D 4325 BE 00
 
 D 4800 F8 4D B7 B8 BF F8 31 A8 F8 00 58 F8 30 A8 08 FB
 D 4810 4E C2 48 2B 08 FB 2A C2 48 F2 08 FB 2F C2 49 36
@@ -1229,9 +1306,7 @@ D 4C80 20 74 6F 20 75 73 65 20 74 68 65 20 6C 61 73 74
 D 4C90 20 61 6E 73 77 65 72 2E 0D 0A 38 20 73 69 67 6E
 D 4CA0 69 66 69 63 61 6E 74 20 64 69 67 69 74 73 2C 20
 D 4CB0 72 6F 75 6E 64 65 64 3B 20 65 78 70 6F 6E 65 6E
-D 4CC0 74 73 20 74 6F 20 2B 2F 2D 39 39 2E 0D 0A 45 6E
-D 4CD0 74 65 72 20 6F 6E 20 69 74 73 20 6F 77 6E 20 71
-D 4CE0 75 69 74 73 2E 0D 0A 00
-D 5000 00
-D 6000 00
-D 7000 00
+D 4CC0 74 73 20 74 6F 20 2B 2F 2D 39 39 2E 0D 0A 45 73
+D 4CD0 63 2C 20 6F 72 20 45 6E 74 65 72 20 6F 6E 20 69
+D 4CE0 74 73 20 6F 77 6E 2C 20 71 75 69 74 73 2E 0D 0A
+D 4CF0 00

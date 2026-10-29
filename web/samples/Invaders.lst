@@ -3,7 +3,7 @@
 ; ==========================================================================
 ; Two rows of six invaders march across the screen and drop a line each time they
 ; reach an edge. The gun sits on line 23. LEFT and RIGHT arrows move it, SPACE
-; fires, and Q quits. If your terminal does not send arrow keys, a and d work too.
+; fires, and Esc (or Q) quits. If your terminal does not send arrow keys, a and d work too.
 ; One rocket in the air at a time. Shoot all twelve and you win; let them reach
 ; line 21 and they have landed.
 ;
@@ -24,8 +24,7 @@
 ; ARROW KEYS ARE THREE BYTES. The left arrow is ESC [ D and the right is ESC [ C,
 ; so a byte at a time is not enough - the program keeps a small state machine in
 ; memory at $4970: 0 = waiting for anything, 1 = seen ESC, 2 = seen ESC and [.
-; That is also why ESC is not the quit key here, as it is in the other apps: it is
-; the first byte of every arrow press.
+; So an ESC quits only on its own: nothing more within ~30 ms (the patches at $4300).
 ;
 ; DRAWING. The formation is redrawn only on the frames it actually marches - every
 ; eighth - not every frame. Redrawing it every frame costs about 110 bytes of
@@ -59,10 +58,35 @@
 ; 64 characters - "D aaaa " plus 19 bytes - and it silently keeps what fits.
 ;
 ; 264 STELLAR commands, $4000-$42E7 (744 bytes of code).
+; Plus the ESC patches at $4300-$4340 (2026-10-29), 21 commands.
 ; Data at $4900, 94 bytes, past the end marker.
 ; Data at $49A0, 30 bytes, past the end marker.
 ; Data at $49C0, 25 bytes, past the end marker.
 ; Data at $49E0, 15 bytes, past the end marker.
+;
+; ESC QUITS (2026-10-29): two patches past the end of the program, reached by GAL so no address moves.
+; ESCW:
+; D 4300 11 09 00 08    LOADXI R9 0008         ESC seen (state 1): is the rest of an arrow coming (~30 ms)?
+; D 4304 CC             SERST
+; D 4305 A0 01 0D       IFTRUEI NOKEY          yes: the state machine takes it
+; D 4308 43 09          DECX R9
+; D 430A 8C 09          TESTXZ R9
+; D 430C A1 03 04       IFFALSEI 4304
+; D 430F B0 01 90       GAL QUIT               no: ESC on its own quits
+; STARTK:
+; D 4320 CB             SERIN                  The key that starts the game
+; D 4321 81 00 1B       TESTAI 001B            ESC?
+; D 4324 A1 03 39       IFFALSEI GO
+; D 4327 11 09 00 08    LOADXI R9 0008         an arrow following (~30 ms)?
+; D 432B CC             SERST
+; D 432C A0 03 39       IFTRUEI GO
+; D 432F 43 09          DECX R9
+; D 4331 8C 09          TESTXZ R9
+; D 4333 A1 03 2B       IFFALSEI 432B
+; D 4336 B0 01 90       GAL QUIT               ESC on its own quits
+; GO:
+; D 4339 11 01 00 26    LOADXI R1 0026         Gun starts at column 38 (moved here from $4011)
+; D 433D B0 00 15       GAL 4015               back to the game
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
@@ -74,8 +98,8 @@
 ; D 400B C3             RAND                   Stir the generator while we wait
 ; D 400C CC             SERST                  A key yet?
 ; D 400D A1 00 0B       IFFALSEI SEED
-; D 4010 CB             SERIN                  Take it and discard it
-; D 4011 11 01 00 26    LOADXI R1 0026         Gun starts at column 38
+; D 4010 B0 03 20       GAL STARTK             Take the key (a lone ESC quits): the patch at $4320
+; D 4013 C4 C4          NOP NOP                (not reached)
 ; D 4015 11 02 00 00    LOADXI R2 0000         No rocket in flight
 ; D 4019 11 03 00 00    LOADXI R3 0000
 ; D 401D 11 04 00 08    LOADXI R4 0008         The formation starts at column 8
@@ -118,7 +142,7 @@
 ; D 4084 86 0C 00 1B    TESTXI R12 001B        ESC starts an arrow key
 ; D 4088 A1 00 92       IFFALSEI KNOTESC
 ; D 408B 32 0B 00 01    COPYMX2I R11 0001      Remember we have seen ESC
-; D 408F B0 01 0D       GAL NOKEY
+; D 408F B0 03 00       GAL ESCW               An arrow, or ESC on its own? (the patch at $4300)
 ; D 4092 86 0C 00 20    TESTXI R12 0020        Space fires
 ; D 4096 A0 00 FD       IFTRUEI FIRE
 ; D 4099 86 0C 00 71    TESTXI R12 0071        q quits
@@ -342,8 +366,7 @@ D 4009 C1 0E
 D 400B C3
 D 400C CC
 D 400D A1 00 0B
-D 4010 CB
-D 4011 11 01 00 26
+D 4010 B0 03 20 C4 C4
 D 4015 11 02 00 00
 D 4019 11 03 00 00
 D 401D 11 04 00 08
@@ -386,7 +409,7 @@ D 4081 A0 00 CA
 D 4084 86 0C 00 1B
 D 4088 A1 00 92
 D 408B 32 0B 00 01
-D 408F B0 01 0D
+D 408F B0 03 00
 D 4092 86 0C 00 20
 D 4096 A0 00 FD
 D 4099 86 0C 00 71
@@ -600,11 +623,15 @@ D 42E3 C9
 D 42E4 CA 48
 D 42E6 BE 00
 
+D 4300 11 09 00 08 CC A0 01 0D 43 09 8C 09 A1 03 04 B0
+D 4310 01 90
+D 4320 CB 81 00 1B A1 03 39 11 09 00 08 CC A0 03 39 43
+D 4330 09 8C 09 A1 03 2B B0 01 90 11 01 00 26 B0 00 15
 D 4900 53 54 45 4C 4C 41 52 20 49 4E 56 41 44 45 52 53
 D 4910 20 2D 2D 20 61 72 72 6F 77 73 20 6F 72 20 61 2F
 D 4920 64 20 74 6F 20 6D 6F 76 65 2C 20 53 50 41 43 45
-D 4930 20 74 6F 20 66 69 72 65 2C 20 51 20 74 6F 20 71
-D 4940 75 69 74 0D 0A 50 72 65 73 73 20 61 6E 79 20 6B
+D 4930 20 74 6F 20 66 69 72 65 2C 20 45 73 63 20 71 75
+D 4940 69 74 73 0D 0A 50 72 65 73 73 20 61 6E 79 20 6B
 D 4950 65 79 20 74 6F 20 62 65 67 69 6E 0D 0A 00
 
 D 49A0 41 4C 4C 20 53 48 49 50 53 20 44 45 53 54 52 4F

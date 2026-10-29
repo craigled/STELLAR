@@ -5,7 +5,7 @@
 ; flicker-free stale-edge erase are all as before; what changed is how the
 ; frame reaches the screen. Measured in the simulator on V0061.34:
 ;
-;   v04 69,313 1802 instructions + 151 bytes a frame; v05 22,275 + 121 (3.1x fewer)
+;   see ball5_verify.py
 ;
 ; WHERE v04's TIME WENT. 41% of a frame was DIVXY splitting cursor positions
 ; into digits (13 cursor moves a frame, two divides each), and most of the rest
@@ -35,7 +35,7 @@
 ;
 ; HW-VERIFIED on the Elf2K (V0061.34), 2026-09-26 - Craig: "works great".
 ;
-; 252 STELLAR commands, $4000-$42AC (685 bytes of code).
+; 268 STELLAR commands, $4000-$42D0 (721 bytes of code).
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
@@ -107,10 +107,10 @@
 ; D 4087 CA 6C          SEROUTI 6C 'l'             l - hide the cursor
 ; D 4089 23 00 1E       COPYXY R1 -> R14
 ; D 408C 23 00 2D       COPYXY R2 -> R13
-; D 408F BD 02 67       CALL DRAW                  Put ball A on the screen
+; D 408F BD 02 8B       CALL DRAW                  Put ball A on the screen
 ; D 4092 23 00 6E       COPYXY R6 -> R14
 ; D 4095 23 00 7D       COPYXY R7 -> R13
-; D 4098 BD 02 67       CALL DRAW                  and ball B
+; D 4098 BD 02 8B       CALL DRAW                  and ball B
 ; LOOP:
 ; D 409B 42 00          INCX R0                    Next frame phase
 ; D 409D 86 00 00 06    TESTXI R0 0006
@@ -191,7 +191,7 @@
 ; D 4168 52 0E 00 02    ADDXI R14 0002
 ; ECA:
 ; D 416C 23 00 CD       COPYXY R12 -> R13          From the old top line
-; D 416F BD 02 72       CALL POSXY
+; D 416F BD 02 96       CALL POSXY
 ; D 4172 11 0F 0A 5E    LOADXI R15 0A5E
 ; D 4176 C1 0F          PRINTSTR R15               Blank the stale column, top to bottom
 ; D 4178 87 2C          TESTXY R2 = R12            Did y stay put this frame?
@@ -205,7 +205,7 @@
 ; D 418B 52 0D 00 02    ADDXI R13 0002
 ; ERA:
 ; D 418F 23 00 BE       COPYXY R11 -> R14          From the old left edge
-; D 4192 BD 02 72       CALL POSXY
+; D 4192 BD 02 96       CALL POSXY
 ; D 4195 11 0F 0A 6A    LOADXI R15 0A6A
 ; D 4199 C1 0F          PRINTSTR R15               Three spaces clear the row
 ; NRA:
@@ -254,7 +254,7 @@
 ; D 4212 52 0E 00 02    ADDXI R14 0002
 ; ECB:
 ; D 4216 23 00 CD       COPYXY R12 -> R13          From the old top line
-; D 4219 BD 02 72       CALL POSXY
+; D 4219 BD 02 96       CALL POSXY
 ; D 421C 11 0F 0A 5E    LOADXI R15 0A5E
 ; D 4220 C1 0F          PRINTSTR R15               Blank the stale column, top to bottom
 ; D 4222 87 7C          TESTXY R7 = R12            Did y stay put this frame?
@@ -268,58 +268,77 @@
 ; D 4235 52 0D 00 02    ADDXI R13 0002
 ; ERB:
 ; D 4239 23 00 BE       COPYXY R11 -> R14          From the old left edge
-; D 423C BD 02 72       CALL POSXY
+; D 423C BD 02 96       CALL POSXY
 ; D 423F 11 0F 0A 6A    LOADXI R15 0A6A
 ; D 4243 C1 0F          PRINTSTR R15               Three spaces clear the row
 ; NRB:
 ; D 4245 23 00 1E       COPYXY R1 -> R14           Both moved and erased: now draw both
 ; D 4248 23 00 2D       COPYXY R2 -> R13
-; D 424B BD 02 67       CALL DRAW
+; D 424B BD 02 8B       CALL DRAW
 ; D 424E 23 00 6E       COPYXY R6 -> R14
 ; D 4251 23 00 7D       COPYXY R7 -> R13
-; D 4254 BD 02 67       CALL DRAW
+; D 4254 BD 02 8B       CALL DRAW
 ; D 4257 CC             SERST                      A key waiting?
-; D 4258 A1 02 62       IFFALSEI NOKEY             No
+; D 4258 A1 02 70       IFFALSEI NOKEY             No
 ; D 425B CB             SERIN                      Read it
 ; D 425C 81 00 1B       TESTAI 001B                Was it ESC?
-; D 425F A0 02 90       IFTRUEI QUIT               Yes - stop
+; D 425F A1 02 70       IFFALSEI NOKEY
+; D 4262 BD 02 75       CALL KWAIT                 Yes: an arrow following?
+; D 4265 A1 02 B4       IFFALSEI QUIT              No: ESC on its own stops it
+; D 4268 CB             SERIN                      an arrow (ESC [ x): its two bytes are thrown away
+; D 4269 BD 02 75       CALL KWAIT
+; D 426C A1 02 70       IFFALSEI NOKEY
+; D 426F CB             SERIN
 ; NOKEY:
-; D 4262 C0 04          DLYI 04                    Pace the animation
-; D 4264 B0 00 9B       GAL LOOP                   Round again
+; D 4270 C0 04          DLYI 04                    Pace the animation
+; D 4272 B0 00 9B       GAL LOOP                   Round again
+; KWAIT:
+; D 4275 72 0B          PUSHX R11
+; D 4277 11 0B 00 08    LOADXI R11 0008
+; KWAIT1:
+; D 427B CC             SERST
+; D 427C A0 02 86       IFTRUEI KWAIT2
+; D 427F 43 0B          DECX R11
+; D 4281 8C 0B          TESTXZ R11
+; D 4283 A1 02 7B       IFFALSEI KWAIT1
+; KWAIT2:
+; D 4286 73 0B          POPX R11
+; D 4288 CC             SERST                      Test: a key is waiting
+; D 4289 BE 00          RETURN
 ; DRAW:
-; D 4267 BD 02 72       CALL POSXY
-; D 426A 11 0F 0A 40    LOADXI R15 0A40
-; D 426E C1 0F          PRINTSTR R15               Reverse video, three rows of three, normal video
-; D 4270 BE 00          RETURN
+; D 428B BD 02 96       CALL POSXY
+; D 428E 11 0F 0A 40    LOADXI R15 0A40
+; D 4292 C1 0F          PRINTSTR R15               Reverse video, three rows of three, normal video
+; D 4294 BE 00          RETURN
 ; POSXY:
-; D 4272 CA 1B          SEROUTI 1B                 ESC
-; D 4274 CA 5B          SEROUTI 5B '['             [
-; D 4276 2E 0D 09 80    READIDX R13 0980           Line: tens digit
-; D 427A C9             SEROUT
-; D 427B 2E 0D 09 E0    READIDX R13 09E0           units digit
-; D 427F C9             SEROUT
-; D 4280 CA 3B          SEROUTI 3B ';'             ;
-; D 4282 2E 0E 09 80    READIDX R14 0980           Column: tens digit
-; D 4286 C9             SEROUT
-; D 4287 2E 0E 09 E0    READIDX R14 09E0           units digit
-; D 428B C9             SEROUT
-; D 428C CA 48          SEROUTI 48 'H'             H
-; D 428E BE 00          RETURN
+; D 4296 CA 1B          SEROUTI 1B                 ESC
+; D 4298 CA 5B          SEROUTI 5B '['             [
+; D 429A 2E 0D 09 80    READIDX R13 0980           Line: tens digit
+; D 429E C9             SEROUT
+; D 429F 2E 0D 09 E0    READIDX R13 09E0           units digit
+; D 42A3 C9             SEROUT
+; D 42A4 CA 3B          SEROUTI 3B ';'             ;
+; D 42A6 2E 0E 09 80    READIDX R14 0980           Column: tens digit
+; D 42AA C9             SEROUT
+; D 42AB 2E 0E 09 E0    READIDX R14 09E0           units digit
+; D 42AF C9             SEROUT
+; D 42B0 CA 48          SEROUTI 48 'H'             H
+; D 42B2 BE 00          RETURN
 ; QUIT:
-; D 4290 CA 1B          SEROUTI 1B                 ESC
-; D 4292 CA 5B          SEROUTI 5B '['             [
-; D 4294 CA 3F          SEROUTI 3F '?'             ?
-; D 4296 CA 32          SEROUTI 32 '2'             2
-; D 4298 CA 35          SEROUTI 35 '5'             5
-; D 429A CA 68          SEROUTI 68 'h'             h - show the cursor again
-; D 429C CA 1B          SEROUTI 1B                 ESC
-; D 429E CA 5B          SEROUTI 5B '['             [
-; D 42A0 CA 32          SEROUTI 32 '2'             2
-; D 42A2 CA 4A          SEROUTI 4A 'J'             J
-; D 42A4 CA 1B          SEROUTI 1B                 ESC
-; D 42A6 CA 5B          SEROUTI 5B '['             [
-; D 42A8 CA 48          SEROUTI 48 'H'             H - cursor home
-; D 42AA F0 00 00       BREAK                      End of program
+; D 42B4 CA 1B          SEROUTI 1B                 ESC
+; D 42B6 CA 5B          SEROUTI 5B '['             [
+; D 42B8 CA 3F          SEROUTI 3F '?'             ?
+; D 42BA CA 32          SEROUTI 32 '2'             2
+; D 42BC CA 35          SEROUTI 35 '5'             5
+; D 42BE CA 68          SEROUTI 68 'h'             h - show the cursor again
+; D 42C0 CA 1B          SEROUTI 1B                 ESC
+; D 42C2 CA 5B          SEROUTI 5B '['             [
+; D 42C4 CA 32          SEROUTI 32 '2'             2
+; D 42C6 CA 4A          SEROUTI 4A 'J'             J
+; D 42C8 CA 1B          SEROUTI 1B                 ESC
+; D 42CA CA 5B          SEROUTI 5B '['             [
+; D 42CC CA 48          SEROUTI 48 'H'             H - cursor home
+; D 42CE F0 00 00       BREAK                      End of program
 
 ; --------------------------------------------------------------------------
 ; CODE, then DATA  -  download both blocks
@@ -391,10 +410,10 @@ D 4085 CA 35
 D 4087 CA 6C
 D 4089 23 00 1E
 D 408C 23 00 2D
-D 408F BD 02 67
+D 408F BD 02 8B
 D 4092 23 00 6E
 D 4095 23 00 7D
-D 4098 BD 02 67
+D 4098 BD 02 8B
 D 409B 42 00
 D 409D 86 00 00 06
 D 40A1 A1 00 A8
@@ -464,7 +483,7 @@ D 4162 B0 01 6C
 D 4165 23 00 BE
 D 4168 52 0E 00 02
 D 416C 23 00 CD
-D 416F BD 02 72
+D 416F BD 02 96
 D 4172 11 0F 0A 5E
 D 4176 C1 0F
 D 4178 87 2C
@@ -476,7 +495,7 @@ D 4185 B0 01 8F
 D 4188 23 00 CD
 D 418B 52 0D 00 02
 D 418F 23 00 BE
-D 4192 BD 02 72
+D 4192 BD 02 96
 D 4195 11 0F 0A 6A
 D 4199 C1 0F
 D 419B 23 00 6B
@@ -518,7 +537,7 @@ D 420C B0 02 16
 D 420F 23 00 BE
 D 4212 52 0E 00 02
 D 4216 23 00 CD
-D 4219 BD 02 72
+D 4219 BD 02 96
 D 421C 11 0F 0A 5E
 D 4220 C1 0F
 D 4222 87 7C
@@ -530,53 +549,69 @@ D 422F B0 02 39
 D 4232 23 00 CD
 D 4235 52 0D 00 02
 D 4239 23 00 BE
-D 423C BD 02 72
+D 423C BD 02 96
 D 423F 11 0F 0A 6A
 D 4243 C1 0F
 D 4245 23 00 1E
 D 4248 23 00 2D
-D 424B BD 02 67
+D 424B BD 02 8B
 D 424E 23 00 6E
 D 4251 23 00 7D
-D 4254 BD 02 67
+D 4254 BD 02 8B
 D 4257 CC
-D 4258 A1 02 62
+D 4258 A1 02 70
 D 425B CB
 D 425C 81 00 1B
-D 425F A0 02 90
-D 4262 C0 04
-D 4264 B0 00 9B
-D 4267 BD 02 72
-D 426A 11 0F 0A 40
-D 426E C1 0F
-D 4270 BE 00
-D 4272 CA 1B
-D 4274 CA 5B
-D 4276 2E 0D 09 80
-D 427A C9
-D 427B 2E 0D 09 E0
-D 427F C9
-D 4280 CA 3B
-D 4282 2E 0E 09 80
-D 4286 C9
-D 4287 2E 0E 09 E0
-D 428B C9
-D 428C CA 48
-D 428E BE 00
-D 4290 CA 1B
-D 4292 CA 5B
-D 4294 CA 3F
-D 4296 CA 32
-D 4298 CA 35
-D 429A CA 68
-D 429C CA 1B
-D 429E CA 5B
-D 42A0 CA 32
-D 42A2 CA 4A
-D 42A4 CA 1B
-D 42A6 CA 5B
-D 42A8 CA 48
-D 42AA F0 00 00
+D 425F A1 02 70
+D 4262 BD 02 75
+D 4265 A1 02 B4
+D 4268 CB
+D 4269 BD 02 75
+D 426C A1 02 70
+D 426F CB
+D 4270 C0 04
+D 4272 B0 00 9B
+D 4275 72 0B
+D 4277 11 0B 00 08
+D 427B CC
+D 427C A0 02 86
+D 427F 43 0B
+D 4281 8C 0B
+D 4283 A1 02 7B
+D 4286 73 0B
+D 4288 CC
+D 4289 BE 00
+D 428B BD 02 96
+D 428E 11 0F 0A 40
+D 4292 C1 0F
+D 4294 BE 00
+D 4296 CA 1B
+D 4298 CA 5B
+D 429A 2E 0D 09 80
+D 429E C9
+D 429F 2E 0D 09 E0
+D 42A3 C9
+D 42A4 CA 3B
+D 42A6 2E 0E 09 80
+D 42AA C9
+D 42AB 2E 0E 09 E0
+D 42AF C9
+D 42B0 CA 48
+D 42B2 BE 00
+D 42B4 CA 1B
+D 42B6 CA 5B
+D 42B8 CA 3F
+D 42BA CA 32
+D 42BC CA 35
+D 42BE CA 68
+D 42C0 CA 1B
+D 42C2 CA 5B
+D 42C4 CA 32
+D 42C6 CA 4A
+D 42C8 CA 1B
+D 42CA CA 5B
+D 42CC CA 48
+D 42CE F0 00 00
 
 D 4900 54 77 6F 20 62 6F 75 6E 63 69 6E 67 20 62 61 6C
 D 4910 6C 73 20 2D 2D 20 61 6E 79 20 6B 65 79 20 74 6F

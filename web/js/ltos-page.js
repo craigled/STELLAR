@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '130';                                    // the ?v= the card is fetched with
+  var V = '131';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var SPEEDS = [
@@ -21,7 +21,7 @@
     ['DEMO you', 'DEMO.SH: functions, loops, case, $( )'],
     ['SH -x TEST', 'each line shown as it runs'],
     ['LW2 DOCS/LETTER.TXT', 'Lite-Writer 2 (Ctrl-X: the menu)'],
-    ['GALAXIA', 'a game: arrows, SPACE, Q back to LTOS'],
+    ['GALAXIA', 'a game: arrows, SPACE; Esc back to LTOS'],
     ['ORBIT', 'STELLAR ORBIT: Apollo 7 on three VMs (SPACE: the count, ?: help)'],
     ['TETRIS', 'more games: SNAKE, PONG, INVADERS, BREAKOUT, MAZE'],
     ["RAWK '{ s += $2 } END { print s }' DOCS/SALES.TXT", 'awk on the 1802'],

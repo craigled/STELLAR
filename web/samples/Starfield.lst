@@ -92,7 +92,7 @@
 ; 40 and a clamped 99 all initialise exactly that many stars with none frozen at the
 ; centre. ESC restores the cursor, clears the screen and homes.
 ;
-; 256 STELLAR commands, $4000-$42AF (688 bytes of code).
+; 272 STELLAR commands, $4000-$42D3 (724 bytes of code).
 ; Data at $4A00, 109 bytes, past the end marker.
 ; Data at $4A80, 26 bytes, past the end marker.
 ; Data at $4B00, 81 bytes, past the end marker.
@@ -105,6 +105,7 @@
 ; D 4000 CD             START                  Start of program, and run the label pre-pass
 ; D 4001 11 0B 0A 00    LOADXI R11 0A00        Point at the banner
 ; D 4005 C1 0B          PRINTSTR R11           Print it
+; SEED:
 ; D 4007 C3             RAND                   Spin the generator while we wait - RAND is seeded the same at every
 ; D 4008 CC             SERST                  cold boot, so the number of turns the operator's timing adds is
 ; D 4009 A1 00 07       IFFALSEI SEED          the only thing that makes one run differ from the next
@@ -113,6 +114,7 @@
 ; D 4011 11 0B 0A 80    LOADXI R11 0A80
 ; D 4015 C1 0B          PRINTSTR R11           Ask how many stars
 ; D 4017 11 04 00 00    LOADXI R4 0000         The number being typed
+; GETD:
 ; D 401B CB             SERIN                  Wait for a key
 ; D 401C 21 0C          COPYAX 0C
 ; D 401E 86 0C 00 0D    TESTXI R12 000D        RETURN ends the number
@@ -133,16 +135,20 @@
 ; D 4044 21 04          COPYAX 04
 ; D 4046 50 45 04       ADDXYZ R4,R5 -> R4     and add the new digit
 ; D 4049 B0 00 1B       GAL GETD
+; GOTN:
 ; D 404C 8C 04          TESTXZ R4              Nothing typed?
 ; D 404E A1 00 55       IFFALSEI CHKHI
 ; D 4051 11 04 00 0C    LOADXI R4 000C         Take 12 as the default
+; CHKHI:
 ; D 4055 11 0B 00 29    LOADXI R11 0029
 ; D 4059 88 4B          TESTGXY R4 R11         More than 40?
 ; D 405B A1 00 62       IFFALSEI NOK
 ; D 405E 11 04 00 28    LOADXI R4 0028         Hold it at 40 - the table is that big, and more than
+; NOK:
 ; D 4062 23 00 42       COPYXY R4 -> R2        R2 is the star count from here on
 ; D 4065 11 09 00 00    LOADXI R9 0000         Index of the record being filled
 ; D 4069 11 03 00 00    LOADXI R3 0000         Star number
+; INIT:
 ; D 406D C3             RAND                   Which of the 63 launch directions this star starts on
 ; D 406E 21 0B          COPYAX 0B
 ; D 4070 11 0C 00 3F    LOADXI R12 003F
@@ -170,6 +176,7 @@
 ; D 40B0 88 BC          TESTGXY R11 R12        Past the end?
 ; D 40B2 A1 00 B9       IFFALSEI NWI
 ; D 40B5 11 0B 00 00    LOADXI R11 0000        Back to the start
+; NWI:
 ; D 40B9 22 0B          COPYXA 0B
 ; D 40BB 2F 09 09 06    WRITEIDX R9 0906
 ; D 40BF C3             RAND                   How far along this one already is
@@ -178,6 +185,7 @@
 ; D 40C6 4D BC          DIVXY R11 R12
 ; D 40C8 27             COPYREMA               The remainder is this field
 ; D 40C9 21 06          COPYAX 06
+; STAG:
 ; D 40CB 8C 06          TESTXZ R6              Done staggering this one?
 ; D 40CD A0 00 FB       IFTRUEI STAGD
 ; D 40D0 23 00 A8       COPYXY R10 -> R8
@@ -196,6 +204,7 @@
 ; D 40F3 A0 00 FB       IFTRUEI STAGD
 ; D 40F6 43 06          DECX R6
 ; D 40F8 B0 00 CB       GAL STAG
+; STAGD:
 ; D 40FB 22 0A          COPYXA 0A              Distance from the centre, in quarter columns
 ; D 40FD 2F 09 09 00    WRITEIDX R9 0900
 ; D 4101 22 00          COPYXA 00              and in eighth lines - half as tall, so the burst looks round
@@ -219,8 +228,10 @@
 ; D 4130 CA 32          SEROUTI 32
 ; D 4132 CA 35          SEROUTI 35
 ; D 4134 CA 6C          SEROUTI 6C
+; FRAME:
 ; D 4136 11 09 00 00    LOADXI R9 0000
 ; D 413A 11 03 00 00    LOADXI R3 0000
+; STAR:
 ; D 413E 2E 09 09 00    READIDX R9 0900        This star's distance out
 ; D 4142 21 0A          COPYAX 0A
 ; D 4144 2E 09 09 01    READIDX R9 0901
@@ -239,6 +250,7 @@
 ; D 4167 11 0C 00 59    LOADXI R12 0059
 ; D 416B 88 0C          TESTGXY R0 R12         Past the top or bottom?
 ; D 416D A1 01 AC       IFFALSEI ONSCR
+; RESP:
 ; D 4170 2E 09 09 06    READIDX R9 0906        Gone - take the next direction out of the table
 ; D 4174 21 0B          COPYAX 0B              R11 = this star's offset into the direction table
 ; D 4176 2E 0B 0C 00    READIDX R11 0C00       how fast it pulls away horizontally
@@ -256,8 +268,10 @@
 ; D 419D 88 BC          TESTGXY R11 R12        Past the end?
 ; D 419F A1 01 A6       IFFALSEI NWR
 ; D 41A2 11 0B 00 00    LOADXI R11 0000        Back to the start
+; NWR:
 ; D 41A6 22 0B          COPYXA 0B
 ; D 41A8 2F 09 09 06    WRITEIDX R9 0906
+; ONSCR:
 ; D 41AC 22 0A          COPYXA 0A
 ; D 41AE 2F 09 09 00    WRITEIDX R9 0900
 ; D 41B2 22 00          COPYXA 00
@@ -273,7 +287,9 @@
 ; D 41CE A1 01 D7       IFFALSEI XLEFT
 ; D 41D1 50 78 07       ADDXYZ R7,R8 -> R7     Right of centre
 ; D 41D4 B0 01 DA       GAL XDONE
+; XLEFT:
 ; D 41D7 51 78 07       SUBXYZ R7,R8 -> R7     Left of centre
+; XDONE:
 ; D 41DA 23 00 08       COPYXY R0 -> R8
 ; D 41DD 61 82          SHIFTBX R8 RIGHT
 ; D 41DF 61 82          SHIFTBX R8 RIGHT
@@ -286,7 +302,9 @@
 ; D 41F2 A1 01 FB       IFFALSEI YUP
 ; D 41F5 50 68 06       ADDXYZ R6,R8 -> R6     Below centre
 ; D 41F8 B0 01 FE       GAL YDONE
+; YUP:
 ; D 41FB 51 68 06       SUBXYZ R6,R8 -> R6     Above centre
+; YDONE:
 ; D 41FE 2E 09 09 04    READIDX R9 0904        The cell it is lit in now
 ; D 4202 21 05          COPYAX 05
 ; D 4204 2E 09 09 05    READIDX R9 0905
@@ -296,69 +314,97 @@
 ; D 420F 87 64          TESTXY R6 R4           and the same line?
 ; D 4211 A0 02 57       IFTRUEI NEXT           Then it has not moved - leave the screen alone.
 ; Stars near the centre creep, so this saves most of the output
+; MOVED:
 ; D 4214 8C 04          TESTXZ R4              Was it ever drawn?
 ; D 4216 A0 02 24       IFTRUEI NOERA
 ; D 4219 23 00 4D       COPYXY R4 -> R13       Rub out the old one
 ; D 421C 23 00 5E       COPYXY R5 -> R14
-; D 421F BD 02 75       CALL POSXY
+; D 421F BD 02 83       CALL POSXY
 ; D 4222 CA 20          SEROUTI 20             A space
+; NOERA:
 ; D 4224 23 00 6D       COPYXY R6 -> R13       and light the new one
 ; D 4227 23 00 7E       COPYXY R7 -> R14
-; D 422A BD 02 75       CALL POSXY
+; D 422A BD 02 83       CALL POSXY
 ; D 422D 11 0B 00 06    LOADXI R11 0006
 ; D 4231 88 1B          TESTGXY R1 R11         Well away from the centre?
 ; D 4233 A0 02 3B       IFTRUEI MID
 ; D 4236 CA 2E          SEROUTI 2E             Still far off - a faint full stop
 ; D 4238 B0 02 4B       GAL DREW
+; MID:
 ; D 423B 11 0B 00 12    LOADXI R11 0012
 ; D 423F 88 1B          TESTGXY R1 R11         Nearly past us?
 ; D 4241 A0 02 49       IFTRUEI NEAR
 ; D 4244 CA 2B          SEROUTI 2B             Closer - a plus
 ; D 4246 B0 02 4B       GAL DREW
+; NEAR:
 ; D 4249 CA 2A          SEROUTI 2A             Nearly on top of us - a bright asterisk
+; DREW:
 ; D 424B 22 07          COPYXA 07
 ; D 424D 2F 09 09 04    WRITEIDX R9 0904
 ; D 4251 22 06          COPYXA 06
 ; D 4253 2F 09 09 05    WRITEIDX R9 0905
+; NEXT:
 ; D 4257 52 09 00 07    ADDXI R9 0007
 ; D 425B 42 03          INCX R3
 ; D 425D 87 32          TESTXY R3 R2           Done every star?
 ; D 425F A1 01 3E       IFFALSEI STAR
 ; D 4262 CC             SERST                  A key waiting?
-; D 4263 A1 02 70       IFFALSEI NOKEY
+; D 4263 A1 02 7E       IFFALSEI NOKEY
 ; D 4266 CB             SERIN
 ; D 4267 21 0C          COPYAX 0C
-; D 4269 86 0C 00 1B    TESTXI R12 001B        ESC stops the flight
-; D 426D A0 02 93       IFTRUEI QUIT
-; D 4270 C0 02          DLYI 02                The speed knob
-; D 4272 B0 01 36       GAL FRAME
-; D 4275 CA 1B          SEROUTI 1B             ESC
-; D 4277 CA 5B          SEROUTI 5B             [
-; D 4279 2E 0D 0B 00    READIDX R13 0B00
-; D 427D C9             SEROUT                 Line, tens
-; D 427E 2E 0D 0B 60    READIDX R13 0B60
-; D 4282 C9             SEROUT                 Line, units
-; D 4283 CA 3B          SEROUTI 3B             ;
-; D 4285 2E 0E 0B 00    READIDX R14 0B00
-; D 4289 C9             SEROUT                 Column, tens
-; D 428A 2E 0E 0B 60    READIDX R14 0B60
-; D 428E C9             SEROUT                 Column, units
-; D 428F CA 48          SEROUTI 48             H
-; D 4291 BE 00          RETURN
-; D 4293 CA 1B          SEROUTI 1B             Show the cursor again
-; D 4295 CA 5B          SEROUTI 5B
-; D 4297 CA 3F          SEROUTI 3F
-; D 4299 CA 32          SEROUTI 32
-; D 429B CA 35          SEROUTI 35
-; D 429D CA 68          SEROUTI 68
-; D 429F CA 1B          SEROUTI 1B
-; D 42A1 CA 5B          SEROUTI 5B
-; D 42A3 CA 32          SEROUTI 32
-; D 42A5 CA 4A          SEROUTI 4A
-; D 42A7 CA 1B          SEROUTI 1B             Cursor home
-; D 42A9 CA 5B          SEROUTI 5B
-; D 42AB CA 48          SEROUTI 48
-; D 42AD F0 00 00       BREAK                  End of program
+; D 4269 86 0C 00 1B    TESTXI R12 001B        ESC stops the flight - on its own (not an arrow's ESC [ x)
+; D 426D A1 02 7E       IFFALSEI NOKEY
+; D 4270 BD 02 A1       CALL KWAIT             An arrow following?
+; D 4273 A1 02 B7       IFFALSEI QUIT          No: ESC on its own
+; D 4276 CB             SERIN                  An arrow: its two bytes are thrown away
+; D 4277 BD 02 A1       CALL KWAIT
+; D 427A A1 02 7E       IFFALSEI NOKEY
+; D 427D CB             SERIN
+; NOKEY:
+; D 427E C0 02          DLYI 02                The speed knob
+; D 4280 B0 01 36       GAL FRAME
+; POSXY:
+; D 4283 CA 1B          SEROUTI 1B             ESC
+; D 4285 CA 5B          SEROUTI 5B             [
+; D 4287 2E 0D 0B 00    READIDX R13 0B00
+; D 428B C9             SEROUT                 Line, tens
+; D 428C 2E 0D 0B 60    READIDX R13 0B60
+; D 4290 C9             SEROUT                 Line, units
+; D 4291 CA 3B          SEROUTI 3B             ;
+; D 4293 2E 0E 0B 00    READIDX R14 0B00
+; D 4297 C9             SEROUT                 Column, tens
+; D 4298 2E 0E 0B 60    READIDX R14 0B60
+; D 429C C9             SEROUT                 Column, units
+; D 429D CA 48          SEROUTI 48             H
+; D 429F BE 00          RETURN
+; KWAIT:
+; D 42A1 72 09          PUSHX R9
+; D 42A3 11 09 00 08    LOADXI R9 0008
+; KWAIT1:
+; D 42A7 CC             SERST
+; D 42A8 A0 02 B2       IFTRUEI KWAIT2
+; D 42AB 43 09          DECX R9
+; D 42AD 8C 09          TESTXZ R9
+; D 42AF A1 02 A7       IFFALSEI KWAIT1
+; KWAIT2:
+; D 42B2 73 09          POPX R9
+; D 42B4 CC             SERST                  Test: a key is waiting
+; D 42B5 BE 00          RETURN
+; QUIT:
+; D 42B7 CA 1B          SEROUTI 1B             Show the cursor again
+; D 42B9 CA 5B          SEROUTI 5B
+; D 42BB CA 3F          SEROUTI 3F
+; D 42BD CA 32          SEROUTI 32
+; D 42BF CA 35          SEROUTI 35
+; D 42C1 CA 68          SEROUTI 68
+; D 42C3 CA 1B          SEROUTI 1B
+; D 42C5 CA 5B          SEROUTI 5B
+; D 42C7 CA 32          SEROUTI 32
+; D 42C9 CA 4A          SEROUTI 4A
+; D 42CB CA 1B          SEROUTI 1B             Cursor home
+; D 42CD CA 5B          SEROUTI 5B
+; D 42CF CA 48          SEROUTI 48
+; D 42D1 F0 00 00       BREAK                  End of program
 ; --------------------------------------------------------------------------
 ; CODE  -  download this block
 ; --------------------------------------------------------------------------
@@ -560,11 +606,11 @@ D 4214 8C 04
 D 4216 A0 02 24
 D 4219 23 00 4D
 D 421C 23 00 5E
-D 421F BD 02 75
+D 421F BD 02 83
 D 4222 CA 20
 D 4224 23 00 6D
 D 4227 23 00 7E
-D 422A BD 02 75
+D 422A BD 02 83
 D 422D 11 0B 00 06
 D 4231 88 1B
 D 4233 A0 02 3B
@@ -585,40 +631,56 @@ D 425B 42 03
 D 425D 87 32
 D 425F A1 01 3E
 D 4262 CC
-D 4263 A1 02 70
+D 4263 A1 02 7E
 D 4266 CB
 D 4267 21 0C
 D 4269 86 0C 00 1B
-D 426D A0 02 93
-D 4270 C0 02
-D 4272 B0 01 36
-D 4275 CA 1B
-D 4277 CA 5B
-D 4279 2E 0D 0B 00
-D 427D C9
-D 427E 2E 0D 0B 60
-D 4282 C9
-D 4283 CA 3B
-D 4285 2E 0E 0B 00
-D 4289 C9
-D 428A 2E 0E 0B 60
-D 428E C9
-D 428F CA 48
-D 4291 BE 00
-D 4293 CA 1B
-D 4295 CA 5B
-D 4297 CA 3F
-D 4299 CA 32
-D 429B CA 35
-D 429D CA 68
-D 429F CA 1B
-D 42A1 CA 5B
-D 42A3 CA 32
-D 42A5 CA 4A
-D 42A7 CA 1B
-D 42A9 CA 5B
-D 42AB CA 48
-D 42AD F0 00 00
+D 426D A1 02 7E
+D 4270 BD 02 A1
+D 4273 A1 02 B7
+D 4276 CB
+D 4277 BD 02 A1
+D 427A A1 02 7E
+D 427D CB
+D 427E C0 02
+D 4280 B0 01 36
+D 4283 CA 1B
+D 4285 CA 5B
+D 4287 2E 0D 0B 00
+D 428B C9
+D 428C 2E 0D 0B 60
+D 4290 C9
+D 4291 CA 3B
+D 4293 2E 0E 0B 00
+D 4297 C9
+D 4298 2E 0E 0B 60
+D 429C C9
+D 429D CA 48
+D 429F BE 00
+D 42A1 72 09
+D 42A3 11 09 00 08
+D 42A7 CC
+D 42A8 A0 02 B2
+D 42AB 43 09
+D 42AD 8C 09
+D 42AF A1 02 A7
+D 42B2 73 09
+D 42B4 CC
+D 42B5 BE 00
+D 42B7 CA 1B
+D 42B9 CA 5B
+D 42BB CA 3F
+D 42BD CA 32
+D 42BF CA 35
+D 42C1 CA 68
+D 42C3 CA 1B
+D 42C5 CA 5B
+D 42C7 CA 32
+D 42C9 CA 4A
+D 42CB CA 1B
+D 42CD CA 5B
+D 42CF CA 48
+D 42D1 F0 00 00
 
 D 4A00 53 54 45 4C 4C 41 52 20 53 54 41 52 46 49 45 4C
 D 4A10 44 20 2D 2D 20 66 6C 79 69 6E 67 20 74 68 72 6F

@@ -60,7 +60,7 @@
     "name": "Simple-Calc-8 (8 digits, RUNMC)",
     "file": "Simple-Calc-8.lst",
     "input": "1/7\r",
-    "blurb": "An eight-digit calculator: 1/7 = 0.14285714, 99999999*99999999 = 9.9999998E15. Works left to right (2+3*4 = 20); a line starting with + * / carries on from the last answer; a leading - is a negative number; Enter on its own quits. The arithmetic is native 1802 code called through RUNMC, on numbers held one decimal digit per byte, so every answer is correctly rounded to 8 digits. 1/7 is pre-typed; click the terminal to type more.",
+    "blurb": "An eight-digit calculator: 1/7 = 0.14285714, 99999999*99999999 = 9.9999998E15. Works left to right (2+3*4 = 20); a line starting with + * / carries on from the last answer; a leading - is a negative number; Esc, or Enter on its own, quits. The arithmetic is native 1802 code called through RUNMC, on numbers held one decimal digit per byte, so every answer is correctly rounded to 8 digits. 1/7 is pre-typed; click the terminal to type more.",
     "maxSteps": 8000000,
     "halts": false,
     "speed": "flat out"
@@ -85,7 +85,7 @@
     "name": "ELIZA (chatbot)",
     "file": "ELIZA.lst",
     "input": "",
-    "blurb": "The 1966 therapist chatbot. Runs flat out. Wait for WHAT'S YOUR NAME?, click the terminal, type your name, then talk to it in plain English - lower case is fine; BYE ends it. The text work (keyword search, pronoun swapping) is native 1802 code called through RUNMC, so replies start in a fraction of a second; it rotates its replies, remembers what you said after \"my\" and brings it back, and notices when you repeat yourself. Uses SETSIZE to take 12KB.",
+    "blurb": "The 1966 therapist chatbot. Runs flat out. Wait for WHAT'S YOUR NAME?, click the terminal, type your name, then talk to it in plain English - lower case is fine; BYE or Esc ends it. The text work (keyword search, pronoun swapping) is native 1802 code called through RUNMC, so replies start in a fraction of a second; it rotates its replies, remembers what you said after \"my\" and brings it back, and notices when you repeat yourself. Uses SETSIZE to take 12KB.",
     "maxSteps": 8000000,
     "halts": false,
     "speed": "flat out"
@@ -178,7 +178,7 @@
     "name": "Pong (VT100, arrow keys)",
     "file": "Pong.lst",
     "input": "",
-    "blurb": "You are the paddle on the RIGHT; the computer plays the left. Click the terminal and press any key to serve, then steer with the up and down arrows (w and s work too). Where the ball strikes your paddle decides which way it leaves - top cell up, bottom cell down. First to 9 wins; Q quits. Opens at Elf2K speed - the real hardware's pace. Verified on the Elf2K.",
+    "blurb": "You are the paddle on the RIGHT; the computer plays the left. Click the terminal and press any key to serve, then steer with the up and down arrows (w and s work too). Where the ball strikes your paddle decides which way it leaves - top cell up, bottom cell down. First to 9 wins; Esc (or Q) quits. Opens at Elf2K speed - the real hardware's pace. Verified on the Elf2K.",
     "maxSteps": 14000000,
     "halts": false,
     "speed": "Elf2K"
@@ -232,7 +232,7 @@
     "name": "Galaxia (VT100, arrow keys)",
     "file": "Galaxia.lst",
     "input": "",
-    "blurb": "A Galaxian-style shooter. Click the terminal and press any key. Left / right arrows (or z / x) move your ship, SPACE fires - keys are queued while the screen is drawn, so a held arrow keeps moving. The swarm sways overhead: flagships 60, reds 50, purples 40, blues 30. Divers swoop down, chase you and drop bombs - shoot one in flight for double points. Three ships; each wave dives more often. P pauses, R restarts, Q quits. Stellar C with a native frame engine. Verified on the Elf2K.",
+    "blurb": "A Galaxian-style shooter. Click the terminal and press any key. Left / right arrows (or z / x) move your ship, SPACE fires - keys are queued while the screen is drawn, so a held arrow keeps moving. The swarm sways overhead: flagships 60, reds 50, purples 40, blues 30. Divers swoop down, chase you and drop bombs - shoot one in flight for double points. Three ships; each wave dives more often. P pauses, R restarts, Esc (or Q) quits. Stellar C with a native frame engine. Verified on the Elf2K.",
     "maxSteps": 14000000,
     "halts": false,
     "speed": "Elf2K"
@@ -241,7 +241,7 @@
     "name": "Battleship (VT100, arrow keys)",
     "file": "Battleship.lst",
     "input": "",
-    "blurb": "You against the computer on two 10 x 10 seas: carrier 5, battleship 4, cruiser 3, submarine 3, destroyer 2. Click the terminal and press SPACE; R shuffles your fleet, SPACE starts the battle. The arrow keys move your aim over ENEMY WATERS and SPACE or Enter fires - or type a square (B7, J10) to jump there. The computer hunts on a checkerboard and works round every hit. Q gives up and shows its ships. Verified on the Elf2K.",
+    "blurb": "You against the computer on two 10 x 10 seas: carrier 5, battleship 4, cruiser 3, submarine 3, destroyer 2. Click the terminal and press SPACE; R shuffles your fleet, SPACE starts the battle. The arrow keys move your aim over ENEMY WATERS and SPACE or Enter fires - or type a square (B7, J10) to jump there. The computer hunts on a checkerboard and works round every hit. Q gives up and shows its ships; Esc quits. Verified on the Elf2K.",
     "maxSteps": 14000000,
     "halts": false,
     "speed": "Elf2K"
@@ -268,7 +268,7 @@
     "name": "Getting Warmer (guess the number)",
     "file": "Getting-Warmer.lst",
     "input": "",
-    "blurb": "The computer picks a number from 1 to 1000 and you have ten guesses. Click the terminal, press any key, then type a guess and Enter. Each answer says go higher or lower - and from the second guess on whether you are getting warmer or colder than your last one. Ten is always enough if you halve the range each time. A line that is not a number from 1 to 1000 costs nothing; Q gives up; Y plays again, N quits. Plain text: no VT100 needed. Verified on the Elf2K.",
+    "blurb": "The computer picks a number from 1 to 1000 and you have ten guesses. Click the terminal, press any key, then type a guess and Enter. Each answer says go higher or lower - and from the second guess on whether you are getting warmer or colder than your last one. Ten is always enough if you halve the range each time. A line that is not a number from 1 to 1000 costs nothing; Q gives up, Esc quits; Y plays again, N quits. Plain text: no VT100 needed. Verified on the Elf2K.",
     "maxSteps": 14000000,
     "halts": false
   },
@@ -276,7 +276,7 @@
     "name": "Big Clock (VT100: chime, alarm, timer)",
     "file": "Big-Clock-v3.lst",
     "input": "",
-    "blurb": "The time in big seven-segment digits made of reverse-video blocks, with the day of the week and the date underneath - plus a timer, an hourly chime that strikes the hour and an alarm with snooze, both sounding on Q (click \ud83d\udd08 Sound under the Front Panel to hear them). On the Elf2K it reads the DS12887 real-time clock through the $07 RTC opcode; here the simulator's clock chip runs on this computer's own clock. Click the terminal: T starts a timer and T again stops it, showing the time passed; C turns the chime on or off, A sets the alarm (HH:MM, Enter = off), S sets the clock, Q quits. When the alarm rings, Z snoozes 9 minutes and any other key stops it. Verified on the Elf2K.",
+    "blurb": "The time in big seven-segment digits made of reverse-video blocks, with the day of the week and the date underneath - plus a timer, an hourly chime that strikes the hour and an alarm with snooze, both sounding on Q (click \ud83d\udd08 Sound under the Front Panel to hear them). On the Elf2K it reads the DS12887 real-time clock through the $07 RTC opcode; here the simulator's clock chip runs on this computer's own clock. Click the terminal: T starts a timer and T again stops it, showing the time passed; C turns the chime on or off, A sets the alarm (HH:MM, Enter = off), S sets the clock, Esc (or Q) quits. When the alarm rings, Z snoozes 9 minutes and any other key stops it. Verified on the Elf2K.",
     "speed": "Elf2K",
     "maxSteps": 14000000,
     "halts": false,
@@ -311,7 +311,7 @@
     "name": "Sort visualiser (VT100)",
     "file": "Sort-Visualiser.lst",
     "input": "",
-    "blurb": "Watch STELLAR's $FC PULSESORTXY opcode sort twenty numbers. Each pass is ONE opcode - one bubble-sort pass - and only the bars that moved are redrawn; it stops when a pass finds nothing to swap. Click the terminal and press any key to start; when sorted, A sorts up, D sorts down, N gives new numbers, Q quits. Runs at the Elf2K's own speed.",
+    "blurb": "Watch STELLAR's $FC PULSESORTXY opcode sort twenty numbers. Each pass is ONE opcode - one bubble-sort pass - and only the bars that moved are redrawn; it stops when a pass finds nothing to swap. Click the terminal and press any key to start; when sorted, A sorts up, D sorts down, N gives new numbers, Esc (or Q) quits. Runs at the Elf2K's own speed.",
     "maxSteps": 14000000,
     "halts": false,
     "speed": "Elf2K"

@@ -2,7 +2,7 @@
 ; STELLAR PONG  -  you on the RIGHT, the computer on the left   (VM1 @ $4000)
 ; ==========================================================================
 ; Your paddle is the one on the RIGHT.  UP and DOWN arrows move it (w and s work
-; too, for terminals that send no arrow keys).  First to 9 wins.  Q quits.
+; too, for terminals that send no arrow keys).  First to 9 wins.  ESC or Q quits.
 ;
 ; NO SIGNED ARITHMETIC ANYWHERE.  Positions are magnitudes and each axis carries
 ; a direction FLAG; a bounce flips the flag.  That is Bouncing-Ball's model, and
@@ -26,7 +26,7 @@
 ; An earlier version gated the paddle on a frame counter (move one cell every Nth
 ; frame) and that measured NON-MONOTONIC: N=3 and N=5 lost, N=4 won 9-2 - a frame
 ; counter phase-locks against the ball's own path rather than capping skill.  The
-; operand is the COLUMN it starts tracking at, 12, at $4288.  The computer guards
+; operand is the COLUMN it starts tracking at, 12, at $429A.  The computer guards
 ; the LEFT end, so RAISE it to widen the band and make the computer harder, lower
 ; it to make it easier.
 ;
@@ -67,7 +67,7 @@
 ; The computer is deliberately held to the ball's frames, so REACT keeps meaning
 ; ball-steps.  The tick byte is at $4901.
 ;
-; THE FRAME DELAY at $4318 (DLYI 14) is the ball's speed knob, and it has to be
+; THE FRAME DELAY at $432A (DLYI 14) is the ball's speed knob, and it has to be
 ; big enough to DOMINATE the frame: a held frame does less work than a stepping
 ; one, so with the old DLYI 03 holding the ball bought only 1.23x.  At 14 it
 ; buys 1.46x, and with the hold the ball is 2.1x slower than the first build.
@@ -80,7 +80,7 @@
 ; guessed: against the same auto-player, 2 cells a frame gave 0-2 in 1159 frames
 ; and 3 or more gave 0-0 stalemates - both paddles track a 45 degree ball
 ; perfectly and no rally ever ends, the same failure SPIN exists to prevent.
-; At 1 the game actually reaches a result.  The operand is at $4160.
+; At 1 the game actually reaches a result.  The operand is at $4172.
 ;
 ; REGISTERS.  R0 scratch, R1 ball column, R2 ball line, R3 ball x-direction
 ; (0 left, 1 right), R4 ball y-direction (0 up, 1 down), R5 your paddle top line
@@ -106,8 +106,8 @@
 ; cell.  The tuning shipped here (REACT, the frame delay, PCAP) is the tuning
 ; that was played.
 ;
-; 414 STELLAR commands, $4000-$4445 (1094 bytes of code).
-; Data at $4900, 161 bytes, past the end marker.
+; 428 STELLAR commands, $4000-$4469 (1130 bytes of code).
+; Data at $4900, 168 bytes, past the end marker.
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
@@ -119,414 +119,428 @@
 ; D 4007 C3             RAND                   Spin the generator while we wait - the number of turns it
 ; D 4008 CC             SERST                  gets depends on when the operator presses a key, and that
 ; D 4009 A1 00 07       IFFALSEI SEED          is the only thing that differs between two runs
-; D 400C CB             SERIN                  Take the key and throw it away
-; D 400D 11 0F 00 0A    LOADXI R15 000A        Ten, for splitting a number into digits
-; D 4011 11 0B 09 00    LOADXI R11 0900        The arrow-key state starts clear
-; D 4015 32 0B 00 00    COPYMX2I R11 0000
-; D 4019 11 0B 09 01    LOADXI R11 0901        and the ball's tick - the pre-pass does not clear RAM
-; D 401D 32 0B 00 00    COPYMX2I R11 0000
-; D 4021 11 07 00 00    LOADXI R7 0000         Player score
-; D 4025 11 08 00 00    LOADXI R8 0000         Computer score
-; D 4029 11 05 00 0B    LOADXI R5 000B         Both paddles start centred
-; D 402D 11 06 00 0B    LOADXI R6 000B
-; D 4031 CA 1B          SEROUTI 1B             Hide the cursor
-; D 4033 CA 5B          SEROUTI 5B
-; D 4035 CA 3F          SEROUTI 3F
-; D 4037 CA 32          SEROUTI 32
-; D 4039 CA 35          SEROUTI 35
-; D 403B CA 6C          SEROUTI 6C
-; D 403D CA 1B          SEROUTI 1B             Clear the screen
+; D 400C CB             SERIN                  Take the key and throw it away -
+; D 400D 81 00 1B       TESTAI 001B            unless it is an ESC on its own: that quits
+; D 4010 A1 00 19       IFFALSEI SEEDOK
+; D 4013 BD 03 B7       CALL KWAIT             Anything more within ~30 ms?
+; D 4016 A1 03 6C       IFFALSEI QUIT          No: a lone ESC
+; D 4019 11 0F 00 0A    LOADXI R15 000A        Ten, for splitting a number into digits
+; D 401D 11 0B 09 00    LOADXI R11 0900        The arrow-key state starts clear
+; D 4021 32 0B 00 00    COPYMX2I R11 0000
+; D 4025 11 0B 09 01    LOADXI R11 0901        and the ball's tick - the pre-pass does not clear RAM
+; D 4029 32 0B 00 00    COPYMX2I R11 0000
+; D 402D 11 07 00 00    LOADXI R7 0000         Player score
+; D 4031 11 08 00 00    LOADXI R8 0000         Computer score
+; D 4035 11 05 00 0B    LOADXI R5 000B         Both paddles start centred
+; D 4039 11 06 00 0B    LOADXI R6 000B
+; D 403D CA 1B          SEROUTI 1B             Hide the cursor
 ; D 403F CA 5B          SEROUTI 5B
-; D 4041 CA 32          SEROUTI 32
-; D 4043 CA 4A          SEROUTI 4A
-; D 4045 11 0D 00 02    LOADXI R13 0002        The wall on line 2
-; D 4049 11 0E 00 02    LOADXI R14 0002
-; D 404D BD 03 A5       CALL POSXY
-; D 4050 10 00 4E       LOADAI 004E            78 columns of it
-; D 4053 21 00          COPYAX 00              LOADXI cannot write R0
-; D 4055 CA 2D          SEROUTI 2D             '-'
-; D 4057 43 00          DECX R0
-; D 4059 8C 00          TESTXZ R0
-; D 405B A1 00 55       IFFALSEI W2
-; D 405E 11 0D 00 17    LOADXI R13 0017        The wall on line 23
-; D 4062 11 0E 00 02    LOADXI R14 0002
-; D 4066 BD 03 A5       CALL POSXY
-; D 4069 10 00 4E       LOADAI 004E            78 columns of it
-; D 406C 21 00          COPYAX 00              LOADXI cannot write R0
-; D 406E CA 2D          SEROUTI 2D             '-'
-; D 4070 43 00          DECX R0
-; D 4072 8C 00          TESTXZ R0
-; D 4074 A1 00 6E       IFFALSEI W23
-; D 4077 BD 03 C7       CALL SCORE
-; D 407A BD 03 FE       CALL FULLP
-; D 407D BD 04 22       CALL FULLC
-; D 4080 11 01 00 28    LOADXI R1 0028         The ball starts in the middle
-; D 4084 C3             RAND                   A fresh draw for the line. One draw per field: chaining
-; D 4085 21 0A          COPYAX 0A              several off one RAND depends on how wide the value is
-; D 4087 10 00 12       LOADAI 0012
-; D 408A 21 00          COPYAX 00              LOADXI cannot write R0
-; D 408C 4D A0          DIVXY R10 R0
-; D 408E 27             COPYREMA
-; D 408F 4E 00 04       ADDAI 0004             Clear of both walls
-; D 4092 21 02          COPYAX 02
-; D 4094 C3             RAND                   and another for which way it leaves vertically
-; D 4095 21 0A          COPYAX 0A
-; D 4097 10 00 02       LOADAI 0002
-; D 409A 21 00          COPYAX 00              LOADXI cannot write R0
-; D 409C 4D A0          DIVXY R10 R0
-; D 409E 27             COPYREMA
-; D 409F 21 04          COPYAX 04
-; D 40A1 C0 30          DLYI 30                A pause, so the serve is not a surprise
-; D 40A3 CA 1B          SEROUTI 1B             Draw the ball where it starts
-; D 40A5 CA 5B          SEROUTI 5B
-; D 40A7 CA 37          SEROUTI 37
-; D 40A9 CA 6D          SEROUTI 6D
-; D 40AB 23 00 2D       COPYXY R2 -> R13
-; D 40AE 23 00 1E       COPYXY R1 -> R14
-; D 40B1 BD 03 81       CALL CELL
-; D 40B4 11 09 00 00    LOADXI R9 0000         This frame's paddle allowance, spent by PCAP
-; D 40B8 11 0B 09 00    LOADXI R11 0900        RB back on the key state - the ball tick borrows it
-; D 40BC CC             SERST                  Anything typed?
-; D 40BD A1 01 A7       IFFALSEI MOVE          No - get on with the frame
-; D 40C0 CB             SERIN
-; D 40C1 21 0C          COPYAX 0C              RC = the key
-; D 40C3 33 0B          COPYMXA 0B             The arrow-key state machine: an arrow is three
-; D 40C5 81 00 01       TESTAI 0001            bytes, ESC [ A or ESC [ B
-; D 40C8 A0 01 00       IFTRUEI KST1
-; D 40CB 33 0B          COPYMXA 0B
-; D 40CD 81 00 02       TESTAI 0002
-; D 40D0 A0 01 12       IFTRUEI KST2
-; D 40D3 86 0C 00 1B    TESTXI R12 001B        ESC starts one
-; D 40D7 A1 00 E1       IFFALSEI KPLAIN
-; D 40DA 32 0B 00 01    COPYMX2I R11 0001
-; D 40DE B0 00 BC       GAL KEYS
-; D 40E1 86 0C 00 77    TESTXI R12 0077        w moves up, for terminals that send no arrows
-; D 40E5 A0 01 27       IFTRUEI GOUP
-; D 40E8 86 0C 00 73    TESTXI R12 0073        s moves down
-; D 40EC A0 01 67       IFTRUEI GODOWN
-; D 40EF 86 0C 00 71    TESTXI R12 0071        q quits
-; D 40F3 A0 03 5A       IFTRUEI QUIT
-; D 40F6 86 0C 00 51    TESTXI R12 0051        and so does Q
-; D 40FA A0 03 5A       IFTRUEI QUIT
-; D 40FD B0 00 BC       GAL KEYS
-; D 4100 32 0B 00 00    COPYMX2I R11 0000      Whatever it was, the sequence restarts
-; D 4104 86 0C 00 5B    TESTXI R12 005B        Was it '[' ?
-; D 4108 A1 00 BC       IFFALSEI KEYS
-; D 410B 32 0B 00 02    COPYMX2I R11 0002      Now expect the letter
-; D 410F B0 00 BC       GAL KEYS
-; D 4112 32 0B 00 00    COPYMX2I R11 0000      Sequence finished
-; D 4116 86 0C 00 41    TESTXI R12 0041        'A' is the up arrow
-; D 411A A0 01 27       IFTRUEI GOUP
-; D 411D 86 0C 00 42    TESTXI R12 0042        'B' is the down arrow
-; D 4121 A0 01 67       IFTRUEI GODOWN
-; D 4124 B0 00 BC       GAL KEYS
-; D 4127 86 05 00 03    TESTXI R5 0003         Already against the top wall?
-; D 412B A0 00 BC       IFTRUEI KEYS
-; D 412E 23 00 5A       COPYXY R5 -> R10
-; D 4131 52 0A 00 03    ADDXI R10 0003         The old bottom cell is three below the top
-; D 4135 CA 1B          SEROUTI 1B             Erase just that one cell
-; D 4137 CA 5B          SEROUTI 5B
-; D 4139 CA 30          SEROUTI 30
-; D 413B CA 6D          SEROUTI 6D
-; D 413D 23 00 AD       COPYXY R10 -> R13
-; D 4140 11 0E 00 4E    LOADXI R14 004E
-; D 4144 BD 03 81       CALL CELL
-; D 4147 43 05          DECX R5                Up one
-; D 4149 CA 1B          SEROUTI 1B             and draw the new top cell
-; D 414B CA 5B          SEROUTI 5B
-; D 414D CA 37          SEROUTI 37
-; D 414F CA 6D          SEROUTI 6D
-; D 4151 23 00 5D       COPYXY R5 -> R13
-; D 4154 11 0E 00 4E    LOADXI R14 004E
-; D 4158 BD 03 81       CALL CELL
-; D 415B 42 09          INCX R9                One more cell moved this frame
-; D 415D 86 09 00 01    TESTXI R9 0001         Used the frame's allowance?
-; D 4161 A0 01 A7       IFTRUEI MOVE           Yes - leave the rest of the keys waiting
-; D 4164 B0 00 BC       GAL KEYS
-; D 4167 86 05 00 13    TESTXI R5 0013         Already against the bottom wall?
-; D 416B A0 00 BC       IFTRUEI KEYS
-; D 416E CA 1B          SEROUTI 1B             Erase the old top cell
-; D 4170 CA 5B          SEROUTI 5B
-; D 4172 CA 30          SEROUTI 30
-; D 4174 CA 6D          SEROUTI 6D
-; D 4176 23 00 5D       COPYXY R5 -> R13
-; D 4179 11 0E 00 4E    LOADXI R14 004E
-; D 417D BD 03 81       CALL CELL
-; D 4180 42 05          INCX R5                Down one
-; D 4182 23 00 5A       COPYXY R5 -> R10
-; D 4185 52 0A 00 03    ADDXI R10 0003
-; D 4189 CA 1B          SEROUTI 1B             and draw the new bottom cell
-; D 418B CA 5B          SEROUTI 5B
-; D 418D CA 37          SEROUTI 37
-; D 418F CA 6D          SEROUTI 6D
-; D 4191 23 00 AD       COPYXY R10 -> R13
-; D 4194 11 0E 00 4E    LOADXI R14 004E
-; D 4198 BD 03 81       CALL CELL
-; D 419B 42 09          INCX R9                One more cell moved this frame
-; D 419D 86 09 00 01    TESTXI R9 0001         Used the frame's allowance?
-; D 41A1 A0 01 A7       IFTRUEI MOVE           Yes - leave the rest of the keys waiting
-; D 41A4 B0 00 BC       GAL KEYS
-; D 41A7 11 0B 09 01    LOADXI R11 0901        Does the ball step this frame?
-; D 41AB 33 0B          COPYMXA 0B
-; D 41AD 21 0A          COPYAX 0A
-; D 41AF 86 0A 00 01    TESTXI R10 0001
-; D 41B3 A0 01 BD       IFTRUEI BALLGO
-; D 41B6 32 0B 00 01    COPYMX2I R11 0001      No - hold it, and skip the computer
-; D 41BA B0 03 17       GAL ENDF               too, so REACT still means ball-steps
-; D 41BD 32 0B 00 00    COPYMX2I R11 0000
-; D 41C1 CA 1B          SEROUTI 1B             Erase the ball where it is now
-; D 41C3 CA 5B          SEROUTI 5B
-; D 41C5 CA 30          SEROUTI 30
-; D 41C7 CA 6D          SEROUTI 6D
-; D 41C9 23 00 2D       COPYXY R2 -> R13
-; D 41CC 23 00 1E       COPYXY R1 -> R14
-; D 41CF BD 03 81       CALL CELL
-; D 41D2 86 04 00 00    TESTXI R4 0000         Going up?
-; D 41D6 A1 01 EE       IFFALSEI BDOWN
-; D 41D9 86 02 00 03    TESTXI R2 0003         At the top wall?
-; D 41DD A1 01 E9       IFFALSEI BUP1
-; D 41E0 11 04 00 01    LOADXI R4 0001         Turn round
-; D 41E4 42 02          INCX R2
-; D 41E6 B0 02 00       GAL BX
-; D 41E9 43 02          DECX R2
-; D 41EB B0 02 00       GAL BX
-; D 41EE 86 02 00 16    TESTXI R2 0016         At the bottom wall?
-; D 41F2 A1 01 FE       IFFALSEI BDN1
-; D 41F5 11 04 00 00    LOADXI R4 0000
-; D 41F9 43 02          DECX R2
-; D 41FB B0 02 00       GAL BX
-; D 41FE 42 02          INCX R2
-; D 4200 86 03 00 00    TESTXI R3 0000         Going left?
-; D 4204 A1 02 13       IFFALSEI BRIGHT
-; D 4207 86 01 00 04    TESTXI R1 0004         Reached the computer's column?
-; D 420B A0 02 1F       IFTRUEI CHIT
-; D 420E 43 01          DECX R1
-; D 4210 B0 02 6E       GAL DRAWB
-; D 4213 86 01 00 4D    TESTXI R1 004D         Reached yours?
-; D 4217 A0 02 41       IFTRUEI PHIT
-; D 421A 42 01          INCX R1
-; D 421C B0 02 6E       GAL DRAWB
-; D 421F 88 26          TESTGXY R2 R6          Ball at or below the paddle top?
-; D 4221 A1 03 2B       IFFALSEI PSCORE
-; D 4224 23 00 6A       COPYXY R6 -> R10
-; D 4227 52 0A 00 03    ADDXI R10 0003
-; D 422B 88 A2          TESTGXY R10 R2         and at or above its bottom? $89 TESTLXY is
-; D 422D A1 03 2B       IFFALSEI PSCORE
-; D 4230 11 03 00 01    LOADXI R3 0001         Hit - turn the ball round
-; D 4234 87 26          TESTXY R2 R6           Struck by the paddle's TOP cell?
-; D 4236 A0 02 63       IFTRUEI SPINUP
-; D 4239 87 2A          TESTXY R2 R10          by its BOTTOM cell?
-; D 423B A0 02 6A       IFTRUEI SPINDN
-; D 423E B0 02 6E       GAL DRAWB              the middle two - keep going the same way
-; D 4241 88 25          TESTGXY R2 R5          Ball at or below the paddle top?
-; D 4243 A1 03 1C       IFFALSEI CSCORE
-; D 4246 23 00 5A       COPYXY R5 -> R10
-; D 4249 52 0A 00 03    ADDXI R10 0003
-; D 424D 88 A2          TESTGXY R10 R2         and at or above its bottom? $89 TESTLXY is
-; D 424F A1 03 1C       IFFALSEI CSCORE
-; D 4252 11 03 00 00    LOADXI R3 0000         Hit - turn the ball round
-; D 4256 87 25          TESTXY R2 R5           Struck by the paddle's TOP cell?
-; D 4258 A0 02 63       IFTRUEI SPINUP
-; D 425B 87 2A          TESTXY R2 R10          by its BOTTOM cell?
-; D 425D A0 02 6A       IFTRUEI SPINDN
-; D 4260 B0 02 6E       GAL DRAWB              the middle two - keep going the same way
-; D 4263 11 04 00 00    LOADXI R4 0000         Off the top of the paddle - send it up
-; D 4267 B0 02 6E       GAL DRAWB
-; D 426A 11 04 00 01    LOADXI R4 0001         Off the bottom - send it down
-; D 426E CA 1B          SEROUTI 1B
-; D 4270 CA 5B          SEROUTI 5B
-; D 4272 CA 37          SEROUTI 37
-; D 4274 CA 6D          SEROUTI 6D
-; D 4276 23 00 2D       COPYXY R2 -> R13
-; D 4279 23 00 1E       COPYXY R1 -> R14
-; D 427C BD 03 81       CALL CELL
-; D 427F 86 03 00 00    TESTXI R3 0000         Is the ball even coming this way?
-; D 4283 A1 03 17       IFFALSEI ENDF          No - hold position. Following the ball all
-; D 4286 10 00 0C       LOADAI 000C            the way across is what makes a computer
-; D 4289 21 00          COPYAX 00              LOADXI cannot write R0
-; D 428B 88 01          TESTGXY R0 R1          paddle unbeatable, so it only reacts inside
-; D 428D A1 03 17       IFFALSEI ENDF          the first 8 columns
-; D 4290 23 00 2A       COPYXY R2 -> R10       Aim the middle of the paddle at the ball
-; D 4293 86 0A 00 03    TESTXI R10 0003
-; D 4297 A0 02 9C       IFTRUEI AICMP
-; D 429A 43 0A          DECX R10
-; D 429C 87 6A          TESTXY R6 R10          Already there?
-; D 429E A0 03 17       IFTRUEI ENDF
-; D 42A1 88 6A          TESTGXY R6 R10         Below the target?
-; D 42A3 A0 02 A9       IFTRUEI AIUP
-; D 42A6 B0 02 E0       GAL AIDN
-; D 42A9 86 06 00 03    TESTXI R6 0003         Already against the top wall?
-; D 42AD A0 03 17       IFTRUEI ENDF
-; D 42B0 23 00 6A       COPYXY R6 -> R10
-; D 42B3 52 0A 00 03    ADDXI R10 0003         The old bottom cell is three below the top
-; D 42B7 CA 1B          SEROUTI 1B             Erase just that one cell
-; D 42B9 CA 5B          SEROUTI 5B
-; D 42BB CA 30          SEROUTI 30
-; D 42BD CA 6D          SEROUTI 6D
-; D 42BF 23 00 AD       COPYXY R10 -> R13
-; D 42C2 11 0E 00 03    LOADXI R14 0003
-; D 42C6 BD 03 81       CALL CELL
-; D 42C9 43 06          DECX R6                Up one
-; D 42CB CA 1B          SEROUTI 1B             and draw the new top cell
-; D 42CD CA 5B          SEROUTI 5B
-; D 42CF CA 37          SEROUTI 37
-; D 42D1 CA 6D          SEROUTI 6D
-; D 42D3 23 00 6D       COPYXY R6 -> R13
-; D 42D6 11 0E 00 03    LOADXI R14 0003
-; D 42DA BD 03 81       CALL CELL
-; D 42DD B0 03 17       GAL ENDF
-; D 42E0 86 06 00 13    TESTXI R6 0013         Already against the bottom wall?
-; D 42E4 A0 03 17       IFTRUEI ENDF
-; D 42E7 CA 1B          SEROUTI 1B             Erase the old top cell
-; D 42E9 CA 5B          SEROUTI 5B
-; D 42EB CA 30          SEROUTI 30
-; D 42ED CA 6D          SEROUTI 6D
-; D 42EF 23 00 6D       COPYXY R6 -> R13
-; D 42F2 11 0E 00 03    LOADXI R14 0003
-; D 42F6 BD 03 81       CALL CELL
-; D 42F9 42 06          INCX R6                Down one
-; D 42FB 23 00 6A       COPYXY R6 -> R10
-; D 42FE 52 0A 00 03    ADDXI R10 0003
-; D 4302 CA 1B          SEROUTI 1B             and draw the new bottom cell
-; D 4304 CA 5B          SEROUTI 5B
-; D 4306 CA 37          SEROUTI 37
-; D 4308 CA 6D          SEROUTI 6D
-; D 430A 23 00 AD       COPYXY R10 -> R13
-; D 430D 11 0E 00 03    LOADXI R14 0003
-; D 4311 BD 03 81       CALL CELL
-; D 4314 B0 03 17       GAL ENDF
-; D 4317 C0 14          DLYI 14                The frame delay - the ball's speed knob
-; D 4319 B0 00 B4       GAL FRAME
-; D 431C 42 08          INCX R8                A point to the computer
-; D 431E BD 03 C7       CALL SCORE
-; D 4321 86 08 00 09    TESTXI R8 0009         Game over?
-; D 4325 A0 03 41       IFTRUEI LOST
-; D 4328 B0 00 80       GAL SERVE
-; D 432B 42 07          INCX R7                A point to the player
-; D 432D BD 03 C7       CALL SCORE
-; D 4330 86 07 00 09    TESTXI R7 0009         Game over?
-; D 4334 A0 03 3A       IFTRUEI WON
-; D 4337 B0 00 80       GAL SERVE
-; D 433A 11 0A 0B 00    LOADXI R10 0B00
-; D 433E B0 03 45       GAL OVER
-; D 4341 11 0A 0B 40    LOADXI R10 0B40
-; D 4345 11 0D 00 18    LOADXI R13 0018
-; D 4349 11 0E 00 01    LOADXI R14 0001
-; D 434D BD 03 A5       CALL POSXY
-; D 4350 CA 1B          SEROUTI 1B
-; D 4352 CA 5B          SEROUTI 5B
-; D 4354 CA 30          SEROUTI 30
-; D 4356 CA 6D          SEROUTI 6D
-; D 4358 C1 0A          PRINTSTR R10
-; D 435A CA 1B          SEROUTI 1B             Normal video, cursor back, and tidy up
-; D 435C CA 5B          SEROUTI 5B
-; D 435E CA 30          SEROUTI 30
-; D 4360 CA 6D          SEROUTI 6D
+; D 4041 CA 3F          SEROUTI 3F
+; D 4043 CA 32          SEROUTI 32
+; D 4045 CA 35          SEROUTI 35
+; D 4047 CA 6C          SEROUTI 6C
+; D 4049 CA 1B          SEROUTI 1B             Clear the screen
+; D 404B CA 5B          SEROUTI 5B
+; D 404D CA 32          SEROUTI 32
+; D 404F CA 4A          SEROUTI 4A
+; D 4051 11 0D 00 02    LOADXI R13 0002        The wall on line 2
+; D 4055 11 0E 00 02    LOADXI R14 0002
+; D 4059 BD 03 C9       CALL POSXY
+; D 405C 10 00 4E       LOADAI 004E            78 columns of it
+; D 405F 21 00          COPYAX 00              LOADXI cannot write R0
+; D 4061 CA 2D          SEROUTI 2D             '-'
+; D 4063 43 00          DECX R0
+; D 4065 8C 00          TESTXZ R0
+; D 4067 A1 00 61       IFFALSEI W2
+; D 406A 11 0D 00 17    LOADXI R13 0017        The wall on line 23
+; D 406E 11 0E 00 02    LOADXI R14 0002
+; D 4072 BD 03 C9       CALL POSXY
+; D 4075 10 00 4E       LOADAI 004E            78 columns of it
+; D 4078 21 00          COPYAX 00              LOADXI cannot write R0
+; D 407A CA 2D          SEROUTI 2D             '-'
+; D 407C 43 00          DECX R0
+; D 407E 8C 00          TESTXZ R0
+; D 4080 A1 00 7A       IFFALSEI W23
+; D 4083 BD 03 EB       CALL SCORE
+; D 4086 BD 04 22       CALL FULLP
+; D 4089 BD 04 46       CALL FULLC
+; D 408C 11 01 00 28    LOADXI R1 0028         The ball starts in the middle
+; D 4090 C3             RAND                   A fresh draw for the line. One draw per field: chaining
+; D 4091 21 0A          COPYAX 0A              several off one RAND depends on how wide the value is
+; D 4093 10 00 12       LOADAI 0012
+; D 4096 21 00          COPYAX 00              LOADXI cannot write R0
+; D 4098 4D A0          DIVXY R10 R0
+; D 409A 27             COPYREMA
+; D 409B 4E 00 04       ADDAI 0004             Clear of both walls
+; D 409E 21 02          COPYAX 02
+; D 40A0 C3             RAND                   and another for which way it leaves vertically
+; D 40A1 21 0A          COPYAX 0A
+; D 40A3 10 00 02       LOADAI 0002
+; D 40A6 21 00          COPYAX 00              LOADXI cannot write R0
+; D 40A8 4D A0          DIVXY R10 R0
+; D 40AA 27             COPYREMA
+; D 40AB 21 04          COPYAX 04
+; D 40AD C0 30          DLYI 30                A pause, so the serve is not a surprise
+; D 40AF CA 1B          SEROUTI 1B             Draw the ball where it starts
+; D 40B1 CA 5B          SEROUTI 5B
+; D 40B3 CA 37          SEROUTI 37
+; D 40B5 CA 6D          SEROUTI 6D
+; D 40B7 23 00 2D       COPYXY R2 -> R13
+; D 40BA 23 00 1E       COPYXY R1 -> R14
+; D 40BD BD 03 93       CALL CELL
+; D 40C0 11 09 00 00    LOADXI R9 0000         This frame's paddle allowance, spent by PCAP
+; D 40C4 11 0B 09 00    LOADXI R11 0900        RB back on the key state - the ball tick borrows it
+; D 40C8 CC             SERST                  Anything typed?
+; D 40C9 A1 01 B9       IFFALSEI MOVE          No - get on with the frame
+; D 40CC CB             SERIN
+; D 40CD 21 0C          COPYAX 0C              RC = the key
+; D 40CF 33 0B          COPYMXA 0B             The arrow-key state machine: an arrow is three
+; D 40D1 81 00 01       TESTAI 0001            bytes, ESC [ A or ESC [ B
+; D 40D4 A0 01 12       IFTRUEI KST1
+; D 40D7 33 0B          COPYMXA 0B
+; D 40D9 81 00 02       TESTAI 0002
+; D 40DC A0 01 24       IFTRUEI KST2
+; D 40DF 86 0C 00 1B    TESTXI R12 001B        ESC starts one
+; D 40E3 A1 00 F3       IFFALSEI KPLAIN
+; D 40E6 32 0B 00 01    COPYMX2I R11 0001
+; D 40EA BD 03 B7       CALL KWAIT             Is the rest of an arrow coming (~30 ms)?
+; D 40ED A0 00 C8       IFTRUEI KEYS           Yes: on with the sequence
+; D 40F0 B0 03 6C       GAL QUIT               No: ESC on its own quits
+; D 40F3 86 0C 00 77    TESTXI R12 0077        w moves up, for terminals that send no arrows
+; D 40F7 A0 01 39       IFTRUEI GOUP
+; D 40FA 86 0C 00 73    TESTXI R12 0073        s moves down
+; D 40FE A0 01 79       IFTRUEI GODOWN
+; D 4101 86 0C 00 71    TESTXI R12 0071        q quits
+; D 4105 A0 03 6C       IFTRUEI QUIT
+; D 4108 86 0C 00 51    TESTXI R12 0051        and so does Q
+; D 410C A0 03 6C       IFTRUEI QUIT
+; D 410F B0 00 C8       GAL KEYS
+; D 4112 32 0B 00 00    COPYMX2I R11 0000      Whatever it was, the sequence restarts
+; D 4116 86 0C 00 5B    TESTXI R12 005B        Was it '[' ?
+; D 411A A1 00 C8       IFFALSEI KEYS
+; D 411D 32 0B 00 02    COPYMX2I R11 0002      Now expect the letter
+; D 4121 B0 00 C8       GAL KEYS
+; D 4124 32 0B 00 00    COPYMX2I R11 0000      Sequence finished
+; D 4128 86 0C 00 41    TESTXI R12 0041        'A' is the up arrow
+; D 412C A0 01 39       IFTRUEI GOUP
+; D 412F 86 0C 00 42    TESTXI R12 0042        'B' is the down arrow
+; D 4133 A0 01 79       IFTRUEI GODOWN
+; D 4136 B0 00 C8       GAL KEYS
+; D 4139 86 05 00 03    TESTXI R5 0003         Already against the top wall?
+; D 413D A0 00 C8       IFTRUEI KEYS
+; D 4140 23 00 5A       COPYXY R5 -> R10
+; D 4143 52 0A 00 03    ADDXI R10 0003         The old bottom cell is three below the top
+; D 4147 CA 1B          SEROUTI 1B             Erase just that one cell
+; D 4149 CA 5B          SEROUTI 5B
+; D 414B CA 30          SEROUTI 30
+; D 414D CA 6D          SEROUTI 6D
+; D 414F 23 00 AD       COPYXY R10 -> R13
+; D 4152 11 0E 00 4E    LOADXI R14 004E
+; D 4156 BD 03 93       CALL CELL
+; D 4159 43 05          DECX R5                Up one
+; D 415B CA 1B          SEROUTI 1B             and draw the new top cell
+; D 415D CA 5B          SEROUTI 5B
+; D 415F CA 37          SEROUTI 37
+; D 4161 CA 6D          SEROUTI 6D
+; D 4163 23 00 5D       COPYXY R5 -> R13
+; D 4166 11 0E 00 4E    LOADXI R14 004E
+; D 416A BD 03 93       CALL CELL
+; D 416D 42 09          INCX R9                One more cell moved this frame
+; D 416F 86 09 00 01    TESTXI R9 0001         Used the frame's allowance?
+; D 4173 A0 01 B9       IFTRUEI MOVE           Yes - leave the rest of the keys waiting
+; D 4176 B0 00 C8       GAL KEYS
+; D 4179 86 05 00 13    TESTXI R5 0013         Already against the bottom wall?
+; D 417D A0 00 C8       IFTRUEI KEYS
+; D 4180 CA 1B          SEROUTI 1B             Erase the old top cell
+; D 4182 CA 5B          SEROUTI 5B
+; D 4184 CA 30          SEROUTI 30
+; D 4186 CA 6D          SEROUTI 6D
+; D 4188 23 00 5D       COPYXY R5 -> R13
+; D 418B 11 0E 00 4E    LOADXI R14 004E
+; D 418F BD 03 93       CALL CELL
+; D 4192 42 05          INCX R5                Down one
+; D 4194 23 00 5A       COPYXY R5 -> R10
+; D 4197 52 0A 00 03    ADDXI R10 0003
+; D 419B CA 1B          SEROUTI 1B             and draw the new bottom cell
+; D 419D CA 5B          SEROUTI 5B
+; D 419F CA 37          SEROUTI 37
+; D 41A1 CA 6D          SEROUTI 6D
+; D 41A3 23 00 AD       COPYXY R10 -> R13
+; D 41A6 11 0E 00 4E    LOADXI R14 004E
+; D 41AA BD 03 93       CALL CELL
+; D 41AD 42 09          INCX R9                One more cell moved this frame
+; D 41AF 86 09 00 01    TESTXI R9 0001         Used the frame's allowance?
+; D 41B3 A0 01 B9       IFTRUEI MOVE           Yes - leave the rest of the keys waiting
+; D 41B6 B0 00 C8       GAL KEYS
+; D 41B9 11 0B 09 01    LOADXI R11 0901        Does the ball step this frame?
+; D 41BD 33 0B          COPYMXA 0B
+; D 41BF 21 0A          COPYAX 0A
+; D 41C1 86 0A 00 01    TESTXI R10 0001
+; D 41C5 A0 01 CF       IFTRUEI BALLGO
+; D 41C8 32 0B 00 01    COPYMX2I R11 0001      No - hold it, and skip the computer
+; D 41CC B0 03 29       GAL ENDF               too, so REACT still means ball-steps
+; D 41CF 32 0B 00 00    COPYMX2I R11 0000
+; D 41D3 CA 1B          SEROUTI 1B             Erase the ball where it is now
+; D 41D5 CA 5B          SEROUTI 5B
+; D 41D7 CA 30          SEROUTI 30
+; D 41D9 CA 6D          SEROUTI 6D
+; D 41DB 23 00 2D       COPYXY R2 -> R13
+; D 41DE 23 00 1E       COPYXY R1 -> R14
+; D 41E1 BD 03 93       CALL CELL
+; D 41E4 86 04 00 00    TESTXI R4 0000         Going up?
+; D 41E8 A1 02 00       IFFALSEI BDOWN
+; D 41EB 86 02 00 03    TESTXI R2 0003         At the top wall?
+; D 41EF A1 01 FB       IFFALSEI BUP1
+; D 41F2 11 04 00 01    LOADXI R4 0001         Turn round
+; D 41F6 42 02          INCX R2
+; D 41F8 B0 02 12       GAL BX
+; D 41FB 43 02          DECX R2
+; D 41FD B0 02 12       GAL BX
+; D 4200 86 02 00 16    TESTXI R2 0016         At the bottom wall?
+; D 4204 A1 02 10       IFFALSEI BDN1
+; D 4207 11 04 00 00    LOADXI R4 0000
+; D 420B 43 02          DECX R2
+; D 420D B0 02 12       GAL BX
+; D 4210 42 02          INCX R2
+; D 4212 86 03 00 00    TESTXI R3 0000         Going left?
+; D 4216 A1 02 25       IFFALSEI BRIGHT
+; D 4219 86 01 00 04    TESTXI R1 0004         Reached the computer's column?
+; D 421D A0 02 31       IFTRUEI CHIT
+; D 4220 43 01          DECX R1
+; D 4222 B0 02 80       GAL DRAWB
+; D 4225 86 01 00 4D    TESTXI R1 004D         Reached yours?
+; D 4229 A0 02 53       IFTRUEI PHIT
+; D 422C 42 01          INCX R1
+; D 422E B0 02 80       GAL DRAWB
+; D 4231 88 26          TESTGXY R2 R6          Ball at or below the paddle top?
+; D 4233 A1 03 3D       IFFALSEI PSCORE
+; D 4236 23 00 6A       COPYXY R6 -> R10
+; D 4239 52 0A 00 03    ADDXI R10 0003
+; D 423D 88 A2          TESTGXY R10 R2         and at or above its bottom? $89 TESTLXY is
+; D 423F A1 03 3D       IFFALSEI PSCORE
+; D 4242 11 03 00 01    LOADXI R3 0001         Hit - turn the ball round
+; D 4246 87 26          TESTXY R2 R6           Struck by the paddle's TOP cell?
+; D 4248 A0 02 75       IFTRUEI SPINUP
+; D 424B 87 2A          TESTXY R2 R10          by its BOTTOM cell?
+; D 424D A0 02 7C       IFTRUEI SPINDN
+; D 4250 B0 02 80       GAL DRAWB              the middle two - keep going the same way
+; D 4253 88 25          TESTGXY R2 R5          Ball at or below the paddle top?
+; D 4255 A1 03 2E       IFFALSEI CSCORE
+; D 4258 23 00 5A       COPYXY R5 -> R10
+; D 425B 52 0A 00 03    ADDXI R10 0003
+; D 425F 88 A2          TESTGXY R10 R2         and at or above its bottom? $89 TESTLXY is
+; D 4261 A1 03 2E       IFFALSEI CSCORE
+; D 4264 11 03 00 00    LOADXI R3 0000         Hit - turn the ball round
+; D 4268 87 25          TESTXY R2 R5           Struck by the paddle's TOP cell?
+; D 426A A0 02 75       IFTRUEI SPINUP
+; D 426D 87 2A          TESTXY R2 R10          by its BOTTOM cell?
+; D 426F A0 02 7C       IFTRUEI SPINDN
+; D 4272 B0 02 80       GAL DRAWB              the middle two - keep going the same way
+; D 4275 11 04 00 00    LOADXI R4 0000         Off the top of the paddle - send it up
+; D 4279 B0 02 80       GAL DRAWB
+; D 427C 11 04 00 01    LOADXI R4 0001         Off the bottom - send it down
+; D 4280 CA 1B          SEROUTI 1B
+; D 4282 CA 5B          SEROUTI 5B
+; D 4284 CA 37          SEROUTI 37
+; D 4286 CA 6D          SEROUTI 6D
+; D 4288 23 00 2D       COPYXY R2 -> R13
+; D 428B 23 00 1E       COPYXY R1 -> R14
+; D 428E BD 03 93       CALL CELL
+; D 4291 86 03 00 00    TESTXI R3 0000         Is the ball even coming this way?
+; D 4295 A1 03 29       IFFALSEI ENDF          No - hold position. Following the ball all
+; D 4298 10 00 0C       LOADAI 000C            the way across is what makes a computer
+; D 429B 21 00          COPYAX 00              LOADXI cannot write R0
+; D 429D 88 01          TESTGXY R0 R1          paddle unbeatable, so it only reacts inside
+; D 429F A1 03 29       IFFALSEI ENDF          the first 8 columns
+; D 42A2 23 00 2A       COPYXY R2 -> R10       Aim the middle of the paddle at the ball
+; D 42A5 86 0A 00 03    TESTXI R10 0003
+; D 42A9 A0 02 AE       IFTRUEI AICMP
+; D 42AC 43 0A          DECX R10
+; D 42AE 87 6A          TESTXY R6 R10          Already there?
+; D 42B0 A0 03 29       IFTRUEI ENDF
+; D 42B3 88 6A          TESTGXY R6 R10         Below the target?
+; D 42B5 A0 02 BB       IFTRUEI AIUP
+; D 42B8 B0 02 F2       GAL AIDN
+; D 42BB 86 06 00 03    TESTXI R6 0003         Already against the top wall?
+; D 42BF A0 03 29       IFTRUEI ENDF
+; D 42C2 23 00 6A       COPYXY R6 -> R10
+; D 42C5 52 0A 00 03    ADDXI R10 0003         The old bottom cell is three below the top
+; D 42C9 CA 1B          SEROUTI 1B             Erase just that one cell
+; D 42CB CA 5B          SEROUTI 5B
+; D 42CD CA 30          SEROUTI 30
+; D 42CF CA 6D          SEROUTI 6D
+; D 42D1 23 00 AD       COPYXY R10 -> R13
+; D 42D4 11 0E 00 03    LOADXI R14 0003
+; D 42D8 BD 03 93       CALL CELL
+; D 42DB 43 06          DECX R6                Up one
+; D 42DD CA 1B          SEROUTI 1B             and draw the new top cell
+; D 42DF CA 5B          SEROUTI 5B
+; D 42E1 CA 37          SEROUTI 37
+; D 42E3 CA 6D          SEROUTI 6D
+; D 42E5 23 00 6D       COPYXY R6 -> R13
+; D 42E8 11 0E 00 03    LOADXI R14 0003
+; D 42EC BD 03 93       CALL CELL
+; D 42EF B0 03 29       GAL ENDF
+; D 42F2 86 06 00 13    TESTXI R6 0013         Already against the bottom wall?
+; D 42F6 A0 03 29       IFTRUEI ENDF
+; D 42F9 CA 1B          SEROUTI 1B             Erase the old top cell
+; D 42FB CA 5B          SEROUTI 5B
+; D 42FD CA 30          SEROUTI 30
+; D 42FF CA 6D          SEROUTI 6D
+; D 4301 23 00 6D       COPYXY R6 -> R13
+; D 4304 11 0E 00 03    LOADXI R14 0003
+; D 4308 BD 03 93       CALL CELL
+; D 430B 42 06          INCX R6                Down one
+; D 430D 23 00 6A       COPYXY R6 -> R10
+; D 4310 52 0A 00 03    ADDXI R10 0003
+; D 4314 CA 1B          SEROUTI 1B             and draw the new bottom cell
+; D 4316 CA 5B          SEROUTI 5B
+; D 4318 CA 37          SEROUTI 37
+; D 431A CA 6D          SEROUTI 6D
+; D 431C 23 00 AD       COPYXY R10 -> R13
+; D 431F 11 0E 00 03    LOADXI R14 0003
+; D 4323 BD 03 93       CALL CELL
+; D 4326 B0 03 29       GAL ENDF
+; D 4329 C0 14          DLYI 14                The frame delay - the ball's speed knob
+; D 432B B0 00 C0       GAL FRAME
+; D 432E 42 08          INCX R8                A point to the computer
+; D 4330 BD 03 EB       CALL SCORE
+; D 4333 86 08 00 09    TESTXI R8 0009         Game over?
+; D 4337 A0 03 53       IFTRUEI LOST
+; D 433A B0 00 8C       GAL SERVE
+; D 433D 42 07          INCX R7                A point to the player
+; D 433F BD 03 EB       CALL SCORE
+; D 4342 86 07 00 09    TESTXI R7 0009         Game over?
+; D 4346 A0 03 4C       IFTRUEI WON
+; D 4349 B0 00 8C       GAL SERVE
+; D 434C 11 0A 0B 00    LOADXI R10 0B00
+; D 4350 B0 03 57       GAL OVER
+; D 4353 11 0A 0B 40    LOADXI R10 0B40
+; D 4357 11 0D 00 18    LOADXI R13 0018
+; D 435B 11 0E 00 01    LOADXI R14 0001
+; D 435F BD 03 C9       CALL POSXY
 ; D 4362 CA 1B          SEROUTI 1B
 ; D 4364 CA 5B          SEROUTI 5B
-; D 4366 CA 3F          SEROUTI 3F
-; D 4368 CA 32          SEROUTI 32
-; D 436A CA 35          SEROUTI 35
-; D 436C CA 68          SEROUTI 68
-; D 436E 11 0D 00 18    LOADXI R13 0018
-; D 4372 11 0E 00 01    LOADXI R14 0001
-; D 4376 BD 03 A5       CALL POSXY
-; D 4379 CA 0D          SEROUTI 0D
-; D 437B CA 0A          SEROUTI 0A
-; D 437D 00             HALT
-; D 437E F0 00 00       BREAK                  End of program
-; D 4381 CA 1B          SEROUTI 1B             ESC
-; D 4383 CA 5B          SEROUTI 5B             [
-; D 4385 4D DF          DIVXY R13 R15          Split the line number
-; D 4387 25             COPYMAA
-; D 4388 4E 00 30       ADDAI 0030
-; D 438B C9             SEROUT                 Tens
-; D 438C 27             COPYREMA
-; D 438D 4E 00 30       ADDAI 0030
-; D 4390 C9             SEROUT                 Units
-; D 4391 CA 3B          SEROUTI 3B             ;
-; D 4393 4D EF          DIVXY R14 R15          Split the column number
-; D 4395 25             COPYMAA
-; D 4396 4E 00 30       ADDAI 0030
-; D 4399 C9             SEROUT                 Tens
-; D 439A 27             COPYREMA
-; D 439B 4E 00 30       ADDAI 0030
-; D 439E C9             SEROUT                 Units
-; D 439F CA 48          SEROUTI 48             H
-; D 43A1 CA 20          SEROUTI 20             the cell itself
-; D 43A3 BE 00          RETURN
-; D 43A5 CA 1B          SEROUTI 1B             ESC
-; D 43A7 CA 5B          SEROUTI 5B             [
-; D 43A9 4D DF          DIVXY R13 R15          Split the line number
-; D 43AB 25             COPYMAA
-; D 43AC 4E 00 30       ADDAI 0030
-; D 43AF C9             SEROUT                 Tens
-; D 43B0 27             COPYREMA
-; D 43B1 4E 00 30       ADDAI 0030
-; D 43B4 C9             SEROUT                 Units
-; D 43B5 CA 3B          SEROUTI 3B             ;
-; D 43B7 4D EF          DIVXY R14 R15          Split the column number
-; D 43B9 25             COPYMAA
-; D 43BA 4E 00 30       ADDAI 0030
-; D 43BD C9             SEROUT                 Tens
-; D 43BE 27             COPYREMA
-; D 43BF 4E 00 30       ADDAI 0030
-; D 43C2 C9             SEROUT                 Units
-; D 43C3 CA 48          SEROUTI 48             H
-; D 43C5 BE 00          RETURN
-; D 43C7 11 0D 00 01    LOADXI R13 0001        The score line
-; D 43CB 11 0E 00 22    LOADXI R14 0022
-; D 43CF BD 03 A5       CALL POSXY
-; D 43D2 CA 1B          SEROUTI 1B
-; D 43D4 CA 5B          SEROUTI 5B
-; D 43D6 CA 30          SEROUTI 30
-; D 43D8 CA 6D          SEROUTI 6D
-; D 43DA CA 43          SEROUTI 43
-; D 43DC CA 50          SEROUTI 50
-; D 43DE CA 55          SEROUTI 55
-; D 43E0 CA 20          SEROUTI 20
-; D 43E2 22 08          COPYXA 08
-; D 43E4 4E 00 30       ADDAI 0030
-; D 43E7 C9             SEROUT
-; D 43E8 CA 20          SEROUTI 20
-; D 43EA CA 20          SEROUTI 20
-; D 43EC CA 20          SEROUTI 20
-; D 43EE CA 59          SEROUTI 59
-; D 43F0 CA 4F          SEROUTI 4F
-; D 43F2 CA 55          SEROUTI 55
-; D 43F4 CA 20          SEROUTI 20
-; D 43F6 22 07          COPYXA 07
-; D 43F8 4E 00 30       ADDAI 0030
-; D 43FB C9             SEROUT
-; D 43FC BE 00          RETURN
-; D 43FE 23 00 50       COPYXY R5 -> R0
-; D 4401 11 0A 00 04    LOADXI R10 0004        Four cells
-; D 4405 CA 1B          SEROUTI 1B
-; D 4407 CA 5B          SEROUTI 5B
-; D 4409 CA 37          SEROUTI 37
-; D 440B CA 6D          SEROUTI 6D
-; D 440D 23 00 0D       COPYXY R0 -> R13
-; D 4410 11 0E 00 4E    LOADXI R14 004E
-; D 4414 BD 03 81       CALL CELL
-; D 4417 42 00          INCX R0
-; D 4419 43 0A          DECX R10
-; D 441B 8C 0A          TESTXZ R10
-; D 441D A1 04 0D       IFFALSEI FULLPL
+; D 4366 CA 30          SEROUTI 30
+; D 4368 CA 6D          SEROUTI 6D
+; D 436A C1 0A          PRINTSTR R10
+; D 436C CA 1B          SEROUTI 1B             Normal video, cursor back, and tidy up
+; D 436E CA 5B          SEROUTI 5B
+; D 4370 CA 30          SEROUTI 30
+; D 4372 CA 6D          SEROUTI 6D
+; D 4374 CA 1B          SEROUTI 1B
+; D 4376 CA 5B          SEROUTI 5B
+; D 4378 CA 3F          SEROUTI 3F
+; D 437A CA 32          SEROUTI 32
+; D 437C CA 35          SEROUTI 35
+; D 437E CA 68          SEROUTI 68
+; D 4380 11 0D 00 18    LOADXI R13 0018
+; D 4384 11 0E 00 01    LOADXI R14 0001
+; D 4388 BD 03 C9       CALL POSXY
+; D 438B CA 0D          SEROUTI 0D
+; D 438D CA 0A          SEROUTI 0A
+; D 438F 00             HALT
+; D 4390 F0 00 00       BREAK                  End of program
+; D 4393 CA 1B          SEROUTI 1B             ESC
+; D 4395 CA 5B          SEROUTI 5B             [
+; D 4397 4D DF          DIVXY R13 R15          Split the line number
+; D 4399 25             COPYMAA
+; D 439A 4E 00 30       ADDAI 0030
+; D 439D C9             SEROUT                 Tens
+; D 439E 27             COPYREMA
+; D 439F 4E 00 30       ADDAI 0030
+; D 43A2 C9             SEROUT                 Units
+; D 43A3 CA 3B          SEROUTI 3B             ;
+; D 43A5 4D EF          DIVXY R14 R15          Split the column number
+; D 43A7 25             COPYMAA
+; D 43A8 4E 00 30       ADDAI 0030
+; D 43AB C9             SEROUT                 Tens
+; D 43AC 27             COPYREMA
+; D 43AD 4E 00 30       ADDAI 0030
+; D 43B0 C9             SEROUT                 Units
+; D 43B1 CA 48          SEROUTI 48             H
+; D 43B3 CA 20          SEROUTI 20             the cell itself
+; D 43B5 BE 00          RETURN
+; D 43B7 11 0A 00 08    LOADXI R10 0008
+; D 43BB CC             SERST
+; D 43BC A0 03 C7       IFTRUEI KWX
+; D 43BF 43 0A          DECX R10
+; D 43C1 8C 0A          TESTXZ R10
+; D 43C3 A1 03 BB       IFFALSEI KW
+; D 43C6 CC             SERST                  Test false: nothing came
+; D 43C7 BE 00          RETURN
+; D 43C9 CA 1B          SEROUTI 1B             ESC
+; D 43CB CA 5B          SEROUTI 5B             [
+; D 43CD 4D DF          DIVXY R13 R15          Split the line number
+; D 43CF 25             COPYMAA
+; D 43D0 4E 00 30       ADDAI 0030
+; D 43D3 C9             SEROUT                 Tens
+; D 43D4 27             COPYREMA
+; D 43D5 4E 00 30       ADDAI 0030
+; D 43D8 C9             SEROUT                 Units
+; D 43D9 CA 3B          SEROUTI 3B             ;
+; D 43DB 4D EF          DIVXY R14 R15          Split the column number
+; D 43DD 25             COPYMAA
+; D 43DE 4E 00 30       ADDAI 0030
+; D 43E1 C9             SEROUT                 Tens
+; D 43E2 27             COPYREMA
+; D 43E3 4E 00 30       ADDAI 0030
+; D 43E6 C9             SEROUT                 Units
+; D 43E7 CA 48          SEROUTI 48             H
+; D 43E9 BE 00          RETURN
+; D 43EB 11 0D 00 01    LOADXI R13 0001        The score line
+; D 43EF 11 0E 00 22    LOADXI R14 0022
+; D 43F3 BD 03 C9       CALL POSXY
+; D 43F6 CA 1B          SEROUTI 1B
+; D 43F8 CA 5B          SEROUTI 5B
+; D 43FA CA 30          SEROUTI 30
+; D 43FC CA 6D          SEROUTI 6D
+; D 43FE CA 43          SEROUTI 43
+; D 4400 CA 50          SEROUTI 50
+; D 4402 CA 55          SEROUTI 55
+; D 4404 CA 20          SEROUTI 20
+; D 4406 22 08          COPYXA 08
+; D 4408 4E 00 30       ADDAI 0030
+; D 440B C9             SEROUT
+; D 440C CA 20          SEROUTI 20
+; D 440E CA 20          SEROUTI 20
+; D 4410 CA 20          SEROUTI 20
+; D 4412 CA 59          SEROUTI 59
+; D 4414 CA 4F          SEROUTI 4F
+; D 4416 CA 55          SEROUTI 55
+; D 4418 CA 20          SEROUTI 20
+; D 441A 22 07          COPYXA 07
+; D 441C 4E 00 30       ADDAI 0030
+; D 441F C9             SEROUT
 ; D 4420 BE 00          RETURN
-; D 4422 23 00 60       COPYXY R6 -> R0
+; D 4422 23 00 50       COPYXY R5 -> R0
 ; D 4425 11 0A 00 04    LOADXI R10 0004        Four cells
 ; D 4429 CA 1B          SEROUTI 1B
 ; D 442B CA 5B          SEROUTI 5B
 ; D 442D CA 37          SEROUTI 37
 ; D 442F CA 6D          SEROUTI 6D
 ; D 4431 23 00 0D       COPYXY R0 -> R13
-; D 4434 11 0E 00 03    LOADXI R14 0003
-; D 4438 BD 03 81       CALL CELL
+; D 4434 11 0E 00 4E    LOADXI R14 004E
+; D 4438 BD 03 93       CALL CELL
 ; D 443B 42 00          INCX R0
 ; D 443D 43 0A          DECX R10
 ; D 443F 8C 0A          TESTXZ R10
-; D 4441 A1 04 31       IFFALSEI FULLCL
+; D 4441 A1 04 31       IFFALSEI FULLPL
 ; D 4444 BE 00          RETURN
+; D 4446 23 00 60       COPYXY R6 -> R0
+; D 4449 11 0A 00 04    LOADXI R10 0004        Four cells
+; D 444D CA 1B          SEROUTI 1B
+; D 444F CA 5B          SEROUTI 5B
+; D 4451 CA 37          SEROUTI 37
+; D 4453 CA 6D          SEROUTI 6D
+; D 4455 23 00 0D       COPYXY R0 -> R13
+; D 4458 11 0E 00 03    LOADXI R14 0003
+; D 445C BD 03 93       CALL CELL
+; D 445F 42 00          INCX R0
+; D 4461 43 0A          DECX R10
+; D 4463 8C 0A          TESTXZ R10
+; D 4465 A1 04 55       IFFALSEI FULLCL
+; D 4468 BE 00          RETURN
 
 ; --------------------------------------------------------------------------
 ; CODE  -  download this block
@@ -539,413 +553,427 @@ D 4007 C3
 D 4008 CC
 D 4009 A1 00 07
 D 400C CB
-D 400D 11 0F 00 0A
-D 4011 11 0B 09 00
-D 4015 32 0B 00 00
-D 4019 11 0B 09 01
-D 401D 32 0B 00 00
-D 4021 11 07 00 00
-D 4025 11 08 00 00
-D 4029 11 05 00 0B
-D 402D 11 06 00 0B
-D 4031 CA 1B
-D 4033 CA 5B
-D 4035 CA 3F
-D 4037 CA 32
-D 4039 CA 35
-D 403B CA 6C
+D 400D 81 00 1B
+D 4010 A1 00 19
+D 4013 BD 03 B7
+D 4016 A1 03 6C
+D 4019 11 0F 00 0A
+D 401D 11 0B 09 00
+D 4021 32 0B 00 00
+D 4025 11 0B 09 01
+D 4029 32 0B 00 00
+D 402D 11 07 00 00
+D 4031 11 08 00 00
+D 4035 11 05 00 0B
+D 4039 11 06 00 0B
 D 403D CA 1B
 D 403F CA 5B
-D 4041 CA 32
-D 4043 CA 4A
-D 4045 11 0D 00 02
-D 4049 11 0E 00 02
-D 404D BD 03 A5
-D 4050 10 00 4E
-D 4053 21 00
-D 4055 CA 2D
-D 4057 43 00
-D 4059 8C 00
-D 405B A1 00 55
-D 405E 11 0D 00 17
-D 4062 11 0E 00 02
-D 4066 BD 03 A5
-D 4069 10 00 4E
-D 406C 21 00
-D 406E CA 2D
-D 4070 43 00
-D 4072 8C 00
-D 4074 A1 00 6E
-D 4077 BD 03 C7
-D 407A BD 03 FE
-D 407D BD 04 22
-D 4080 11 01 00 28
-D 4084 C3
-D 4085 21 0A
-D 4087 10 00 12
-D 408A 21 00
-D 408C 4D A0
-D 408E 27
-D 408F 4E 00 04
-D 4092 21 02
-D 4094 C3
-D 4095 21 0A
-D 4097 10 00 02
-D 409A 21 00
-D 409C 4D A0
-D 409E 27
-D 409F 21 04
-D 40A1 C0 30
-D 40A3 CA 1B
-D 40A5 CA 5B
-D 40A7 CA 37
-D 40A9 CA 6D
-D 40AB 23 00 2D
-D 40AE 23 00 1E
-D 40B1 BD 03 81
-D 40B4 11 09 00 00
-D 40B8 11 0B 09 00
-D 40BC CC
-D 40BD A1 01 A7
-D 40C0 CB
-D 40C1 21 0C
-D 40C3 33 0B
-D 40C5 81 00 01
-D 40C8 A0 01 00
-D 40CB 33 0B
-D 40CD 81 00 02
-D 40D0 A0 01 12
-D 40D3 86 0C 00 1B
-D 40D7 A1 00 E1
-D 40DA 32 0B 00 01
-D 40DE B0 00 BC
-D 40E1 86 0C 00 77
-D 40E5 A0 01 27
-D 40E8 86 0C 00 73
-D 40EC A0 01 67
-D 40EF 86 0C 00 71
-D 40F3 A0 03 5A
-D 40F6 86 0C 00 51
-D 40FA A0 03 5A
-D 40FD B0 00 BC
-D 4100 32 0B 00 00
-D 4104 86 0C 00 5B
-D 4108 A1 00 BC
-D 410B 32 0B 00 02
-D 410F B0 00 BC
+D 4041 CA 3F
+D 4043 CA 32
+D 4045 CA 35
+D 4047 CA 6C
+D 4049 CA 1B
+D 404B CA 5B
+D 404D CA 32
+D 404F CA 4A
+D 4051 11 0D 00 02
+D 4055 11 0E 00 02
+D 4059 BD 03 C9
+D 405C 10 00 4E
+D 405F 21 00
+D 4061 CA 2D
+D 4063 43 00
+D 4065 8C 00
+D 4067 A1 00 61
+D 406A 11 0D 00 17
+D 406E 11 0E 00 02
+D 4072 BD 03 C9
+D 4075 10 00 4E
+D 4078 21 00
+D 407A CA 2D
+D 407C 43 00
+D 407E 8C 00
+D 4080 A1 00 7A
+D 4083 BD 03 EB
+D 4086 BD 04 22
+D 4089 BD 04 46
+D 408C 11 01 00 28
+D 4090 C3
+D 4091 21 0A
+D 4093 10 00 12
+D 4096 21 00
+D 4098 4D A0
+D 409A 27
+D 409B 4E 00 04
+D 409E 21 02
+D 40A0 C3
+D 40A1 21 0A
+D 40A3 10 00 02
+D 40A6 21 00
+D 40A8 4D A0
+D 40AA 27
+D 40AB 21 04
+D 40AD C0 30
+D 40AF CA 1B
+D 40B1 CA 5B
+D 40B3 CA 37
+D 40B5 CA 6D
+D 40B7 23 00 2D
+D 40BA 23 00 1E
+D 40BD BD 03 93
+D 40C0 11 09 00 00
+D 40C4 11 0B 09 00
+D 40C8 CC
+D 40C9 A1 01 B9
+D 40CC CB
+D 40CD 21 0C
+D 40CF 33 0B
+D 40D1 81 00 01
+D 40D4 A0 01 12
+D 40D7 33 0B
+D 40D9 81 00 02
+D 40DC A0 01 24
+D 40DF 86 0C 00 1B
+D 40E3 A1 00 F3
+D 40E6 32 0B 00 01
+D 40EA BD 03 B7
+D 40ED A0 00 C8
+D 40F0 B0 03 6C
+D 40F3 86 0C 00 77
+D 40F7 A0 01 39
+D 40FA 86 0C 00 73
+D 40FE A0 01 79
+D 4101 86 0C 00 71
+D 4105 A0 03 6C
+D 4108 86 0C 00 51
+D 410C A0 03 6C
+D 410F B0 00 C8
 D 4112 32 0B 00 00
-D 4116 86 0C 00 41
-D 411A A0 01 27
-D 411D 86 0C 00 42
-D 4121 A0 01 67
-D 4124 B0 00 BC
-D 4127 86 05 00 03
-D 412B A0 00 BC
-D 412E 23 00 5A
-D 4131 52 0A 00 03
-D 4135 CA 1B
-D 4137 CA 5B
-D 4139 CA 30
-D 413B CA 6D
-D 413D 23 00 AD
-D 4140 11 0E 00 4E
-D 4144 BD 03 81
-D 4147 43 05
-D 4149 CA 1B
-D 414B CA 5B
-D 414D CA 37
-D 414F CA 6D
-D 4151 23 00 5D
-D 4154 11 0E 00 4E
-D 4158 BD 03 81
-D 415B 42 09
-D 415D 86 09 00 01
-D 4161 A0 01 A7
-D 4164 B0 00 BC
-D 4167 86 05 00 13
-D 416B A0 00 BC
-D 416E CA 1B
-D 4170 CA 5B
-D 4172 CA 30
-D 4174 CA 6D
-D 4176 23 00 5D
-D 4179 11 0E 00 4E
-D 417D BD 03 81
-D 4180 42 05
-D 4182 23 00 5A
-D 4185 52 0A 00 03
-D 4189 CA 1B
-D 418B CA 5B
-D 418D CA 37
-D 418F CA 6D
-D 4191 23 00 AD
-D 4194 11 0E 00 4E
-D 4198 BD 03 81
-D 419B 42 09
-D 419D 86 09 00 01
-D 41A1 A0 01 A7
-D 41A4 B0 00 BC
-D 41A7 11 0B 09 01
-D 41AB 33 0B
-D 41AD 21 0A
-D 41AF 86 0A 00 01
-D 41B3 A0 01 BD
-D 41B6 32 0B 00 01
-D 41BA B0 03 17
-D 41BD 32 0B 00 00
-D 41C1 CA 1B
-D 41C3 CA 5B
-D 41C5 CA 30
-D 41C7 CA 6D
-D 41C9 23 00 2D
-D 41CC 23 00 1E
-D 41CF BD 03 81
-D 41D2 86 04 00 00
-D 41D6 A1 01 EE
-D 41D9 86 02 00 03
-D 41DD A1 01 E9
-D 41E0 11 04 00 01
-D 41E4 42 02
-D 41E6 B0 02 00
-D 41E9 43 02
-D 41EB B0 02 00
-D 41EE 86 02 00 16
-D 41F2 A1 01 FE
-D 41F5 11 04 00 00
-D 41F9 43 02
-D 41FB B0 02 00
-D 41FE 42 02
-D 4200 86 03 00 00
-D 4204 A1 02 13
-D 4207 86 01 00 04
-D 420B A0 02 1F
-D 420E 43 01
-D 4210 B0 02 6E
-D 4213 86 01 00 4D
-D 4217 A0 02 41
-D 421A 42 01
-D 421C B0 02 6E
-D 421F 88 26
-D 4221 A1 03 2B
-D 4224 23 00 6A
-D 4227 52 0A 00 03
-D 422B 88 A2
-D 422D A1 03 2B
-D 4230 11 03 00 01
-D 4234 87 26
-D 4236 A0 02 63
-D 4239 87 2A
-D 423B A0 02 6A
-D 423E B0 02 6E
-D 4241 88 25
-D 4243 A1 03 1C
-D 4246 23 00 5A
-D 4249 52 0A 00 03
-D 424D 88 A2
-D 424F A1 03 1C
-D 4252 11 03 00 00
-D 4256 87 25
-D 4258 A0 02 63
-D 425B 87 2A
-D 425D A0 02 6A
-D 4260 B0 02 6E
-D 4263 11 04 00 00
-D 4267 B0 02 6E
-D 426A 11 04 00 01
-D 426E CA 1B
-D 4270 CA 5B
-D 4272 CA 37
-D 4274 CA 6D
-D 4276 23 00 2D
-D 4279 23 00 1E
-D 427C BD 03 81
-D 427F 86 03 00 00
-D 4283 A1 03 17
-D 4286 10 00 0C
-D 4289 21 00
-D 428B 88 01
-D 428D A1 03 17
-D 4290 23 00 2A
-D 4293 86 0A 00 03
-D 4297 A0 02 9C
-D 429A 43 0A
-D 429C 87 6A
-D 429E A0 03 17
-D 42A1 88 6A
-D 42A3 A0 02 A9
-D 42A6 B0 02 E0
-D 42A9 86 06 00 03
-D 42AD A0 03 17
-D 42B0 23 00 6A
-D 42B3 52 0A 00 03
-D 42B7 CA 1B
-D 42B9 CA 5B
-D 42BB CA 30
-D 42BD CA 6D
-D 42BF 23 00 AD
-D 42C2 11 0E 00 03
-D 42C6 BD 03 81
-D 42C9 43 06
-D 42CB CA 1B
-D 42CD CA 5B
-D 42CF CA 37
-D 42D1 CA 6D
-D 42D3 23 00 6D
-D 42D6 11 0E 00 03
-D 42DA BD 03 81
-D 42DD B0 03 17
-D 42E0 86 06 00 13
-D 42E4 A0 03 17
-D 42E7 CA 1B
-D 42E9 CA 5B
-D 42EB CA 30
-D 42ED CA 6D
-D 42EF 23 00 6D
-D 42F2 11 0E 00 03
-D 42F6 BD 03 81
-D 42F9 42 06
-D 42FB 23 00 6A
-D 42FE 52 0A 00 03
-D 4302 CA 1B
-D 4304 CA 5B
-D 4306 CA 37
-D 4308 CA 6D
-D 430A 23 00 AD
-D 430D 11 0E 00 03
-D 4311 BD 03 81
-D 4314 B0 03 17
-D 4317 C0 14
-D 4319 B0 00 B4
-D 431C 42 08
-D 431E BD 03 C7
-D 4321 86 08 00 09
-D 4325 A0 03 41
-D 4328 B0 00 80
-D 432B 42 07
-D 432D BD 03 C7
-D 4330 86 07 00 09
-D 4334 A0 03 3A
-D 4337 B0 00 80
-D 433A 11 0A 0B 00
-D 433E B0 03 45
-D 4341 11 0A 0B 40
-D 4345 11 0D 00 18
-D 4349 11 0E 00 01
-D 434D BD 03 A5
-D 4350 CA 1B
-D 4352 CA 5B
-D 4354 CA 30
-D 4356 CA 6D
-D 4358 C1 0A
-D 435A CA 1B
-D 435C CA 5B
-D 435E CA 30
-D 4360 CA 6D
+D 4116 86 0C 00 5B
+D 411A A1 00 C8
+D 411D 32 0B 00 02
+D 4121 B0 00 C8
+D 4124 32 0B 00 00
+D 4128 86 0C 00 41
+D 412C A0 01 39
+D 412F 86 0C 00 42
+D 4133 A0 01 79
+D 4136 B0 00 C8
+D 4139 86 05 00 03
+D 413D A0 00 C8
+D 4140 23 00 5A
+D 4143 52 0A 00 03
+D 4147 CA 1B
+D 4149 CA 5B
+D 414B CA 30
+D 414D CA 6D
+D 414F 23 00 AD
+D 4152 11 0E 00 4E
+D 4156 BD 03 93
+D 4159 43 05
+D 415B CA 1B
+D 415D CA 5B
+D 415F CA 37
+D 4161 CA 6D
+D 4163 23 00 5D
+D 4166 11 0E 00 4E
+D 416A BD 03 93
+D 416D 42 09
+D 416F 86 09 00 01
+D 4173 A0 01 B9
+D 4176 B0 00 C8
+D 4179 86 05 00 13
+D 417D A0 00 C8
+D 4180 CA 1B
+D 4182 CA 5B
+D 4184 CA 30
+D 4186 CA 6D
+D 4188 23 00 5D
+D 418B 11 0E 00 4E
+D 418F BD 03 93
+D 4192 42 05
+D 4194 23 00 5A
+D 4197 52 0A 00 03
+D 419B CA 1B
+D 419D CA 5B
+D 419F CA 37
+D 41A1 CA 6D
+D 41A3 23 00 AD
+D 41A6 11 0E 00 4E
+D 41AA BD 03 93
+D 41AD 42 09
+D 41AF 86 09 00 01
+D 41B3 A0 01 B9
+D 41B6 B0 00 C8
+D 41B9 11 0B 09 01
+D 41BD 33 0B
+D 41BF 21 0A
+D 41C1 86 0A 00 01
+D 41C5 A0 01 CF
+D 41C8 32 0B 00 01
+D 41CC B0 03 29
+D 41CF 32 0B 00 00
+D 41D3 CA 1B
+D 41D5 CA 5B
+D 41D7 CA 30
+D 41D9 CA 6D
+D 41DB 23 00 2D
+D 41DE 23 00 1E
+D 41E1 BD 03 93
+D 41E4 86 04 00 00
+D 41E8 A1 02 00
+D 41EB 86 02 00 03
+D 41EF A1 01 FB
+D 41F2 11 04 00 01
+D 41F6 42 02
+D 41F8 B0 02 12
+D 41FB 43 02
+D 41FD B0 02 12
+D 4200 86 02 00 16
+D 4204 A1 02 10
+D 4207 11 04 00 00
+D 420B 43 02
+D 420D B0 02 12
+D 4210 42 02
+D 4212 86 03 00 00
+D 4216 A1 02 25
+D 4219 86 01 00 04
+D 421D A0 02 31
+D 4220 43 01
+D 4222 B0 02 80
+D 4225 86 01 00 4D
+D 4229 A0 02 53
+D 422C 42 01
+D 422E B0 02 80
+D 4231 88 26
+D 4233 A1 03 3D
+D 4236 23 00 6A
+D 4239 52 0A 00 03
+D 423D 88 A2
+D 423F A1 03 3D
+D 4242 11 03 00 01
+D 4246 87 26
+D 4248 A0 02 75
+D 424B 87 2A
+D 424D A0 02 7C
+D 4250 B0 02 80
+D 4253 88 25
+D 4255 A1 03 2E
+D 4258 23 00 5A
+D 425B 52 0A 00 03
+D 425F 88 A2
+D 4261 A1 03 2E
+D 4264 11 03 00 00
+D 4268 87 25
+D 426A A0 02 75
+D 426D 87 2A
+D 426F A0 02 7C
+D 4272 B0 02 80
+D 4275 11 04 00 00
+D 4279 B0 02 80
+D 427C 11 04 00 01
+D 4280 CA 1B
+D 4282 CA 5B
+D 4284 CA 37
+D 4286 CA 6D
+D 4288 23 00 2D
+D 428B 23 00 1E
+D 428E BD 03 93
+D 4291 86 03 00 00
+D 4295 A1 03 29
+D 4298 10 00 0C
+D 429B 21 00
+D 429D 88 01
+D 429F A1 03 29
+D 42A2 23 00 2A
+D 42A5 86 0A 00 03
+D 42A9 A0 02 AE
+D 42AC 43 0A
+D 42AE 87 6A
+D 42B0 A0 03 29
+D 42B3 88 6A
+D 42B5 A0 02 BB
+D 42B8 B0 02 F2
+D 42BB 86 06 00 03
+D 42BF A0 03 29
+D 42C2 23 00 6A
+D 42C5 52 0A 00 03
+D 42C9 CA 1B
+D 42CB CA 5B
+D 42CD CA 30
+D 42CF CA 6D
+D 42D1 23 00 AD
+D 42D4 11 0E 00 03
+D 42D8 BD 03 93
+D 42DB 43 06
+D 42DD CA 1B
+D 42DF CA 5B
+D 42E1 CA 37
+D 42E3 CA 6D
+D 42E5 23 00 6D
+D 42E8 11 0E 00 03
+D 42EC BD 03 93
+D 42EF B0 03 29
+D 42F2 86 06 00 13
+D 42F6 A0 03 29
+D 42F9 CA 1B
+D 42FB CA 5B
+D 42FD CA 30
+D 42FF CA 6D
+D 4301 23 00 6D
+D 4304 11 0E 00 03
+D 4308 BD 03 93
+D 430B 42 06
+D 430D 23 00 6A
+D 4310 52 0A 00 03
+D 4314 CA 1B
+D 4316 CA 5B
+D 4318 CA 37
+D 431A CA 6D
+D 431C 23 00 AD
+D 431F 11 0E 00 03
+D 4323 BD 03 93
+D 4326 B0 03 29
+D 4329 C0 14
+D 432B B0 00 C0
+D 432E 42 08
+D 4330 BD 03 EB
+D 4333 86 08 00 09
+D 4337 A0 03 53
+D 433A B0 00 8C
+D 433D 42 07
+D 433F BD 03 EB
+D 4342 86 07 00 09
+D 4346 A0 03 4C
+D 4349 B0 00 8C
+D 434C 11 0A 0B 00
+D 4350 B0 03 57
+D 4353 11 0A 0B 40
+D 4357 11 0D 00 18
+D 435B 11 0E 00 01
+D 435F BD 03 C9
 D 4362 CA 1B
 D 4364 CA 5B
-D 4366 CA 3F
-D 4368 CA 32
-D 436A CA 35
-D 436C CA 68
-D 436E 11 0D 00 18
-D 4372 11 0E 00 01
-D 4376 BD 03 A5
-D 4379 CA 0D
-D 437B CA 0A
-D 437D 00
-D 437E F0 00 00
-D 4381 CA 1B
-D 4383 CA 5B
-D 4385 4D DF
-D 4387 25
-D 4388 4E 00 30
-D 438B C9
-D 438C 27
-D 438D 4E 00 30
-D 4390 C9
-D 4391 CA 3B
-D 4393 4D EF
-D 4395 25
-D 4396 4E 00 30
-D 4399 C9
-D 439A 27
-D 439B 4E 00 30
-D 439E C9
-D 439F CA 48
-D 43A1 CA 20
-D 43A3 BE 00
-D 43A5 CA 1B
-D 43A7 CA 5B
-D 43A9 4D DF
-D 43AB 25
-D 43AC 4E 00 30
-D 43AF C9
-D 43B0 27
-D 43B1 4E 00 30
-D 43B4 C9
-D 43B5 CA 3B
-D 43B7 4D EF
-D 43B9 25
-D 43BA 4E 00 30
-D 43BD C9
-D 43BE 27
-D 43BF 4E 00 30
-D 43C2 C9
-D 43C3 CA 48
-D 43C5 BE 00
-D 43C7 11 0D 00 01
-D 43CB 11 0E 00 22
-D 43CF BD 03 A5
-D 43D2 CA 1B
-D 43D4 CA 5B
-D 43D6 CA 30
-D 43D8 CA 6D
-D 43DA CA 43
-D 43DC CA 50
-D 43DE CA 55
-D 43E0 CA 20
-D 43E2 22 08
-D 43E4 4E 00 30
-D 43E7 C9
-D 43E8 CA 20
-D 43EA CA 20
-D 43EC CA 20
-D 43EE CA 59
-D 43F0 CA 4F
-D 43F2 CA 55
-D 43F4 CA 20
-D 43F6 22 07
-D 43F8 4E 00 30
-D 43FB C9
-D 43FC BE 00
-D 43FE 23 00 50
-D 4401 11 0A 00 04
-D 4405 CA 1B
-D 4407 CA 5B
-D 4409 CA 37
-D 440B CA 6D
-D 440D 23 00 0D
-D 4410 11 0E 00 4E
-D 4414 BD 03 81
-D 4417 42 00
-D 4419 43 0A
-D 441B 8C 0A
-D 441D A1 04 0D
+D 4366 CA 30
+D 4368 CA 6D
+D 436A C1 0A
+D 436C CA 1B
+D 436E CA 5B
+D 4370 CA 30
+D 4372 CA 6D
+D 4374 CA 1B
+D 4376 CA 5B
+D 4378 CA 3F
+D 437A CA 32
+D 437C CA 35
+D 437E CA 68
+D 4380 11 0D 00 18
+D 4384 11 0E 00 01
+D 4388 BD 03 C9
+D 438B CA 0D
+D 438D CA 0A
+D 438F 00
+D 4390 F0 00 00
+D 4393 CA 1B
+D 4395 CA 5B
+D 4397 4D DF
+D 4399 25
+D 439A 4E 00 30
+D 439D C9
+D 439E 27
+D 439F 4E 00 30
+D 43A2 C9
+D 43A3 CA 3B
+D 43A5 4D EF
+D 43A7 25
+D 43A8 4E 00 30
+D 43AB C9
+D 43AC 27
+D 43AD 4E 00 30
+D 43B0 C9
+D 43B1 CA 48
+D 43B3 CA 20
+D 43B5 BE 00
+D 43B7 11 0A 00 08
+D 43BB CC
+D 43BC A0 03 C7
+D 43BF 43 0A
+D 43C1 8C 0A
+D 43C3 A1 03 BB
+D 43C6 CC
+D 43C7 BE 00
+D 43C9 CA 1B
+D 43CB CA 5B
+D 43CD 4D DF
+D 43CF 25
+D 43D0 4E 00 30
+D 43D3 C9
+D 43D4 27
+D 43D5 4E 00 30
+D 43D8 C9
+D 43D9 CA 3B
+D 43DB 4D EF
+D 43DD 25
+D 43DE 4E 00 30
+D 43E1 C9
+D 43E2 27
+D 43E3 4E 00 30
+D 43E6 C9
+D 43E7 CA 48
+D 43E9 BE 00
+D 43EB 11 0D 00 01
+D 43EF 11 0E 00 22
+D 43F3 BD 03 C9
+D 43F6 CA 1B
+D 43F8 CA 5B
+D 43FA CA 30
+D 43FC CA 6D
+D 43FE CA 43
+D 4400 CA 50
+D 4402 CA 55
+D 4404 CA 20
+D 4406 22 08
+D 4408 4E 00 30
+D 440B C9
+D 440C CA 20
+D 440E CA 20
+D 4410 CA 20
+D 4412 CA 59
+D 4414 CA 4F
+D 4416 CA 55
+D 4418 CA 20
+D 441A 22 07
+D 441C 4E 00 30
+D 441F C9
 D 4420 BE 00
-D 4422 23 00 60
+D 4422 23 00 50
 D 4425 11 0A 00 04
 D 4429 CA 1B
 D 442B CA 5B
 D 442D CA 37
 D 442F CA 6D
 D 4431 23 00 0D
-D 4434 11 0E 00 03
-D 4438 BD 03 81
+D 4434 11 0E 00 4E
+D 4438 BD 03 93
 D 443B 42 00
 D 443D 43 0A
 D 443F 8C 0A
 D 4441 A1 04 31
 D 4444 BE 00
+D 4446 23 00 60
+D 4449 11 0A 00 04
+D 444D CA 1B
+D 444F CA 5B
+D 4451 CA 37
+D 4453 CA 6D
+D 4455 23 00 0D
+D 4458 11 0E 00 03
+D 445C BD 03 93
+D 445F 42 00
+D 4461 43 0A
+D 4463 8C 0A
+D 4465 A1 04 55
+D 4468 BE 00
 
 D 4A00 0D 0A 53 54 45 4C 4C 41 52 20 50 4F 4E 47 0D 0A
 D 4A10 0D 0A 59 6F 75 72 20 70 61 64 64 6C 65 20 69 73
@@ -953,12 +981,9 @@ D 4A20 20 6F 6E 20 74 68 65 20 52 49 47 48 54 2E 20 20
 D 4A30 55 50 20 61 6E 64 20 44 4F 57 4E 20 61 72 72 6F
 D 4A40 77 73 20 6D 6F 76 65 20 69 74 20 28 77 20 61 6E
 D 4A50 64 20 73 20 74 6F 6F 29 2E 0D 0A 46 69 72 73 74
-D 4A60 20 74 6F 20 39 20 77 69 6E 73 2E 20 20 51 20 71
-D 4A70 75 69 74 73 2E 0D 0A 0D 0A 50 72 65 73 73 20 61
-D 4A80 6E 79 20 6B 65 79 20 74 6F 20 73 74 61 72 74 2E
-D 4A90 0D 0A 00
+D 4A60 20 74 6F 20 39 20 77 69 6E 73 2E 20 20 45 53 43
+D 4A70 20 6F 72 20 51 20 71 75 69 74 73 2E 0D 0A 0D 0A
+D 4A80 50 72 65 73 73 20 61 6E 79 20 6B 65 79 20 74 6F
+D 4A90 20 73 74 61 72 74 2E 0D 0A 00
 D 4B00 59 4F 55 20 57 49 4E 00
 D 4B40 49 20 57 49 4E 00
-D 5000 00
-D 6000 00
-D 7000 00

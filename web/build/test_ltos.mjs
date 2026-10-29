@@ -1,6 +1,6 @@
 // The LTOS page's machine (js/elf2k.js + the web BIOS + the baked card) against the Python Elf2K: the same
 // commands, typed one at each prompt, must print exactly the same text (build/ltos-session.json, made by
-// build/ltos_ref.py from the same card). Then: a STELLAR app (GALAXIA) starts and Q brings LTOS back, and a
+// build/ltos_ref.py from the same card). Then: a STELLAR app (GALAXIA) starts and a lone Esc brings LTOS back, and a
 // card written to and put back ("Restore the card") is the baked one again.
 //     node web/build/test_ltos.mjs
 import { readFileSync } from 'node:fs';
@@ -74,13 +74,13 @@ function runTo(m, stop, cap, done) {
 // 2. a STELLAR app and back; 3. the card restored
 {
   const m = machine([['LTOS> ', 'RM README.TXT\r'], ['LTOS> ', 'ECHO new > NEW.TXT\r'], ['LTOS> ', 'GALAXIA\r'],
-                     ['any key to start', 'q'], ['SPACE: fire', 'q'], ['LTOS> ', 'DIR\r']]);
+                     ['any key to start', ' '], ['SPACE: fire', '\x1b'], ['LTOS> ', 'DIR\r']]);
   const st = runTo(m, 0xFFFF, 600_000_000, () => /DIR\r?\n[\s\S]*LTOS> $/.test(m.text())), t = m.text(), e = [];
   const dir = t.slice(t.lastIndexOf('LTOS> DIR'));
   if (!t.includes('G  A  L  A  X  I  A') || !t.includes('Thanks for playing STELLAR GALAXIA.')) e.push('Galaxia: ' + JSON.stringify(t.slice(-400)));
-  if (t.split('LTOS 0.5 - LiteOS').length < 3) e.push('LTOS did not come back after Q');
+  if (t.split('LTOS 0.5 - LiteOS').length < 3) e.push('LTOS did not come back after Esc');
   if (!dir.includes('NEW') || dir.includes('README')) e.push('DIR after RM / ECHO: ' + JSON.stringify(dir.slice(0, 400)));
-  report('RM README.TXT, ECHO > NEW.TXT, GALAXIA, Q back to LTOS, DIR', e);
+  report('RM README.TXT, ECHO > NEW.TXT, GALAXIA, Esc back to LTOS, DIR', e);
   const e2 = [];
   if (!m.cf.dirty.size) e2.push('nothing written');
   const fresh = machine([['LTOS> ', 'DIR\r'], ['LTOS> ', 'MON\r']]);       // what "Restore the card" boots: the baked map

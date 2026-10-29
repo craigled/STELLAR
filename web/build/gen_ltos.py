@@ -52,7 +52,7 @@ Some things to try:
   DIR /BIN          the programs           TYPE DEMO.SH   a shell script
   DEMO you          run DEMO.SH            SH -x TEST     each line shown as it runs
   LW2 DOCS/LETTER.TXT                      the Lite-Writer 2 editor (^X: menu)
-  GALAXIA           a game (arrows, SPACE; Q quits back to LTOS)
+  GALAXIA           a game (arrows, SPACE; Esc quits back to LTOS)
   ORBIT             STELLAR ORBIT: fly Apollo 7 on three VMs (SPACE starts the count)
   RAWK '{ s += $2 } END { print s }' DOCS/SALES.TXT
   ECHO hello > HI.TXT ; TYPE HI.TXT ; FSCK
