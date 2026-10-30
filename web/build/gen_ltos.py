@@ -54,6 +54,8 @@ Some things to try:
   LW2 DOCS/LETTER.TXT                      the Lite-Writer 2 editor (^X: menu)
   GALAXIA           a game (arrows, SPACE; Esc quits back to LTOS)
   ORBIT             STELLAR ORBIT: fly Apollo 7 on three VMs (SPACE starts the count)
+  EROFF EROFF.RF    a small nroff: plain text made into pages (> EROFF.TXT keeps it)
+  SORT -n -r DOCS/SALES.TXT    SORT, UNIQ, PWD, WC, GREP ... - HELP has them all
   RAWK '{ s += $2 } END { print s }' DOCS/SALES.TXT
   ECHO hello > HI.TXT ; TYPE HI.TXT ; FSCK
 
@@ -94,6 +96,7 @@ def add_files(m):
         open(os.path.join(m, 'BIN', name + '.STL'), 'wb').write(build.stl_of(open(p, encoding='latin1').read()))
     open(os.path.join(m, 'TEST.SH'), 'wb').write(TEST_SH)
     open(os.path.join(m, 'DEMO.SH'), 'wb').write(open(os.path.join(LTOS, 'examples', 'DEMO.SH'), 'rb').read())
+    open(os.path.join(m, 'EROFF.RF'), 'wb').write(open(os.path.join(LTOS, 'examples', 'EROFF.RF'), 'rb').read())
     open(os.path.join(m, 'README.TXT'), 'wb').write(README)
     open(os.path.join(m, 'DOCS', 'LETTER.TXT'), 'wb').write(LETTER)
     open(os.path.join(m, 'DOCS', 'SALES.TXT'), 'wb').write(SALES)

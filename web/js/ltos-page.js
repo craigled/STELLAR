@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '134';                                    // the ?v= the card is fetched with
+  var V = '135';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var SPEEDS = [
@@ -24,6 +24,8 @@
     ['GALAXIA', 'a game: arrows, SPACE; Esc back to LTOS'],
     ['ORBIT', 'STELLAR ORBIT: Apollo 7 on three VMs (SPACE: the count, ?: help)'],
     ['TETRIS', 'more games: SNAKE, PONG, INVADERS, BREAKOUT, MAZE'],
+    ['EROFF EROFF.RF', 'a small nroff: plain text made into pages, headings, lists'],
+    ['SORT -r DOCS/SALES.TXT', 'SORT, UNIQ, PWD and more tools'],
     ["RAWK '{ s += $2 } END { print s }' DOCS/SALES.TXT", 'awk on the 1802'],
     ['ECHO hello > HI.TXT', 'a file written to the card'],
     ['FSCK', 'check the card (slow at Elf2K speed)'],
