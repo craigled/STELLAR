@@ -24,6 +24,7 @@ SAMPLES = os.path.join(WEB, 'samples')
 APPS = [                                         # (NAME on the card, the .lst)
     ('GALAXIA', os.path.join(WORK, 'APPLICATIONS', 'Galaxia', 'Galaxia.lst')),
     ('LW2', os.path.join(WORK, 'APPLICATIONS', 'Lite-Writer-2', 'Lite-Writer-2.lst')),
+    ('LW3', os.path.join(WORK, 'APPLICATIONS', 'Lite-Writer-3', 'Lite-Writer-3.lst')),
     ('TETRIS', 'Tetris.lst'), ('BREAKOUT', 'Breakout.lst'), ('SNAKE', 'Snake.lst'),
     ('LANDER', 'Lunar-Lander.lst'), ('RACER', 'Racer.lst'), ('PONG', 'Pong.lst'), ('INVADERS', 'Invaders.lst'),
     ('TICTAC', 'Tic-Tac-Toe.lst'), ('MOONBASE', 'Moonbase.lst'), ('WARMER', 'Getting-Warmer.lst'),
@@ -52,6 +53,7 @@ Some things to try:
   DIR /BIN          the programs           TYPE DEMO.SH   a shell script
   DEMO you          run DEMO.SH            SH -x TEST     each line shown as it runs
   LW2 DOCS/LETTER.TXT                      the Lite-Writer 2 editor (^X: menu)
+  LW3 DOCS/BOOK.TXT   Lite-Writer 3: a 20 KB file, a part at a time (^N ^P ^T ^B)
   GALAXIA           a game (arrows, SPACE; Esc quits back to LTOS)
   ORBIT             STELLAR ORBIT: fly Apollo 7 on three VMs (SPACE starts the count)
   EROFF EROFF.RF    a small nroff: plain text made into pages (> EROFF.TXT keeps it)
@@ -75,6 +77,8 @@ the letter goes back onto the card.
 Best wishes,
 The 1802
 '''
+
+BOOK = b''.join(b'Line %04d of a long document: LW3 holds one part at a time.\n' % i for i in range(1, 341))
 
 SALES = b'''north 120
 south 75
@@ -100,6 +104,7 @@ def add_files(m):
     open(os.path.join(m, 'README.TXT'), 'wb').write(README)
     open(os.path.join(m, 'DOCS', 'LETTER.TXT'), 'wb').write(LETTER)
     open(os.path.join(m, 'DOCS', 'SALES.TXT'), 'wb').write(SALES)
+    open(os.path.join(m, 'DOCS', 'BOOK.TXT'), 'wb').write(BOOK)
     for junk in ('.fseventsd', '.Spotlight-V100', '.Trashes'):        # what the Mac leaves on a volume
         shutil.rmtree(os.path.join(m, junk), ignore_errors=True)
     for d, ds, fs in os.walk(m):
