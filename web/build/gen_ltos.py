@@ -54,6 +54,7 @@ Some things to try:
   DEMO you          run DEMO.SH            SH -x TEST     each line shown as it runs
   LW2 DOCS/LETTER.TXT                      the Lite-Writer 2 editor (^X: menu)
   LW3 DOCS/BOOK.TXT   Lite-Writer 3: a 20 KB file, a part at a time (^N ^P ^T ^B)
+  ENANO DOCS/BOOK.TXT   ENANO: a small nano in 1802 code (^G help, ^X leaves)
   GALAXIA           a game (arrows, SPACE; Esc quits back to LTOS)
   ORBIT             STELLAR ORBIT: fly Apollo 7 on three VMs (SPACE starts the count)
   EROFF EROFF.RF    a small nroff: plain text made into pages (> EROFF.TXT keeps it)

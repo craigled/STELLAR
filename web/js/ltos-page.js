@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var V = '136';                                    // the ?v= the card is fetched with
+  var V = '137';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var SPEEDS = [
@@ -22,6 +22,7 @@
     ['SH -x TEST', 'each line shown as it runs'],
     ['LW2 DOCS/LETTER.TXT', 'Lite-Writer 2 (Ctrl-X: the menu)'],
     ['LW3 DOCS/BOOK.TXT', 'Lite-Writer 3: a 20 KB file, a part at a time (Ctrl-N, Ctrl-P)'],
+    ['ENANO DOCS/BOOK.TXT', 'ENANO: a small nano, in 1802 code (Ctrl-G help, Ctrl-X leaves)'],
     ['GALAXIA', 'a game: arrows, SPACE; Esc back to LTOS'],
     ['ORBIT', 'STELLAR ORBIT: Apollo 7 on three VMs (SPACE: the count, ?: help)'],
     ['TETRIS', 'more games: SNAKE, PONG, INVADERS, BREAKOUT, MAZE'],
