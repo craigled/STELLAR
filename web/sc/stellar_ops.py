@@ -69,3 +69,37 @@ def serouti(ch, note=""):
 def printstr(x, note=""): return _r("C1 0%X" % x, "PRINTSTR R%d" % x, note)
 def getstr(x, y, note=""): return _r("C2 %X%X" % (x, y), "GETSTR R%d R%d" % (x, y), note)
 def runmc(addr, note=""): return _r("F1 %s" % _w(addr), "RUNMC %04X" % addr, note)
+
+
+# ---- Esc quits every app (2026-10-29). An arrow is ESC [ x back to back; a lone ESC is ESC with nothing
+#      after it for ~30 ms. KWAIT: a subroutine, Test = a key arrived within ~30 ms (RX counts down).
+def kwait(label, x, note=""):
+    return [lbl(label, note or "Test = a key arrives within ~30 ms (R%d counts)" % x), ldx(x, 8),
+            lbl(label + "1"), _r("CC", "SERST", ""), ift(label + "2"), decx(x), testxz(x), iff(label + "1"),
+            _r("CC", "SERST", "Test false: nothing came"),
+            lbl(label + "2"), ret()]
+
+#      KWAITP: the same, but RX is kept (PUSHX / POPX) - for programs with no register to spare.
+def kwaitp(label, x, note=""):
+    return [lbl(label, note or "Test = a key arrives within ~30 ms (R%d kept)" % x), _r("72 0%X" % x, "PUSHX R%d" % x, ""),
+            ldx(x, 8),
+            lbl(label + "1"), _r("CC", "SERST", ""), ift(label + "2"), decx(x), testxz(x), iff(label + "1"),
+            lbl(label + "2"), _r("73 0%X" % x, "POPX R%d" % x, ""), _r("CC", "SERST", "Test: a key is waiting"), ret()]
+
+#      GETL: GETSTR R<cur> R<start> with ESC: a lone ESC as the line's first key goes to quit (a GAL); an arrow
+#      there is thrown away. Anything else is the line, read by GETSTR as before (Enter alone: an empty line,
+#      0 at the cursor, as GETSTR leaves it). It uses Acc and the stack; RX for the wait is kept.
+def getl(label, cur, start, x, quit, note=""):
+    k = label
+    return [lbl(k, note or "Read a line (GETSTR R%d R%d); a lone ESC first quits" % (cur, start)),
+            lbl(k + "K"), _r("CB", "SERIN", "the first key"),
+            testai(0x1B), iff(k + "N"),
+            call(k + "W", "ESC: an arrow following?"), iff(quit, "no: ESC on its own quits"),
+            _r("CB", "SERIN", "an arrow (ESC [ x): its two bytes are thrown away"), call(k + "W"), iff(k + "K"),
+            _r("CB", "SERIN", ""), gal(k + "K"),
+            lbl(k + "N"), testai(0x0D), iff(k + "C"),
+            ldai(0), _r("36 01 0%X" % cur, "COPYIAMX 1 byte Acc -> M(R%d)" % cur, "Enter alone: the empty line"), ret(),
+            lbl(k + "C"), testai(0x08), ift(k + "K", "nothing to rub out yet"), testai(0x7F), ift(k + "K"),
+            _r("C9", "SEROUT", "the echo"), _r("36 01 0%X" % cur, "COPYIAMX 1 byte Acc -> M(R%d)" % cur, ""),
+            incx(cur), getstr(cur, start, "the rest of the line (Backspace can rub out the first key too)"), ret()] + \
+           kwaitp(k + "W", x)

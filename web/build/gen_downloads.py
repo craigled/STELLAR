@@ -59,7 +59,7 @@ CATALOG = [
  ('Morse', 'Morse Receiver v10', 'Key Morse on the Input switch; it learns your hand and prints the text.',
   'APPLICATIONS/MORSE CODE/Morse-Receiver-v10.lst', 'simulator-verified, not yet run on hardware'),
  ('Math', 'Simple-Calc-5', '5-digit calculator, all in STELLAR bytecode.', 'samples/Simple-Calc-5.lst', None),
- ('Math', 'Simple-Calc-8', '8-digit calculator, math in native 1802 via RUNMC.', 'samples/Simple-Calc-8.lst', None),
+ ('Math', 'Simple-Calc-8', '8-digit calculator, math in native 1802 via RUNMC; square root, and n! with every digit.', 'samples/Simple-Calc-8.lst', None),
  ('Math', 'Pi digits', 'The digits of pi, up to 1526, by the spigot; the inner loop is raw 1802 (RUNMC).',
   'samples/Pi-Spigot.lst', None),
  ('Math', 'Pi digits Stellar only', 'The same pi spigot in pure STELLAR bytecode, up to 350 digits (18x slower).',

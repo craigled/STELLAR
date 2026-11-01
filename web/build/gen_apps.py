@@ -130,8 +130,9 @@ APPS = [
   'Give it a range and it prints every prime number in it.',
   [40 * M]),
  ('Simple-Calc-8.lst', 'Math', 'Simple-Calc',
-  'A pocket calculator on the terminal: 8-digit add, subtract, multiply and divide, with the answer carried on.',
-  [3 * M, b'355/113\r', 4 * M, b'*2\r', 4 * M]),
+  'A pocket calculator on the terminal: 8-digit add, subtract, multiply and divide, with the answer carried on; '
+  '2s is a square root, 25! a factorial, and F shows every digit of one (E puts it back).',
+  [3 * M, b'355/113\r', 4 * M, b'*2\r', 4 * M, b'2s\r', 4 * M, b'F\r', 2 * M, b'25!\r', 6 * M]),
  # ---------------------------------------------------------------- multitasking (the Multitasking page)
  ('downloads/Stellar-Orbit.lst', 'Multitasking', 'STELLAR ORBIT',
   'Fly Apollo 7: the Saturn V to orbit (watch the g, drop the tower, cut off at 7,800 m/s), '

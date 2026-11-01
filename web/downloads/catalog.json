@@ -184,7 +184,7 @@
  {
   "group": "Math",
   "name": "Simple-Calc-8",
-  "what": "8-digit calculator, math in native 1802 via RUNMC.",
+  "what": "8-digit calculator, math in native 1802 via RUNMC; square root, and n! with every digit.",
   "href": "samples/Simple-Calc-8.lst",
   "note": null
  },

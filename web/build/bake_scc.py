@@ -62,6 +62,19 @@ EXAMPLES = [
      'Four VMs check themselves: main() stops a counting task and sees the count hold still, starts it again; '
      'a stopped task is not woken by the variable it waits for until it is started; a task stops itself and '
      'carries on only when main() starts it. Each line printed is one check passed. HW-verified on the Elf2K.'),
+    ('menu', 'A menu (print, getc, switch)', '2x3q', 'Elf2K',
+     'A hard-coded menu: the whole menu printed with one print(), a key read with getc(), a small '
+     'letter turned into a capital, and switch picking what to do - each choice says which program it '
+     'would run. The input box presses 2, x, 3 and q; empty it to choose in the terminal.'),
+    ('vmtalk', 'Three VMs talking (chan, shared, wait)', '1922', 'Elf2K',
+     'The menu again, now with three VMs: main() runs the menu, worker() waits on a chan for a job and '
+     'hands back the sum of 1..N through a shared variable while main() wait()s for it, and ticker() counts '
+     'in the background - choice 3 stops and starts it. The input box adds up 1..9 and looks at the '
+     'ticker; type 2, 3 or q in the terminal.'),
+    ('fact', 'Factorials with every digit', '20\r69\r', 'flat out',
+     'A u16 holds 8! at most, so bigger factorials are kept as decimal digits in a byte array and '
+     'multiplied as on paper, a digit at a time with a carry - up to 100! (158 digits). The input box asks '
+     'for 20! and 69!; type another N (0-100) in the terminal, or Enter to stop.'),
     ('nativedemo', 'Native 1802: native { }', '', 'flat out',
      'Raw 1802 machine code run by $F1 RUNMC: sums a 200-byte array (71x faster than the compiled '
      'loop), formats the total as hex, and copies a string kept inside the native block.'),
