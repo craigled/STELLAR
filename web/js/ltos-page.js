@@ -22,7 +22,7 @@
     ['SH -x TEST', 'each line shown as it runs'],
     ['LW2 DOCS/LETTER.TXT', 'Lite-Writer 2 (Ctrl-X: the menu)'],
     ['LW3 DOCS/BOOK.TXT', 'Lite-Writer 3: a 20 KB file, a part at a time (Ctrl-N, Ctrl-P)'],
-    ['ENANO DOCS/BOOK.TXT', 'ENANO: a small nano, in 1802 code (Ctrl-G help, Ctrl-X leaves)'],
+    ['ENANO DOCS/BOOK.TXT', 'ENANO: a small nano in 1802 code - long lines wrapped, Shift+arrow selects (Ctrl-G: every key)'],
     ['GALAXIA', 'a game: arrows, SPACE; Esc back to LTOS'],
     ['ORBIT', 'STELLAR ORBIT: Apollo 7 on three VMs (SPACE: the count, ?: help)'],
     ['TETRIS', 'more games: SNAKE, PONG, INVADERS, BREAKOUT, MAZE'],
