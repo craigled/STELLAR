@@ -16,7 +16,7 @@ Stellar C is a small C-like language shaped to what STELLAR does in one opcode:
     conditions  == != < <= > >= && || !   (all unsigned)
     expressions + - * / % & | ^ << >> (by a constant), unary -, a[i], calls
     builtins    putc(e)  print("text")  printu(e)  getc()  keyready()
-                rand()   delay(k)       halt()
+                rand()   rand(n)        delay(k)       halt()
     Elf2K I/O   out(e) outmem(a) outport(p) q(e) scanin() getin() inport(p)
                 efsource(n) ef() waitef()      ($01-$0F, see ARITY below)
     asm { }     inline STELLAR, one command per line (see ASM below)
@@ -352,6 +352,9 @@ class Parser:
         if s.accept('('):
             args = []
             while not s.accept(')'): args.append(s.expr()); s.accept(',')
+            if t[1] == 'rand' and args:                     # rand(n): 0 .. n - 1, as rand() % n
+                if len(args) > 1: raise Error('line %d: rand() or rand(n)' % t[2])
+                return ('bin', '%', ('call', 'rand', []), args[0])
             return ('call', t[1], args)
         if s.accept('['): e = s.expr(); s.take(']'); return ('idx', t[1], e)
         return ('var', t[1])

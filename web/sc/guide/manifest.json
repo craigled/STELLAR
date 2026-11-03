@@ -33,42 +33,42 @@
  },
  "signed": {
   "input": "",
-  "line": 298
+  "line": 300
  },
  "switch": {
   "input": "+-*/x",
-  "line": 336
+  "line": 338
  },
  "screen": {
   "input": "",
-  "line": 372
+  "line": 374
  },
  "game": {
   "input": "\\x1b[C\\x1b[C\\x1b[C\\x1b[Bq",
-  "line": 420
+  "line": 422
  },
  "clock": {
   "input": "",
-  "line": 491
+  "line": 493
  },
  "asmdemo": {
   "input": "",
-  "line": 550
+  "line": 552
  },
  "hilo": {
   "input": "50\\r25\\rabc\\r12\\r18\\r21\\r23\\rn\\r",
-  "line": 642
+  "line": 644
  },
  "pipeline": {
   "input": "hello\\r",
-  "line": 714
+  "line": 716
  },
  "together": {
   "input": "",
-  "line": 776
+  "line": 778
  },
  "pausing": {
   "input": "",
-  "line": 803
+  "line": 805
  }
 }

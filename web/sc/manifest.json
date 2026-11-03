@@ -92,6 +92,13 @@
    "blurb": "A u16 holds 8! at most, so bigger factorials are kept as decimal digits in a byte array and multiplied as on paper, a digit at a time with a carry - up to 100! (158 digits). The input box asks for 20! and 69!; type another N (0-100) in the terminal, or Enter to stop."
   },
   {
+   "name": "Dice (rand and rand(n))",
+   "file": "dice.sc",
+   "input": "aasq",
+   "speed": "Elf2K",
+   "blurb": "rand() is STELLAR's RAND opcode, a number 0 to 65535; rand(n) is 0 to n - 1, so rand(6) + 1 is a die. It stirs rand() while waiting for a key. The input box rolls twice, then S rolls 600 times to show the spread, and q quits; click the terminal to roll your own."
+  },
+  {
    "name": "Native 1802: native { }",
    "file": "nativedemo.sc",
    "input": "",

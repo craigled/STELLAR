@@ -15,7 +15,7 @@ import verify_phase0 as V
 import verify_phase3 as P3
 import verify_webbios as W
 
-COMMANDS = ['VER', 'DIR', 'DIR /BIN', 'TYPE README.TXT', 'TEST', 'SH -x TEST', 'ECHO hello there > HI.TXT',
+COMMANDS = ['VER', 'DISKINFO', 'DIR', 'DIR /BIN', 'TYPE README.TXT', 'TEST', 'SH -x TEST', 'ECHO hello there > HI.TXT',
             'TYPE HI.TXT', 'TYPE DOCS/SALES.TXT', "RAWK '{ s += $2 } END { print s }' DOCS/SALES.TXT",
             'HELP SCRIPTS', 'ECHO abcd\b\b\bxyz', 'NOPE', 'VER']
 

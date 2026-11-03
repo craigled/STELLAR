@@ -27,6 +27,8 @@
     ['ORBIT', 'STELLAR ORBIT: Apollo 7 on three VMs (SPACE: the count, ?: help)'],
     ['TETRIS', 'more games: SNAKE, PONG, INVADERS, BREAKOUT, MAZE'],
     ['EROFF EROFF.RF', 'a small nroff: plain text made into pages, headings, lists'],
+    ['DISKINFO', 'all about the card: model, format, label, space, files and folders'],
+    ['DICE', 'a Stellar C app: rand(6) + 1, two dice (S: 600 rolls, Q quits)'],
     ['SORT -r DOCS/SALES.TXT', 'SORT, UNIQ, PWD and more tools'],
     ["RAWK '{ s += $2 } END { print s }' DOCS/SALES.TXT", 'awk on the 1802'],
     ['ECHO hello > HI.TXT', 'a file written to the card'],

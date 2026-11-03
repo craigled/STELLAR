@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stellar C guide</title>
 <meta name="description" content="Programming in Stellar C: the language taught step by step, from the first line to a finished game - every example checked by compiling and running it.">
-<link rel="stylesheet" href="css/site.css?v=139">
+<link rel="stylesheet" href="css/site.css?v=140">
 <style>
 .guide{max-width:82ch}
 .guide h2{margin-top:2.2em; border-top:1px solid var(--line); padding-top:.9em}
@@ -189,7 +189,7 @@ void main() {
 }</code></pre></div>
 <div class="g-out g-output"><div class="g-lbl">Output</div><pre>rolls counted: 600
 50 300 700 950 1200 </pre></div>
-<ul><li><code>u8 a[n]</code> is n bytes (0-255 each); <code>u16 a[n]</code> is n 16-bit numbers; <code>i16 a[n]</code> n signed ones (section 7). Indexes start at 0. <code>a[] = { ... }</code> sets starting values (and the size).</li><li><code>rand()</code> is a pseudo-random 16-bit number; <code>rand() % 6</code> is 0 to 5.</li><li><code>&amp;a[i]</code> is the address of an element; <code>fill(&amp;a[0], value, count)</code> and <code>copy(&amp;dst[0], &amp;src[0], count)</code> set or copy bytes in one STELLAR command each.</li><li><b>Arrays the program changes are set back to their starting values when it starts</b> - so running a program again without reloading it (the Elf2K way) starts it clean. (<code>patched u8 a[] = ...</code> turns that off for an array whose bytes are always written before they are read: a template string, say.)</li><li>There are no bounds checks: <code>a[10]</code> of a 10-element array is the next thing in memory.</li></ul>
+<ul><li><code>u8 a[n]</code> is n bytes (0-255 each); <code>u16 a[n]</code> is n 16-bit numbers; <code>i16 a[n]</code> n signed ones (section 7). Indexes start at 0. <code>a[] = { ... }</code> sets starting values (and the size).</li><li><code>rand()</code> is a pseudo-random 16-bit number (STELLAR's RAND, $C3: about 3,600 1802 steps, some 16 ms on the Elf2K); <code>rand(n)</code> is 0 to n - 1, the same as <code>rand() % n</code> - so <code>rand(6) + 1</code> is a die. <code>examples/dice.sc</code> rolls two, and 600 to show the spread.</li><li><code>&amp;a[i]</code> is the address of an element; <code>fill(&amp;a[0], value, count)</code> and <code>copy(&amp;dst[0], &amp;src[0], count)</code> set or copy bytes in one STELLAR command each.</li><li><b>Arrays the program changes are set back to their starting values when it starts</b> - so running a program again without reloading it (the Elf2K way) starts it clean. (<code>patched u8 a[] = ...</code> turns that off for an array whose bytes are always written before they are read: a template string, say.)</li><li>There are no bounds checks: <code>a[10]</code> of a 10-element array is the next thing in memory.</li></ul>
 <hr>
 <h2 id="7-signed-numbers">7. Signed numbers</h2>
 <div class="g-ex"><div class="g-exh"><span class="mono">signed.sc</span><a class="g-try" href="stellarc.html#guide=signed">Try it &rarr;</a></div><pre><code>i16 t[] = { -12, 5, -3, 20, -8, 0, 15 };
@@ -515,6 +515,6 @@ void main() { count = 2; }</code></pre></div>
 <ul><li>Types: <code>u16</code>, <code>i16</code>, <code>u8</code> (and arrays of each); <code>const</code>; <code>patched</code> arrays.</li><li>Statements: <code>if</code>/<code>else</code>, <code>while</code>, <code>for</code>, <code>switch</code>/<code>case</code>/<code>default</code>, <code>break</code>, <code>continue</code>, <code>return</code>; assignment <code>= += -= *= /= %= &amp;= |= ^=</code>, <code>++</code>, <code>--</code>.</li><li>Operators: <code>+ - * / %  &amp; | ^ ~  &lt;&lt; &gt;&gt;</code> (by a constant)  <code>== != &lt; &lt;= &gt; &gt;=  &amp;&amp; || !</code>, unary <code>-</code>.</li><li>Output: <code>putc print printu printi printw printz printh</code>; screen: <code>cls at rev eol cursor</code>.</li><li>Input: <code>getc keyready getline</code>. Other: <code>rand delay halt fill copy</code>.</li><li>Tasks: <code>task f()</code>, <code>task(N) f()</code>, <code>shared</code>, <code>chan c[n]</code>, <code>send recv ready wait turns</code>, <code>stop(t) start(t)</code>, <code>atomic { }</code>.</li><li>Hardware: <code>out q ef waitef getin scanin outport inport efsource rtcget rtcset peek poke peekw pokew</code>.</li><li>Full details, the inline <code>asm</code> / <code>native</code> rules and how the compiler works: <code>SC/README.md</code>.</li></ul>
 </main>
 <footer class="foot">STELLAR for the RCA COSMAC 1802 &middot; <a href="stellarc.html">Stellar C</a> &middot; <a href="index.html">home</a></footer>
-<script src="js/nav.js?v=139"></script>
+<script src="js/nav.js?v=140"></script>
 </body>
 </html>

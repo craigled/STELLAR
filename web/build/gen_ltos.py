@@ -35,6 +35,7 @@ APPS = [                                         # (NAME on the card, the .lst)
     ('CANNON', 'CanonBall-Solo.lst'), ('CLOCK', 'Big-Clock-v3.lst'),
     ('ORBIT', os.path.join(WEB, 'downloads', 'Stellar-Orbit.lst')), ('MAZE', os.path.join(WEB, 'downloads', 'Maze.lst')),
     ('MAZERACE', os.path.join(WEB, 'downloads', 'MazeRace.lst')),
+    ('DICE', os.path.join(WORK, 'SC', 'examples', 'dice.lst')),
 ]
 
 TEST_SH = b'''echo "Testing the batch feature"
