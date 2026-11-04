@@ -5,73 +5,113 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Simulator</title>
 <meta name="description" content="Run STELLAR programs in the browser on the real firmware — step through the disassembly and watch the core update live.">
-<link rel="stylesheet" href="css/site.css?v=141">
+<link rel="stylesheet" href="css/site.css?v=142">
 </head>
 <body>
-<main class="wrap">
+<main class="wrap sim-wide">
   <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Interactive</div>
   <h1 style="margin:.1em 0 .1em">Simulator</h1>
-  <p class="muted" style="max-width:72ch">Runs the actual V0061.36 firmware on a faithful 1802 emulator — the same bytes the hardware executes. Step one opcode at a time and watch the VM core change; the side panel disassembles the running program and tracks the current instruction.</p>
+  <p class="muted" style="max-width:72ch">Runs the actual V0061.36 firmware on a faithful 1802 emulator — the same bytes the hardware executes. Step one opcode at a time and watch a VM core change, a lamp for every bit, or switch to the digital view; the side panel follows the running program.</p>
 
-  <div class="sim-controls">
-    <select id="sample" title="Sample program"></select>
-    <label class="mono small" style="color:var(--ink-soft)">input
-      <input type="text" id="input" value="" size="10" placeholder="e.g. 3&#92;r60&#92;r" title="Serial input; use \r for Enter">
-    </label>
-    <button id="load">Load</button>
-    <button id="openFile" title="Open a .lst program from your computer">Open .lst…</button>
-    <input type="file" id="fileInput" accept=".lst,.txt" hidden>
-    <span class="grow"></span>
-    <a class="dl-jump small" href="#elf2k" title="Download the firmware and the apps for a real Elf2K">⤓ Elf2K downloads</a>
-    <button id="toggleSide" title="Show/hide the disassembly panel">Side panel</button>
-  </div>
-  <p class="sim-blurb" id="blurb"></p>
-
-  <div class="sim-controls">
-    <button id="step" class="primary">Step ▸</button>
-    <button id="run">Run ▶</button>
-    <button id="pause" disabled>Pause ⏸</button>
-    <button id="reset">Reset ↺</button>
-    <button id="clearBreaks" title="Remove all breakpoints">Clear breaks</button>
-    <span class="mono small" id="bpCount" style="color:var(--ink-soft)"></span>
-  </div>
-  <div class="clock-row" role="radiogroup" aria-label="Clock speed">
-    <span class="clock-lbl">clock</span>
-    <span id="clockBtns"></span>
-    <span id="speedLabel" class="mono clock-now"></span>
-  </div>
-  <div class="status-line" id="status">loading…</div>
-  <p class="small muted" style="margin:2px 0 8px">The core status bar counts the raw 1802 instructions behind each STELLAR opcode — <b>this op</b> and the running <b>total</b>. (The first instruction after <span class="mono">START</span> also carries the one-time label pre-pass.)</p>
-
-  <div class="sim-body side-open" id="body">
-    <div class="sim-main">
-      <div id="core"></div>
-      <div class="io-row">
-        <div class="term-wrap">
-          <h4>Serial terminal</h4>
-          <div class="term" id="term" tabindex="0" role="textbox" aria-label="Serial terminal — click to type"></div>
-          <p class="arrow-note" id="termHint">Click the terminal and type to send keys to the running program — Enter, Backspace and Ctrl-key combinations all go through. On a phone or tablet, tap the terminal for the keyboard; the arrow keys, Esc and Enter are in the row underneath. The <b>input</b> box above just pre-loads keystrokes before you start.</p>
-        </div>
-        <div class="fp-wrap">
-          <h4>Front panel</h4>
-          <div class="fp" id="frontpanel"></div>
-          <div class="sim-controls fp-sound">
-            <button id="sound" aria-pressed="false" title="Play the Q line as a speaker would - at the Elf2K speed">🔈 Sound off</button>
-          </div>
-          <p class="arrow-note" id="soundNote">Q through a speaker: the program's own pitch, at the Elf2K clock only.</p>
-          <div class="sim-controls fp-sound">
-            <button id="inKey" title="The Elf2K's INPUT switch (EF4): hold it down to key Morse. Space works too while it has focus.">⏺ INPUT</button>
-            <button id="listen" aria-pressed="false" title="Hear a Morse tone through the microphone: the tone holds INPUT (EF4) down">🎤 Listen</button>
-          </div>
-          <p class="arrow-note" id="listenNote">INPUT is EF4. 🎤 Listen keys it from a tone the microphone hears - another computer running Morse Sender v18, say.</p>
-        </div>
+  <section class="simcon" aria-label="STELLAR console">
+    <div class="con-head">
+      <div class="con-brand"><b>STELLAR</b><span>virtual CPU on an 1802</span></div>
+      <div class="con-lamps">
+        <span class="con-lamp" title="The program is running"><i id="lampRun" class="c-green"></i>RUN</span>
+        <span class="con-lamp" title="The program has ended"><i id="lampHalt" class="c-red"></i>HALT</span>
+        <span class="con-lamp" title="Stopped on a breakpoint"><i id="lampBrk" class="c-amber"></i>BREAK</span>
+        <span class="con-lamp" title="The 1802 Q line"><i id="lampQ" class="c-red"></i>Q</span>
+      </div>
+      <span class="grow"></span>
+      <div class="sim-controls con-run">
+        <button id="step" class="primary">Step ▸</button>
+        <button id="run" class="go">Run ▶</button>
+        <button id="pause" disabled>Pause ⏸</button>
+        <button id="reset">Reset ↺</button>
       </div>
     </div>
-    <div class="sim-side" id="side">
-      <h4>Disassembly — running program</h4>
-      <div class="dis-panel" id="disasm"></div>
+
+    <div class="sim-controls">
+      <select id="sample" title="Sample program"></select>
+      <label class="mono small" style="color:var(--ink-soft)">input
+        <input type="text" id="input" value="" size="10" placeholder="e.g. 3&#92;r60&#92;r" title="Serial input; use \r for Enter">
+      </label>
+      <button id="load">Load</button>
+      <button id="openFile" title="Open a .lst program from your computer">Open .lst…</button>
+      <input type="file" id="fileInput" accept=".lst,.txt" hidden>
+      <span class="grow"></span>
+      <button id="clearBreaks" title="Remove all breakpoints">Clear breaks</button>
+      <span class="mono small" id="bpCount" style="color:var(--ink-soft)"></span>
+      <a class="dl-jump small" href="#elf2k" title="Download the firmware and the apps for a real Elf2K">⤓ Elf2K downloads</a>
+      <button id="toggleSide" title="Show/hide the disassembly panel">Side panel</button>
     </div>
-  </div>
+    <p class="sim-blurb" id="blurb"></p>
+    <div class="clock-row" role="radiogroup" aria-label="Clock speed">
+      <span class="clock-lbl">clock</span>
+      <span id="clockBtns"></span>
+      <span id="speedLabel" class="mono clock-now"></span>
+    </div>
+    <div class="status-line" id="status">loading…</div>
+
+    <div class="sim-body side-open" id="body">
+      <div class="sim-main">
+        <div class="con-bar">
+          <h4>VM core</h4>
+          <div class="seg" id="coreMode" role="group" aria-label="How to show the core">
+            <button type="button" data-v="leds">LEDs</button>
+            <button type="button" data-v="digital">Digital</button>
+          </div>
+          <span class="con-ledonly" id="ledOnly">
+            <span class="seg" id="vmPick" role="group" aria-label="Which VM to show">
+              <button type="button" data-v="1" title="Show VM1's core">VM1</button>
+              <button type="button" data-v="2" title="Show VM2's core">VM2</button>
+              <button type="button" data-v="3" title="Show VM3's core">VM3</button>
+              <button type="button" data-v="4" title="Show VM4's core">VM4</button>
+            </span>
+            <span class="seg" id="radix" role="group" aria-label="Numbers beside the lamps">
+              <button type="button" data-v="hex">Hex</button>
+              <button type="button" data-v="dec">Dec</button>
+            </span>
+          </span>
+        </div>
+        <div id="coreleds"></div>
+        <div id="core"></div>
+      </div>
+      <div class="sim-side" id="side">
+        <div class="con-bar">
+          <h4>Running program</h4>
+          <div class="seg" id="sideMode" role="group" aria-label="How to show the program">
+            <button type="button" data-v="text">Text</button>
+            <button type="button" data-v="leds">LEDs</button>
+          </div>
+        </div>
+        <div class="dis-panel" id="disasm"></div>
+        <div class="dis-panel" id="disleds"></div>
+      </div>
+    </div>
+    <p class="small con-note">While paused, click a lamp with a ring to flip that bit: the registers, accumulators and four of the flags. A busy bit glows at the share of the time it is on. Rows the last step changed are marked, and the numbers count the raw 1802 instructions behind each opcode. Click a program line to set a breakpoint.</p>
+
+    <div class="io-row">
+      <div class="term-wrap">
+        <h4>Serial terminal</h4>
+        <div class="term" id="term" tabindex="0" role="textbox" aria-label="Serial terminal — click to type"></div>
+        <p class="arrow-note" id="termHint">Click the terminal and type to send keys to the running program — Enter, Backspace and Ctrl-key combinations all go through. On a phone or tablet, tap the terminal for the keyboard; the arrow keys, Esc and Enter are in the row underneath. The <b>input</b> box above just pre-loads keystrokes before you start.</p>
+      </div>
+      <div class="fp-wrap">
+        <h4>Front panel</h4>
+        <div class="fp" id="frontpanel"></div>
+        <div class="sim-controls fp-sound">
+          <button id="sound" aria-pressed="false" title="Play the Q line as a speaker would - at the Elf2K speed">🔈 Sound off</button>
+        </div>
+        <p class="arrow-note" id="soundNote">Q through a speaker: the program's own pitch, at the Elf2K clock only.</p>
+        <div class="sim-controls fp-sound">
+          <button id="inKey" title="The Elf2K's INPUT switch (EF4): hold it down to key Morse. Space works too while it has focus.">⏺ INPUT</button>
+          <button id="listen" aria-pressed="false" title="Hear a Morse tone through the microphone: the tone holds INPUT (EF4) down">🎤 Listen</button>
+        </div>
+        <p class="arrow-note" id="listenNote">INPUT is EF4. 🎤 Listen keys it from a tone the microphone hears - another computer running Morse Sender v18, say.</p>
+      </div>
+    </div>
+  </section>
 
   <div class="mv-wrap" style="margin-top:18px">
     <h4>Memory — $2F00 to $7EFF</h4>
@@ -105,21 +145,22 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=141"></script>
-<script src="js/firmware-0061-36.js?v=141"></script>
-<script src="js/stellar-vm.js?v=141"></script>
-<script src="js/disasm.js?v=141"></script>
-<script src="js/core-view.js?v=141"></script>
-<script src="js/mem-view.js?v=141"></script>
-<script src="js/front-panel.js?v=141"></script>
-<script src="js/vt100.js?v=141"></script>
-<script src="js/term-zoom.js?v=141"></script>
-<script src="js/term-input.js?v=141"></script>
-<script src="js/sim-app.js?v=141"></script>
-<script src="js/q-audio.js?v=141"></script>
-<script src="js/tone-listen.js?v=141"></script>
-<script src="js/clock-row.js?v=141"></script>
-<script src="js/simulator-page.js?v=141"></script>
-<script src="js/nav.js?v=141"></script>
+<script src="js/opcodes.js?v=142"></script>
+<script src="js/firmware-0061-36.js?v=142"></script>
+<script src="js/stellar-vm.js?v=142"></script>
+<script src="js/disasm.js?v=142"></script>
+<script src="js/core-view.js?v=142"></script>
+<script src="js/mem-view.js?v=142"></script>
+<script src="js/led-panel.js?v=142"></script>
+<script src="js/front-panel.js?v=142"></script>
+<script src="js/vt100.js?v=142"></script>
+<script src="js/term-zoom.js?v=142"></script>
+<script src="js/term-input.js?v=142"></script>
+<script src="js/sim-app.js?v=142"></script>
+<script src="js/q-audio.js?v=142"></script>
+<script src="js/tone-listen.js?v=142"></script>
+<script src="js/clock-row.js?v=142"></script>
+<script src="js/simulator-page.js?v=142"></script>
+<script src="js/nav.js?v=142"></script>
 </body>
 </html>

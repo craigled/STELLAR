@@ -8,6 +8,7 @@
   var panel = new window.FrontPanel(document.getElementById('frontpanel'));
   var qAudio = window.QAudio ? new window.QAudio() : null;
   var memView = null;   // built after the app exists, so it can read the live memory
+  var leds = null, memLeds = null;   // the LED console: built after the app, too
 
   function showBreaks(n) {
     var el = document.getElementById('bpCount');
@@ -37,6 +38,8 @@
     coldBoot: true,
     statusEl: document.getElementById('status'),
     onBreaksChanged: function (n) { showBreaks(n); },
+    onDisasm: function (lines) { if (memLeds) memLeds.setLines(lines); },
+    onOp: function () { if (leds) leds.sample(); },
     onTick: function (vm, ips) {
       if (qAudio) qAudio.tick(vm.cpu, ips === window.ClockRow.ELF2K);
     },
@@ -45,6 +48,9 @@
       var k = btn('inKey'), down = !!(app.vm && app.vm.cpu.EF[3]);
       if (k && k.classList.contains('on') !== down) k.classList.toggle('on', down);
       if (memView) memView.render();
+      if (leds) { leds.render(!app.running); showVMs(); }
+      if (memLeds) memLeds.render(s.pl);
+      lamps(s);
       btn('pause').disabled = !app.running;
       btn('run').disabled = app.running || s.halted;
       btn('step').disabled = app.running || s.halted;
@@ -52,6 +58,69 @@
   });
 
   function btn(id) { return document.getElementById(id); }
+
+  // ---- the LED console (js/led-panel.js) ----
+  // A choice remembered in this browser; the page works the same if storage is blocked.
+  function pref(k, d) { try { return localStorage.getItem('stellar-sim-' + k) || d; } catch (e) { return d; } }
+  function keep(k, v) { try { localStorage.setItem('stellar-sim-' + k, v); } catch (e) {} }
+  // A row of buttons where one is chosen: the buttons carry data-v.
+  function choice(id, value, onPick) {
+    var host = btn(id);
+    function show(v) {
+      [].forEach.call(host.children, function (b) { b.setAttribute('aria-pressed', b.dataset.v === v ? 'true' : 'false'); });
+    }
+    host.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button') : null;
+      if (b) { show(b.dataset.v); onPick(b.dataset.v); }
+    });
+    show(value);
+  }
+  function lamps(s) {
+    btn('lampRun').classList.toggle('on', !!app.running);
+    btn('lampHalt').classList.toggle('on', !!s.halted);
+    btn('lampBrk').classList.toggle('on', !app.running && !!app.breaks[s.pl]);
+    btn('lampQ').classList.toggle('on', !!(app.vm && app.vm.cpu.Q));
+  }
+  // Which VMs the firmware made: a small lamp on each button of the selector.
+  function showVMs() {
+    var cpu = app.vm && app.vm.cpu;
+    if (!cpu) return;
+    [].forEach.call(btn('vmPick').children, function (b, i) {
+      var there = window.LedPanel.vmThere(cpu.M, i + 1);
+      if (b.classList.contains('vm-there') !== there) b.classList.toggle('vm-there', there);
+    });
+  }
+  leds = new window.LedPanel.LedCore(btn('coreleds'), {
+    cpu: function () { return app.vm && app.vm.cpu; },
+    running: function () { return app.running; },
+    stats: function () { return { op: app.vm ? app.vm.lastOpCost || 0 : 0, total: app.vm ? app.vm.cpu.steps : 0 }; },
+    onFlip: function (text) { app._render(); app._setStatus(text); },
+    onRefused: function () { app._setStatus('pause the program first, then click a lamp to flip that bit'); }
+  });
+  memLeds = new window.LedPanel.LedMem(btn('disleds'), {
+    mem: function () { return app.vm && app.vm.cpu.M; },
+    isBreak: function (a) { return !!app.breaks[a]; },
+    onToggle: function (a) { app.toggleBreak(a); showBreaks(app.breakCount()); }
+  });
+  function showCore(v) {
+    btn('coreleds').classList.toggle('is-hidden', v !== 'leds');
+    btn('core').classList.toggle('is-hidden', v === 'leds');
+    btn('ledOnly').classList.toggle('is-hidden', v !== 'leds');
+    leds.setVisible(v === 'leds');
+  }
+  function showSide(v) {
+    btn('disasm').classList.toggle('is-hidden', v === 'leds');
+    btn('disleds').classList.toggle('is-hidden', v !== 'leds');
+    memLeds.setVisible(v === 'leds');
+    if (app.vm) { memLeds.render(app._pl()); app._highlight(app._pl()); }
+  }
+  var coreMode = pref('core', 'leds'), sideMode = pref('side', 'text'), radix = pref('radix', 'hex');
+  choice('coreMode', coreMode, function (v) { keep('core', v); showCore(v); });
+  choice('sideMode', sideMode, function (v) { keep('side', v); showSide(v); });
+  choice('radix', radix, function (v) { keep('radix', v); leds.setDecimal(v === 'dec'); });
+  choice('vmPick', '1', function (v) { leds.setVM(+v); });
+  showCore(coreMode); showSide(sideMode); leds.setDecimal(radix === 'dec');
+
   var samples = [];
   var autoRun = false;          // set by a #app= link: run the app once it is loaded
 
@@ -67,6 +136,9 @@
   fetch('samples/manifest.json?v=125')
     .then(function (r) { return r.json(); })
     .then(function (list) {
+      // Most samples are one VM. This one is four, so the VM selector has something to show.
+      list.push({ name: 'Mandelbrot x 4 (four VMs)', file: '../downloads/Mandelbrot-4VM.lst', input: '', speed: 'flat out',
+        blurb: 'One Mandelbrot drawn by all four VMs at once, a quarter each. Use the VM buttons to watch each core in turn.' });
       samples = list;
       var sel = btn('sample');
       list.forEach(function (s, i) {
@@ -122,7 +194,7 @@
     function () { return app.vm && app.vm.cpu && app.vm.cpu.M; });
 
   document.getElementById('clearBreaks').addEventListener('click', function () {
-    app.clearBreaks(); showBreaks(0);
+    app.clearBreaks(); memLeds.draw(); showBreaks(0);
   });
 
   // Live typing into the serial terminal (shared with the multitasking page).
@@ -274,7 +346,7 @@
   });
   btn('step').addEventListener('click', function () { app.step(); });
   btn('run').addEventListener('click', function () { app.run(); });
-  btn('pause').addEventListener('click', function () { app.stop(); app._setStatus('paused'); btn('run').disabled = false; btn('step').disabled = false; btn('pause').disabled = true; });
+  btn('pause').addEventListener('click', function () { app.stop(); app._render(); app._setStatus('paused'); });
   btn('reset').addEventListener('click', function () { app.reset(); });
   btn('toggleSide').addEventListener('click', function () {
     document.getElementById('body').classList.toggle('side-open');

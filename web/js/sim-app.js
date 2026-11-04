@@ -100,6 +100,7 @@
     host.innerHTML = '';
     this.rows = {};
     var d = window.StellarDisasm.disassemble(this.vm.cpu.M, ENTRY, ENTRY + 0x0FFF);
+    if (this.opts.onDisasm) this.opts.onDisasm(d.lines);
     var frag = document.createDocumentFragment();
     d.lines.forEach(function (ln) {
       var row = document.createElement('div');
@@ -230,6 +231,7 @@
         while (q.length && q[0].cyc <= c.cycles) c.EF[3] = q.shift().v;
         var cap = self.instrPerSec ? Math.max(500, Math.ceil((budget - (c.cycles - c0)) / CPI)) : FLAT_PIECE;
         var r = self.vm.stepOpcode(cap);
+        if (self.opts.onOp) self.opts.onOp();
         if (r.capped && !r.halted) continue;            // part of a long opcode: no breakpoint check mid-way
         // stop() before _render(): the render fires onState, and the page decides
         // the Run/Step/Pause button states from this.running — rendering first
