@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Opcode Reference</title>
 <meta name="description" content="Every STELLAR opcode by group — hex, mnemonic, operands, and description. Searchable and deep-linkable.">
-<link rel="stylesheet" href="css/site.css?v=142">
+<link rel="stylesheet" href="css/site.css?v=143">
 </head>
 <body>
 <main class="wrap">
@@ -16,6 +16,9 @@
     <span class="mono">X/Y</span> register · <span class="mono">Z/D</span> nibble selector ·
     <span class="mono">LL</span> label · <span class="mono">V</span> VM number.
     Each row links to itself — e.g. <a href="#op-4D">#op-4D</a>.</p>
+  <p class="muted" style="max-width:70ch">Click an opcode's description to see worked examples of it, and click again to close them. Each program was run on the
+    V0061.36 firmware, and the results shown are what the machine did. Key the D-lines into the monitor, or try them in the
+    <a href="simulator.html">Simulator</a>. Whole multitasking programs are at the end of the page.</p>
 
   <div class="op-controls">
     <input class="op-search" id="q" type="search" placeholder="Search name, hex, or description…  (try DIV, 4D, remainder)" autocomplete="off">
@@ -28,8 +31,9 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a> · <a href="architecture.html">architecture</a></footer>
 
-<script src="js/opcodes.js?v=142"></script>
-<script src="js/opcodes-page.js?v=142"></script>
-<script src="js/nav.js?v=142"></script>
+<script src="js/opcodes.js?v=143"></script>
+<script src="js/opcode-examples.js?v=143"></script>
+<script src="js/opcodes-page.js?v=143"></script>
+<script src="js/nav.js?v=143"></script>
 </body>
 </html>

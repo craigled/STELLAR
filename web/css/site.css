@@ -625,3 +625,28 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .lm-row.lm-end{opacity:.6}
 .lm-row.lm-bp{border-left-color:#e0483e}
 @media(max-width:700px){ .simcon{padding:12px 10px 14px} .simcon .sim-side .dis-panel{height:420px} }
+
+/* ================= worked examples on the Opcodes page ================= */
+.ex-box{padding:0 10px 8px 78px; border-bottom:1px solid var(--line)}
+.op-row .ex-link{border:0; background:transparent; padding:0; font:inherit; font-size:14px; text-align:left; color:var(--link); cursor:pointer}
+.op-row .ex-link:hover{color:var(--accent); text-decoration:underline}
+.op-row .ex-link[aria-expanded="true"]{color:var(--accent)}
+.op-row.whole{display:block}
+.ex-list{display:flex; flex-direction:column; gap:14px; padding:6px 0 10px}
+.ex{background:var(--bg-panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; min-width:0}
+.ex h4{margin:0 0 6px; font-size:15px}
+.ex-tag{font-family:var(--mono); font-size:11px; font-weight:600; padding:1px 7px; border-radius:6px; margin-left:6px; vertical-align:1px}
+.ex-fixed{background:var(--hi); color:var(--ink)}
+.ex-new{background:var(--bg-sunk); color:var(--link)}
+.ex-note,.ex-res,.ex-fix{margin:6px 0 0; font-size:14px; color:var(--ink-soft); max-width:90ch}
+.ex-note{margin:0 0 8px}
+.ex-res b,.ex-fix b{color:var(--ink)}
+.ex-res{font-family:var(--mono); font-size:13px}
+.ex-scroll{overflow-x:auto}
+.ex-t{border-collapse:collapse; width:100%; font-size:13px}
+.ex-t th{text-align:left; font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft);
+  padding:3px 10px 3px 0; border-bottom:1px solid var(--line); white-space:nowrap}
+.ex-t td{padding:2px 14px 2px 0; vertical-align:top}
+.ex-d,.ex-m{font-family:var(--mono); white-space:nowrap}
+.ex-m{color:var(--accent)}
+@media(max-width:680px){ .ex-box{padding-left:10px} }

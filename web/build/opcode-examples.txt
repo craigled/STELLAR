@@ -1,0 +1,3787 @@
+// The programs on the Opcodes page. Built by gen_opcode_examples.js: see the top of that file.
+// src: Tn = the nth table of STELLAR TEST PROGRAMS V0.61.36.docx; new = written for this page.
+
+## 01 02 03 | Set the output port, the input port and the EF source
+src: T1 T2
+fix: DEFIN 05 is refused: the input port must be 9 to F, so the program stopped with error 08 at the second line. DEFEF 01 named EF line 0. The explanations said port 03 while T2's code said 04. Now it sets the three settings to real values; T2 was the same program and is covered here.
+note: These three commands tell a program where its input and output are. Run them first if your hardware is not the Elf2K default of output 4, input C, EF4.
+expect: OP~=410901 E=00
+CD
+01 01 ; Define the output port as 1
+02 09 ; Define the input port as 9
+03 41 ; EF source = EF4, inverted (active low)
+F0 00 00
+
+## 02 | DEFIN refuses a port it cannot use
+src: new
+note: What happened to the document's first example. Any port outside 9 to F stops the program with error 08, before it can read from the wrong place.
+expect: E=08 PL=4001
+CD
+02 05 ; Port 05 is not 9 to F: stops here with error 08
+04 AA ; Never runs
+F0 00 00
+
+## 04 | Output AA, then delay and break
+src: T3
+fix: "HELLO WORLOAD" should be "HELLO WORLD". The display keeps AA when the program ends: it does not clear back to 00.
+note: The "hello world" of STELLAR. AA goes to the display and stays there.
+expect: OUT=AA
+CD
+04 AA
+C0 FF
+F0 00 00
+
+## 05 0F | Output the two bytes of the Accumulator
+src: T4
+fix: The text said AA then BB. Z=0 is the low byte, so BB comes first, then AA. The display is not cleared at the end.
+note: BB appears, then AA after you press and release the Input switch.
+expect: OUT=BB,AA
+CD
+10 AA BB
+05 00
+0F 00
+05 01
+0F 00
+F0 00 00
+
+## 05 46 | Output the value in the Math Accumulator
+src: T5
+note: 00BB + 1234 = 12EF. Z counts up from the low end of the MA's remainder, so the MA's own low byte is Z=2 and the next is Z=3.
+expect: MA=000012EF OUT=12,EF
+CD
+10 00 BB
+11 01 12 34
+46 01
+05 13
+0F 00
+05 12
+0F 00
+F0 00 00
+
+## 05 6B | Output the value in the Decimal Accumulator
+src: T6
+fix: The old program used $F8, a stub that stops with error 0F, to poke bytes into the core. Rewritten: CVT2DEC puts a real number in the DA.
+note: 3039 hex is 12345 in decimal. The DA keeps it as packed decimal digits, so the display reads the digits themselves: 45, then 23. Z counts up from the low end of the DA's remainder, so the DA's own low byte is Z=3.
+expect: DA=00012345 OUT=45,23
+CD
+10 30 39
+6B 00
+05 23 ; Output the digits 45
+C0 80
+05 24 ; Output the digits 23
+C0 80
+F0 00 00
+
+## 06 | Store CCDD in Register 3, then display CC and DD from it
+src: T7
+note: Any Z other than 0 picks the high byte.
+expect: R3=CCDD OUT=CC,DD
+CD
+10 CC DD
+21 03
+06 13
+0F 00
+06 03
+0F 00
+F0 00 00
+
+## 07 | Read the date and time from the clock chip
+src: new
+note: RTC function 0 writes eight bytes at M(RX): seconds, minutes, hours, weekday, day, month and a two-byte year. The Elf2K's clock is a DS12887; here it is this computer's clock.
+expect: E=00 R1=0100
+CD
+11 01 01 00
+07 01 ; Read the clock into M(R1)
+F0 00 00
+
+## 08 | Output the value in the memory location pointed to by a register
+src: T8
+fix: The text said location 0003; the code uses 0008, which is the FF operand of the DLYI below. Memory mode is relative, so R1 = 0008 means 4008.
+note: A program can read its own bytes: 4008 holds the FF of DLYI FF.
+expect: OUT=FF
+CD
+11 01 00 08
+08 01
+C0 FF
+F0 00 00
+
+## 09 | Get the current EF flag status
+src: T9
+tidy: Added the F0 00 00 end marker.
+note: Bit 0 is EF1 and bit 3 is EF4. Here EF4 is held down, so the Accumulator holds 0008. This one loops for ever, showing the flags.
+run: ef4=1 stop=12
+expect: A=0008
+CD
+loop:
+09
+05 00
+B0 {loop}
+F0 00 00
+
+## 0A | Turn Q off and on for ever
+src: T10
+tidy: Added the F0 00 00 end marker.
+note: A blinking Q light.
+run: stop=12
+CD
+FF 00
+loop:
+0A 00
+C0 60
+0A 01
+C0 60
+B0 {loop}
+F0 00 00
+
+## 0A | Pulse Q: on, then off, in one command
+src: T11
+tidy: Added the F0 00 00 end marker.
+note: SETQ 02 turns Q on and off again by itself.
+run: stop=12
+CD
+loop:
+0A 00
+C0 60
+0A 02
+C0 60
+B0 {loop}
+F0 00 00
+
+## 0A | Toggle Q as fast as STELLAR can
+src: T12
+tidy: Added the F0 00 00 end marker.
+note: With no delay, this shows how fast one STELLAR command runs.
+run: stop=12
+CD
+loop:
+0A 00
+0A 01
+B0 {loop}
+F0 00 00
+
+## 0C | Display what is on the switches until FF is entered
+src: T13
+note: SIPA reads the port straight away, without waiting. Here the switches are set to FF, so it ends on the first pass.
+run: sw=FF
+expect: A=00FF OUT=FF
+CD
+loop:
+0C 00
+05 00
+81 00 FF
+A1 {loop}
+F0 00 00
+
+## 0D | Wait for the Input key, then display the switches
+src: T14
+tidy: Removed two NOPs that did nothing.
+note: GIPA waits for the Input key before it reads. The switches are set to FF here, so one press ends it.
+run: sw=FF
+expect: A=00FF OUT=FF
+CD
+loop:
+0D 00
+05 00
+81 00 FF
+A1 {loop}
+F0 00 00
+
+## 0E | Read the switches into a register
+src: T15
+note: The switches are set to 05 here.
+expect: R1=0005 OUT=05
+CD
+0E 01
+06 01
+C0 FF
+F0 00 00
+
+## 0F | Wait for the Input key
+src: T16
+note: Q and the display change only after the key is pressed and released.
+expect: OUT=01,02 Q=0
+CD
+0A 01
+04 01
+0F 00
+0A 00
+04 02
+C0 FF
+F0 00 00
+
+## 10 | Load the Accumulator
+src: T17
+expect: A=BBCC R1=BBCC R2=BBCC
+CD
+10 BB CC
+21 01
+21 02
+F0 00 00
+
+## 11 | Load all of a register, or only one byte
+src: T18
+fix: The text said the last line loads nothing because its Z is invalid. In fact Z=4 loads both bytes, like Z=0. It has been left out: Z should be 0, 1 or 2.
+note: Z=1 takes the low byte of the pair and Z=2 the high byte. The other byte of the register is left as it was.
+expect: R1=1234 R2=0034 R3=1200
+CD
+11 01 12 34
+11 12 12 34
+11 23 12 34
+F0 00 00
+
+## 12 | Load the Accumulator with LOADZAI
+src: T20
+expect: A=1234
+CD
+12 20 12 34
+F0 00 00
+
+## 12 | Load the whole Math Accumulator
+src: T19 T21
+fix: The text said this "places 5 bytes into the Math Accumulator". LOADZAI fills the 7 bytes of the MA from the END: 4 of number, 2 of remainder and 1 of sign. Five bytes reach only the low two bytes of the number. T19's three bytes landed in the remainder and the sign.
+note: Give all seven bytes to set the MA exactly: the number, then the remainder, then the sign.
+expect: MA=12345678 MAR=0000 MAS=00
+CD
+12 71 12 34 56 78 00 00 00
+F0 00 00
+
+## 12 | Load the Decimal Accumulator
+src: T22
+fix: Eight bytes is one too many: the first byte went past the DA. Now seven: 4 of number, 3 of remainder.
+expect: DA=11223344 DAR=556677
+CD
+12 72 11 22 33 44 55 66 77
+F0 00 00
+
+## 13 | Copy the low byte of the Accumulator to the high byte
+src: T23
+expect: A=9999 R1=0099 OUT=99
+CD
+10 00 99
+21 01
+13
+05 01
+C0 80
+F0 00 00
+
+## 14 | Copy the low byte of a register to the high byte
+src: T24
+expect: R6=9999 OUT=99
+CD
+11 06 00 99
+14 06
+06 16
+C0 80
+F0 00 00
+
+## 15 | Swap the low and high bytes in the Accumulator
+src: T25
+expect: A=9900 OUT=99
+CD
+10 00 99
+15
+05 01
+C0 80
+F0 00 00
+
+## 16 | Swap the low and high bytes in a register
+src: T26
+fix: A stray F0 on the COPYAX line was overwritten by the next line. Removed.
+expect: R1=9900 OUT=99
+CD
+10 00 99
+21 01
+16 01
+06 11
+C0 80
+F0 00 00
+
+## 17 | Shift the bytes in the Math Accumulator
+src: T27
+note: FFFF + 0003 = 00010002. The ring is the low 3 bytes of the MA, not all 4: each ring shift moves them left by one byte, and the top one comes round to the bottom.
+expect: MA=00020100
+CD
+10 FF FF
+11 01 00 03
+46 01 ; MA = 00010002
+0F 00
+17 01 ; MA = 00000201
+0F 00
+17 01 ; MA = 00020100
+F0 00 00
+
+## 18 | Set a bit in the Accumulator
+src: T28
+tidy: Removed DEBUG 00, which is the default.
+expect: A=0003 OUT=02,03
+CD
+10 00 02
+05 00
+C0 80
+18 01
+05 00
+C0 80
+F0 00 00
+
+## 19 18 | Set one bit and reset another
+src: T29
+tidy: Removed DEBUG 00, which is the default.
+expect: A=0005 OUT=84,85,05
+CD
+10 00 84
+05 00
+C0 80
+18 01
+05 00
+C0 80
+19 80
+05 00
+C0 80
+F0 00 00
+
+## 1A 18 19 A5 | Set, reset and test bits
+src: T30
+fix: The explanations said SETBITA 01 and TESTBITA 10 where the code has SETBITI 80 and TESTBITI 04. Now they match. Removed DEBUG 00.
+note: Bit 04 is set, so the program shows 11 and stops. If it were clear, the jump would show EE.
+expect: T=1 OUT=04,84,04,11
+CD
+10 00 04
+05 00
+C0 80
+18 80
+05 00
+C0 80
+19 80
+05 00
+C0 80
+1A 04
+A5 00 05
+04 11
+C0 80
+F0
+04 EE
+C0 80
+F0 00 00
+
+## 05 12 | Every byte of the Math Accumulator
+src: new
+note: A map of OUTA for the MA. Z=0 and 1 are the remainder; Z=2 to 5 are the number, low byte first.
+expect: MA=12345678 MAR=9ABC OUT=BC,9A,78,56,34,12
+CD
+12 71 12 34 56 78 9A BC 00 ; MA = 12345678, remainder 9ABC
+05 10
+05 11
+05 12
+05 13
+05 14
+05 15
+F0 00 00
+
+## 20 3B | Absolute memory mode
+src: T61
+note: In MEMMODE 00 an address means exactly that address, so R1 = 0000 is the very start of the firmware. Branches are absolute too. The first 8 bytes of memory are copied to 4100.
+expect: M4100~=00,00,00,00 E=00 R2=4100
+CD
+20 00
+11 01 00 00
+11 02 41 00
+3B 12 08
+F0 00 00
+
+## 21 | Copy the Accumulator to a register
+src: T31
+expect: R1=AABB
+CD
+10 AA BB
+21 01
+F0 00 00
+
+## 21 12 | Copy any accumulator to a register
+src: T32
+fix: LOADZAI 41 with 4 bytes and LOADZAI 82 with 8 bytes did not load what the text expected: see LOADZAI. Now each loads the whole accumulator.
+note: Only the low 2 bytes of the number are copied.
+expect: R1=AABB R2=5678 R3=3344
+CD
+10 AA BB
+12 71 12 34 56 78 00 00 00
+12 72 11 22 33 44 00 00 00
+21 01
+21 12
+21 23
+F0 00 00
+
+## 22 | Copy a register to an accumulator
+src: T33
+fix: Removed DEBUG 00. The explanations covered only the first two lines.
+note: The same register goes to the Accumulator, then the MA, then the Accumulator again.
+expect: A=4567 MA=00003456 R1=4567
+CD
+11 01 23 45
+22 01
+11 01 34 56
+22 11
+11 01 45 67
+22 01
+F0 00 00
+
+## 23 | Copy a register to a register: all, low byte, high byte
+src: T34
+fix: Removed the leftover LOADAI AABB and three WIPs, which did nothing for this example, and its stale notes ("COPY ACC TO MA", "COPY R0 TO R1"). Removed DEBUG 00.
+note: The Z of COPYXY is in the first byte: 00 both bytes, 01 the low byte, 02 the high byte.
+expect: R1=0102 R2=0102 R3=0002 R4=0100
+CD
+10 01 02
+21 01
+23 00 12
+23 01 13
+23 02 14
+F0 00 00
+
+## 23 | COPYXY refuses a Z in the wrong nibble
+src: T35 T36
+fix: T35 and T36 wrote the Z as 10 and 20. The Z is the low nibble (01 and 02), so both stopped with error 05 before copying anything. The right forms are in the example above.
+note: Shown here so you can recognise the error.
+expect: E=05 PL=4006 R2=0000
+CD
+10 01 02
+21 01
+23 10 12 ; The Z must be 00, 01 or 02: stops with error 05
+F0 00 00
+
+## 24 | Copy the Accumulator to the Math Accumulator
+src: T37
+expect: MA=0000ABCD
+CD
+10 AB CD
+24
+F0 00 00
+
+## 25 24 | Copy the Math Accumulator to the Accumulator
+src: T38
+fix: The text said AABB; the code loads ABCD. Removed DEBUG 07, which printed its trace to the display.
+note: ABCD goes into the Acc and the MA, then 1234 into the Acc, then the MA is copied back over it.
+expect: A=ABCD MA=0000ABCD
+CD
+10 AB CD
+24
+10 12 34
+25
+F0 00 00
+
+## 27 4D | Copy the remainder to the Accumulator
+src: T39 T40
+fix: Removed DEBUG 07. T39, for COPYAREM ($26), is gone: that opcode was retired and now stops with error 0F.
+note: 0125 / 0020 hex is 9 with 5 left over, and the 5 goes to the Accumulator.
+expect: A=0005 MA=00000009 MAR=0005
+CD
+11 01 01 25
+11 02 00 20
+4D 12
+27
+F0 00 00
+
+## 28 | Copy the Command Counter to the Accumulator
+src: T41
+tidy: Removed DEBUG 00, and made the program stop instead of looping for ever.
+note: The counter counts commands, not bytes: START, LOADAI, COPYAX and COPYCCA itself make 4, from 8 bytes.
+expect: A=0004
+CD
+10 01 01
+21 0F
+28 00
+F0 00 00
+
+## 28 | Copy the Command Counter to the Math Accumulator
+src: T42
+tidy: Removed DEBUG 00, and made the program stop instead of looping for ever.
+note: The MA has room for the whole count.
+expect: MA=00000004
+CD
+10 01 01
+21 0F
+28 01
+F0 00 00
+
+## 29 0C | Get the I/O byte back after the Accumulator changed
+src: T43
+note: SIPA leaves a copy of what it read in the I/O byte. Only the low byte of the Acc changes: the high byte stays 99.
+expect: A=9905 OUT=05
+CD
+0C 00
+10 99 99
+29
+05 00
+C0 FF
+F0 00 00
+
+## 2A | Copy the Accumulator to the I/O byte
+src: T44
+expect: IO=99
+CD
+0C 00
+10 99 99
+2A
+F0 00 00
+
+## 2B 49 | Read the high word of a big answer
+src: new
+note: A multiply can give more than 16 bits. COPYMAA gives the low word and COPYMAH the high word.
+expect: MA=0E014006 A=0E01
+CD
+11 01 20 02
+11 02 70 03
+4A 12
+2B
+F0 00 00
+
+## 2E 2F | Read and write an array by index
+src: new
+note: One command each for array[i] = v and v = array[i]. MM MM is the array's address and the register is the index, which is left unchanged.
+expect: A=0077 M4105=77 R1=0005
+CD
+11 01 00 05 ; i = 5
+10 00 77
+2F 01 01 00 ; array[i] = 77
+10 00 00 ; Clear the Acc to prove the read
+2E 01 01 00 ; Acc = array[i]
+F0 00 00
+
+## 31 | Save a byte at a memory location
+src: T45
+fix: Removed DEBUG 00. The text says "X0F0": memory mode is relative, so R2 = 00F0 means 40F0 here.
+expect: M40F0=88
+CD
+11 02 00 F0
+31 02 88
+F0 00 00
+
+## 31 42 | Save two bytes one after the other
+src: T46
+tidy: Removed DEBUG 00.
+expect: M40F0=AA,BB R2=00F1
+CD
+11 02 00 F0
+31 02 AA
+42 02
+31 02 BB
+F0 00 00
+
+## 32 | Save two bytes at a time
+src: T47
+fix: The two INCX R2 on one line are now two lines.
+expect: M40F0=AA,BB,CC,DD
+CD
+11 02 00 F0
+32 02 AA BB
+42 02
+42 02
+32 02 CC DD
+F0 00 00
+
+## 33 32 | Load the Accumulator from memory
+src: T48
+fix: The text said COPYMXA is not implemented yet: it is. Removed DEBUG 00.
+note: Memory holds 11 22 33 44 55 66 and R2 points at the second byte, so the Acc gets 2233.
+expect: A=2233 R2=00F1
+CD
+11 02 00 F0
+32 02 11 22
+42 02
+42 02
+32 02 33 44
+42 02
+42 02
+32 02 55 66
+11 02 00 F1
+33 02
+F0 00 00
+
+## 34 | Save the Accumulator to memory
+src: T49
+tidy: Removed DEBUG 00.
+expect: M40F0=DD,EE
+CD
+11 02 00 F0
+10 DD EE
+34 02
+F0 00 00
+
+## 34 46 | Save the Math Accumulator with its remainder
+src: T50
+fix: Removed DEBUG 00. The text said "the entire contents": it is 5 bytes, the low 3 of the number and the 2 of the remainder. The number's top byte is not saved.
+note: R1 was never set, so ADDAX adds 0 and the MA is DDEE.
+expect: MA=0000DDEE M40F0=00,DD,EE,00,00
+CD
+11 02 00 F0
+10 DD EE
+46 01
+34 12
+F0 00 00
+
+## 35 20 | Read firmware bytes into the DA and the Acc
+src: T51
+tidy: Removed DEBUG 07.
+note: In absolute mode R3 = 0010 points at the firmware itself, so what is read depends on the firmware. D is the number of bytes.
+expect: R3=0010 E=00 DA~=00000000 A~=0000
+CD
+20 00
+11 03 00 10
+35 04 23
+35 02 03
+F0 00 00
+
+## 35 | Read two bytes of this program
+src: T52
+note: R3 = 0005 points at the 35 of the next line, so the Acc gets 3502: the command reads itself.
+expect: A=3502
+CD
+11 03 00 05
+35 02 03
+F0 00 00
+
+## 36 | Save 2 bytes of the Accumulator
+src: T53
+expect: M40F0=34,56
+CD
+11 03 00 F0
+10 34 56
+36 02 03
+F0 00 00
+
+## 36 46 | Save 2 bytes of the Math Accumulator
+src: T54
+note: 3456 + 00F0 = 3546.
+expect: MA=00003546 M40F0=35,46
+CD
+11 03 00 F0
+10 34 56
+46 03
+36 02 13
+F0 00 00
+
+## 36 6B | Save the Decimal Accumulator
+src: T55
+fix: COPYIAMX 04 3 R3 is refused with error 0C: Z=3 is not an accumulator, it should be 2. CVT2DEC 03 was also a bad form, it should be Z=1 for the MA.
+note: 3546 hex is 13638 in decimal.
+expect: DA=00013638 M40F0=00,01,36,38 E=00
+CD
+11 03 00 F0
+10 34 56
+46 03
+6B 10
+36 04 23
+F0 00 00
+
+## 37 | Load chosen bytes of an accumulator from memory
+src: T56
+fix: Removed DEBUG 00. The explanation was cut off.
+note: The 2 bytes BB CC go into the MA starting at its byte 1, then at its byte 0, then into the DA at its byte 0.
+expect: MA=BBCCCC00 DA=BBCC0000
+CD
+11 02 02 00
+31 02 BB
+42 02
+31 02 CC
+43 02
+37 21 12
+0F 00
+37 20 12
+0F 00
+37 20 22
+F0 00 00
+
+## 38 | Save chosen bytes of the Accumulator to memory
+src: T57
+tidy: Removed DEBUG 00.
+expect: M40F0=02,03
+CD
+11 02 00 F0
+10 02 03
+38 20 02
+F0 00 00
+
+## 39 | Load a register from memory
+src: T58
+expect: R3=1234
+CD
+11 02 00 F0
+32 02 12 34
+39 02 23
+F0 00 00
+
+## 3A | Save a register to memory
+src: T59
+expect: M40F0=01,02
+CD
+11 0A 00 F0
+11 01 01 02
+3A 02 1A
+F0 00 00
+
+## 3B | Copy a block of memory
+src: T60
+note: Relative mode: the first 8 bytes of this program are copied to 4100, so CD 11 01 00 00 11 02 01 appears there.
+expect: M4100=CD,11,01,00,00,11,02,01
+CD
+11 01 00 00
+11 02 01 00
+3B 12 08
+F0 00 00
+
+## 3C | Copy a block until a register is reached
+src: T62
+note: When you set the memory mode to absolute, branch instructions go to the literal address too, so be careful. This copies firmware 0000 up to 01FF to 4100.
+expect: R3=01FF E=00
+CD
+20 00
+11 01 00 00
+11 02 41 00
+11 03 01 FF
+3C 12 03
+F0 00 00
+
+## 3D | Compare the Accumulator with memory
+src: T63
+note: Memory and the Acc both hold 3010, so the program branches to 0020 and shows AA. If they differed it would show EE.
+expect: T=1 OUT=AA
+CD
+11 01 00 F0
+32 01 30 10
+10 30 10
+3D 01
+A0 00 20
+04 EE
+0F 00
+F0
+@4020
+04 AA
+0F 00
+F0 00 00
+
+## 40 | Increment the Accumulator
+src: T64 T65
+tidy: T65 was the same program. Added the end marker.
+note: Counts up for ever, showing the low byte.
+run: stop=20
+CD
+10 01 FF
+05 00
+C0 40
+loop:
+40
+05 00
+C0 40
+B0 {loop}
+F0 00 00
+
+## 40 93 | Does INCA set the Carry flag?
+src: T66
+fix: The explanation said FFFF; the code loaded FEFF, which took 257 passes. Now FFFE, so it takes two. The loop target was right. Removed DEBUG 00.
+note: When the Accumulator wraps from FFFF to 0000 the Carry flag is set, and the loop ends with Q on.
+expect: A=0000 C=1 Q=1 OUT=FE,FF,00
+CD
+10 FF FE
+05 00
+C0 40
+loop:
+40
+05 00
+C0 40
+93
+A1 {loop}
+0A 01
+F0 00 00
+
+## 41 | Simple decrement
+src: T67
+expect: A=0004 OUT=05,04
+CD
+10 00 05
+05 00
+C0 40
+41
+05 00
+C0 40
+F0 00 00
+
+## 41 8D | Count down to zero using DECA
+src: T68
+tidy: Removed DEBUG 00.
+expect: A=0000 OUT=05,04,03,02,01
+CD
+10 00 05
+loop:
+05 00
+C0 FF
+41
+8D 00
+A1 {loop}
+F0 00 00
+
+## 42 | Increment a register
+src: T69
+expect: R1=0006 OUT=05,06
+CD
+11 01 00 05
+06 01
+C0 40
+42 01
+06 01
+C0 40
+F0 00 00
+
+## 42 | Count up in a register for ever
+src: T70
+fix: The explanations described a test and a branch to 3004 that are not in the code: this one simply counts.
+run: stop=20
+CD
+11 01 00 00
+loop:
+06 01
+C0 10
+42 01
+B0 {loop}
+F0 00 00
+
+## 42 8C | Count in decimal
+src: T71
+fix: The explanation said the branch goes to 3004. It goes to 4007. Removed DEBUG 00.
+note: INCX with Z=1 keeps the register as decimal digits: 09 is followed by 10, and 99 by 0100. The test on the low byte ends the count at 100.
+expect: R1=0100
+CD
+11 01 00 00
+loop:
+06 01
+C0 10
+42 11
+8C 11
+A1 {loop}
+F0 00 00
+
+## 43 | Decrement a register
+src: T72
+fix: The explanation said 0005; the code loads 0105.
+expect: R1=0104 OUT=05,04
+CD
+11 01 01 05
+06 01
+C0 40
+43 01
+06 01
+C0 40
+F0 00 00
+
+## 43 B7 | Count down with a loop command
+src: T73
+fix: The explanations said 0101 and 3004; the code has 0031 and 4005.
+note: LOOPXI goes back until the register reaches 0000.
+expect: R1=0000
+CD
+11 01 00 31
+loop:
+06 01
+C0 30
+43 01
+B7 01 {loop}
+F0 00 00
+
+## 44 05 | Add two registers and show both bytes
+src: T74
+fix: It printed OUTA 14 and OUTA 13, which are 00 and A1, so the low byte of the answer was never shown. Now OUTA 13 and OUTA 12. The explanation also said R2 was 0002; it is A002.
+expect: MA=0000A105 OUT=A1,05
+CD
+11 01 01 03
+11 02 A0 02
+44 12
+05 13
+C0 FF
+05 12
+C0 FF
+F0 00 00
+
+## 44 21 | Keep adding
+src: T75
+fix: The explanation said 0103; the code loads 0003.
+tidy: Removed DEBUG 00.
+note: R1 is added to R2, and the answer becomes the new R2, so it goes up by 3 each time.
+run: stop=20
+CD
+11 01 00 03
+11 02 00 02
+B3 01
+44 12
+05 13
+C0 FF
+05 12
+C0 FF
+21 12
+B4 01
+F0 00 00
+
+## 45 93 | Subtract, with a negative answer
+src: T76
+fix: The text said the sign byte is at 3027, which is no longer so. When the answer is negative, Carry is set and the MA holds its size.
+tidy: Removed DEBUG 00.
+note: 57A4 - 5864 is C0 below zero: the MA holds 00C0 and Carry is 1, so Q comes on.
+expect: MA=000000C0 C=1 Q=1
+CD
+11 01 57 A4
+11 02 58 64
+45 12
+93
+A5 00 03
+0A 01
+F0 00 00
+
+## 45 8D | Count down by 2's
+src: T77
+fix: OUTA 13 showed the high byte, which stayed 00: now OUTA 12. It subtracted from 0100, which took 128 long delays: now 0010. Removed a NOP and DEBUG 00.
+note: R1 stays 0010 while R2 goes up by 2, so the MA goes down by 2 until it is zero.
+expect: MA=00000000 OUT=0E,0C,0A,08,06,04,02,00
+CD
+11 01 00 10
+11 02 00 02
+loop:
+45 12
+05 12
+C0 FF
+42 02
+42 02
+8D 01
+A1 {loop}
+F0 00 00
+
+## 46 | Add the Accumulator and a register
+src: T78
+expect: MA=00003579 OUT=35,79
+CD
+11 01 12 34
+10 23 45
+46 01
+05 13
+C0 FF
+05 12
+C0 FF
+F0 00 00
+
+## 47 | Subtract a register from the Accumulator
+src: T79
+fix: OUTA 14 and 13 showed 00 and 00. Now 13 and 12 show the answer. 2445 - 2447 is negative: the MA holds 2 and Carry is 1.
+expect: MA=00000002 C=1 OUT=00,02
+CD
+11 01 24 47
+10 24 45
+47 01
+05 13
+C0 FF
+05 12
+C0 FF
+F0 00 00
+
+## 48 | Subtract the Accumulator from a register
+src: T80
+fix: OUTA 14 and 13 showed 00 and 01. Now 13 and 12 show the answer.
+tidy: Removed DEBUG 00.
+expect: MA=00000131 OUT=01,31
+CD
+11 01 01 33
+10 00 02
+48 01
+05 13
+C0 FF
+05 12
+C0 FF
+F0 00 00
+
+## 49 | Multiply a register by the Accumulator
+src: T81
+fix: The loop only repeated the same multiply with an unused INCA. Removed.
+note: 01FF x 0082 = 1037E: too big for 16 bits, and the MA holds it all.
+expect: MA=0001037E
+CD
+11 01 01 FF
+10 00 82
+49 01
+F0 00 00
+
+## 49 | A simple multiply
+src: T82
+tidy: Removed DEBUG 00.
+expect: MA=0000400A
+CD
+11 01 00 02
+10 20 05
+49 01
+F0 00 00
+
+## 49 05 | A times table
+src: T83
+fix: GAL 0009 landed in the middle of LOADAI and stopped with error 12. It should go to 000A, the MULTXA. OUTA 13 is the high byte, so it is shown with the low byte now.
+tidy: Removed DEBUG 00.
+note: 0105 x 2, x 3, x 4 ... one step for each press of the Input key.
+run: stop=12
+CD
+11 01 00 02
+10 01 05
+loop:
+49 01
+05 13
+0F 00
+05 12
+0F 00
+42 01
+B0 {loop}
+F0 00 00
+
+## 4A | Multiply two registers
+src: T84
+tidy: Removed DEBUG 00.
+expect: MA=0000E006
+CD
+11 01 00 02
+11 02 70 03
+4A 12
+F0 00 00
+
+## 4A | A 32-bit answer
+src: T85
+tidy: Removed DEBUG 00.
+expect: MA=0E014006
+CD
+11 01 20 02
+11 02 70 03
+4A 12
+F0 00 00
+
+## 4A B8 | Multiply in a loop
+src: T86
+tidy: Removed DEBUG 00.
+note: 00F0 x 1, x 2 ... x 80.
+expect: MA=00007800 R2=0081 R3=0000
+CD
+11 01 00 F0
+11 02 00 01
+11 03 00 80
+B3 01
+4A 12
+42 02
+43 03
+C0 FF
+B8 03 01
+F0 00 00
+
+## 4A 34 52 | A table of squares in memory
+src: T87
+tidy: Removed DEBUG 00 and a NOP.
+note: 1 x 1, 2 x 2 ... 80 x 80, saved 3 bytes apart from 4200 up.
+expect: MA=00004000 M4200=00,00,01,00,00,04,00,00,09 R4=0380
+CD
+11 01 00 01
+11 02 00 01
+11 03 00 80
+11 04 02 00
+B3 01
+06 01
+4A 12
+34 14
+42 01
+42 02
+43 03
+52 04 00 03
+B8 03 01
+F0 00 00
+
+## 4B | Divide the Accumulator by a register
+src: T88
+note: AA / 23 hex is 4, with 1E left over.
+expect: MA=00000004 MAR=001E
+CD
+10 00 AA
+11 01 00 23
+4B 01
+F0 00 00
+
+## 4C | Divide a register by the Accumulator
+src: T89
+note: F7 / 2 hex is 7B, with 1 left over.
+expect: MA=0000007B MAR=0001
+CD
+11 01 00 F7
+10 00 02
+4C 01
+F0 00 00
+
+## 4D | Divide one register by another
+src: T90
+tidy: Removed DEBUG 00.
+expect: MA=00004D36 MAR=0002
+CD
+11 01 E7 A4
+11 02 00 03
+4D 12
+F0 00 00
+
+## 4E | Add to the Accumulator
+src: T91
+expect: A=1011
+CD
+10 00 10
+4E 10 01
+F0 00 00
+
+## 4F | Subtract from the Accumulator
+src: T92
+note: 0010 - 1001 goes below zero, so the Accumulator wraps round and Carry is set.
+expect: A=F00F C=1
+CD
+10 00 10
+4F 10 01
+F0 00 00
+
+## 50 | Add two registers into a third
+src: T93
+tidy: Removed DEBUG 00.
+expect: R3=1011
+CD
+11 01 00 10
+11 02 10 01
+50 12 03
+F0 00 00
+
+## 51 | Subtract two registers into a third
+src: T94
+tidy: Removed DEBUG 00.
+expect: R3=F00F C=1
+CD
+11 01 00 10
+11 02 10 01
+51 12 03
+F0 00 00
+
+## 52 | Add a number to a register
+src: T95
+tidy: Removed DEBUG 00.
+expect: R1=0018
+CD
+11 01 00 10
+52 01 00 03
+52 01 00 05
+F0 00 00
+
+## 53 | Subtract a number from a register
+src: T96
+tidy: Removed DEBUG 00.
+note: 0001 - 0003 wraps round to FFFE.
+expect: R1=FFFE OUT=FE
+CD
+11 01 00 01
+53 01 00 03
+06 01
+0F 00
+F0 00 00
+
+## 54 | Add two bytes in memory
+src: T97
+tidy: Removed DEBUG 00.
+note: Memory holds 01 and 03. 11 means one byte, added onto the MA.
+expect: MA=00000004
+CD
+11 01 01 00
+11 02 01 01
+32 01 01 03
+54 11 12
+F0 00 00
+
+## 55 | Subtract two bytes in memory
+src: T98
+tidy: Removed DEBUG 00.
+expect: MA=0000001F
+CD
+11 01 01 00
+11 02 01 01
+32 01 22 03
+55 11 12
+F0 00 00
+
+## 56 | Add a byte from memory to the Accumulator
+src: T99
+expect: MA=0000010B
+CD
+11 01 00 F0
+10 01 05
+31 01 06
+56 11
+F0 00 00
+
+## 56 | Add two bytes from memory to the Accumulator
+src: T100
+expect: MA=0000230B
+CD
+11 01 00 F0
+10 01 05
+32 01 22 06
+56 21
+F0 00 00
+
+## 57 | Subtract a byte in memory from the Accumulator
+src: T101
+fix: The explanation said 06; the code saves 08.
+expect: MA=000000FD OUT=AA
+CD
+11 01 00 F0
+10 01 05
+31 01 08
+57 11
+04 AA
+0F 00
+F0 00 00
+
+## 57 | Subtract two bytes in memory from the Accumulator
+src: T102
+expect: MA=000003FF
+CD
+11 01 00 F0
+10 05 05
+32 01 01 06
+57 21
+F0 00 00
+
+## 58 | Multiply the Accumulator by memory
+src: T103
+expect: MA=00000408
+CD
+11 01 00 F0
+10 01 02
+32 01 00 04
+58 01
+F0 00 00
+
+## 59 | Divide the Accumulator by memory
+src: T104
+expect: MA=00000056
+CD
+11 01 00 F0
+10 01 02
+32 01 00 03
+59 01
+F0 00 00
+
+## 5A | Multiply two values in memory
+src: new
+fix: The document's heading gave this a DZ byte and it had no program. In the firmware it takes one operand, XY.
+note: M(R1) holds 0012 and M(R2) holds 0010.
+expect: MA=00000120
+CD
+11 01 00 F0
+11 02 00 F2
+32 01 00 12
+32 02 00 10
+5A 12
+F0 00 00
+
+## 5B | Divide two values in memory
+src: new
+fix: The document's heading gave this a DZ byte and it had no program. In the firmware it takes one operand, XY.
+note: M(R1) holds 0123 and M(R2) holds 0010.
+expect: MA=00000012 MAR=0003
+CD
+11 01 00 F0
+11 02 00 F2
+32 01 01 23
+32 02 00 10
+5B 12
+F0 00 00
+
+## 5C | Divide the whole Math Accumulator
+src: new
+note: Not in the document. The other divides take 16 bits; DIVMAX divides all 32 bits of the MA by a register. 12345678 / 1000 hex.
+expect: MA=00012345 MAR=0678
+CD
+12 71 12 34 56 78 00 00 00
+11 01 10 00
+5C 01
+F0 00 00
+
+## 60 | Shift the Accumulator left twice
+src: T107
+tidy: Removed DEBUG 07, which printed a trace to the display.
+expect: A=FC04 C=1
+CD
+10 FF 01
+60 00
+60 00
+F0 00 00
+
+## 60 8D | Shift left until all the bits are gone
+src: T108
+fix: IFFALSEI 0005 landed inside the LOADAI and stopped with error 08. It should go to the SHIFTBA: 0006 in the old listing.
+tidy: Removed DEBUG 07.
+expect: A=0000 E=00
+CD
+10 FF 01
+loop:
+60 00
+8D 00
+A1 {loop}
+F0 00 00
+
+## 60 8D | Shift right until all the bits are gone
+src: T109
+fix: IFFALSEI 0005 landed inside the LOADAI and stopped with error 08.
+tidy: Removed DEBUG 07.
+expect: A=0000 E=00
+CD
+10 FF 01
+loop:
+60 02
+8D 00
+A1 {loop}
+F0 00 00
+
+## 60 | Ring shift left for ever
+src: T110
+fix: GAL 0005 landed inside the LOADAI and stopped with error 08.
+tidy: Removed DEBUG 07.
+note: Bits leaving the top come back in at the bottom. Nothing is lost, so it never ends.
+run: stop=20
+CD
+10 FF 01
+loop:
+60 01
+B0 {loop}
+F0 00 00
+
+## 60 | Ring shift right for ever
+src: T111
+fix: GAL 0005 landed inside the LOADAI and stopped with error 08.
+tidy: Removed DEBUG 07.
+run: stop=20
+CD
+10 FF 01
+loop:
+60 03
+B0 {loop}
+F0 00 00
+
+## 60 | Shift only one byte of the Accumulator
+src: new
+note: The D of SHIFTBA picks the part: 0 both bytes, 1 the low byte, 2 the high byte. The other byte stays as it was.
+expect: A=8102
+CD
+10 81 01
+60 10 ; Low byte left: 01 becomes 02
+F0 00 00
+
+## 61 | Shift a register right
+src: T112
+tidy: Removed DEBUG 07.
+note: The first digit of the operand is the register, the second the shift: 0 left, 1 ring left, 2 right, 3 ring right.
+expect: R1=0004
+CD
+11 01 00 08
+61 12
+F0 00 00
+
+## 61 06 | Ring shift a register right
+src: T113
+expect: R1=8001 OUT=00,03,80,01
+CD
+11 01 00 03
+06 11
+C0 40
+06 01
+C0 80
+61 13
+06 11
+C0 40
+06 01
+C0 80
+F0 00 00
+
+## 62 | Shift the Math Accumulator left
+src: T114
+note: 3 x 5 = F, and one shift left doubles it.
+expect: MA=0000001E
+CD
+11 01 00 03
+11 02 00 05
+4A 12
+0F 00
+62 00
+F0 00 00
+
+## 63 | OR a register with the Accumulator
+src: T115
+expect: MA=00003333
+CD
+10 22 11
+11 01 11 22
+63 01
+F0 00 00
+
+## 63 | OR a register with a number
+src: T116
+expect: MA=00003367
+CD
+11 01 11 22
+63 11 23 45
+F0 00 00
+
+## 64 | XOR a register with a number
+src: T117
+fix: The program had no number after 64 12, so the end marker F0 00 was used as the number and the program ran on. Added F0 00 as a real number, then an end marker.
+expect: MA=0000C3E8
+CD
+11 01 22 AA
+11 02 33 E8
+64 12 F0 00
+F0 00 00
+
+## 64 | XOR a register with the Accumulator
+src: new
+note: XOR with itself always gives zero.
+expect: MA=00000000
+CD
+10 12 34
+21 01
+64 01
+F0 00 00
+
+## 65 | AND a register with a number
+src: T118
+fix: As for XOR: no number followed 65 12.
+note: AND with F000 keeps only the top four bits.
+expect: MA=00003000
+CD
+11 01 22 AA
+11 02 33 E8
+65 12 F0 00
+F0 00 00
+
+## 65 | AND a register with the Accumulator
+src: new
+expect: MA=00000F00
+CD
+10 0F F0
+11 01 FF 00
+65 01
+F0 00 00
+
+## 6A | Clear each accumulator
+src: new
+note: The document's table was empty.
+expect: A=0000 MA=00000000 DA=00000000
+CD
+10 12 34
+12 71 12 34 56 78 00 00 00
+12 72 11 22 33 44 00 00 00
+6A 00
+6A 01
+6A 02
+F0 00 00
+
+## 6B | Convert the Accumulator to decimal
+src: T120
+fix: The COPYAMA was not needed: Z=0 converts the Accumulator. The listing's "CVT2DEC R0" is Z=0, X=0.
+note: FFFA is 65530 in decimal.
+expect: DA=00065530
+CD
+10 FF FA
+6B 00
+F0 00 00
+
+## 6B 05 | Count in decimal on the display
+src: T121
+fix: OUTA 24 shows the hundreds, so it stayed 00: OUTA 23 shows the last two digits. GAL 0004 jumped back to a COPYAMA that was not needed. Removed.
+note: A hex counter that displays in decimal: 09 is followed by 10.
+run: stop=20
+CD
+10 00 01
+loop:
+6B 00
+05 23
+40
+C0 FF
+B0 {loop}
+F0 00 00
+
+## 6B 4B | Convert the Math Accumulator to decimal
+src: T122
+fix: 001E / 001F is 0 with a remainder, which is not much of a test. Now 0100 / 0003: the answer is 55 hex, 85 in decimal.
+expect: MA=00000055 DA=00000085
+CD
+10 01 00
+11 02 00 03
+4B 02
+6B 10
+F0 00 00
+
+## 6B | Convert a register to decimal
+src: new
+note: Z=2 converts a register, with no need to go through an accumulator.
+expect: DA=00004660
+CD
+11 05 12 34
+6B 25
+F0 00 00
+
+## 6C | Convert decimal 12345 to hex
+src: T123
+note: Seven bytes would fill the DA; six reach its number and remainder. 12345 decimal is 3039 hex.
+expect: DA=00012345 MA=00003039
+CD
+12 62 01 23 45 00 00 00
+0F 00
+6C
+F0 00 00
+
+## 6C 6B | To decimal and back
+src: T124
+note: AA + 22 = CC, which is 204 in decimal. ADDXY then changes the MA, and CVT2HEX brings the CC back from the DA.
+expect: DA=00000204 MA=000000CC
+CD
+11 01 00 AA
+11 02 00 22
+44 12
+6B 10
+44 22
+0F 00
+6C
+F0 00 00
+
+## 6D | Math results go to the DA by themselves
+src: T125 T126
+fix: T125 and T126 still held bytes from an older opcode set (50, and F6 41) and showed nothing about the flag. Rewritten.
+note: With SETHEXDEC 01 every math result also appears in the DA as decimal, with no CVT2DEC. 0100 + 0002 = 0102 hex, 258 in decimal.
+expect: HEX=01 MA=00000102 DA=00000258
+CD
+6D 01
+11 01 01 00
+11 02 00 02
+44 12
+F0 00 00
+
+## 6E 6B | Print a number on the terminal
+src: new
+note: Not in the document. OUTDEC sends the DA to the terminal as text, with no leading zeros.
+expect: SER=65530
+CD
+10 FF FA
+6B 00
+6E
+F0 00 00
+
+## 70 | Push the Accumulator
+src: T130
+fix: The heading says $72. PUSHA is $70 since the stack opcodes were renumbered; the code was right.
+note: The stack grows down from FF, 2 bytes for each push.
+expect: A=3344 SP=FB
+CD
+10 11 22
+70 00
+10 33 44
+70 00
+F0 00 00
+
+## 70 | Push the Math Accumulator
+src: T131
+expect: MA=00004466 SP=F9
+CD
+10 11 22
+11 01 33 44
+46 01
+70 01
+F0 00 00
+
+## 70 | Push the Decimal Accumulator
+src: T132
+expect: DA=00017510 SP=F7
+CD
+10 11 22
+11 01 33 44
+46 01
+6B 10
+70 02
+F0 00 00
+
+## 71 70 | Pop the Accumulator
+src: T133
+fix: The heading says $73: POPA is $71.
+tidy: Removed DEBUG 00.
+note: Last in, first out: 3344 comes off first, then 1122.
+expect: A=1122 SP=FF
+CD
+10 11 22
+70 00
+10 33 44
+70 00
+0F 00
+71 00
+0F 00
+71 00
+F0 00 00
+
+## 72 | Push registers
+src: T134
+fix: The heading says $74: PUSHX is $72.
+expect: SP=FB
+CD
+11 01 55 66
+72 01
+11 02 77 88
+72 02
+F0 00 00
+
+## 72 B7 | Push twenty times
+src: T135
+expect: R1=0000 SP=D7
+CD
+11 01 00 14
+loop:
+72 01
+43 01
+B7 01 {loop}
+F0 00 00
+
+## 73 72 | Swap two registers on the stack
+src: T136
+fix: The heading says $75: POPX is $73.
+note: Push R1 then R2, and pop them in the same order, and they change places.
+expect: R1=7788 R2=5566 SP=FF
+CD
+11 01 55 66
+72 01
+11 02 77 88
+72 02
+73 01
+73 02
+F0 00 00
+
+## 74 | Push a byte of memory
+src: T137
+fix: 74 0A has Z=0, which pushes 16 bytes, not 1. Now 74 1A. The heading says $76: PUSHMX is $74.
+tidy: Removed DEBUG 00.
+expect: SP=FE
+CD
+11 0A 03 00
+31 0A 33
+74 1A
+F0 00 00
+
+## 75 74 | Push and pop bytes of memory
+src: T138
+fix: 74 0A pushed 16 bytes, and 75 01 popped 16 bytes on top of the program at R1 = 0000. Now one byte at a time, into the two bytes at 00F1.
+tidy: Removed DEBUG 00.
+note: 33 then 44 go on the stack, and come off in the other order.
+expect: M40F1=44,33 SP=FF
+CD
+11 0A 00 F0
+31 0A 33
+74 1A
+31 0A 44
+74 1A
+11 01 00 F1
+11 02 00 F2
+75 11
+75 12
+F0 00 00
+
+## 74 75 | Copy a block through the stack
+src: new
+note: PUSHMX walks down and POPMX walks up, so to copy in order, push from the end of the block and pop from the start.
+expect: M4101=11,22,33 SP=FF
+CD
+11 01 00 F0
+32 01 11 22
+11 01 00 F2
+31 01 33
+74 31 ; Push 33 22 11, from 00F2 down
+11 02 01 01
+75 32 ; Pop them to 0101 up
+F0 00 00
+
+## 76 | Push special bytes
+src: T139
+fix: The heading says $78: PUSHS is $76.
+note: Each one is one byte: the memory mode, DATADIR and the hex flag.
+expect: SP=FC
+CD
+76 02
+76 03
+76 04
+F0 00 00
+
+## 76 0D | Push every special byte
+src: T140
+fix: Z=5 is unassigned and does nothing, so that line is gone.
+tidy: Removed DEBUG 00.
+expect: A=0005 SP=F9
+CD
+0D 00
+76 00
+76 01
+76 02
+76 03
+76 04
+76 06
+F0 00 00
+
+## 77 76 | Save and restore the hex flag
+src: T141
+fix: The heading says $79: POPS is $77.
+tidy: Removed DEBUG 07.
+expect: HEX=01 SP=FF
+CD
+6D 01
+76 04
+6D 00
+77 04
+F0 00 00
+
+## 78 79 | Save the Q state, change it, get it back
+src: T143 T144
+fix: The heading says $7A: PUSHQ is $78. The old program pushed four times and never popped; POPQ's table was empty. Together they make a better example.
+note: Q is on, and is saved. It goes off for a while. POPQ turns it back on.
+expect: Q=1 SP=FF
+CD
+0A 01
+78
+0A 00
+C0 40
+79
+F0 00 00
+
+## 80 A0 | Test the Accumulator against a register
+src: T146
+note: Both hold 5566, so the program branches and shows AA. If not, it would show BB.
+expect: T=1 OUT=AA
+CD
+10 55 66
+21 0E
+10 55 66
+80 0E
+A0 {same}
+04 BB
+C0 80
+F0
+same:
+04 AA
+C0 80
+F0 00 00
+
+## 81 A1 | Test the Accumulator against a number
+src: T147
+expect: A=AABC T=1 OUT=AA
+CD
+10 AA BB
+40
+81 AA BC
+A1 {done}
+04 AA
+C0 FF
+done:
+F0 00 00
+
+## 82 | Is the Accumulator the same as the Math Accumulator?
+src: T148
+fix: TESTAMA now takes an operand: 0 tests the low 2 bytes of the MA, 1 the high 2. The old code had none, so the next byte was swallowed and the program stopped.
+expect: T=1 OUT=AA
+CD
+10 AA BB
+24
+10 AA BB
+82 00
+A1 {done}
+04 AA
+C0 80
+done:
+F0 00 00
+
+## 83 | Wait until the switches match the Accumulator
+src: T149
+note: The switches are set to 02 here, so it passes first time. Any other value loops back.
+run: sw=02
+expect: T=1 OUT=AA,00
+CD
+loop:
+0C 00
+10 00 02
+83
+A1 {loop}
+04 AA
+C0 60
+04 00
+F0 00 00
+
+## 84 | Wait until the switches match a number
+src: T150
+run: sw=02
+expect: T=1 OUT=AA,00
+CD
+loop:
+0C 00
+84 02
+A1 {loop}
+04 AA
+C0 60
+04 00
+F0 00 00
+
+## 85 | Is the Accumulator the same as the Decimal Accumulator?
+src: T151
+fix: TESTADA now takes an operand, like TESTAMA. The old code had none, so the program stopped.
+note: 0100 + 0102 = 0202 hex, and that is 514 in decimal. The Acc holds the digits 0514.
+expect: DA=00000514 T=1 OUT=AA
+CD
+11 01 01 00
+11 02 01 02
+44 12
+6B 10
+10 05 14
+85 00
+A1 {done}
+04 AA
+C0 80
+done:
+F0 00 00
+
+## 86 | Test the high byte of a register
+src: T152
+expect: T=1 OUT=AA
+CD
+11 01 00 22
+11 02 01 23
+86 22 01 23
+A1 {done}
+04 AA
+C0 60
+done:
+F0 00 00
+
+## 86 | Test the low byte of a register
+src: T153
+expect: T=1 OUT=AA
+CD
+11 01 00 23
+11 02 01 23
+86 11 00 23
+A1 {done}
+04 AA
+C0 60
+done:
+F0 00 00
+
+## 86 | Test both bytes of a register
+src: T154
+expect: T=1 OUT=AA
+CD
+11 01 01 23
+11 02 01 23
+86 02 01 23
+A1 {done}
+04 AA
+C0 FF
+done:
+F0 00 00
+
+## 86 | All three forms in one program
+src: T155
+note: Five tests of R1 = 1234, showing 11, 22, 33 for the three that match. The last two compare 9934 and show EE: the high byte does not match, so both are false.
+expect: OUT=11,22,33,EE,EE
+CD
+11 01 12 34
+86 01 12 34 ; Z=0: both bytes match
+A1 {e1}
+04 11
+C0 40
+B0 {t2}
+e1:
+04 EE
+C0 40
+t2:
+86 11 99 34 ; Z=1: the low byte, 34, matches
+A1 {e2}
+04 22
+C0 40
+B0 {t3}
+e2:
+04 EE
+C0 40
+t3:
+86 21 12 99 ; Z=2: the high byte, 12, matches
+A1 {e3}
+04 33
+C0 40
+B0 {t4}
+e3:
+04 EE
+C0 40
+t4:
+86 01 99 34 ; Z=0: the high byte does not match
+A1 {e4}
+04 44
+C0 40
+B0 {t5}
+e4:
+04 EE
+C0 40
+t5:
+86 21 99 34 ; Z=2: the high byte does not match
+A1 {e5}
+04 55
+C0 40
+B0 {end}
+e5:
+04 EE
+C0 40
+end:
+F0 00 00
+
+## 87 | Are two registers the same?
+src: T156
+expect: T=1 OUT=AA
+CD
+11 01 01 22
+11 02 01 22
+87 12
+A1 {done}
+04 AA
+C0 60
+done:
+F0 00 00
+
+## 88 | Is one register greater than or equal to another?
+src: T157
+tidy: Added the end marker.
+note: R1 starts below R2, so it shows BB, then AA for ever once R1 reaches 0122.
+run: stop=120
+expect: T=1
+CD
+11 01 01 1A
+11 02 01 22
+loop:
+88 12
+A1 {less}
+04 AA
+B0 {next}
+less:
+04 BB
+next:
+C0 50
+42 01
+B0 {loop}
+F0 00 00
+
+## 88 0E | Compare the switches with 0020
+src: T158
+tidy: Added the end marker.
+note: The switches are 05 here: 0020 >= 0005, so it shows BB each time the Input key is pressed.
+run: stop=20
+expect: T=1 R2=0005
+CD
+11 01 00 20
+loop:
+0E 02
+88 12
+A0 {yes}
+04 AA
+B0 {loop}
+yes:
+04 BB
+B0 {loop}
+F0 00 00
+
+## 89 | Is one register less than another?
+src: T159
+fix: The explanation column held old D-lines from another listing.
+note: R1 starts above R2, so it shows BB until R1 has counted down below R2. Then it shows AA.
+run: stop=60
+expect: T=1
+CD
+11 01 01 24
+11 02 01 22
+loop:
+89 12
+A1 {not}
+04 AA
+B0 {next}
+not:
+04 BB
+next:
+0F 00
+43 01
+B0 {loop}
+F0 00 00
+
+## 89 0E | Is 0020 less than the switches?
+src: T160
+tidy: The end marker had two extra zeros.
+note: The switches are 40 here, so R1 is less and it shows BB.
+run: sw=40 stop=20
+expect: T=1 R2=0040
+CD
+11 01 00 20
+loop:
+0E 02
+89 12
+A0 {yes}
+04 AA
+B0 {loop}
+yes:
+04 BB
+B0 {loop}
+F0 00 00
+
+## 8A 6B | Is the Decimal Accumulator greater than a register?
+src: T161
+fix: 6B 11 converts the MA, which never changes, so the program never ended. 6B 21 converts R1. It tests greater than, not greater than or equal. The DA holds decimal digits but is compared as raw bytes: 10 decimal is the byte 10, more than 09.
+expect: R1=000A DA=00000010 T=1
+CD
+11 01 00 05
+11 02 00 09
+loop:
+6B 21
+8A 02
+A0 {done}
+0F 00
+42 01
+B0 {loop}
+done:
+F0 00 00
+
+## 8B | Wait for the Command Counter
+src: T162
+note: Loops until 2000 hex commands have run, then Q comes on.
+expect: T=1 Q=1 OUT=AA
+CD
+11 01 20 00
+loop:
+8B 01
+A1 {loop}
+04 AA
+0A 01
+C0 FF
+F0 00 00
+
+## 8C | Count down until the high byte of a register is zero
+src: T163
+expect: RF=00FF T=1
+CD
+11 0F 01 0F
+loop:
+06 0F
+C0 FF
+43 0F
+8C 2F
+A1 {loop}
+F0 00 00
+
+## 8D | Is the Accumulator zero?
+src: T164
+expect: A=0000 T=1 OUT=AA
+CD
+10 FF FF
+40
+8D 00
+A0 {zero}
+F0
+zero:
+04 AA
+0F 00
+F0 00 00
+
+## 8E | Is the remainder zero?
+src: T165
+fix: The WIP was missing its operand, so the end marker's F0 was taken for it.
+note: 0202 / 2 divides exactly.
+expect: MA=00000101 T=1 OUT=AA
+CD
+11 01 02 02
+10 00 02
+4C 01
+8E
+A1 {done}
+04 AA
+0F 00
+done:
+F0 00 00
+
+## 8F | Is the Decimal remainder zero?
+src: new
+note: The document's table was empty. The DA here is 12345 with no remainder, then one is added.
+expect: DA=00012345 DAR=000001 T=0
+CD
+12 72 00 01 23 45 00 00 00
+8F
+A1 {bad}
+12 72 00 01 23 45 00 00 01
+8F
+F0 00 00
+bad:
+04 EE
+F0 00 00
+
+## 90 0D | Is the Accumulator in a range?
+src: T167
+fix: IFFALSEI 0014 and GAL 0008 both landed inside an instruction: the targets are 0015 and 0009. Added the end marker.
+note: The switches are 05 here, in the range 1 to 9, so 05 is shown. A number outside the range would show EE.
+run: stop=12
+expect: T=1 A=0005
+CD
+11 01 00 01
+11 02 00 09
+loop:
+0D 00
+90 12
+A1 {out}
+05 00
+B0 {loop}
+out:
+04 EE
+C0 FF
+B0 {loop}
+F0 00 00
+
+## 91 | Is the Math Accumulator positive?
+src: new
+note: The document's table was empty. 0002 - 0005 is negative, so the test is false and the program shows EE.
+expect: MA=00000003 T=0 OUT=EE
+CD
+11 01 00 02
+11 02 00 05
+45 12
+91
+A1 {neg}
+04 11
+F0
+neg:
+04 EE
+F0 00 00
+
+## 92 | Flip Q for ever
+src: T169
+tidy: Removed DEBUG 00. Added the end marker.
+note: If Q is on, turn it off. If it is off, turn it on.
+run: stop=20
+CD
+loop:
+92
+A1 {on}
+0A 00
+B0 {loop}
+on:
+0A 01
+B0 {loop}
+F0 00 00
+
+## 93 42 | INCX sets Carry when a register wraps
+src: T170
+tidy: Removed DEBUG 00.
+expect: RA=0000 C=1 T=1 OUT=01
+CD
+11 0A FF FF
+42 0A
+93
+A1 {done}
+04 01
+C0 80
+done:
+F0 00 00
+
+## 93 44 | Adding into the MA does not set Carry
+src: T171
+fix: The test expected Carry. The MA is 32 bits, so FFFF + 0202 fits: nothing is lost and Carry stays clear.
+tidy: Removed DEBUG 00.
+expect: MA=00010201 C=0 OUT=
+CD
+11 0A FF FF
+11 0B 02 02
+44 AB
+93
+A1 {done}
+04 01
+C0 80
+done:
+F0 00 00
+
+## 93 45 | Subtracting with no borrow leaves Carry clear
+src: T172
+fix: The program shows 01 only when Carry is set. FFFF - 0002 needs no borrow, so nothing is shown: T76 has the case that sets it.
+tidy: Removed DEBUG 00.
+expect: MA=0000FFFD C=0 OUT=
+CD
+11 0A FF FF
+11 0B 00 02
+45 AB
+93
+A1 {done}
+04 01
+done:
+F0 00 00
+
+## 94 | Is the Overflow flag set?
+src: T173
+tidy: Removed two NOPs.
+note: Nothing has overflowed, so nothing is shown.
+expect: T=0 OUT=
+CD
+94 00
+A1 {done}
+04 01
+done:
+F0 00 00
+
+## 94 6D | Is the Decimal flag set?
+src: T174
+tidy: Removed two NOPs.
+expect: T=1 OUT=01
+CD
+6D 01
+94 02
+A1 {done}
+04 01
+done:
+F0 00 00
+
+## 96 FC | Did the sort change anything?
+src: T175 T176
+fix: T176 used SETEXIT ($95), which does not exist: it stops with error 0F, and T175 was empty. ExitCode is set by commands that report something, such as PULSESORTXY.
+note: 03 02 01 is out of order, so one pass changes it and ExitCode is 01. The program shows 02.
+expect: X=01 T=1 OUT=02 M4100=02,01,03
+CD
+11 01 01 00
+11 02 01 02
+32 01 03 02
+31 02 01
+FC 01 12
+96 01
+A0 {yes}
+04 01
+F0
+yes:
+04 02
+F0 00 00
+
+## 97 | What is the Interrupt State?
+src: new
+note: The document's table was empty. State 00 means single: no interrupts are in use, which is how a program starts.
+expect: T=1 OUT=00
+CD
+97 00
+A1 {other}
+04 00
+F0
+other:
+04 EE
+F0 00 00
+
+## 98 | Has anything failed?
+src: new
+note: The document's table was empty. A new program has no error, so the test is false.
+expect: T=0 E=00 OUT=11
+CD
+98
+A0 {bad}
+04 11
+F0
+bad:
+04 EE
+F0 00 00
+
+## 99 | Read one EF line
+src: new
+note: The document's table was empty. EF4 is held down here, so EF4 = 1 is true.
+run: ef4=1
+expect: T=1 OUT=11
+CD
+99 41
+A1 {no}
+04 11
+F0
+no:
+04 EE
+F0 00 00
+
+## 9A | Blink Q on even numbers
+src: T180
+fix: GAL 0013 and IFFALSEJI 0006 both landed on the 00 of SETQ 00, which is HALT, so the program stopped on the first pass. A forward jump counts from the next command, so the jump is 5.
+tidy: Removed DEBUG 00. Added the end marker.
+run: stop=30
+CD
+10 00 00
+loop:
+05 00
+9A 00
+A5 00 05
+0A 01
+B0 {next}
+0A 00
+next:
+40
+C0 FF
+B0 {loop}
+F0 00 00
+
+## 9B | Is one byte of an accumulator zero?
+src: T181
+note: The Acc is 0010: byte 0 is 10, so the test is false. Byte 1 is 00: see the second test.
+expect: T=1 OUT=01
+CD
+10 00 10
+9B 00
+A0 {bad}
+9B 10 ; Byte 1 of the Acc
+A1 {bad}
+04 01
+0F 00
+F0
+bad:
+04 EE
+F0 00 00
+
+## 9C 3B | Compare two blocks of memory
+src: T182
+note: Copies FF bytes, then compares them. They match, so Q comes on.
+expect: T=1 Q=1 OUT=01,02
+CD
+11 01 00 00
+11 02 01 00
+3B 12 FF
+04 01
+9C FF 12
+04 02
+A1 {done}
+0A 01
+done:
+0F 00
+F0 00 00
+
+## 9D | Test memory against the bytes that follow
+src: T183
+fix: 9D 0A has Z=0, which stops with error 0C. The Z is the byte count: 9D 2A compares 2 bytes. The heading says "the next two bytes"; it is any number from 1 to 15. WIP F0 was missing its operand.
+expect: T=1 OUT=01
+CD
+11 0A 01 00
+32 0A 12 33
+9D 2A 12 33
+A0 {same}
+04 00
+F0
+same:
+04 01
+0F 00
+F0 00 00
+
+## 9E | What is the System Status?
+src: new
+note: The document's table was empty. It is 00 unless a program or the firmware sets it.
+expect: T=1 OUT=11
+CD
+9E 00
+A1 {no}
+04 11
+F0
+no:
+04 EE
+F0 00 00
+
+## 9F | Wait for a value on the input port
+src: T185
+note: Shows a count until the switches read 33. They are set to 33 here, so it stops at once.
+run: sw=33
+expect: T=1 RA=0002 OUT=01,AA
+CD
+11 0A 00 01
+loop:
+06 0A
+0D 00
+9F 00 33
+42 0A
+A1 {loop}
+04 AA
+0F 00
+F0 00 00
+
+## A0 A1 | Branch on the Test flag
+src: new
+note: The document's tables were empty. MM MM is relative to the program block unless MEMMODE 00 is set.
+expect: OUT=11,22
+CD
+10 00 05
+81 00 05
+A0 {yes} ; True: goes
+04 EE
+yes:
+04 11
+81 00 06
+A1 {no} ; False: goes
+04 EE
+no:
+04 22
+F0 00 00
+
+## A2 A3 | Branch to a label on the Test flag
+src: new
+note: The document's tables were empty.
+expect: OUT=11,22
+CD
+10 00 05
+81 00 05
+A2 01 ; True: goes to label 01
+04 EE
+B3 01
+04 11
+81 00 06
+A3 02 ; False: goes to label 02
+04 EE
+B3 02
+04 22
+F0 00 00
+
+## A4 | Jump ahead if true
+src: T190
+tidy: Removed DEBUG 00.
+note: R1 is zero, so the jump skips the BRK and Q comes on.
+expect: T=1 Q=1
+CD
+0A 00
+11 01 00 00
+8C 01
+A4 00 01
+F0
+0A 01
+F0 00 00
+
+## A5 | Jump back if false
+src: new
+note: The document's table was empty. A forward jump counts from the next command; a back jump counts from the jump itself.
+expect: A=0003 T=1
+CD
+10 00 00
+loop:
+40
+81 00 03
+A5 01 04 ; False: back 4 bytes to the INCA
+F0 00 00
+
+## A6 | Go to the address in a register if true
+src: T192
+fix: The bytes at 400F and 4010 overlapped, and the listing showed OUTI 0F. Rebuilt.
+tidy: Removed DEBUG 00.
+note: RA holds 0100, so the program carries on at 4100.
+expect: T=1 OUT=AA
+CD
+11 0A 01 00
+11 01 00 00
+8C 01
+A6 0A
+04 BB
+0F 00
+F0
+@4100
+04 AA
+0F 00
+F0 00 00
+
+## A7 | Go to the address in a register if false
+src: new
+note: The document's table was empty. With Z=1 the address is read from memory. Note that the pointer is an actual address even in relative mode: R1 = 00F0 means 40F0, but RA must say 40F0 itself.
+expect: OUT=AA
+CD
+11 01 00 F0
+11 0A 40 F0
+32 01 01 00 ; M(40F0) holds 0100
+10 00 01
+8D 00
+A7 1A
+04 BB
+F0
+@4100
+04 AA
+F0 00 00
+
+## B0 | Go to a memory location
+src: T195
+expect: Q=0 A=0001
+CD
+0A 00
+10 00 01
+B0 01 00
+@4100
+0A 01
+C0 FF
+0A 00
+F0 00 00
+
+## B1 | Go to the address in a register
+src: T196
+expect: OUT=AA,BB
+CD
+04 AA
+11 0A 00 20
+0F 00
+B1 0A
+F0
+@4020
+04 BB
+0F 00
+F0 00 00
+
+## B2 BA BF | Call a labelled subroutine
+src: T197
+fix: T197 began with a separate CLEARPROG program, and its listing was out of step. The subroutine returned with RETURN 00; RETURNL is the return for CALLL.
+note: DEFSUB gives the subroutine a label number. CALLL goes to it, and RETURNL comes back.
+run: stop=30
+CD
+BA 01 00 80
+B3 02
+0A 01
+0F 00
+B2 01
+0A 00
+0F 00
+04 99
+B4 02
+F0 00 00
+@4080
+04 CC
+0F 00
+BF
+
+## B3 B4 | Label a location
+src: T198
+tidy: Added the end marker.
+note: A label lets a program move around without knowing exact addresses.
+run: stop=20
+CD
+B3 01
+0A 01
+C4
+C4
+0A 00
+C4
+C4
+B4 01
+F0 00 00
+
+## B3 06 | Count and pulse Q
+src: T199
+tidy: The labels 02 and 03 at 4020 and 4030 were not used. Removed. Added the end marker.
+run: stop=20
+CD
+11 01 00 00
+B3 01
+0A 01
+06 01
+0A 00
+42 01
+C0 FF
+B4 01
+F0 00 00
+
+## B3 B4 | Jump between two labels
+src: T200
+tidy: Added the end marker.
+run: stop=20
+CD
+B3 01
+0A 01
+C0 FF
+0A 00
+C0 FF
+B4 02
+@4020
+B3 02
+04 AA
+C0 FF
+04 BB
+C0 FF
+B4 01
+F0 00 00
+
+## B4 | Go to a label
+src: T201
+fix: LBL was entered at 4004 instead of 4003, so the byte at 4003 was 00: HALT. The program stopped on the first pass.
+tidy: Removed DEBUG 00. Added the end marker.
+run: stop=20
+CD
+B3 01
+0A 00
+C0 FF
+0A 01
+C0 FF
+B4 01
+F0 00 00
+
+## B2 BF | Two labelled subroutines
+src: T202
+fix: This stopped with error 01. BRK at 4009 was followed by 00 00, which is the end marker, so the label pre-pass stopped there and never saw the labels after it. Now it is F0 C4. It used GTL where it meant CALLL. It said multi-level, but RETURNL is one level deep, so the subroutines are now called one after the other.
+note: The label pre-pass stops at the first F0 00 00, so put the end marker after your last label.
+expect: OUT=01,0A,0B E=00
+CD
+04 01
+0F 00
+B2 0A
+B2 0B
+F0
+C4
+@4080
+B3 0A
+04 0A
+0F 00
+BF
+@4090
+B3 0B
+04 0B
+0F 00
+BF
+F0 00 00
+
+## B5 | Loop until one register reaches another
+src: T203
+fix: 4006 held LOADAI 016F and 4008 COPYAX: they overlapped, which left byte 0B, an opcode that no longer exists. The program stopped with error 0F.
+note: B5 loops back until RA >= RB.
+expect: RA=016F Q=1 OUT=63,64,65,66,67,68,69,6A,6B,6C,6D,6E
+CD
+10 01 63
+21 0A
+10 01 6F
+21 0B
+0A 00
+loop:
+06 0A
+C0 F0
+42 0A
+B5 AB {loop}
+0A 01
+F0 00 00
+
+## B6 | Loop to a label until one register reaches another
+src: T204
+fix: The explanations said 0123 and 02FF; the code has 012A and 012F.
+expect: RA=012F Q=1 OUT=2A,2B,2C,2D,2E
+CD
+10 01 2A
+21 0A
+10 01 2F
+21 0B
+0A 00
+B3 01
+06 0A
+C0 FF
+42 0A
+B6 AB 01
+0A 01
+F0 00 00
+
+## B7 | Loop until a register is zero
+src: T205
+fix: The explanation said 0060; the code loads 0005.
+expect: RA=0000 Q=1 OUT=05,04,03,02,01
+CD
+0A 00
+10 00 05
+21 0A
+loop:
+06 0A
+43 0A
+C0 80
+B7 0A {loop}
+0A 01
+F0 00 00
+
+## B8 | Loop to a label until a register is zero
+src: T206
+fix: The explanation said 0060; the code loads 0020.
+expect: RA=0000 Q=1
+CD
+0A 00
+10 00 20
+21 0A
+B3 01
+06 0A
+43 0A
+C0 80
+B8 0A 01
+0A 01
+F0 00 00
+
+## B9 | Jump back: count down for ever
+src: T207
+tidy: Removed DEBUG 00. Added the end marker.
+note: A back jump counts from the jump command: 3 bytes back from B9 is the OUTA. The display shows the high byte, as the low byte goes too fast to read.
+run: stop=20
+CD
+10 FF FF
+05 01
+41
+B9 01 03
+F0 00 00
+
+## B9 | Jump ahead and back
+src: T208
+tidy: Removed DEBUG 00.
+note: A forward jump counts from the next command, so B9 00 02 skips the two BRKs. A back jump counts from the jump itself: back 10 hex to the DECA.
+run: stop=20
+CD
+10 00 01
+05 00
+C0 40
+41
+0A 00
+05 00
+C0 40
+B9 00 02
+F0
+F0
+0A 01
+C0 40
+B9 01 10
+F0 00 00
+
+## BA BF | Define a subroutine at an address
+src: T209
+tidy: Removed DEBUG 01.
+fix: GTL 02 went to the subroutine, but RETURNL is the return for CALLL, so it is now CALLL 02. The explanation said Load 0000; the code loads 5566.
+note: Label 02 is the subroutine at 00A0: it blinks Q and counts in the Acc.
+run: stop=20
+CD
+BA 02 00 A0
+10 55 66
+21 0A
+B3 01
+0A 00
+C0 30
+B2 02
+B4 01
+F0 00 00
+@40A0
+0A 01
+40
+05 00
+C0 F0
+BF
+
+## BB BC BE | A subroutine defined in line
+src: T210
+fix: ENDSUB does not return: it only marks the end for the first pass. The old program ran on through ENDSUB into its own main code and looped for ever. RETURN 01 is the return.
+note: The first time through, STARTSUB skips to ENDSUB. GTL then runs the subroutine.
+expect: OUT=AA,BB
+CD
+BB 0A
+04 BB
+0F 00
+BE 01
+BC 00
+04 AA
+0F 00
+B4 0A
+F0 00 00
+
+## BB BC BE | Two subroutines in line
+src: T211
+fix: WIP C4 should be WIP 00.
+tidy: Removed DEBUG 00.
+expect: OUT=01,0A,0B,0A
+CD
+04 01
+0F 00
+BB 0A
+04 0A
+0F 00
+BE 01
+BC 00
+BB 0B
+04 0B
+0F 00
+BE 01
+BC 00
+B4 0A
+B4 0B
+B4 0A
+F0 00 00
+
+## BD BE | Call and return
+src: T213
+tidy: Removed DEBUG 00.
+expect: OUT=01,0A,0B,0A
+CD
+04 01
+0F 00
+BD 00 80
+BD 00 90
+BD 00 80
+F0
+@4080
+04 0A
+0F 00
+BE 00
+@4090
+04 0B
+0F 00
+BE 00
+F0 00 00
+
+## BD 20 | Call in absolute mode
+src: T214
+note: With MEMMODE 00 the call needs the whole address: 4080, not 0080.
+expect: OUT=01,0A,0B,0A
+CD
+20 00
+04 01
+0F 00
+BD 40 80
+BD 40 90
+BD 40 80
+F0
+@4080
+04 0A
+0F 00
+BE 00
+@4090
+04 0B
+0F 00
+BE 00
+F0 00 00
+
+## BD BE | Calls within calls
+src: T215
+tidy: Removed DEBUG 00 and two NOPs.
+note: CALL can go as deep as the call stack allows.
+expect: OUT=01,0A,0B,0C,0A,0B,0C
+CD
+04 01
+0F 00
+BD 00 80
+BD 00 80
+F0
+@4080
+04 0A
+0F 00
+BD 00 90
+BE 00
+@4090
+04 0B
+0F 00
+BD 00 A0
+BE 00
+@40A0
+04 0C
+0F 00
+BE 00
+F0 00 00
+
+## B1 | Go to an address held in memory
+src: new
+note: The Z=1 form of GTX. As with IFFALSEX, the pointer is an actual address, and the address it finds is relative.
+expect: OUT=AA
+CD
+11 01 00 F0
+11 0A 40 F0
+32 01 01 00 ; M(40F0) holds 0100
+B1 1A
+04 BB
+F0
+@4100
+04 AA
+F0 00 00
+
+## 00 | Halt
+src: T217
+note: HALT ends the program. The bytes after it never run.
+expect: A=0123 R2=2222 OUT=AA PL=400A
+CD
+10 01 23
+11 02 22 22
+04 AA
+00
+F0 00 00
+
+## C0 | Delays of different lengths
+src: T218
+expect: OUT=01,02,03,04,05,06,07,08
+CD
+04 01
+C0 20
+04 02
+C0 40
+04 03
+C0 60
+04 04
+C0 80
+04 05
+C0 A0
+04 06
+C0 C0
+04 07
+C0 E0
+04 08
+C0 FF
+00
+F0 00 00
+
+## C1 | Print a string
+src: new
+note: Not in the document. The string ends with a 00 byte.
+expect: SER=HELLO\r\n
+CD
+11 01 01 00
+C1 01
+F0 00 00
+@4100
+db 48 45 4C 4C 4F 0D 0A 00 ; "HELLO", Return, Line Feed, and the end
+
+## C2 C1 | Read a line and print it back
+src: new
+note: Not in the document. Keys are echoed as they are typed. R1 moves along the line; R2 stays at its start, so Backspace cannot go past it. The line ends with Return and a 00 byte.
+run: serial=HI\r
+expect: M4100=48,49,00 R1=0102
+CD
+11 01 01 00
+11 02 01 00
+C2 12
+F0 00 00
+
+## C3 05 | Show random numbers
+src: T220
+fix: The first line, C3 F0 00 00, and the lines after it overlapped, and the listing had the same address twice. Rebuilt as the listing meant it.
+note: Each pass shows a new random low byte.
+run: stop=20
+CD
+loop:
+C3
+05 00
+C0 FF
+B0 {loop}
+F0 00 00
+
+## C3 34 88 | Fill a block with random numbers
+src: T221
+fix: There was no CD at the start, so the program never ran, and FB 12 had no fill byte, so it swallowed the RAND.
+note: Saves a random 2 bytes at a time from 4100 to 41FF.
+expect: R1=0200 E=00
+CD
+11 01 01 00
+11 02 01 FF
+FB 12 00
+loop:
+C3
+34 01
+42 01
+42 01
+88 12
+A1 {loop}
+F0 00 00
+
+## C4 | No operation
+src: T222
+expect: E=00
+CD
+C4
+C4
+C4
+C4
+F0 00 00
+
+## C5 C6 | Turn external interrupts on and off
+src: new
+note: The document's tables were empty.
+expect: E=00 OUT=11
+CD
+C5
+C6
+04 11
+F0 00 00
+
+## C7 | Turn multitasking off for a moment
+src: new
+fix: The document calls $C7 SETSTATE. It is SETMULTI now.
+note: While multitasking is off, no other VM can run: this is how a VM does something that must not be interrupted.
+expect: M2F55=01 OUT=11
+CD
+C7 00
+04 11
+C7 01
+F0 00 00
+
+## C8 | Set the counter interrupt
+src: new
+note: How many commands a VM runs before the next VM gets a turn.
+expect: E=00 M305F=20
+CD
+C8 20
+F0 00 00
+
+## C9 | Send the Accumulator to the terminal
+src: new
+expect: SER=A
+CD
+10 00 41
+C9
+F0 00 00
+
+## CA | Send a byte to the terminal
+src: new
+expect: SER=HI
+CD
+CA 48
+CA 49
+F0 00 00
+
+## CB C9 | Echo a key
+src: new
+note: SERIN waits for a key, but lets other VMs run while it waits.
+run: serial=Z
+expect: A=005A SER=Z
+CD
+CB
+C9
+F0 00 00
+
+## CC | Is a key waiting?
+src: new
+note: SERST does not wait and does not take the key. It only says whether one is there.
+run: serial=K
+expect: T=1 A=004B
+CD
+CC
+A1 {none}
+CB
+F0
+none:
+04 EE
+F0 00 00
+
+## CD F0 | The smallest program
+src: T242
+note: Every program starts with CD and ends with F0 00 00. A program with no CD at 4000 does not run.
+expect: E=00 PL=4001
+CD
+F0 00 00
+
+## D0 D1 D3 CF | Read a register in another VM
+src: T233
+note: VM1 counts in R1. VM2 waits for VM1 to share itself, blinks Q 16 times, reading VM1's R1 into its own R2 each time, then kills VM1 and stops.
+expect: VM2.R1=0000 VM2.R2~=0000 VM1.R1~=0000
+CD
+D0 12
+11 01 00 00
+loop:
+06 01
+42 01
+C0 FF
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+11 01 00 10
+blink:
+0A 00
+C0 60
+0A 01
+C0 60
+43 01
+D3 10 12
+8C 01
+A1 {blink}
+CF 10
+F0 00 00
+
+## D2 | Read the Accumulator of another VM
+src: T234
+tidy: Added the end markers.
+note: VM1 counts up from 0101. VM2 copies VM1's Acc, shows it and adds 2, so VM2's R2 runs 2 ahead of what it read.
+run: stop=60
+CD
+D0 12
+10 01 01
+loop:
+0A 00
+C0 60
+0A 01
+40
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+next:
+D2 10
+05 00
+40
+40
+21 02
+C0 60
+B0 {next}
+F0 00 00
+
+## D4 | Read memory in another VM
+src: T235
+fix: The VM2 listing had ;VM1 notes where the code begins; those are gone.
+note: VM1 keeps a counter in its memory at 00F0. VM2 reads it into its own R2 each time the Input key is pressed.
+run: stop=100
+CD
+D0 12
+11 01 01 02
+11 02 00 F0
+loop:
+3A 02 12
+42 01
+06 01
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+next:
+D4 10 22
+0F 00
+B0 {next}
+F0 00 00
+
+## D5 | Write to memory in another VM
+src: T236
+fix: VM1 shared itself read-only, which should not allow a write. Now D0 12, read and write, and VM2 tests for that.
+note: VM2 stores its R1 in VM1's memory at the address in VM1's R3. VM1 must be running for this to work.
+run: stop=20
+expect: M40FF=56,78
+CD
+D0 12
+11 03 00 FF
+loop:
+0F 00
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+11 01 56 78
+D5 10 13
+F0 00 00
+
+## D6 | Copy a byte inside another VM
+src: new
+note: Not in the document's programs. VM2 copies a byte in VM1's memory from M(R1) to M(R2).
+run: stop=300
+expect: M4101=7E
+CD
+D0 12
+11 01 01 00
+11 02 01 01
+31 01 7E
+loop:
+C4
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+C0 40
+D6 11 12
+F0 00 00
+
+## D7 | Copy a register inside another VM
+src: new
+note: Not in the document's programs. VM2 makes VM1's R2 a copy of VM1's R1.
+run: stop=300
+expect: VM1.R2=4321
+CD
+D0 12
+11 01 43 21
+loop:
+C4
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+C0 40
+D7 11 12
+F0 00 00
+
+## D8 | Increment the Accumulator of another VM
+src: T237
+fix: VM1 shared itself read-only: this needs read and write, so D0 12. It also tested for 11.
+note: VM1 only shows its Accumulator. VM2 is the one making it count.
+run: stop=100
+CD
+D0 12
+loop:
+05 00
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+next:
+D8 10
+C0 20
+B0 {next}
+F0 00 00
+
+## D9 | Decrement the Accumulator of another VM
+src: new
+note: Not in the document's programs.
+run: stop=300
+expect: VM1.A=0009
+CD
+D0 12
+10 00 0A
+loop:
+C4
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+C0 40
+D9 10
+F0 00 00
+
+## DA | Increment a register in another VM
+src: T238
+fix: VM1 shared itself read-only: this needs read and write, so D0 12.
+run: stop=500
+CD
+D0 12
+11 01 00 0A
+loop:
+06 01
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+next:
+DA 11
+C0 20
+B0 {next}
+F0 00 00
+
+## DB | Decrement a register in another VM
+src: new
+note: Not in the document's programs.
+run: stop=300
+expect: VM1.R1=0009
+CD
+D0 12
+11 01 00 0A
+loop:
+C4
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+C0 40
+DB 11
+F0 00 00
+
+## DC | Copy a block from one VM to another
+src: T239
+fix: T239 had the title "create a block of random numbers" but its program was a copy of T238, for INCVX. Written new.
+note: VM1 builds a small block and shares itself. VM2 copies it to its own memory. V is given twice: the VM to read and the VM to write.
+run: stop=300
+expect: M5100=11,22,33,44
+CD
+D0 12
+11 01 01 00
+32 01 11 22
+11 02 01 02
+32 02 33 44
+loop:
+C4
+B0 {loop}
+F0 00 00
+@5000
+CD
+D0 12 ; Both VMs must be open to the copy
+wait:
+D1 12
+A1 {wait}
+C0 40
+11 02 01 00
+DC 11 22 04
+F0 00 00
+
+## DD | Ask whether another VM's last action worked
+src: new
+note: Not in the document's programs.
+run: stop=300
+expect: VM2.E~=00
+CD
+D0 12
+loop:
+C4
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+C0 40
+DD 10
+F0 00 00
+
+## DE CF | Wait for another VM's register to reach a value
+src: T240
+fix: VM2 had a delay of 60 in its loop while VM1 counted with a delay of 40, so VM2 could look before and after 0088 and miss it, and the program ran on for ever. VM2 now looks without a delay.
+note: VM1 counts in R1. VM2 waits until that equals its own R1, 0088, then kills VM1.
+expect: VM2.T=1 VM1.R1~=0088
+CD
+D0 12
+11 01 00 00
+loop:
+06 01
+42 01
+C0 40
+B0 {loop}
+F0 00 00
+@5000
+CD
+11 01 00 88
+wait:
+D1 12
+A1 {wait}
+next:
+DE 10 11
+A1 {next}
+CF 10
+F0 00 00
+
+## DF | Test a special register in another VM
+src: T241
+fix: DF needs a byte to compare with. The old code had none, so it took the OUTA that followed.
+note: VM1 blinks Q. VM2 tests VM1's Q state and shows 11 when it is on.
+run: stop=120
+CD
+D0 11
+11 01 00 00
+loop:
+0A 00
+42 01
+0A 01
+42 01
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 11
+A1 {wait}
+next:
+DF 11 01
+A1 {next}
+04 11
+F0 00 00
+
+## CE | Pause and resume another VM
+src: new
+note: The document's table was empty. VM2 pauses VM1, waits, and resumes it. VM1's count stands still in between.
+run: stop=120
+expect: VM2.T~=0
+CD
+D0 12
+11 01 00 00
+loop:
+42 01
+B0 {loop}
+F0 00 00
+@5000
+CD
+wait:
+D1 12
+A1 {wait}
+CE 10 ; Pause VM1
+C0 80
+CE 11 ; Resume VM1
+F0 00 00
+
+## F1 | Run 1802 machine code
+src: new
+fix: The document says RUNMC is $C2. It moved to $F1 in V0061.24.
+note: The address is an actual one, and the code ends with D5 (SEP R5). This machine code stores A5 at 4120.
+expect: M4120=A5
+CD
+F1 41 00
+F0 00 00
+@4100
+db F8 41 BF ; LDI 41, PHI RF
+db F8 20 AF ; LDI 20, PLO RF
+db F8 A5 5F ; LDI A5, STR RF
+db D5 ; SEP R5: back to STELLAR
+
+## F2 | Take a second block for a big program
+src: new
+note: Not in the document. A program can have more than 4K by taking the block of the VM above it, as long as that VM is not running.
+expect: E=00 M305D=20
+CD
+F2 02
+F0 00 00
+
+## F6 | Add up a block of memory
+src: T243
+fix: R1 = 4000 and R2 = 40FF are relative, so they meant 8000 to 80FF, which is empty, and the answer was 0. Now 0000 to 000F, the program's own bytes.
+expect: MA=000003E5 OUT=03,E5
+CD
+11 01 00 00
+11 02 00 0F
+F6 12
+05 13
+C0 FF
+05 12
+C0 FF
+F0 00 00
+
+## FA | Reset a flag
+src: new
+fix: The document's flag numbers are out of date: 00 Carry, 01 Overflow, 02 Macro, 03 Error, 04 Test, 05 MA Sign, 06 Interrupt, 07 Debug. Its table was empty.
+note: 0000 - 0001 sets Carry, and RESETFLAG clears it.
+expect: C=0
+CD
+10 00 00
+4F 00 01
+FA 00
+F0 00 00
+
+## FB | Fill a block of memory
+src: T246
+expect: M4100=BB,BB,BB,BB M41FF=BB
+CD
+11 0A 01 00
+11 0B 01 FF
+FB AB BB
+F0 00 00
+
+## FC 96 | Sort a block of memory
+src: T247
+fix: The listing's columns were out of step. It sorted 256 random bytes; now 8 words you can check by eye.
+note: PULSESORTXY does one pass, and sets ExitCode to 01 if it moved anything. So repeat until ExitCode is 00.
+expect: X=00 M4100=01,02,03,04,05,06,07,08
+CD
+11 01 01 00
+32 01 05 02
+42 01
+42 01
+32 01 08 01
+42 01
+42 01
+32 01 07 03
+42 01
+42 01
+32 01 06 04
+11 02 01 00
+11 03 01 07
+sort:
+FC 01 23
+96 01
+A0 {sort}
+F0 00 00
+
+## FD | Clear a VM's program memory
+src: T248
+fix: Part of the listing was out of step, and FD 00 clears every block, including the program doing it. Now FD 02 clears VM2's block.
+note: Run this alone before you load a new program.
+expect: M5100=00 E=00
+CD
+FD 02
+F0 00 00
+@5100
+db 11 ; Something to clear
+
+## FF | Show each command on the display
+src: new
+note: The document's table was empty. DEBUG 07 sends each opcode to the output port as it runs.
+expect: OUT=10,40,F0
+CD
+FF 07
+10 12 34
+40
+F0 00 00
+
+## - | Four VMs counting
+src: T250
+note: Four programs, each counting in its own register to its own limit on one 1802. Look at 2F00 to 2F5F for their status.
+expect: VM1.R1=000F VM2.R2=001F VM3.R3=002F VM4.R4=004F
+CD
+11 01 00 00
+l1:
+06 01
+42 01
+86 01 00 0F
+A1 {l1}
+F0 00 00
+@5000
+CD
+11 02 00 00
+l2:
+06 02
+42 02
+C0 FF
+86 02 00 1F
+A1 {l2}
+F0 00 00
+@6000
+CD
+11 03 00 00
+l3:
+06 03
+42 03
+86 03 00 2F
+A1 {l3}
+F0 00 00
+@7000
+CD
+11 04 00 00
+l4:
+06 04
+42 04
+86 04 00 4F
+A1 {l4}
+F0 00 00
+
+## - | Four VMs using labels
+src: T251
+tidy: T253 mixed this program and T252's with an empty fourth block; left out.
+note: Each VM has its own labels, so all four can use label 01.
+expect: VM1.R1=03FF VM2.R1=03FF VM3.R1=03FF VM4.R1=03FF
+CD
+11 01 00 00
+B3 01
+06 01
+42 01
+86 01 03 FF
+A3 01
+F0 00 00
+@5000
+CD
+11 01 00 00
+B3 01
+06 01
+42 01
+86 01 03 FF
+A3 01
+F0 00 00
+@6000
+CD
+11 01 00 00
+B3 01
+06 01
+42 01
+86 01 03 FF
+A3 01
+F0 00 00
+@7000
+CD
+11 01 00 00
+B3 01
+06 01
+42 01
+86 01 03 FF
+A3 01
+F0 00 00
+
+## - | Four VMs, each with its own stack
+src: T252
+fix: There was no CD in any block, so nothing ran, and blocks 2 to 4 still had the old stack numbers 74 and 75.
+note: Each VM pushes and pops through its own stack, so they cannot disturb each other.
+expect: VM1.R1=03FF VM4.R1=03FF VM1.SP=FF VM4.SP=FF
+CD
+11 01 00 01
+B3 01
+06 01
+72 01
+73 02
+42 02
+23 00 21
+86 01 03 FF
+A3 01
+F0 00 00
+@5000
+CD
+11 01 00 01
+B3 01
+06 01
+72 01
+73 02
+42 02
+23 00 21
+86 01 03 FF
+A3 01
+F0 00 00
+@6000
+CD
+11 01 00 01
+B3 01
+06 01
+72 01
+73 02
+42 02
+23 00 21
+86 01 03 FF
+A3 01
+F0 00 00
+@7000
+CD
+11 01 00 01
+B3 01
+06 01
+72 01
+73 02
+42 02
+23 00 21
+86 01 03 FF
+A3 01
+F0 00 00
+
+## - | Four VMs filling memory with random numbers
+src: T254
+note: Each VM fills 256 bytes of its own block from X100 up, and each gets its own random sequence.
+expect: VM1.R1=0200 VM4.R1=0200
+CD
+11 01 01 00
+11 02 02 00
+FB 12 00
+a1:
+06 01
+C3
+34 01
+42 01
+42 01
+88 12
+A1 {a1}
+F0 00 00
+@5000
+CD
+11 01 01 00
+11 02 02 00
+FB 12 00
+a2:
+06 01
+C3
+34 01
+42 01
+42 01
+88 12
+A1 {a2}
+F0 00 00
+@6000
+CD
+11 01 01 00
+11 02 02 00
+FB 12 00
+a3:
+06 01
+C3
+34 01
+42 01
+42 01
+88 12
+A1 {a3}
+F0 00 00
+@7000
+CD
+11 01 01 00
+11 02 02 00
+FB 12 00
+a4:
+06 01
+C3
+34 01
+42 01
+42 01
+88 12
+A1 {a4}
+F0 00 00
+
+## - | Find prime numbers
+src: T255 T258
+fix: This table's columns had come apart, its branch targets were left blank or wrong, and it used CVT2DEC on the MA where it needed R1. Rebuilt from T255 and the working copy in T258. It now stops after 16 primes.
+note: For each odd candidate in R1 it tries divisors from 2 to half of it. A prime is saved at 4100 up as decimal digits.
+expect: VM1.RF=0010 M4100=00,05,00,07,00,11,00,13,00,17,00,19,00,23,00,29
+CD
+11 0F 00 00 ; RF counts the primes found
+11 0A 01 00 ; RA points to the results
+11 0B 01 20 ; RB is the end of the results
+FB AB 00
+11 01 00 05 ; R1 is the candidate
+next:
+11 02 00 02 ; R2 is the divisor
+23 00 13
+61 32 ; R3 = half of R1
+42 03
+try:
+4D 12
+8E ; Does R2 divide R1 exactly?
+A1 {more}
+42 01 ; Yes: not a prime
+B0 {next}
+more:
+87 23
+A0 {prime} ; All the divisors tried?
+42 02
+B0 {try}
+prime:
+6B 21 ; R1 to decimal
+21 29 ; The digits go to R9
+42 0F
+06 0F
+3A 02 9A ; Save them at M(RA)
+52 0A 00 02
+42 01
+88 AB ; Results full?
+A1 {next}
+F0 00 00
+
+## - | Turn Q off and on
+src: T256
+fix: The title said 256 times; the count is 1F, 31 times. It was entered at 5000 with nothing at 4000, so it never ran as VM1.
+expect: R1=0000 Q=1
+CD
+11 01 00 1F
+loop:
+0A 00
+C0 60
+0A 01
+C0 60
+43 01
+8C 01
+A1 {loop}
+F0 00 00
+
+## - | How fast does STELLAR run?
+src: T257
+fix: It was entered at 6000 with no CD, so it never ran.
+note: A tight loop of 0AFF passes. On the Elf2K, about 2000 commands a second.
+expect: R1=0000
+CD
+11 01 0A FF
+loop:
+0A 00
+0A 01
+43 01
+8C 01
+A1 {loop}
+F0 00 00
