@@ -23,7 +23,7 @@ from calc_interactive import UART               # noqa: E402
 CORE = 0x3000
 
 def run(lst_path, inp, max_steps):
-    mem = bytearray(build_image())      # V0061.36 exactly as flashed
+    mem = bytearray(build_image())      # V0061.37 exactly as flashed
     for ln in open(lst_path):
         import re
         m = re.match(r'D\s+([0-9A-Fa-f]{4})\s+(.+)', ln.strip())

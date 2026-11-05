@@ -1,10 +1,10 @@
 # STELLAR TEST PROGRAMS V0.61.36: what the review found
 
-Every table in `STELLAR TEST PROGRAMS V0.61.36.docx` was read, then run on the V0061.36 firmware in the website's emulator. The document itself has not been changed yet. The Opcodes page now holds %COUNT% worked examples, covering all 198 opcodes, and each one has been seen to give the result shown. None of this was run on the Elf2K itself.
+Every table in `STELLAR TEST PROGRAMS V0.61.36.docx` was read, then run in the website's emulator, on V0061.36 at first and now on V0061.37. The Opcodes page now holds %COUNT% worked examples, covering all 198 opcodes, and each one has been seen to give the result shown. None of this was run on the Elf2K itself.
 
-## Firmware faults: fixed in the V0061.37 patch set (not flashed yet)
+## Firmware faults: fixed in V0061.37 (on the Elf2K 2026-11-05)
 
-The patch is in `STELLAR V0061.37 PATCH D-LINES.txt`, built by `tools/fw_patchset_v37.py`. Each fix has a `TESTS/PATCH-*` program that prints K on the patched firmware in the simulator. The examples on the page still show V0061.36 until the patch is flashed.
+The patch is in `STELLAR V0061.37 PATCH D-LINES.txt`, built by `tools/fw_patchset_v37.py`. Each fix has a `TESTS/PATCH-*` program, and all six print K on the Elf2K. The examples on the page show V0061.37.
 
 1. **`$17 SHIFTMA` left out the MA's top byte in all four modes**, not only the ring modes as this report first said. It now moves all 4 bytes.
 2. **`$33 COPYMXA` and `$34 COPYAMX` with Z=1 moved 5 bytes and lost the top byte.** They now move 6: the 4 of the number and the 2 of the remainder. This also repairs `$3D COMPAMX`, which already compared 6 bytes, so a value saved with `$34` never matched itself.

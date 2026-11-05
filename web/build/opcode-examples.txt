@@ -298,16 +298,16 @@ F0 00 00
 
 ## 17 | Shift the bytes in the Math Accumulator
 src: T27
-note: FFFF + 0003 = 00010002. The ring is the low 3 bytes of the MA, not all 4: each ring shift moves them left by one byte, and the top one comes round to the bottom.
-expect: MA=00020100
+note: FFFF + 0003 = 00010002. The ring is all 4 bytes of the MA: each ring shift moves them left by one byte, and the top one comes round to the bottom.
+expect: MA=00020001
 CD
 10 FF FF
 11 01 00 03
 46 01 ; MA = 00010002
 0F 00
-17 01 ; MA = 00000201
+17 01 ; MA = 01000200
 0F 00
-17 01 ; MA = 00020100
+17 01 ; MA = 00020001
 F0 00 00
 
 ## 18 | Set a bit in the Accumulator
@@ -494,7 +494,7 @@ F0 00 00
 ## 28 | Copy the Command Counter to the Math Accumulator
 src: T42
 tidy: Removed DEBUG 00, and made the program stop instead of looping for ever.
-note: The MA has room for the whole count.
+note: The MA has room for all 4 bytes of the count.
 expect: MA=00000004
 CD
 10 01 01
@@ -596,6 +596,17 @@ CD
 33 02
 F0 00 00
 
+## 33 | Load the Math Accumulator from memory
+src: new
+note: 6 bytes: the 4 of the number, then the 2 of the remainder.
+expect: MA=11223344 MAR=5566
+CD
+11 01 01 00
+33 11
+F0 00 00
+@4100
+db 11 22 33 44 55 66
+
 ## 34 | Save the Accumulator to memory
 src: T49
 tidy: Removed DEBUG 00.
@@ -608,9 +619,9 @@ F0 00 00
 
 ## 34 46 | Save the Math Accumulator with its remainder
 src: T50
-fix: Removed DEBUG 00. The text said "the entire contents": it is 5 bytes, the low 3 of the number and the 2 of the remainder. The number's top byte is not saved.
+fix: Removed DEBUG 00. The text said "the entire contents": it is 6 bytes, the 4 of the number and the 2 of the remainder. The sign is not saved.
 note: R1 was never set, so ADDAX adds 0 and the MA is DDEE.
-expect: MA=0000DDEE M40F0=00,DD,EE,00,00
+expect: MA=0000DDEE M40F0=00,00,DD,EE,00,00
 CD
 11 02 00 F0
 10 DD EE
@@ -1072,9 +1083,10 @@ F0 00 00
 
 ## 4A 34 52 | A table of squares in memory
 src: T87
+fix: The squares were 3 bytes apart. COPYAMX saves 6 bytes of the MA, so they are now 6 apart.
 tidy: Removed DEBUG 00 and a NOP.
-note: 1 x 1, 2 x 2 ... 80 x 80, saved 3 bytes apart from 4200 up.
-expect: MA=00004000 M4200=00,00,01,00,00,04,00,00,09 R4=0380
+note: 1 x 1, 2 x 2 ... 80 x 80, saved 6 bytes apart from 4200 up.
+expect: MA=00004000 M4200=00,00,00,01,00,00,00,00,00,04,00,00 R4=0500
 CD
 11 01 00 01
 11 02 00 01
@@ -1087,7 +1099,7 @@ B3 01
 42 01
 42 02
 43 03
-52 04 00 03
+52 04 00 06
 B8 03 01
 F0 00 00
 
@@ -1525,6 +1537,17 @@ CD
 6B 25
 F0 00 00
 
+## 6B 4A | Convert a 32-bit number to decimal
+src: new
+note: The MA converts all 32 bits. 1234 x 10 hex is 12340 hex, 74,560 in decimal. The DA holds 8 digits: above 99,999,999 it keeps the low 8 and sets Overflow.
+expect: MA=00012340 DA=00074560
+CD
+11 01 12 34
+11 02 00 10
+4A 12
+6B 10
+F0 00 00
+
 ## 6C | Convert decimal 12345 to hex
 src: T123
 note: Seven bytes would fill the DA; six reach its number and remainder. 12345 decimal is 3039 hex.
@@ -1546,6 +1569,15 @@ CD
 6B 10
 44 22
 0F 00
+6C
+F0 00 00
+
+## 6C | All eight digits
+src: new
+note: 99999999 decimal is 05F5E0FF hex. The DA remainder is not converted.
+expect: DA=99999999 MA=05F5E0FF
+CD
+12 72 99 99 99 99 00 00 00
 6C
 F0 00 00
 
@@ -1585,7 +1617,8 @@ F0 00 00
 
 ## 70 | Push the Math Accumulator
 src: T131
-expect: MA=00004466 SP=F9
+note: 7 bytes: the 4 of the number, the 2 of the remainder and the sign.
+expect: MA=00004466 SP=F8
 CD
 10 11 22
 11 01 33 44
@@ -1619,6 +1652,17 @@ CD
 71 00
 0F 00
 71 00
+F0 00 00
+
+## 71 70 | Pop the Math Accumulator
+src: new
+note: All 7 bytes come back, the top byte of the number too.
+expect: MA=11223344 SP=FF
+CD
+12 71 11 22 33 44 00 00 00
+70 01
+6A 01 ; clear the MA
+71 01
 F0 00 00
 
 ## 72 | Push registers
@@ -2090,6 +2134,15 @@ zero:
 0F 00
 F0 00 00
 
+## 8D | Is the Math Accumulator zero?
+src: new
+note: All 4 bytes count, so 01000000 is not zero.
+expect: MA=01000000 T=0
+CD
+12 71 01 00 00 00 00 00 00
+8D 01
+F0 00 00
+
 ## 8E | Is the remainder zero?
 src: T165
 fix: The WIP was missing its operand, so the end marker's F0 was taken for it.
@@ -2485,15 +2538,14 @@ F0 00 00
 
 ## A7 | Go to the address in a register if false
 src: new
-note: The document's table was empty. With Z=1 the address is read from memory. Note that the pointer is an actual address even in relative mode: R1 = 00F0 means 40F0, but RA must say 40F0 itself.
+note: The document's table was empty. With Z=1 the address is read from memory. In relative mode the pointer counts from the program, as every other register address does: R1 = 00F0 means 40F0.
 expect: OUT=AA
 CD
 11 01 00 F0
-11 0A 40 F0
 32 01 01 00 ; M(40F0) holds 0100
 10 00 01
 8D 00
-A7 1A
+A7 11
 04 BB
 F0
 @4100
@@ -2873,13 +2925,12 @@ F0 00 00
 
 ## B1 | Go to an address held in memory
 src: new
-note: The Z=1 form of GTX. As with IFFALSEX, the pointer is an actual address, and the address it finds is relative.
+note: The Z=1 form of GTX. In relative mode both the pointer and the address it finds count from the program.
 expect: OUT=AA
 CD
 11 01 00 F0
-11 0A 40 F0
 32 01 01 00 ; M(40F0) holds 0100
-B1 1A
+B1 11
 04 BB
 F0
 @4100

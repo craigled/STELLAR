@@ -11,7 +11,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB = join(HERE, '..');
-const firmware = require(join(WEB, 'js', 'firmware-0061-36.js'));
+const firmware = require(join(WEB, 'js', 'firmware-0061-37.js'));
 const E = require(join(WEB, 'js', 'elf2k.js'));
 const b64 = /LTOS_WEBBIOS = "([^"]+)"/.exec(readFileSync(join(WEB, 'js', 'webbios.js'), 'utf8'))[1];
 const bios = Uint8Array.from(Buffer.from(b64, 'base64'));

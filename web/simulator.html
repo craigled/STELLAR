@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Simulator</title>
 <meta name="description" content="Run STELLAR programs in the browser on the real firmware — step through the disassembly and watch the core update live.">
-<link rel="stylesheet" href="css/site.css?v=143">
+<link rel="stylesheet" href="css/site.css?v=144">
 </head>
 <body>
 <main class="wrap sim-wide">
   <div class="tag" style="font-family:var(--mono);color:var(--accent);letter-spacing:.18em;font-size:12px;text-transform:uppercase">Interactive</div>
   <h1 style="margin:.1em 0 .1em">Simulator</h1>
-  <p class="muted" style="max-width:72ch">Runs the actual V0061.36 firmware on a faithful 1802 emulator — the same bytes the hardware executes. Step one opcode at a time and watch a VM core change, a lamp for every bit, or switch to the digital view; the side panel follows the running program.</p>
+  <p class="muted" style="max-width:72ch">Runs the actual V0061.37 firmware on a faithful 1802 emulator — the same bytes the hardware executes. Step one opcode at a time and watch a VM core change, a lamp for every bit, or switch to the digital view; the side panel follows the running program.</p>
 
   <section class="simcon" aria-label="STELLAR console">
     <div class="con-head">
@@ -125,7 +125,7 @@
     <div class="dl-steps">
       <div class="dl-step">
         <div class="k">1 · The firmware</div>
-        <p>STELLAR <span class="mono" id="dlFwVer">V0061.36</span> as Intel HEX, built from exactly the image this page runs. Send it to the monitor as a text upload.</p>
+        <p>STELLAR <span class="mono" id="dlFwVer">V0061.37</span> as Intel HEX, built from exactly the image this page runs. Send it to the monitor as a text upload.</p>
         <div class="sim-controls"><button id="dlFw" title="Save the STELLAR firmware as an Intel HEX file for the Elf2K">STELLAR firmware (.hex)</button></div>
       </div>
       <div class="dl-step">
@@ -145,22 +145,22 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
 
-<script src="js/opcodes.js?v=143"></script>
-<script src="js/firmware-0061-36.js?v=143"></script>
-<script src="js/stellar-vm.js?v=143"></script>
-<script src="js/disasm.js?v=143"></script>
-<script src="js/core-view.js?v=143"></script>
-<script src="js/mem-view.js?v=143"></script>
-<script src="js/led-panel.js?v=143"></script>
-<script src="js/front-panel.js?v=143"></script>
-<script src="js/vt100.js?v=143"></script>
-<script src="js/term-zoom.js?v=143"></script>
-<script src="js/term-input.js?v=143"></script>
-<script src="js/sim-app.js?v=143"></script>
-<script src="js/q-audio.js?v=143"></script>
-<script src="js/tone-listen.js?v=143"></script>
-<script src="js/clock-row.js?v=143"></script>
-<script src="js/simulator-page.js?v=143"></script>
-<script src="js/nav.js?v=143"></script>
+<script src="js/opcodes.js?v=144"></script>
+<script src="js/firmware-0061-37.js?v=144"></script>
+<script src="js/stellar-vm.js?v=144"></script>
+<script src="js/disasm.js?v=144"></script>
+<script src="js/core-view.js?v=144"></script>
+<script src="js/mem-view.js?v=144"></script>
+<script src="js/led-panel.js?v=144"></script>
+<script src="js/front-panel.js?v=144"></script>
+<script src="js/vt100.js?v=144"></script>
+<script src="js/term-zoom.js?v=144"></script>
+<script src="js/term-input.js?v=144"></script>
+<script src="js/sim-app.js?v=144"></script>
+<script src="js/q-audio.js?v=144"></script>
+<script src="js/tone-listen.js?v=144"></script>
+<script src="js/clock-row.js?v=144"></script>
+<script src="js/simulator-page.js?v=144"></script>
+<script src="js/nav.js?v=144"></script>
 </body>
 </html>
