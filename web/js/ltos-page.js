@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '146';                                    // the ?v= the card is fetched with
+  var V = '148';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var SPEEDS = [
@@ -33,7 +33,8 @@
     ['DICE', 'a Stellar C app: rand(6) + 1, two dice (S: 600 rolls, Q quits)'],
     ['SORT -r DOCS/SALES.TXT', 'SORT, UNIQ, PWD and more tools'],
     ["RAWK '{ s += $2 } END { print s }' DOCS/SALES.TXT", 'awk on the 1802'],
-    ['WALK', 'a man in white blocks; Esc stops him (a blur at 10x: choose Elf2K first)'],
+    ['WALK', 'a man in white blocks, on STELLAR; Esc stops him'],
+    ['RUNNING', 'the same man in 1802 code (a blur at 10x: choose Elf2K first)'],
     ['ECHO hello > HI.TXT', 'a file written to the card'],
     ['DELETE HI.TXT', 'moved to /TRASH; EMPTY deletes it for good'],
     ['FSCK', 'check the card (slow at Elf2K speed)'],

@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""elfprint - a text file from the Elf2K's card to this Mac, ready to print.
+
+    elfprint DOCS/LETTER.TXT        pull it, fix the line ends, open it (Cmd-P prints)
+    elfprint -p DOCS/LETTER.TXT     ... and send it straight to the default printer instead
+    elfprint -k DOCS/LETTER.TXT     ... only fetch it (no window, no printer)
+    elfprint -f FILE.TXT            ... a file already on this Mac (no serial port): -f -p, -f -k too
+
+The file comes over the serial port with XFER (elfser.py pull: checked blocks, any size), so LTOS must be at
+its prompt and no terminal program may hold the port. It is kept in ~/Documents/Elf2K/ (the same name).
+
+EROFF's output (EROFF DOC.RF > DOC.TXT) has \\fB \\fI \\fR font changes and form feeds between pages: such a
+file is made into NAME.pdf as well - Courier, real bold and italic, a page for each of EROFF's - and that is
+what opens (in Preview) or prints. A plain text file opens in TextEdit, or prints as text.
+"""
+import os, re, sys, subprocess
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+OUT = os.path.expanduser('~/Documents/Elf2K')
+FONTS = {'R': 'Courier', 'B': 'Courier-Bold', 'I': 'Courier-Oblique'}
+SIZE, LEAD, LEFT, TOP, MAXLINES = 10, 12, 54, 756, 62      # 10 pt Courier on a Letter page, 1/2 inch margins
+
+
+def pdf(text):
+    """EROFF's output -> a PDF: \\fX changes the font, a form feed starts a page (and every MAXLINES lines)"""
+    pages, page = [], []
+    for chunk in text.split('\f'):
+        for ln in chunk.split('\n'):
+            if len(page) == MAXLINES: pages.append(page); page = []
+            page.append(ln)
+        if page and page[-1] == '': page.pop()             # (the line end before a form feed)
+        pages.append(page); page = []
+    pages = [p for p in pages if p] or [['']]
+    font = 'R'
+    def esc(s): return s.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
+    streams = []
+    for p in pages:
+        ops = ['BT', '/%s %d Tf' % (font, SIZE), '%d TL' % LEAD, '%d %d Td' % (LEFT, TOP)]
+        for ln in p:
+            for k, part in enumerate(re.split(r'\\f([BIR])', ln)):
+                if k % 2: font = part; ops.append('/%s %d Tf' % (font, SIZE))
+                elif part: ops.append('(%s) Tj' % esc(part))
+            ops.append('T*')
+        ops.append('ET')
+        streams.append('\n'.join(ops).encode('latin1', 'replace'))
+    objs = [b'<< /Type /Catalog /Pages 2 0 R >>', None]
+    fobj = {}
+    for k, name in FONTS.items():
+        objs.append(('<< /Type /Font /Subtype /Type1 /BaseFont /%s /Encoding /WinAnsiEncoding >>' % name).encode())
+        fobj[k] = len(objs)
+    res = '<< /Font << %s >> >>' % ' '.join('/%s %d 0 R' % (k, n) for k, n in fobj.items())
+    kids = []
+    for st in streams:
+        objs.append(b'<< /Length %d >>\nstream\n' % len(st) + st + b'\nendstream')
+        objs.append(('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources %s /Contents %d 0 R >>'
+                     % (res, len(objs))).encode())
+        kids.append(len(objs))
+    objs[1] = ('<< /Type /Pages /Kids [%s] /Count %d >>' % (' '.join('%d 0 R' % k for k in kids), len(kids))).encode()
+    out, offs = b'%PDF-1.4\n', []
+    for i, o in enumerate(objs):
+        offs.append(len(out)); out += b'%d 0 obj\n' % (i + 1) + o + b'\nendobj\n'
+    x = len(out)
+    out += b'xref\n0 %d\n0000000000 65535 f \n' % (len(objs) + 1) + b''.join(b'%010d 00000 n \n' % o for o in offs)
+    out += b'trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n' % (len(objs) + 1, x)
+    return out, len(pages)
+
+
+def main():
+    args = sys.argv[1:]
+    mode, local = 'open', False
+    while args and args[0] in ('-p', '-k', '-f'):
+        a = args.pop(0)
+        if a == '-f': local = True
+        else: mode = 'print' if a == '-p' else 'keep'
+    if len(args) != 1:
+        print(__doc__.strip()); return 2
+    name = args[0]
+    os.makedirs(OUT, exist_ok=True)
+    if local:
+        dest = os.path.join(OUT, os.path.basename(name))
+        data = open(name, 'rb').read()
+    else:
+        dest = os.path.join(OUT, os.path.basename(name.replace('\\', '/')))
+        if os.path.exists(dest): os.remove(dest)           # so an old copy is never mistaken for this one
+        subprocess.call([sys.executable, os.path.join(HERE, 'elfser.py'), 'pull', name, dest])
+        if not os.path.exists(dest):
+            print('** nothing came - is LTOS at its prompt, the name right, and the serial port free?'); return 1
+        data = open(dest, 'rb').read()
+    data = data.split(b'\x1a')[0]                          # (a Ctrl-Z end mark, if any)
+    data = data.replace(b'\r\n', b'\n').replace(b'\r', b'\n')   # the Elf2K's line ends -> the Mac's
+    if data and not data.endswith(b'\n'): data += b'\n'
+    if os.path.abspath(dest) != os.path.abspath(name): open(dest, 'wb').write(data)
+    show = dest
+    if re.search(rb'\\f[BIR]', data) or b'\f' in data:      # EROFF's output: a PDF with the fonts and pages
+        doc, n = pdf(data.decode('latin1'))
+        show = os.path.splitext(dest)[0] + '.pdf'
+        open(show, 'wb').write(doc)
+        print('saved %s (%d lines) and %s (%d pages)' % (dest, data.count(b'\n'), show, n))
+    else:
+        print('saved %s (%d lines)' % (dest, data.count(b'\n')))
+    if mode == 'open':
+        subprocess.call(['open', show] if show.endswith('.pdf') else ['open', '-a', 'TextEdit', show])
+    elif mode == 'print':
+        return subprocess.call(['lp', show])
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

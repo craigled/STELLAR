@@ -1,0 +1,71 @@
+.\" EROFF.RF - a tour of EROFF: EROFF EROFF.RF > EROFF.TXT, then elfprint -p EROFF.TXT on the Mac
+.he 'LTOS 0.5'EROFF'Page %'
+.fo ''- % -''
+.ll 64
+.ce 2
+THE ELF2K TEXT FORMATTER
+a small nroff for LTOS
+.sp 2
+.pp
+EROFF takes plain text and makes pages of it. Words are gathered into
+lines of the length you choose, and the right margin is made straight
+by spreading the spaces, the way a typewriter never could.
+Requests are lines that begin with a full stop.
+.pp
+A blank line ends a paragraph, too.
+
+So does a line that starts with spaces:
+   this one keeps its indent.
+.sp
+.in 8
+.ti -4
+1.  An indented list item, with its number hanging out in the margin
+by four columns. The rest of the item lines up under the text.
+.ti -4
+2.  A second item.
+.in 0
+.sp
+.nf
+No fill:   these lines
+           come out exactly
+           as they were typed.
+.fi
+.sp
+.na
+This paragraph is ragged right: .na turns justifying off, and .ad turns it
+back on. Long words like antidisestablishmentarianism still wrap cleanly.
+.ad
+.bp
+.ce
+SECOND PAGE
+.sp
+.ll 40
+A narrower measure: forty characters a line, set with .ll, makes a column
+like a newspaper's.
+.bp
+.ll 64
+.nh Fonts and headings
+.pp
+Words can be \fBbold\fR or \fIitalic\fR: in the file they are marked, and
+elfprint on the Mac prints them in real bold and italic. On the Elf2K's
+screen they show plain.
+.nh 2 Lists
+.ip * 3
+A bullet, hanging in the margin; the item's lines line up after it.
+.ip * 3
+Another bullet.
+.ip "(a)" 5
+A tag of more than one character.
+.lp
+A paragraph with no indent ends the list.
+.nh 2 Displays
+.ds
+.B "A display:"
+  lines exactly as typed,
+  kept together on one page.
+.de
+.sh Units
+.lp
+\&.sp takes inches, centimetres, points or lines: .sp 1i is six lines.
+.sp 1i
+.tl 'left'centre'right'

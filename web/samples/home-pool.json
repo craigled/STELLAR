@@ -14,5 +14,6 @@
   {"file": "Simple-Calc-5.lst", "name": "Simple-Calc", "game": false, "input": "2+3*4\r", "what": "a calculator: click and type", "heavy": false},
   {"file": "Sort-Visualiser.lst", "name": "Sort visualiser", "game": false, "input": "", "what": "bubble sort, drawn", "heavy": true},
   {"file": "Starfield.lst", "name": "Starfield", "game": false, "input": " 12\r", "what": "VT100 animation", "heavy": false},
+  {"file": "Walk.lst", "name": "Walk", "game": false, "input": "", "what": "a walking man, in Stellar C", "heavy": false},
   {"file": "Starship.lst", "name": "Starship", "game": false, "input": "", "what": "a picture, run-length drawn", "heavy": false}
 ]

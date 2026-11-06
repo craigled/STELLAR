@@ -76,6 +76,7 @@ CATALOG = [
  ('Graphics', 'Life Lab', 'Game of Life you seed yourself: draw cells, stamp 9 patterns, run and edit. VT100. Stellar C.',
   'samples/Life-Lab.lst', None),
  ('Graphics', 'Sort visualiser', 'Watch a bubble sort as VT100 bars.', 'samples/Sort-Visualiser.lst', None),
+ ('Graphics', 'Walk', 'A man in white blocks, walking until you press Esc. Stellar C. VT100.', 'samples/Walk.lst', None),
  ('Graphics', 'Starfield', 'Stars streaming outward; you pick how many. VT100.', 'samples/Starfield.lst', None),
  ('Graphics', 'Bouncing Ball', 'Two balls bouncing around the screen and off each other. VT100.',
   'samples/Bouncing-Ball.lst', None),

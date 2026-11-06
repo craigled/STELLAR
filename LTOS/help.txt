@@ -1,0 +1,600 @@
+; help.txt - the text of HELP.PRG (build.py turns it into out/helptext.inc).
+;   # a heading         - shown in the list (HELP alone)
+;   @NAME[,OTHER] text  - a command: its one-line summary in the list; HELP NAME (or OTHER) shows the
+;                         lines that follow, up to the next # or @
+;   Lines starting with ';' are left out. Keep every line under 78 columns.
+# Files
+@DIR List the files in a folder
+Usage:  DIR [-flags] [path]
+
+Lists each file's name, size, date and time, then the count and the total.
+Folders show <DIR>. With no path: the folder you are in.
+
+  DIR GAMES         everything in GAMES
+  DIR *.TXT         the .TXT files here (S* means S*.*)
+  DIR -t /          the root, newest first
+
+Flags (before or after the path, together like -aw or apart):
+  -a  by name               -r  the other way round
+  -e  by extension          -w  wide: names only, five across
+  -s  by size, largest      -p  a screen at a time (Q stops)
+  -t  by date, newest       -h  hidden files too
+Folders come first when sorted. DIR -x (any other letter) lists the flags.
+@TYPE Show a text file
+Usage:  TYPE name
+
+Shows a text file a screen (22 lines) at a time: a key goes on, Q stops.
+LF and CR LF line ends both work.
+
+  TYPE README.TXT
+  TYPE DOCS/NOTE.TXT
+@HEX Show a file in hex and text
+Usage:  HEX name
+
+Shows any file, of any size, 18 bytes a line: the offset, the bytes in hex,
+then the same 18 as text (a dot for anything that is not a letter, digit or
+sign). A screen at a time:
+  space   the next screen        Enter   one more line
+  Q       stop (Ctrl-C and Esc too)
+
+  0000  4C 54 4F 53 20 30 2E 35 ... (18 bytes)  LTOS 0.5 ... (the 18)
+@COPY Copy files
+Usage:  COPY from to
+
+Copies a file (up to about 17 KB). "to" can be a new name, a folder, or both.
+Wildcards copy several files into a folder.
+
+  COPY A.TXT B.TXT
+  COPY A.TXT DOCS          into the folder DOCS, same name
+  COPY *.DAT BACKUP        every .DAT file into BACKUP
+@MV Move or rename files
+Usage:  MV from to
+
+Moves files to another folder, gives a new name, or both. A folder can be
+moved too (not into itself). Wildcards move several files into a folder.
+
+  MV A.TXT DOCS            into DOCS
+  MV B.TXT ..              up one folder
+  MV A.TXT DOCS/B.TXT      into DOCS as B.TXT
+  MV *.PRG BIN             every program into BIN
+@REN Rename a file
+Usage:  REN old new
+
+A new name in the same folder. (MV can also move it.)
+@RM,DEL Delete files
+Usage:  RM names       (DEL is the same)
+
+Deletes files. Wildcards work; when several match it asks first.
+Folders are left alone (RMDIR removes an empty folder).
+
+  RM OLD.TXT
+  RM *.BAK
+@SAVE Save memory to a file
+Usage:  SAVE name a b [x]
+
+Saves memory from a to b (hex) as a file. With x: a program that starts at
+x (it gets the 6-byte LTOS header, so typing its name runs it).
+Asks before replacing a file.
+
+  SAVE DATA.BIN 4000 4FFF
+  SAVE MYPROG.PRG 3000 33FF 3000
+@RECV Receive a file from the terminal
+Usage:  RECV name
+
+Type RECV, then send the file from your terminal program.
+  Intel HEX        -> the file's bytes (NAME.PRG gets the program header)
+  NAME.STL         -> send the STELLAR app's .lst as it is (15 KB at
+                      most; bigger: elfser.py putstl NAME.lst on the
+                      PC/Mac/Linux)
+  text             -> ends with a line holding just .  (or Ctrl-Z)
+  RECV SYSTEM      -> LTOS-SYSTEM.HEX, then again with 2.HEX .. 5.HEX:
+                      every LTOS program, added or replaced (into /BIN
+                      when the card has one)
+Checksums are checked. Ctrl-C stops.
+@WC Count lines, words and bytes
+Usage:  WC names
+
+For each file: its lines, words and bytes; several files: a total too.
+Names are paths or patterns, as for DIR.
+
+  WC NOTE.TXT
+  WC *.TXT          every .TXT file here, and the total
+  WC DOCS           every file in DOCS
+@GREP Find the lines with some text
+Usage:  GREP [-i] [-n] text names
+
+Shows every line of the files that has the text in it.
+  -i   any case (hello finds Hello)
+  -n   line numbers
+With several files, each line starts with its file's name.
+
+  GREP Lot DOCS/LOTSLOSS.TXT
+  GREP -i -n "the end" *.TXT     (quotes: text with spaces)
+@CAT Show files one after another
+Usage:  CAT names
+
+Puts out each file as it is, one after another - no pages (TYPE has those).
+Names are paths or patterns, as for DIR. With > it joins files:
+
+  CAT NOTE.TXT
+  CAT A.TXT B.TXT > AB.TXT     A then B, into AB.TXT
+@HEAD The first lines of a file
+Usage:  HEAD [-n N] name
+
+The first N lines of the file (10 if N is not given; -N works too).
+
+  HEAD LOG.TXT
+  HEAD -n 3 LOG.TXT            (or HEAD -3 LOG.TXT)
+@TAIL The last lines of a file
+Usage:  TAIL [-n N] name
+
+The last N lines of the file (10 if N is not given; -N works too).
+
+  TAIL LOG.TXT
+  TAIL -n 2 LOG.TXT >> OLD.TXT   the last 2, added to OLD.TXT
+@EROFF Format text into pages (a small nroff, with -ms's best bits)
+Usage:  EROFF name                (EROFF name > NEW.TXT keeps it)
+
+Fills the words into lines, justified, LL wide; pages of PL lines with a
+header and footer. A request is a line starting with a dot:
+  .br  new line         .sp N  blank lines (N 1.5i 2c 24p 3v)  .bp  new page
+  .fi / .nf  fill on / off       .ad / .na  justify on / off
+  .ce N  centre N lines .ne N  new page unless N lines fit
+  .in N  indent         .ti N  indent the next line only     (+N -N too)
+  .ll N  line length (65)        .pl N  page length (60; 0 = none)
+  .pp  paragraph (indent 5)      .lp  paragraph (no indent)
+  .ip TAG N  indented paragraph, TAG (a word or "words") in the margin
+  .sh text  heading     .nh L text  numbered heading (1. 1.1. ...)
+  .ds [L|C] ... .de  display: as typed, indented (L left, C centred),
+                     kept on one page
+  .he 'l'c'r'  header   .fo 'l'c'r'  footer   .tl 'l'c'r'  a title line
+               (% = the page number)                   .\"  a comment
+  \fB bold  \fI italic  \fR roman  \fP the font before   (in text)
+  .B text / .I text  bold / italic words; alone: from here on (.R back)
+Bold and italic show in elfprint's PDF; on the screen they are left out.
+
+  EROFF EROFF.RF > EROFF.TXT
+                  then on the PC/Mac/Linux: elfprint -p EROFF.TXT
+@SORT Put a file's lines in order
+Usage:  SORT [-r] [-n] [-u] name
+
+The lines in order, by their characters (a shorter line first when it
+starts the other). -n: by the number at the start of each line (spaces,
+then - and digits; none counts as 0). -r: the other way round. -u: a line
+the same as the one before it left out. The whole file is held in memory,
+about 13 KB at most.
+
+  SORT NAMES.TXT
+  SORT -n -r SCORES.TXT > TOP.TXT
+@UNIQ Leave out repeated lines
+Usage:  UNIQ [-c] [-d] name
+
+The lines, each one that is the same as the line before it left out.
+ONLY REPEATS NEXT TO EACH OTHER COUNT: to find repeats anywhere in the
+file, SORT it first (below). -c: each with how many times it came in a
+row. -d: only the lines that came more than once.
+
+  UNIQ LOG.TXT
+  SORT WORDS.TXT > S.TXT ; UNIQ -c S.TXT
+@TOUCH Make an empty file, or set a file's time
+Usage:  TOUCH names
+
+A file that is there gets the time now; a name not there becomes a new,
+empty file.
+
+  TOUCH NOTES.TXT
+@RAWK Pick out and add up fields (awk, whole numbers)
+Usage:  RAWK [-F c] [-v x=val] [-o file] 'program' names
+        RAWK [-F c] [-v x=val] [-o file] -f PROG.AWK names
+
+RAWK reads the files a line at a time and splits each line into fields:
+$1 is the first word, $2 the second ... $NF the last; $0 is the whole line.
+The program, in single quotes, is a list of rules:  pattern { action }
+  a pattern alone       prints the lines it matches
+  { action } alone      runs for every line
+  BEGIN { }  END { }    run before the first line and after the last
+  -F c      split the fields at the character c (-F, for CSV, -Ft a tab)
+  -v x=val  the variable x is val before BEGIN ('x=a b' with spaces)
+  -f file   the program from a file (any lines, # comments; 623 at most)
+  -o file   what it prints goes into the file instead of the screen
+            (asks before replacing; if anything goes wrong, nothing saved)
+  names     files, or patterns as DIR takes them (*.TXT, DOCS) - 60 at most
+
+Patterns:  /^Lot/   $3 > 100   $1 == "Lot"   NR == 5   NF > 0 && !/x/
+Actions:   print $1, $2   printf "%-8s %5d\n", $1, $2   n++   s += $3
+Built in:  NR the line number (all files), FNR (this file), NF the fields,
+           FILENAME, FS the field separator, OFS what print puts between
+Operators: + - * / %   ++ --   = += -= *= /= %=   < <= > >= == !=
+           && || !   ~ !~ (matches)   ( )   "text" ("\t" a tab, "\n")
+           side by side: joined ($1 " is " $2)
+HELP RAWK2: if, while, for, printf, substr and the rest, with examples.
+
+Numbers are whole, up to about 2 billion: 7/2 is 3, and 3.5 in a file
+counts as 3. SAWK, the STELLAR one, has decimals.
+On the screen: a page at a time - a key goes on, Q stops.
+@RAWK2 RAWK: statements, printf, functions, patterns
+  if (x > 1) ...; else ...       { several; statements }
+  while (c) ...    do ... while (c)    for (i = 1; i <= NF; i++) ...
+  break  continue  (in a loop)    next (the next line)    exit (to END)
+  printf "format", values         printf("%d\n", n)
+    %d %s %c %x %X %%   %5d (width)  %-5s (left)  %05d (0s)  %.2s  %+d
+  length(s)  substr(s, m[, n])  index(s, t)  toupper(s)  tolower(s)
+Patterns in /.../ and after ~:  ^ the start   $ the end   . any character
+  c* any number of c   c+ one or more   c? one or none   \. a .
+  [abc] one of them   [a-z] a range   [^0-9] any but these
+  (not yet: ( ) | - and arrays, split, sub, gsub, getline, print > file)
+A -f file has a rule or statement a line, # to the line's end ignored.
+
+  RAWK '{for (i = NF; i > 0; i--) printf "%s ", $i; print ""}' A.TXT
+  RAWK '$1 ~ /^[A-Z]/ {n++} END {print n " start with a capital"}' A.TXT
+  RAWK -v x=5 'NR > x' BOOK.TXT            from line 6 on
+  RAWK -f TOTALS.AWK *.TXT                 the program in TOTALS.AWK
+@SEND Send a file to the PC/Mac/Linux
+Usage:  SEND [-T] name
+
+The opposite of RECV: the file goes out over the serial line.
+  SEND name      as Intel HEX - any file, byte for byte; RECV puts it
+                 back. On the PC/Mac/Linux: python3 elfser.py get NAME file
+  SEND -T name   the text as it is, for the terminal to capture
+@XFER Move a file of any size to or from the PC/Mac/Linux
+Usage:  XFER -R name    the PC/Mac/Linux to the card
+        XFER -S name    the card to the PC/Mac/Linux
+
+You run it from the PC/Mac/Linux; it types the XFER command here for you.
+First quit the terminal program, so the serial port is free.
+On the PC/Mac/Linux:
+  python3 elfser.py put FILE NAME        FILE onto the card as NAME
+  python3 elfser.py put FILE NAME --yes  the same, replacing NAME
+  python3 elfser.py pull NAME FILE       NAME from the card into FILE
+Any kind of file up to 32 MB, about 1.5 KB a second (100 KB: ~70 s).
+NAME can have a path (DOCS/BOOK.TXT); left out, it is FILE's name.
+
+It goes a sector at a time, each one checked and sent again if damaged.
+If NAME is already on the card, it asks Y/N; the old file stays until
+the new one is all there. If anything goes wrong - 10 bad sectors in
+a row, the card full, Ctrl-C on the PC/Mac/Linux - nothing is saved.
+
+Typed here by hand, XFER just waits for the PC/Mac/Linux; Ctrl-C stops it.
+RECV (up to about 16 KB) and SEND work through the terminal instead.
+@FREE How much room is on the card
+Usage:  FREE
+
+The card's free space and its size, in KB and in clusters; then the space
+used (its size less what is free).
+@DISKINFO All about the card
+Usage:  DISKINFO [-Q | -S]
+
+The card: its model, serial number, firmware, kind and size (what the card
+says of itself). The partition table. The volume: FAT16, who formatted it,
+its label and serial number, sectors, cluster size, FATs, the root's room.
+The space in clusters and bytes: in all, free, used, marked bad. The files
+(and the bytes in them) and folders in every folder.
+  -Q   quick: the card, partition and volume only, nothing counted
+  -S   also read every sector of the card and count the ones that fail
+       (a dot a MB, about a minute each on the Elf2K; any key stops it)
+# Folders
+@PWD Show the current folder
+Usage:  PWD
+
+The path of the folder you are in, "/" for the root (as the prompt shows).
+@CD Go into a folder
+Usage:  CD [path]
+
+  CD GAMES          into GAMES
+  CD ..             up one
+  CD /              the root
+  CD GAMES/OLD      two down
+  CD                (alone) shows where you are
+The prompt shows the folder: LTOS /GAMES>
+@MKDIR Make a folder
+Usage:  MKDIR path
+
+  MKDIR DOCS
+  MKDIR DOCS/OLD
+@RUNNING A man on the move, in 1802 code
+Usage:  RUNNING
+
+Clears the screen and moves a man made of white blocks in the middle of it,
+as fast as the serial line goes, until you press Esc. WALK is the same man
+as a STELLAR app.
+@DELETE Move files to the trash
+Usage:  DELETE names
+
+Moves files to the folder /TRASH, making it the first time, instead of
+deleting them. Wildcards and more than one name are fine:
+  DELETE OLD.TXT            one file
+  DELETE *.BAK DOCS/A.TXT   every .BAK here, and one in DOCS
+
+To get one back:  MV /TRASH/OLD.TXT .
+If /TRASH has that name already, the older one is lost. Folders are left
+alone. The space comes back with EMPTY. DEL and RM delete at once.
+@EMPTY Empty the trash
+Usage:  EMPTY
+
+Deletes the files in /TRASH for good, after asking first.
+@RMDIR Remove an empty folder
+Usage:  RMDIR path
+
+The folder must be empty, and not the one you are in.
+@FIND Find a file anywhere on the card
+Usage:  FIND name
+
+Searches every folder of the card and shows where each one is.
+Wildcards work; no dot means any extension. Folders end with a /.
+
+  FIND NOTE.TXT     /DOCS/NOTE.TXT
+  FIND *.STL        every STELLAR app on the card
+@TREE The folders as a tree
+Usage:  TREE
+
+The folders below this one, indented, each with its files and their
+size - and the totals at the end. (CD / first for the whole card.)
+@PATHS How to name files in other folders
+Paths use / (never \):
+  GAMES/SNAKE.STL   in GAMES, below this folder
+  /HELP.TXT         in the root, from anywhere
+  ..                the folder above;  .  this folder
+Names are 8.3: up to 8 letters, a dot, up to 3 (NOTE.TXT).
+Wildcards: * and ? (DIR S*, RM *.BAK, COPY *.DAT D).
+# Programs
+@RUN Load a program and start it
+Usage:  RUN name [arguments]
+
+Loads an LTOS program (a file with the 6-byte LTOS header) and starts it;
+the rest of the line is its arguments. Give the full name, with a path if
+it is elsewhere: RUN HELLO.PRG hi.
+
+Usually you just type the program's name: HELLO hi runs HELLO.PRG, looked
+for here, then in the root, then in /BIN. RUN looks only where you say.
+@LOAD Load a file into memory
+Usage:  LOAD name [a]
+
+  LOAD X.PRG        a program, to where its header says (it does not run)
+  LOAD X.BIN 4000   any file, as it is, at address a (hex, $3000-$6BFF)
+@BIN Where programs are found
+Typing NAME runs, the first one found of:
+  NAME.SH    a script (here, else the root, else /BIN): SH NAME
+  NAME.PRG   a program (here, else the root, else /BIN)
+  NAME.STL   a STELLAR app: LW2 DOC.TXT is STELLAR LW2 DOC.TXT
+A program found elsewhere still works in this folder, so the files you
+give it are found here. STELLAR finds its firmware and apps the same
+way. A name with a / is looked for only where it says.
+# STELLAR
+@STELLAR Start STELLAR, with apps from the card
+Usage:  STELLAR [-M] [firmware.BIN] [app ...] [document]
+
+Loads the STELLAR firmware (STELLAR.BIN unless one is named) and the apps
+(NAME.STL files; .STL can be left off), then starts STELLAR. When the
+program ends, LTOS starts again by itself.
+With -M it ends at the monitor instead, showing the registers.
+
+  STELLAR LW2               Lite-Writer 2
+  STELLAR LW2 NOTE.TXT      Lite-Writer 2 with NOTE.TXT to edit
+  LW2 NOTE.TXT              the same: an app's name alone starts it
+  STELLAR NOTE.TXT          the same (a document alone means LW2)
+  STELLAR S2.BIN TG         another firmware, and the app TG.STL
+@LW2 Lite-Writer 2, the word processor
+Usage:  LW2 [NAME.TXT]       (or STELLAR LW2 [NAME.TXT])
+
+Edits NAME.TXT from the card (up to 5,204 characters); a new name makes a
+new file. LW2 alone starts a new document here: its first ^W asks for a
+name. Inside Lite-Writer: ^G help, ^W writes the file to the card, ^X
+leaves (it offers to write first). Under LTOS there are no slots (^S, ^L):
+they are only for Lite-Writer run on its own, with no card. Longer
+documents: LW3.
+@LW3 Lite-Writer 3, for documents longer than memory
+Usage:  LW3 [NAME.TXT]       (or STELLAR LW3 [NAME.TXT])
+
+Lite-Writer 2's editor for documents up to 60,000 bytes: a part of the
+document is in memory, the rest stays on the card. Moving past a part's
+top or bottom (or ^P / ^N) brings the part before or after; ^T / ^B go
+to the document's top / bottom. Every move to another part SAVES the
+document first, if the part was changed. The status bar's line counts
+from the document's top. Find (^F) looks on through the parts after this
+one; not there: back to where you were, and from this part's top.
+A line longer than 72 characters (a paragraph from a PC/Mac/Linux) is shown
+wrapped; the file keeps it one line. Line numbers count the rows on the
+screen.
+
+  LW3 BOOK.TXT
+  LW3                         a new document, named at the first ^W
+@NANO A small full-screen editor (in 1802 code)
+Usage:  NANO [name]          (no name: it asks for one)
+
+Type to put text in at the cursor. Files up to 60,000 bytes: about 5,600
+bytes of a long file are in memory at a time. Moving past a part's top or
+end brings in the next part - and WRITES the file first, if it changed.
+A long line is shown whole, wrapped onto more rows; the file keeps it one
+line. The bottom row tells the name, line and column when you stop typing.
+  ^O ^S  write the file          ^X Esc  leave (asks if it changed)
+  ^W ^F  find (any case)         ^C      the line, column and bytes
+  ^K     cut the line (more ^K: more lines, 768 bytes)   ^U  paste
+  ^A ^E  start / end of line     ^Y ^V   a screen up / down
+  ^P ^N  line up / down          ^T ^B   the file's top / end
+  ^_     go to a line            ^L      draw the screen again
+  ^D Del delete at the cursor    Bksp    delete before it
+  ^G     all the keys            Tab     spaces to the next 4th column
+Arrows, Home, End, PgUp, PgDn and Delete work too. A CR LF becomes LF.
+Selecting: ^^ or Alt-A (Esc, then a) marks a spot, or hold Shift with an
+arrow; the text from there to the cursor is shown highlighted. ^K cuts it,
+Alt-6 copies it, ^U pastes it; Esc drops the mark. NANO needs NANO.OVL.
+
+  NANO NOTES.TXT
+  NANO DOCS/BOOK.TXT
+@APPS List the STELLAR apps on the card
+Usage:  APPS
+
+The .STL apps here, with their blocks and the VMs they use.
+@FW Load the STELLAR firmware into memory
+Usage:  FW [name]
+
+Loads STELLAR from the card into memory ($0000-$2EFF) and goes to the
+monitor - whatever was in memory before (MON only puts STELLAR back if it
+was there when LTOS started).
+
+  FW                STELLAR.BIN (the root, else /BIN)
+  FW S2.BIN         another firmware file
+Type BOOT at the monitor to come back to LTOS.
+@MON Back to the monitor
+Usage:  MON
+
+Puts STELLAR back in memory from STELLAR.BIN and goes to the monitor.
+Type BOOT there to come back to LTOS.
+# Scripts
+@SH Run a script (a .SH file of commands)
+Usage:  SH [-x] name [words]      or just:  name [words]
+(name alone: a script wins over a NAME.PRG or NAME.STL of the same name)
+
+Runs name.SH, a line at a time: from this folder, else the root, else /BIN.
+The words are $1 .. $9 inside it. -x shows each command before it runs.
+Ctrl-C (or Esc) between lines stops it. HELP SCRIPTS: what can go in one.
+
+  BACKUP DOCS             runs BACKUP.SH with $1 = DOCS
+  SH -x BACKUP DOCS       the same, each command shown
+@SCRIPTS What a .SH script can hold
+  # a comment               cmd1; cmd2         two commands on one line
+  NAME=value  (no spaces)   $NAME ${NAME}      a variable (names exact)
+  $0 the script  $1-$9 its words  $# how many  $? the last status (0 = ok)
+  'single quotes': nothing changes inside;  "double": $NAME is replaced
+  echo [-n] words           read [-p "prompt "] NAME    (a line typed)
+  if [ "$1" = DOCS ]; then ... elif ...; then ... else ... fi
+  test / [ ]:  -z -n text   a = b  a != b   -eq -ne -lt -le -gt -ge
+               -e -f -d -s name (there, a file, a folder, not empty)  !
+  true  false  exit [n]  set (the variables; -x, +x)  unset NAME
+Any other line is a command, as typed at the prompt (> files too).
+HELP LOOPS: while, for, arithmetic and the rest.
+
+  read -p "Folder? " F
+  if [ -d "$F" ]; then DIR $F > LIST.TXT; else echo no $F; fi
+@LOOPS Loops and more in a .SH script
+  while [ $N -lt 5 ]; do ... done     until ...; do ... done
+  for F in *.TXT DOCS/*.DOC; do ... done    (for A; do: $1 .. $9)
+  break  continue  (6 loops inside each other at most)
+  cmd1 && cmd2   only if cmd1 worked    cmd1 || cmd2   only if it failed
+  ! cmd          its status turned round
+  N=$((N + 1))   whole numbers -32768 .. 32767: + - * / % ( ) < <= == !=
+  ${NAME:-text}  text if NAME is empty    ${NAME:=text}  and NAME = text
+  shift [n]  sleep n (seconds)  pause [text]  set -e (stop at a failure)
+
+  N=0
+  for F in *.TXT; do N=$((N + 1)); COPY $F BACKUP; done
+  echo $N files copied
+HELP FUNCS: functions, case, $(command), scripts running scripts.
+@FUNCS Functions, case and more in a .SH script
+  NAME() { commands; }    a function (6, names of 8 letters at most):
+                          NAME words runs it, $1 .. its words; return [n]
+  case $X in              a*|b*) commands ;;    *.TXT) ... ;;
+    ...                   ?) one character ;;    *) anything else ;;
+  esac
+  N=$(command)            what the command prints (lines joined by spaces;
+                          one $( ) a command)
+  . LIB                   LIB.SH's lines run here (its functions kept)
+  OTHER words             another script; exit n in it comes back here
+
+  backup() { COPY $1 /BACKUP; echo saved $1; }
+  for F in *.TXT; do backup $F; done
+# System
+@REDIR,OUTPUT Sending what a command prints to a file
+Any command's output can go to a file instead of the screen:
+
+  DIR > LIST.TXT          a new LIST.TXT (one there is replaced)
+  ECHO done >> LOG.TXT    added to the end of LOG.TXT
+  FSCK > NUL              shown nowhere
+
+The file is written when the command ends. A > inside quotes is just
+text: GREP "a > b" X.TXT. Questions (replace it? Y/N) and errors still
+show on the screen. Lines in the file end with LF, as on Linux.
+@ECHO Show a line of text
+Usage:  ECHO [-n] words
+
+Shows the words with one space between them, then a new line (-n: none).
+Quotes keep spaces and the like as they are: ECHO "a   b".
+
+  ECHO Hello there
+  ECHO Backed up >> LOG.TXT
+@GETSTR Read a line typed, into a file or a variable
+Usage:  GETSTR [-p "prompt"] [file]
+
+Reads a line from the keyboard (Backspace rubs out, Enter ends it).
+  file       the line goes into it (replacing it)
+  no file    the line is the output: in a script, NAME=$(GETSTR) puts it
+             in the variable NAME (what you type shows on the screen too)
+Ctrl-C: nothing kept, and $? is 1.
+
+  GETSTR -p "Your name? " NAME.TXT
+  N=$(GETSTR -p "How many? ")
+@FETCH Read one key, into a file or a variable
+Usage:  FETCH [-p "prompt"] [file]
+
+Waits for one key - no Enter needed - and shows it.
+  file       the key goes into it (replacing it)
+  no file    the key is the output: in a script, K=$(FETCH) puts it in K
+Enter gives nothing (an empty answer); Ctrl-C: nothing kept, $? is 1.
+
+  K=$(FETCH -p "Go on? (Y/N) ")
+  if [ "$K" = Y ]; then echo yes; fi
+@POS Move the cursor
+Usage:  POS x y
+
+Puts the cursor at column x, row y: POS 1 1 is the top left corner
+(an 80 x 24 screen: POS 80 24 the bottom right). With CLS and ECHO -n,
+a script can draw a screen.
+
+  CLS; POS 30 10; ECHO -n "In the middle"
+@HELP,? This list, or help on one command
+Usage:  HELP [command]
+
+  HELP              every command
+  HELP DIR          just DIR
+@KEYS Editing the command line
+  Left / Right arrows   move along the line (type to insert)
+  Home / End            the start / the end of the line
+  Backspace, Delete     the character before / under the cursor goes
+  Up arrow              the last command again (edit it, then Enter)
+  Ctrl-C                forget this line
+@LICENSE,COPYING Who wrote this, and what you may do with it
+LTOS, STELLAR and Stellar C: Copyright (C) 2026 Craig Ledbetter.
+
+This is free software: you may use, change and share it under the GNU
+General Public License, version 3 or any later version. It comes with
+NO WARRANTY. COPYING.TXT, in the root of the card, is the full licence:
+  TYPE /COPYING.TXT
+
+Programs you compile with Stellar C are yours, on whatever terms you like:
+see the README.TXT's License section.
+@VER LTOS's version and the card
+Usage:  VER
+
+LTOS's version, the kernel's size, how the BIOS started it, the card's
+name and size, and where STELLAR.BIN is.
+@FSCK Check the card
+Usage:  FSCK [-F]
+
+Checks every folder and every file's chain of clusters, the clusters
+that no file owns, and the FAT's two copies. It reports:
+  cross-linked      a cluster two files both use
+  a broken chain    a file that runs off the card
+  size mismatch     a chain longer or shorter than the file's size
+  lost clusters     in use, but no file owns them
+FSCK -F frees the lost clusters (it asks first). Nothing else is changed.
+@DATE Show or set the date
+Usage:  DATE [yyyy-mm-dd]
+
+  DATE              today's date
+  DATE 2026-10-20   sets it
+@TIME Show or set the time
+Usage:  TIME [hh:mm[:ss]]
+
+  TIME              the time now
+  TIME 14:30        sets it
+@DUMP Show memory in hex
+Usage:  DUMP [a [n]]
+
+n bytes (hex, $80 if left out) from address a (hex), in hex and text.
+DUMP alone goes on from where the last one ended.
+@CLS Clear the screen
+Usage:  CLS
+@HELLO A sample program
+Usage:  HELLO [words]
+
+Says hello, and shows the words you typed after it.

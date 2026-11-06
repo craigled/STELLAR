@@ -151,6 +151,14 @@
     "halts": false
   },
   {
+    "name": "Walk (VT100)",
+    "file": "Walk.lst",
+    "input": "",
+    "blurb": "A man in white blocks, walking on the spot in the middle of the screen. Written in Stellar C, the same man as WALK on LTOS. Esc stops him.",
+    "maxSteps": 14000000,
+    "halts": false
+  },
+  {
     "name": "Starfield (VT100)",
     "file": "Starfield.lst",
     "input": " 12\r",

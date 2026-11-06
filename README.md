@@ -74,7 +74,7 @@ What it can do:
 - **Looking after the card:** FSCK checks it, FREE shows the space, and DISKINFO reports everything about the card.
 - **Running STELLAR:** type an app's name, such as GALAXIA, and LTOS loads the STELLAR firmware and the app. Esc comes back to LTOS.
 
-Type HELP at the prompt for every command, or HELP NAME for one. WALK shows a man walking on the spot until you press Esc.
+Type HELP at the prompt for every command, or HELP NAME for one. RUNNING shows a man in white blocks, in 1802 code, and WALK is the same man as a STELLAR app. Esc stops either.
 
 ## The website: stellar-1802.dev
 
@@ -121,7 +121,7 @@ Tip: the LTOS page runs at 10 times the Elf2K's speed. Choose Elf2K to feel the 
 5. Click in the VT 100 window and press Enter. The ROM's banner and `>>>` appear.
 6. Type `BOOT` and press Enter. You are at the `LTOS>` prompt.
 
-Try `HELP`, `DIR /BIN`, `WALK`, `GALAXIA` or `DISKINFO`.
+Try `HELP`, `DIR /BIN`, `RUNNING`, `WALK`, `GALAXIA` or `DISKINFO`.
 
 **Sound:** `ltos.xml` turns on Q as a 700 Hz tone, using Emma's Q sound setting. Emma's own Elf 2000 UART setup has no sound, so Q is silent there. To add it to another setup, put this in the XML file:
 
@@ -160,7 +160,7 @@ The git history starts in February 2026. Before that, the firmware was already w
 - **Early October:** V0061.35 added the real-time clock command. Cron, a job scheduler, and the Lunar Mission (later STELLAR Orbit) arrived.
 - **12 October:** LTOS began as a CompactFlash driver, boot sector and serial installer.
 - **Later in October:** LTOS gained folders, the line editor, its tools, FSCK and XFER, then RAWK, the shell with scripts, EROFF, Lite-Writer 3 and NANO. V0061.36 added one-shot absolute addressing and register-based array access, and LTOS 0.5 became the main line. Stellar C gained multitasking, and LTOS joined the website.
-- **November:** Every command got worked examples on the Opcodes page. A review of the test programs led to V0061.37, which uses all 32 bits of the Math Accumulator everywhere, converts 8 digits both ways, and fixes indirect jumps. LTOS gained DELETE, EMPTY, WALK and progress dots, and now runs on Emma 02.
+- **November:** Every command got worked examples on the Opcodes page. A review of the test programs led to V0061.37, which uses all 32 bits of the Math Accumulator everywhere, converts 8 digits both ways, and fixes indirect jumps. LTOS gained DELETE, EMPTY, RUNNING and progress dots, and now runs on Emma 02.
 
 ## Ideas for the future
 
@@ -191,7 +191,7 @@ The git history starts in February 2026. Before that, the firmware was already w
 
 **The website and Emma 02**
 
-- Pace the web terminal at the real baud rate, so that programs like WALK look as they do on hardware.
+- Pace the web terminal at the real baud rate, so that programs like RUNNING look as they do on hardware.
 - Finish the History section on the site.
 - Offer the kit to the Emma 02 project, and report the clock start-up problem.
 - A short video of each program on the real Elf2K.
@@ -203,6 +203,8 @@ Copyright (C) 2026 Craig Ledbetter.
 LTOS, the STELLAR firmware, the Stellar C compiler and the programs here are free software: you can use, change and share them under the GNU General Public License, version 3 or any later version (GPL-3.0-or-later). They come with no warranty. The full text is in `COPYING`, and on the card as `COPYING.TXT`.
 
 **Programs you compile are yours.** The Stellar C compiler copies some of its library routines into your program, so an exception (`COPYING.EXCEPTION`) lets you use what it produces on any terms you like.
+
+The source of LTOS is in the `LTOS` folder, the Stellar C compiler in `web/sc`, and the programs in `APPLICATIONS` and `web/samples`.
 
 The documentation, including this README and the Stellar C guide, is under the Creative Commons Attribution-ShareAlike 4.0 licence (CC BY-SA 4.0).
 

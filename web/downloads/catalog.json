@@ -253,6 +253,13 @@
  },
  {
   "group": "Graphics",
+  "name": "Walk",
+  "what": "A man in white blocks, walking until you press Esc. Stellar C. VT100.",
+  "href": "samples/Walk.lst",
+  "note": null
+ },
+ {
+  "group": "Graphics",
   "name": "Starfield",
   "what": "Stars streaming outward; you pick how many. VT100.",
   "href": "samples/Starfield.lst",
