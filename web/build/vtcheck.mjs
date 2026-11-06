@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Drive the real VM through the real VT100 and see what the screen holds.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';

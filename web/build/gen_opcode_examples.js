@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Build web/js/opcode-examples.js from web/build/opcode-examples.txt.
 //
 //     node web/build/gen_opcode_examples.js [--check]

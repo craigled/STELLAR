@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // STELLAR disassembler for the side panel. Ported from tools/stellar_disasm.py
 // (shares its opcode length/name tables via opcodes.js, so instruction
 // boundaries match the Python tool exactly). Browser + Node.

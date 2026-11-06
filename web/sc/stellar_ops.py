@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Row helpers for building STELLAR programs with mini.assemble.
 
 Each helper returns one row (bytes_or_ref, asm_text, note) so a builder reads

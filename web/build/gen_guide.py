@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Build web/stellarc-guide.html from the work repo's SC/GUIDE.md - the Stellar C guide - and put its
 examples in web/sc/guide/ (NAME.sc + manifest.json) so each "Try it" link opens one in stellarc.html
 (stellarc.html#guide=NAME).

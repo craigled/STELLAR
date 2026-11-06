@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Its output: see COPYING.EXCEPTION.
 """scc - the Stellar C compiler (prototype).
 
 Stellar C is a small C-like language shaped to what STELLAR does in one opcode:

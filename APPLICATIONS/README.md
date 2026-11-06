@@ -13,7 +13,7 @@ has most of them as samples, and its download list is built from the same copies
 
 | App | File | What it does |
 |---|---|---|
-| Battleship | [`Battleship.lst`](Games/Battleship.lst) | You against the computer on two 10 x 10 seas; arrow-key aim or typed squares. VT100. |
+| Seabattle | [`Seabattle.lst`](Games/Seabattle.lst) | You against the computer on two 10 x 10 seas; arrow-key aim or typed squares. VT100. |
 | Breakout | [`Breakout.lst`](Games/Breakout.lst) | Knock out the wall of bricks; three balls, faster each wall. VT100, arrow keys. |
 | CanonBall | [`CanonBall.lst`](Games/CanonBall.lst) | Your castle and great cannon against the computer's: aim, fire, mind the wind; Easy, Normal, Hard. VT100. Written in Stellar C ([source](Games/CanonBall.sc), [notes](Games/CanonBall.md)). |
 | CanonBall Solo | [`CanonBall-Solo.lst`](Games/CanonBall-Solo.lst) | Aim the cannon and knock down the castle in as few shots as you can. VT100. Stellar C ([source](Games/CanonBall-Solo.sc)). |
@@ -23,10 +23,10 @@ has most of them as samples, and its download list is built from the same copies
 | Lunar Lander | [`Lunar-Lander.lst`](Games/Lunar-Lander.lst) | Land on the pad before the fuel runs out. Easy and Hard. VT100, arrow keys. |
 | Maze | [`Maze.lst`](Games/Maze.lst) | VM1 builds a maze, VM2 solves it. Two programs, one file. VT100. |
 | MOONBASE | [`Moonbase.lst`](Games/Moonbase.lst) | Text adventure: escape the damaged moon base. Two-word commands, 10 rooms; every game is shuffled. |
-| Pong | [`Pong.lst`](Games/Pong.lst) | You on the right against the computer. VT100, arrow keys. |
+| Bounce | [`Bounce.lst`](Games/Bounce.lst) | You on the right against the computer. VT100, arrow keys. |
 | Racer | [`Racer.lst`](Games/Racer.lst) | Keep the car on a scrolling, winding road. VT100, arrow keys. |
 | Snake | [`Snake.lst`](Games/Snake.lst) | Eat the food, grow, and do not hit the wall or yourself. Ten speed levels. VT100, arrow keys. |
-| Tetris | [`Tetris.lst`](Games/Tetris.lst) | Steer the falling pieces and clear the rows; levels speed up. VT100, arrow keys. |
+| Freefall | [`Freefall.lst`](Games/Freefall.lst) | Steer the falling pieces and clear the rows; levels speed up. VT100, arrow keys. |
 | Tic-Tac-Toe | [`Tic-Tac-Toe.lst`](Games/Tic-Tac-Toe.lst) | You are X against a simple AI. |
 
 ## Clock

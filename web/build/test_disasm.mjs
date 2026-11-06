@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Disassembler parity: disasm.js must produce the same instruction stream
 // (address + mnemonic, up to the end marker) as tools/stellar_disasm.py for
 // every app in the work repo. Run:  node web/build/test_disasm.mjs

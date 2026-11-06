@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The die: all 32 KB of the machine's RAM as a 128 x 256 picture, one pixel per
 // byte, 128 bytes to a row (so a 256-byte page is two rows). The bytes themselves
 // are the faint texture - firmware looks like firmware, empty RAM is black. On

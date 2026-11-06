@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The LTOS page's machine (js/elf2k.js + the web BIOS + the baked card) against the Python Elf2K: the same
 // commands, typed one at each prompt, must print exactly the same text (build/ltos-session.json, made by
 // build/ltos_ref.py from the same card). Then: a STELLAR app (GALAXIA) starts and a lone Esc brings LTOS back, and a

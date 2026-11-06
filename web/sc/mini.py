@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tiny two-pass assembler for STELLAR bytecode test programs.
 
 A program is a list of (bytes_or_ref, asm_text, explanation) rows.

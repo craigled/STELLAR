@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Generate web/js/opcodes.js — the data behind the opcode-reference page and the
 disassembler side panel.

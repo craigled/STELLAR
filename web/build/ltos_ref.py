@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The reference LTOS session for test_ltos.mjs: the baked card (ltos/ltos-card.bin) booted in the Python Elf2K
 with the web BIOS (LTOS/verify_webbios.py), these commands typed one at each prompt, and what it printed.
 

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Parity test: the JS STELLAR engine must reproduce the Python firmware sim's
 // serial output byte-for-byte for every sample. Run:
 //     node web/build/test_parity.mjs

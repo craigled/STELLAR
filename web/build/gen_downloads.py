@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Build web/downloads/: the app catalogue behind the Simulator page's download list.
 
 Programs that are Simulator samples are served from web/samples/ as they are (the
@@ -24,19 +26,19 @@ CATALOG = [
   'samples/Snake.lst', None),
  ('Games', 'Galaxia', 'Galaxian-style shooter: a swaying swarm, divers that swoop and bomb. VT100, arrow keys. Stellar C.',
   'samples/Galaxia.lst', None),
- ('Games', 'Tetris', 'Steer the falling pieces and clear the rows; levels speed up. VT100, arrow keys.',
-  'samples/Tetris.lst', None),
+ ('Games', 'Freefall', 'Steer the falling pieces and clear the rows; levels speed up. VT100, arrow keys.',
+  'samples/Freefall.lst', None),
  ('Games', 'Breakout', 'Knock out the wall of bricks; three balls, faster each wall. VT100, arrow keys.',
   'samples/Breakout.lst', None),
- ('Games', 'Battleship', 'You against the computer on two 10 x 10 seas; arrow-key aim or typed squares. VT100.',
-  'samples/Battleship.lst', None),
+ ('Games', 'Seabattle', 'You against the computer on two 10 x 10 seas; arrow-key aim or typed squares. VT100.',
+  'samples/Seabattle.lst', None),
  ('Games', 'CanonBall', 'Your castle and cannon against the computer\'s: aim, fire, mind the wind; three levels. VT100. Stellar C.',
   'samples/CanonBall.lst', None),
  ('Games', 'CanonBall Solo', 'Aim the great cannon and knock down the castle in as few shots as you can. VT100. Stellar C.',
   'samples/CanonBall-Solo.lst', None),
  ('Games', 'Getting Warmer', 'Guess the number from 1 to 1000 in ten tries: higher or lower, warmer or colder. Plain text.',
   'samples/Getting-Warmer.lst', None),
- ('Games', 'Pong', 'You on the right against the computer. VT100, arrow keys.', 'samples/Pong.lst', None),
+ ('Games', 'Bounce', 'You on the right against the computer. VT100, arrow keys.', 'samples/Bounce.lst', None),
  ('Games', 'Racer', 'Keep the car on a scrolling, winding road. VT100, arrow keys.', 'samples/Racer.lst', None),
  ('Games', 'Invaders', 'Two rows of six invaders and an arrow-key gun. VT100.', 'samples/Invaders.lst', None),
  ('Games', 'Tic-Tac-Toe', 'You are X against a simple AI.', 'samples/Tic-Tac-Toe.lst', None),

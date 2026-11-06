@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Simulator controller: loads a program, drives it opcode-by-opcode, and keeps
 // the disassembly side panel, the live core view, and the serial terminal in
 // sync. Shared by simulator.html and core.html.

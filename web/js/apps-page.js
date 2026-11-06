@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Apps page: a card per showcase app with its real screen (web/apps/apps.json, built by
 // web/build/gen_apps.py from the simulator). A card opens the app in the Simulator:
 // simulator.html#app=FILE loads it, runs it and enlarges the terminal.

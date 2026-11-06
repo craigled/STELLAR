@@ -52,6 +52,20 @@
     </div>
   </div>
 
+  <section style="margin-top:22px; max-width:80ch" id="emma02">
+    <h2>Run LTOS in Emma 02</h2>
+    <p>LTOS also runs in <a href="https://www.emma02.hobby-site.com">Emma 02</a>, Marcel van Tongeren's 1802 emulator, on its
+      COSMAC Elf 2000. This kit has a card image, with STELLAR and its apps on it, and the set-up files.</p>
+    <p><a href="downloads/LTOS-for-Emma02.zip" download style="display:inline-block; padding:7px 14px; border:1px solid var(--line); border-radius:8px; text-decoration:none">⤓ LTOS-for-Emma02.zip</a></p>
+    <ol>
+      <li>Copy <span class="mono">ltos-card.ide</span> and <span class="mono">rtcdump.bin</span> into your Emma 02 data folder's <span class="mono">Elf2K</span> folder, and <span class="mono">ltos.xml</span> into <span class="mono">Xml/Elf2K</span>. If your Elf 2000 already starts and shows its banner, keep your own <span class="mono">rtcdump.bin</span>.</li>
+      <li>In Emma 02 choose COSMAC Elf 2000, set XML to <span class="mono">ltos.xml</span>, and press Start.</li>
+      <li>Click in the VT 100 window and press Enter. At the <span class="mono">&gt;&gt;&gt;</span> prompt, type <span class="mono">BOOT</span> and press Enter.</li>
+    </ol>
+    <p>The kit uses the Elf 2000 ROM that comes with Emma 02, and turns on the Q sound. <span class="mono">README.TXT</span> on the card
+      explains the rest, including how to move files on and off the card.</p>
+  </section>
+
   <section style="margin-top:22px; max-width:80ch">
     <h2>What is running</h2>
     <p>The <b>1802</b> is the same emulator as the rest of this site. Around it is an Elf2K: a 16550 UART and a DS12887 clock
@@ -67,7 +81,7 @@
   </section>
 </main>
 
-<footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a></footer>
+<footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a> · <a href="license.html">license</a></footer>
 
 <script src="js/firmware-0061-37.js?v=146"></script>
 <script src="js/stellar-vm.js?v=146"></script>

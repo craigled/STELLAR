@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Bake the Stellar C compiler into the website (web/sc/), for stellarc.html.
 
 The page runs the REAL compiler - these same .py files - in the browser under

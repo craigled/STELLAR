@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Elf2K: the whole machine LTOS runs on, for the LTOS page.
 //
 // The same 1802 core as the rest of the site (StellarVMLib.CPU), with what LTOS needs around it - a port of

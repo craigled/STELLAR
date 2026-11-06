@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Glue for ltos.html: the Elf2K (elf2k.js) with the web BIOS and the demo card, the VT100, the clock, the
 // card kept in this browser (IndexedDB: only the sectors LTOS has written), and the "Things to try" list.
 (function () {
@@ -22,10 +24,10 @@
     ['SH -x TEST', 'each line shown as it runs'],
     ['LW2 DOCS/LETTER.TXT', 'Lite-Writer 2 (Ctrl-X: the menu)'],
     ['LW3 DOCS/BOOK.TXT', 'Lite-Writer 3: a 20 KB file, a part at a time (Ctrl-N, Ctrl-P)'],
-    ['ENANO DOCS/BOOK.TXT', 'ENANO: a small nano in 1802 code - long lines wrapped, Shift+arrow selects (Ctrl-G: every key)'],
+    ['NANO DOCS/BOOK.TXT', 'NANO: a small editor in 1802 code - long lines wrapped, Shift+arrow selects (Ctrl-G: every key)'],
     ['GALAXIA', 'a game: arrows, SPACE; Esc back to LTOS'],
     ['ORBIT', 'STELLAR ORBIT: Apollo 7 on three VMs (SPACE: the count, ?: help)'],
-    ['TETRIS', 'more games: SNAKE, PONG, INVADERS, BREAKOUT, MAZE'],
+    ['FREEFALL', 'more games: SNAKE, BOUNCE, INVADERS, BREAKOUT, MAZE'],
     ['EROFF EROFF.RF', 'a small nroff: plain text made into pages, headings, lists'],
     ['DISKINFO', 'all about the card: model, format, label, space, files and folders'],
     ['DICE', 'a Stellar C app: rand(6) + 1, two dice (S: 600 rolls, Q quits)'],

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // STELLAR virtual machine for the browser (and Node).
 //
 // A faithful port of Firmware-Math/cpu1802.py (CDP1802/1805 base ISA + the

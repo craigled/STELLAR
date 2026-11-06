@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // A small CDP1802/1805 disassembler, for showing the raw machine instructions
 // that execute underneath a single STELLAR opcode. One instruction at a time:
 // decode(M, addr) -> { len, text }. Browser + Node.

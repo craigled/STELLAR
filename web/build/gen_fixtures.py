@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Generate web/build/fixtures.json — golden serial output for each sample program,
 produced by the REAL firmware simulator in Firmware-Math, over the SAME image the

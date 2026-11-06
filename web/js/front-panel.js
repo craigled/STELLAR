@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Elf2K front panel for the simulator: the Q lamp and the two-digit hex
 // display that shows the latched output byte.
 //

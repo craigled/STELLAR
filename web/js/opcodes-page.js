@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Renders the opcode reference from window.STELLAR_OPCODES / _GROUPS.
 (function () {
   var OPS = window.STELLAR_OPCODES || [];

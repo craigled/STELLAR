@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Reusable VM-core panel: renders a snapshot() from stellar-vm.js as registers,
 // accumulators, math units, and flags, highlighting the cells the last opcode
 // changed. A "⊕ all fields" toggle expands to the full decoded core block

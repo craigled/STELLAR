@@ -1,5 +1,5 @@
 ; ==========================================================================
-; STELLAR PONG  -  you on the RIGHT, the computer on the left   (VM1 @ $4000)
+; STELLAR BOUNCE  -  you on the RIGHT, the computer on the left   (VM1 @ $4000)
 ; ==========================================================================
 ; Your paddle is the one on the RIGHT.  UP and DOWN arrows move it (w and s work
 ; too, for terminals that send no arrow keys).  First to 9 wins.  ESC or Q quits.
@@ -88,7 +88,7 @@
 ; frame, RA scratch, RB memory pointer, RC the key, RD/RE line and column for
 ; POSXY, RF the constant ten.
 ;
-; VERIFICATION (Firmware-Math/pong_verify.py, real V0061.24 sim): the escape
+; VERIFICATION (Firmware-Math/bounce_verify.py, real V0061.24 sim): the escape
 ; stream is replayed into an 80x24 screen after every cell change, and at the
 ; start of every frame the ball is inside the court, both paddles are four
 ; contiguous cells on their own columns, and nothing else is lit.  Clean over
@@ -107,7 +107,7 @@
 ; that was played.
 ;
 ; 428 STELLAR commands, $4000-$4469 (1130 bytes of code).
-; Data at $4900, 168 bytes, past the end marker.
+; Data at $4900, 170 bytes, past the end marker.
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
@@ -975,16 +975,16 @@ D 4463 8C 0A
 D 4465 A1 04 55
 D 4468 BE 00
 
-D 4A00 0D 0A 53 54 45 4C 4C 41 52 20 50 4F 4E 47 0D 0A
-D 4A10 0D 0A 59 6F 75 72 20 70 61 64 64 6C 65 20 69 73
-D 4A20 20 6F 6E 20 74 68 65 20 52 49 47 48 54 2E 20 20
-D 4A30 55 50 20 61 6E 64 20 44 4F 57 4E 20 61 72 72 6F
-D 4A40 77 73 20 6D 6F 76 65 20 69 74 20 28 77 20 61 6E
-D 4A50 64 20 73 20 74 6F 6F 29 2E 0D 0A 46 69 72 73 74
-D 4A60 20 74 6F 20 39 20 77 69 6E 73 2E 20 20 45 53 43
-D 4A70 20 6F 72 20 51 20 71 75 69 74 73 2E 0D 0A 0D 0A
-D 4A80 50 72 65 73 73 20 61 6E 79 20 6B 65 79 20 74 6F
-D 4A90 20 73 74 61 72 74 2E 0D 0A 00
+D 4A00 0D 0A 53 54 45 4C 4C 41 52 20 42 4F 55 4E 43 45
+D 4A10 0D 0A 0D 0A 59 6F 75 72 20 70 61 64 64 6C 65 20
+D 4A20 69 73 20 6F 6E 20 74 68 65 20 52 49 47 48 54 2E
+D 4A30 20 20 55 50 20 61 6E 64 20 44 4F 57 4E 20 61 72
+D 4A40 72 6F 77 73 20 6D 6F 76 65 20 69 74 20 28 77 20
+D 4A50 61 6E 64 20 73 20 74 6F 6F 29 2E 0D 0A 46 69 72
+D 4A60 73 74 20 74 6F 20 39 20 77 69 6E 73 2E 20 20 45
+D 4A70 53 43 20 6F 72 20 51 20 71 75 69 74 73 2E 0D 0A
+D 4A80 0D 0A 50 72 65 73 73 20 61 6E 79 20 6B 65 79 20
+D 4A90 74 6F 20 73 74 61 72 74 2E 0D 0A 00
 D 4B00 59 4F 55 20 57 49 4E 00
 D 4B40 49 20 57 49 4E 00
 D 5000 00

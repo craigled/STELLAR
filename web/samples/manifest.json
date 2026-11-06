@@ -175,8 +175,8 @@
     "halts": false
   },
   {
-    "name": "Pong (VT100, arrow keys)",
-    "file": "Pong.lst",
+    "name": "Bounce (VT100, arrow keys)",
+    "file": "Bounce.lst",
     "input": "",
     "blurb": "You are the paddle on the RIGHT; the computer plays the left. Click the terminal and press any key to serve, then steer with the up and down arrows (w and s work too). Where the ball strikes your paddle decides which way it leaves - top cell up, bottom cell down. First to 9 wins; Esc (or Q) quits. Opens at Elf2K speed - the real hardware's pace. Verified on the Elf2K.",
     "maxSteps": 14000000,
@@ -220,8 +220,8 @@
     "speed": "Elf2K"
   },
   {
-    "name": "Tetris (VT100, arrow keys)",
-    "file": "Tetris.lst",
+    "name": "Freefall (VT100, arrow keys)",
+    "file": "Freefall.lst",
     "input": "",
     "blurb": "Steer the falling pieces and clear the rows. Click the terminal and press SPACE (or a digit 0-9 to start at that level). Left / right arrows (or a / d) move the piece, up (or w) rotates it, z rotates it back, down (or s) moves it down a row, SPACE drops it. 1-4 rows at once score 10 / 30 / 50 / 80 points times the level + 1; every 10 rows the level goes up and the pieces fall faster. P pauses, ESC quits. Verified on the Elf2K.",
     "maxSteps": 14000000,
@@ -238,8 +238,8 @@
     "speed": "Elf2K"
   },
   {
-    "name": "Battleship (VT100, arrow keys)",
-    "file": "Battleship.lst",
+    "name": "Seabattle (VT100, arrow keys)",
+    "file": "Seabattle.lst",
     "input": "",
     "blurb": "You against the computer on two 10 x 10 seas: carrier 5, battleship 4, cruiser 3, submarine 3, destroyer 2. Click the terminal and press SPACE; R shuffles your fleet, SPACE starts the battle. The arrow keys move your aim over ENEMY WATERS and SPACE or Enter fires - or type a square (B7, J10) to jump there. The computer hunts on a checkerboard and works round every hit. Q gives up and shows its ships; Esc quits. Verified on the Elf2K.",
     "maxSteps": 14000000,

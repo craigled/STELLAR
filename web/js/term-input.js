@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Live typing into an emulated serial terminal.
 //
 // Keys are appended to the emulated 16C550's receive buffer. That buffer already

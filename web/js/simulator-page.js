@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Glue for simulator.html: sample picker, controls, and the SimApp wiring.
 // Sample fetches carry the same ?v= cache-buster the <script> tags do. Without it a
 // browser that has visited before serves the OLD manifest from cache and newly added
@@ -173,7 +175,7 @@
     btn('blurb').textContent = s.blurb || '';
     // A sample can ask for a speed by its label ("flat out", "Elf2K", ...). ELIZA
     // wants flat out (slower, its start-up outlasts a visitor's first keystrokes);
-    // Pong wants Elf2K, the hardware's real pace - flat out a game is over in seconds.
+    // Bounce wants Elf2K, the hardware's real pace - flat out a game is over in seconds.
     if (s.speed && clock) clock.set(s.speed);
     loadSample(s);
   }

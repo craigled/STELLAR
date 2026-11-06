@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // StellarMachine: the always-running machine behind the home page.
 //
 // It is the same emulator as everywhere else on the site (StellarVMLib.CPU running

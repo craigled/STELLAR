@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Tone detector: is a Morse tone sounding? The web Simulator's stand-in for a tone-
 // decoder chip (an NE567 on the Elf2K's EF4): microphone samples in, key down / up out.
 //

@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """asm1802 - the small RCA 1802 assembler behind Stellar C's native { } blocks.
 
     assemble(lines, base, value) -> (bytes, listing, labels, shorts)

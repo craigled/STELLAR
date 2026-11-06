@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Memory page viewer: one 256-byte page at a time, hex + ASCII, live as the
 // program runs.
 //

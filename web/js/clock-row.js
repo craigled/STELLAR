@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The clock row shared by the Simulator and Multitasking pages: one button per
 // speed, like the home page's clock.
 //

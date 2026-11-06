@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Glue for stellarc.html: the Stellar C editor, the compiler, and a runner.
 //
 // The compiler is the real one (SC/scc.py in the work repo, baked into web/sc/ by

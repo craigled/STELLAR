@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The Simulator's LED console. LedCore shows ONE VM core as rows of lamps, a lamp for
 // every bit; LedMem shows the program block a byte to the row, beside its command.
 //

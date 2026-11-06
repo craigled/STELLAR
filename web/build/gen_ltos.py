@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Bake LTOS for the web: the web BIOS (js/webbios.js) and the demo CF card (ltos/ltos-card.bin).
 
     python3 web/build/gen_ltos.py [path/to/stellar-1802]
@@ -25,13 +27,13 @@ APPS = [                                         # (NAME on the card, the .lst)
     ('GALAXIA', os.path.join(WORK, 'APPLICATIONS', 'Galaxia', 'Galaxia.lst')),
     ('LW2', os.path.join(WORK, 'APPLICATIONS', 'Lite-Writer-2', 'Lite-Writer-2.lst')),
     ('LW3', os.path.join(WORK, 'APPLICATIONS', 'Lite-Writer-3', 'Lite-Writer-3.lst')),
-    ('TETRIS', 'Tetris.lst'), ('BREAKOUT', 'Breakout.lst'), ('SNAKE', 'Snake.lst'),
-    ('LANDER', 'Lunar-Lander.lst'), ('RACER', 'Racer.lst'), ('PONG', 'Pong.lst'), ('INVADERS', 'Invaders.lst'),
+    ('FREEFALL', 'Freefall.lst'), ('BREAKOUT', 'Breakout.lst'), ('SNAKE', 'Snake.lst'),
+    ('LANDER', 'Lunar-Lander.lst'), ('RACER', 'Racer.lst'), ('BOUNCE', 'Bounce.lst'), ('INVADERS', 'Invaders.lst'),
     ('TICTAC', 'Tic-Tac-Toe.lst'), ('MOONBASE', 'Moonbase.lst'), ('WARMER', 'Getting-Warmer.lst'),
     ('MANDEL', 'Mandelbrot.lst'), ('STARS', 'Starfield.lst'), ('BALL', 'Bouncing-Ball.lst'),
     ('STARSHIP', 'Starship.lst'), ('LIFELAB', 'Life-Lab.lst'), ('LIFE', 'Game-of-Life.lst'),
     ('SORTS', 'Sort-Visualiser.lst'), ('ELIZA', 'ELIZA.lst'), ('BANNER', 'Banner.lst'), ('PI', 'Pi-Spigot.lst'),
-    ('PRIMES', 'Prime-Gen-v07.lst'), ('CALC', 'Simple-Calc-8.lst'), ('BATTLE', 'Battleship.lst'),
+    ('PRIMES', 'Prime-Gen-v07.lst'), ('CALC', 'Simple-Calc-8.lst'), ('SEABATTL', 'Seabattle.lst'),
     ('CANNON', 'CanonBall-Solo.lst'), ('CLOCK', 'Big-Clock-v3.lst'),
     ('ORBIT', os.path.join(WEB, 'downloads', 'Stellar-Orbit.lst')), ('MAZE', os.path.join(WEB, 'downloads', 'Maze.lst')),
     ('MAZERACE', os.path.join(WEB, 'downloads', 'MazeRace.lst')),
@@ -55,7 +57,7 @@ Some things to try:
   DEMO you          run DEMO.SH            SH -x TEST     each line shown as it runs
   LW2 DOCS/LETTER.TXT                      the Lite-Writer 2 editor (^X: menu)
   LW3 DOCS/BOOK.TXT   Lite-Writer 3: a 20 KB file, a part at a time (^N ^P ^T ^B)
-  ENANO DOCS/BOOK.TXT   ENANO: a small nano; Shift+arrow selects (^G: every key)
+  NANO DOCS/BOOK.TXT   NANO: a small editor; Shift+arrow selects (^G: every key)
   GALAXIA           a game (arrows, SPACE; Esc quits back to LTOS)
   ORBIT             STELLAR ORBIT: fly Apollo 7 on three VMs (SPACE starts the count)
   EROFF EROFF.RF    a small nroff: plain text made into pages (> EROFF.TXT keeps it)
@@ -104,6 +106,7 @@ def add_files(m):
     open(os.path.join(m, 'DEMO.SH'), 'wb').write(open(os.path.join(LTOS, 'examples', 'DEMO.SH'), 'rb').read())
     open(os.path.join(m, 'EROFF.RF'), 'wb').write(open(os.path.join(LTOS, 'examples', 'EROFF.RF'), 'rb').read())
     open(os.path.join(m, 'README.TXT'), 'wb').write(README)
+    open(os.path.join(m, 'COPYING.TXT'), 'wb').write(open(os.path.join(WORK, 'COPYING'), 'rb').read().replace(b'\n', b'\r\n'))
     open(os.path.join(m, 'DOCS', 'LETTER.TXT'), 'wb').write(LETTER)
     open(os.path.join(m, 'DOCS', 'SALES.TXT'), 'wb').write(SALES)
     open(os.path.join(m, 'DOCS', 'BOOK.TXT'), 'wb').write(BOOK)

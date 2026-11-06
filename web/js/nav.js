@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Shared top nav + theme toggle. Include on every page with <script src="js/nav.js"></script>.
 (function () {
   var TABS = [
@@ -100,7 +102,7 @@
 
     var copy = document.createElement('div');
     copy.className = 'copy';
-    copy.textContent = '© 2026 Craig Ledbetter. All rights reserved.';
+    copy.textContent = '© 2026 Craig Ledbetter. Free software: GPL-3.0-or-later.';
     foot.appendChild(copy);
   }
 })();

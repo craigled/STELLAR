@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // 🎤 Listen: the microphone as the Input switch (EF4). A tone heard by js/tone-detect.js
 // (running as an AudioWorklet) holds the key down; each edge is passed on with the wall-
 // clock moment it happened, so SimApp.keyEdge can replay the marks and gaps at the right

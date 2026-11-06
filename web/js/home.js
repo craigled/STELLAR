@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // The home page: one StellarMachine running four programs, drawn four ways -
 // four VT100 screens, the die, the scheduler timeline, and the descent panels.
 (function () {
@@ -9,7 +11,7 @@
   // scheduler is fair by opcode count, so every VM runs at the pace of the round's dearest
   // opcodes; an idle game (DLYI / RAND at its title screen) costs ~2,600 machine cycles an opcode
   // against 200-350 for the rest, and two or three of them halved everyone's speed (measured).
-  // ?apps=Snake,Pong,Racer,Starfield pins a set instead.
+  // ?apps=Snake,Bounce,Racer,Starfield pins a set instead.
   var LINEUP = null;
   function choose(pool) {
     var want = (new URLSearchParams(location.search).get('apps') || '').split(',')

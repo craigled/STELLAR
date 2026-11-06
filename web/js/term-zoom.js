@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Enlarge a serial terminal to fill the window (computers only - the button is hidden
 // on phones and tablets by CSS).
 //

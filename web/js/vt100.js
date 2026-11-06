@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // A small VT100 for the serial terminal.
 //
 // STELLAR's full-screen programs — Starfield, Bouncing-Ball, Invaders, Starship,

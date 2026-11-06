@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Q as sound: what a speaker wired to the 1802's Q line would play.
 //
 // The emulator logs every change of Q with the machine cycle it happened on

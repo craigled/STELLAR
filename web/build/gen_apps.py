@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Build web/apps/apps.json - the Apps page's catalogue: every showcase app with a screenshot.
 
 Each "screenshot" is the app's real terminal screen: the program is run in the work repo's
@@ -40,11 +42,11 @@ APPS = [
   'Target practice: aim the cannon and knock down the castle across the field in as few shots '
   'as you can. Each shot leaves a trail of dots to aim by. Written in Stellar C.',
   [b' ', 2 * M, DOWN * 20, 3 * M, b' ', 9 * M]),
- ('Battleship.lst', 'Games', 'Battleship',
+ ('Seabattle.lst', 'Games', 'Seabattle',
   'You against the computer on two 10 x 10 seas. Aim with the arrow keys or type a square; '
   'the computer hunts on a checkerboard and works round every hit.',
   [b' ', 3 * M, b' ', 4 * M, b'E5 ', 5 * M, b'C3 ', 5 * M, b'G7 ', 5 * M, b'B8 ', 5 * M, b'H2 ', 6 * M]),
- ('Tetris.lst', 'Games', 'Tetris',
+ ('Freefall.lst', 'Games', 'Freefall',
   'Steer the falling pieces, turn them, and clear the rows. Every ten rows the level goes up and the pieces fall faster.',
   [b' ', 1 * M, LEFT * 3 + b' ', 1 * M, RIGHT * 2 + b' ', 1 * M, UP + LEFT + b' ', 1 * M, RIGHT * 4 + b' ', 1 * M,
    UP + RIGHT * 2 + b' ', 1 * M, b' ', 1 * M, LEFT * 4 + b' ', 1 * M, UP + b' ', 1_500_000]),
@@ -64,7 +66,7 @@ APPS = [
  ('Racer.lst', 'Games', 'Racer',
   'Keep the car on a scrolling, winding road with the arrow keys. The road narrows as you go.',
   [b' ', 900_000, LEFT, 200_000]),
- ('Pong.lst', 'Games', 'Pong',
+ ('Bounce.lst', 'Games', 'Bounce',
   'The classic: you on the right against the computer\'s paddle on the left.',
   [b' ', 4 * M]),
  ('Invaders.lst', 'Games', 'Invaders',

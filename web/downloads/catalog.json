@@ -29,9 +29,9 @@
  },
  {
   "group": "Games",
-  "name": "Tetris",
+  "name": "Freefall",
   "what": "Steer the falling pieces and clear the rows; levels speed up. VT100, arrow keys.",
-  "href": "samples/Tetris.lst",
+  "href": "samples/Freefall.lst",
   "note": null
  },
  {
@@ -43,9 +43,9 @@
  },
  {
   "group": "Games",
-  "name": "Battleship",
+  "name": "Seabattle",
   "what": "You against the computer on two 10 x 10 seas; arrow-key aim or typed squares. VT100.",
-  "href": "samples/Battleship.lst",
+  "href": "samples/Seabattle.lst",
   "note": null
  },
  {
@@ -71,9 +71,9 @@
  },
  {
   "group": "Games",
-  "name": "Pong",
+  "name": "Bounce",
   "what": "You on the right against the computer. VT100, arrow keys.",
-  "href": "samples/Pong.lst",
+  "href": "samples/Bounce.lst",
   "note": null
  },
  {

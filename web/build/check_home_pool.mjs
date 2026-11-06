@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Check every app in web/samples/home-pool.json in every home-page slot (VM1-VM4), beside three
 // other pool apps (a two-block app: in VM1+VM2, three times, beside two others), in the real home-page machine (js/machine.js): its screen gets output, no VM
 // reports an error, all four keep running, and a RUN after it finishes restarts it without

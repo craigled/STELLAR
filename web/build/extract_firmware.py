@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 Craig Ledbetter
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Bake the flashed STELLAR firmware V0061.37 into web/js/firmware-0061-37.js so the
 browser needs no .docx.

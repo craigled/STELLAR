@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Glue for core.html — a focused single-core view. Reuses SimApp; the sample's
 // input comes from the manifest (no manual input field here).
 // Sample fetches carry the same ?v= cache-buster the <script> tags do. Without it a

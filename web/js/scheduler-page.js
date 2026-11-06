@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Craig Ledbetter
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Scheduler view: boots 2–4 real VMs and renders the CIDP page, the per-core
 // state, and the cooperative round-robin hand-off.
 (function () {
