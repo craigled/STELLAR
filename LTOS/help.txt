@@ -291,6 +291,17 @@ Usage:  MKDIR path
 
   MKDIR DOCS
   MKDIR DOCS/OLD
+@HIDE Hide a file from DIR, or show it again
+Usage:  HIDE name         hide it
+        HIDE -U name      show it again
+
+A hidden file still works: TYPE, NANO and SH find it by name, and DIR -h
+lists it. Good for /AUTOEXEC.SH, the script LTOS runs at every boot.
+@MEMVERSE A verse from /BIBLE/MEMVERSE.TXT
+Usage:  MEMVERSE
+
+Shows one line of /BIBLE/MEMVERSE.TXT, picked at random, wrapped at the
+words. Put one verse on each line; blank lines are skipped.
 @RUNNING A man on the move, in 1802 code
 Usage:  RUNNING
 

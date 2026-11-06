@@ -220,7 +220,7 @@ def samples():
             (b'ECHO    PRG', prg('echo')), (b'CAT     PRG', prg('cat')), (b'HEAD    PRG', prg('head')), (b'TAIL    PRG', prg('tail')), (b'TOUCH   PRG', prg('touch')), (b'SH      PRG', prg('sh')), (b'EROFF   PRG', prg('eroff')), (b'PWD     PRG', prg('pwd')), (b'SORT    PRG', prg('sort')), (b'UNIQ    PRG', prg('uniq')),
             (b'ATTACH  PRG', prg('attach')), (b'HELP    PRG', prg('help')), (b'NANO    PRG', prg('enano')), (b'NANO    OVL', enano_ovl()),
             (b'GETSTR  PRG', prg('getstr')), (b'FETCH   PRG', prg('fetch')), (b'POS     PRG', prg('pos')),
-            (b'DELETE  PRG', prg('delete')), (b'EMPTY   PRG', prg('empty')), (b'RUNNING PRG', prg('running'))] + help_dats()
+            (b'DELETE  PRG', prg('delete')), (b'EMPTY   PRG', prg('empty')), (b'RUNNING PRG', prg('running')), (b'MEMVERSEPRG', prg('memverse')), (b'HIDE    PRG', prg('hide'))] + help_dats()
 
 
 def stl_of(lst):

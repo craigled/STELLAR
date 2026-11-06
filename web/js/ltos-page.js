@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '148';                                    // the ?v= the card is fetched with
+  var V = '149';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var SPEEDS = [
@@ -35,8 +35,10 @@
     ["RAWK '{ s += $2 } END { print s }' DOCS/SALES.TXT", 'awk on the 1802'],
     ['WALK', 'a man in white blocks, on STELLAR; Esc stops him'],
     ['RUNNING', 'the same man in 1802 code (a blur at 10x: choose Elf2K first)'],
+    ['MEMVERSE', 'a verse picked at random, wrapped at the words'],
     ['ECHO hello > HI.TXT', 'a file written to the card'],
     ['DELETE HI.TXT', 'moved to /TRASH; EMPTY deletes it for good'],
+    ['HIDE HI.TXT', 'hidden from DIR; DIR -h shows it, HIDE -U brings it back'],
     ['FSCK', 'check the card (slow at Elf2K speed)'],
     ['VER', 'the kernel and the card']
   ];

@@ -17,8 +17,19 @@ START:  LOAD    RD, 032DH       ; built for this kernel? (it uses the kernel's r
         XRI     LOW(KS_STAMPV)
         LBNZ    OLD
 ; ---- TYPE name: CR dropped, LF -> a new line; a pause every 22 lines
+        SEP     R4              ; (not NAMEARG: FINDN finds hidden files too)
+        DW      KS_MNTCHK
+        LOAD    RD, KS_FNAME
         SEP     R4
-        DW      KS_NAMEARG
+        DW      KS_NAMEP
+        LOAD    RD, KS_FNAME
+        SEP     R4
+        DW      KS_FINDN
+        LBDF    KS_NOFILE
+        LOAD    RD, KS_DATTR
+        LDN     RD
+        ANI     10H
+        LBNZ    KS_ISDIR
         SEP     R4
         DW      KS_FOPEN
         LDI     0

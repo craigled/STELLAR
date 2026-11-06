@@ -66,6 +66,7 @@ What it can do:
 
 - **Files and folders:** DIR, TYPE, COPY, MV, REN, RM, MKDIR, RMDIR, CD, PWD, TREE and FIND, with paths and wildcards.
 - **A trash folder:** DELETE moves files to /TRASH, and EMPTY deletes them for good.
+- **Hidden files:** HIDE keeps a file out of DIR, and DIR -h shows it again. Good for /AUTOEXEC.SH, which runs at every boot.
 - **Text tools:** GREP, SORT, UNIQ, WC, HEAD, TAIL, CAT, and EROFF, a small nroff.
 - **awk:** RAWK is an awk written in 1802 code.
 - **Editors:** NANO, a small editor in the style of GNU nano, written from scratch in 1802 code and not part of the GNU project; Lite-Writer 2 (LW2) and Lite-Writer 3 (LW3) on STELLAR, for files up to 60 KB.
@@ -74,7 +75,7 @@ What it can do:
 - **Looking after the card:** FSCK checks it, FREE shows the space, and DISKINFO reports everything about the card.
 - **Running STELLAR:** type an app's name, such as GALAXIA, and LTOS loads the STELLAR firmware and the app. Esc comes back to LTOS.
 
-Type HELP at the prompt for every command, or HELP NAME for one. RUNNING shows a man in white blocks, in 1802 code, and WALK is the same man as a STELLAR app. Esc stops either.
+Type HELP at the prompt for every command, or HELP NAME for one. RUNNING shows a man in white blocks, in 1802 code, and WALK is the same man as a STELLAR app. Esc stops either. MEMVERSE shows a random verse from /BIBLE/MEMVERSE.TXT.
 
 ## The website: stellar-1802.dev
 
