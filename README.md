@@ -151,7 +151,7 @@ DISKINFO shows the file name as the card's model and 26 MB as its size. That com
 
 ## How it got here
 
-The git history starts in February 2026. Before that, the firmware was already written by hand in hex.
+STELLAR is a project started back in 2020 (Covid days) to make the 1802 microprocessor into a gradually more powerful computer system that included advanced math capabilities and multitasking. The firmware was written by hand, in hex. The dates below come from the project's git history, which starts in February 2026.
 
 - **February 2026:** Audits of the firmware, command group by command group, fixed the math, tests, jumps and conversions.
 - **July:** Work moved into one project. Indexed arrays (READIDX and WRITEIDX) were designed, and Morse code, the Mandelbrot set and Banner appeared.
