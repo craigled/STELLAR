@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '?v=150';
+  var V = '?v=151';
   // The four programs are drawn at random from samples/home-pool.json (Craig's list) on every
   // visit: EXACTLY ONE "heavy" app - a game, or Sort visualiser - and three others. STELLAR's
   // scheduler is fair by opcode count, so every VM runs at the pace of the round's dearest
