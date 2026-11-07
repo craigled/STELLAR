@@ -7,7 +7,7 @@
 ;
 ; The sheet in memory IS the file: a pool of lines, "A1 =B1*2" LF, in cell order (a line someone else put out of
 ; order still works; a line that names no cell stays in the file, unused). Saving writes the pool as it is, opening
-; reads it as it is, and TYPE, GREP, RAWK and NANO can all use the file. A name with no extension gets .CAL.
+; reads it as it is, and TYPE, GREP, RAWK and NANO can all use the file. A name with no extension gets .CLC.
 ;
 ; Memory, from the first page after the code, up to $6BFF:
 ;   seven pages, each indexed by the cell's number (0-159: row * 8 + column), so a cell's byte is one PLO away:
@@ -741,7 +741,7 @@ AN7:    LOAD    R8, MNAME
 AN8:    LDI     0
         SMI     0
         SEP     R5
-; DEFEXT: a name with no extension gets .CAL
+; DEFEXT: a name with no extension gets .CLC
 DEFEXT: LOAD    RD, TMP11 + 8
         LDA     RD
         XRI     ' '
@@ -756,10 +756,10 @@ DEFEXT: LOAD    RD, TMP11 + 8
         LDI     'C'
         STR     RD
         INC     RD
-        LDI     'A'
+        LDI     'L'
         STR     RD
         INC     RD
-        LDI     'L'
+        LDI     'C'
         STR     RD
 DE9:    SEP     R5
 ; KEEPNM: the sheet's name = TMP11, its folder = WDIR

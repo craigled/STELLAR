@@ -225,27 +225,27 @@ AE0:    LDA     RC
         LDI     0
         STR     RD
         LBR     AR4
-AN0:    LOAD    RD, NAPPS       ; LW2 (or LW3) alone, no document: HASDOC = 2 - a new one here, named at its first ^W
+AN0:    LOAD    RD, NAPPS       ; LW2 (or LTWRITER) alone, no document: HASDOC = 2 - a new one here, named at its first ^W
         LDN     RD
         XRI     1
         LBNZ    AE1
-        LOAD    RD, APPN
-        LOAD    RC, LW2N
-        LDI     11
-        PLO     RB
-AN1:    LDA     RC
-        STR     R2
+        LOAD    RD, APPN        ; (STELLAR.PRG is full: LW2 or LTW is enough to know them by)
         LDA     RD
-        XOR
-        LBZ     AN1A
-        XRI     1               ; LW3 (Lite-Writer 3) too: its third letter '3', not '2'
+        XRI     'L'
         LBNZ    AE1
-        GLO     RB
-        XRI     9
+        LDA     RD
+        XRI     'W'
+        LBNZ    AN1B
+        LDN     RD
+        XRI     '2'
         LBNZ    AE1
-AN1A:   DEC     RB
-        GLO     RB
-        LBNZ    AN1
+        LBR     AN1A
+AN1B:   XRI     'W' XOR 'T'
+        LBNZ    AE1
+        LDN     RD
+        XRI     'W'
+        LBNZ    AE1
+AN1A:
         LOAD    RD, HASDOC
         LDI     2
         STR     RD

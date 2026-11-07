@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """LTOS + Lite-Writer 3 in the simulator: a document longer than memory, a part at a time.
 
-  * LW3 BIG.TXT (20 KB from the Mac: ATTACH copies it into its run of sectors): ^N ^N ^P ^T ^B - each part's
+  * LTWRITER BIG.TXT (20 KB from the Mac: ATTACH copies it into its run of sectors): ^N ^N ^P ^T ^B - each part's
     first / last line numbered from the document's top on the status bar; ^X: the file as it was;
   * ^F across the parts (found further on; not there: back where it was);
   * long lines (a Mac's paragraphs) shown wrapped, the file written back as it was;
   * edits in three parts (one grows: the rest moves up the card; one shrinks: it moves down), ^W: the Mac
     reads exactly the model's text, fsck clean;
   * typing past a part's room: it is written back and a part starts at the cursor's line - nothing lost;
-  * LW3 alone: a new document, named at ^W.
+  * LTWRITER alone: a new document, named at ^W.
 
     python3 LTOS/verify_lw3.py [-v]
 """
@@ -47,7 +47,7 @@ def main():
         cf, e2k, st = P1.installed_full(mem, n)
         def put(m):
             os.makedirs(os.path.join(m, 'BIN'), exist_ok=True)
-            open(os.path.join(m, 'BIN', 'LW3.STL'), 'wb').write(lw3)
+            open(os.path.join(m, 'BIN', 'LTWRITER.STL'), 'wb').write(lw3)
             for nm, d in files.items(): open(os.path.join(m, nm), 'wb').write(d)
         img, _ = P2.mac(V.image(cf, n), put)
         P1.load_image(cf, img)
@@ -79,7 +79,7 @@ def main():
     c1 = cut1(BIG, 0); c2 = cut1(BIG, c1)
     ln = lambda off: BIG[:off].count(b'\n') + 1               # the line an offset is on
     ls = last_start(BIG)
-    st, t, rc, fl = session({'BIG.TXT': BIG}, b'LW3 BIG.TXT\r', [
+    st, t, rc, fl = session({'BIG.TXT': BIG}, b'LTWRITER BIG.TXT\r', [
         ('press any key', b' '), ('^W writes it back', b'\x0e'),
         ('Line %d ' % ln(c1), b'\x0e'), ('Line %d ' % ln(c2), b'\x10'),
         ('Line %d ' % ln(c2), b'\x14'), ('Line 1 ', b'\x02'),
@@ -89,12 +89,12 @@ def main():
     if rc: e.append('fsck %d' % rc)
     if fl.get('BIG.TXT') != BIG: e.append('BIG.TXT changed: %r' % (fl.get('BIG.TXT') or b'')[:80])
     if '-v' in sys.argv: print(t[-3000:])
-    report('LW3 BIG.TXT (20,480 bytes, parts of up to %d): ^N line %d, ^N line %d, ^P its end (line %d), ^T line 1, '
+    report('LTWRITER BIG.TXT (20,480 bytes, parts of up to %d): ^N line %d, ^N line %d, ^P its end (line %d), ^T line 1, '
            '^B the end (line %d); ^X: the file as it was, fsck clean' % (RLIM, ln(c1), ln(c2), ln(c2),
                                                                           len(lines) + 1), e)
 
     # ---- ^F across the parts: found two parts on; a text that is nowhere: back where it was; the next line
-    st, t, rc, fl = session({'BIG.TXT': BIG}, b'LW3 BIG.TXT\r', [
+    st, t, rc, fl = session({'BIG.TXT': BIG}, b'LTWRITER BIG.TXT\r', [
         ('press any key', b' '), ('^W writes it back', b'\x06line 0500\r'),
         ('Line 500 ', b'\x06nowhere\r'), ('Not found', b'\x06line 0501\r'), ('Line 501 ', b'\x18')])
     e = []
@@ -118,7 +118,7 @@ def main():
         return n
     q1 = cut1(PARA, 0)
     want = b'X' + PARA
-    st, t, rc, fl = session({'PARA.TXT': PARA}, b'LW3 PARA.TXT\r', [
+    st, t, rc, fl = session({'PARA.TXT': PARA}, b'LTWRITER PARA.TXT\r', [
         ('press any key', b' '), ('^W writes it back', b'X\x0e'), ('Line %d ' % (rows(PARA[:q1]) + 1), b'\x17'),
         ('bytes to PARA.TXT', b'\x18')])
     e = []
@@ -126,7 +126,7 @@ def main():
     if fl.get('PARA.TXT') != want: e.append('PARA.TXT: %d bytes, want %d' % (len(fl.get('PARA.TXT') or b''), len(want)))
     sys.path.insert(0, os.path.join(HERE, '..', 'Firmware-Math'))
     import litewriter2_verify as LW
-    vt = LW.VT100(); vt.feed(raw_text[0].split('LW3 PARA.TXT')[-1])
+    vt = LW.VT100(); vt.feed(raw_text[0].split('LTWRITER PARA.TXT')[-1])
     if any('80' in x for x in vt.bad): e.append('a row written past column 80')
     report('PARA.TXT (40 paragraphs of 285 characters on one line each): shown wrapped at column 72, nothing past '
            'column 80; X at the top, ^N (line %d: the rows wrapped before it counted), ^W: the Mac reads the '
@@ -138,7 +138,7 @@ def main():
     nl = d.index(b'\n', p2) + 1; nl = d.index(b'\n', nl) + 1
     d = d[:p2] + b'BBB\n' + d[nl:]
     want = d + b'ZZZ'
-    st, t, rc, fl = session({'BIG.TXT': BIG}, b'LW3 BIG.TXT\r', [
+    st, t, rc, fl = session({'BIG.TXT': BIG}, b'LTWRITER BIG.TXT\r', [
         ('press any key', b' '), ('^W writes it back', b'AAA\x0e'),
         ('Line %d ' % ln(c1), b'\x0b\x0bBBB\r\x02'),
         ('Line %d ' % (want.count(b'\n') + 1), b'ZZZ\x17'), ('bytes to BIG.TXT', b'\x18')])
@@ -159,7 +159,7 @@ def main():
     typed = b''.join(b'%-40s\r' % (b'typed line %02d' % i) for i in range(28))     # 28 x 41: 1,148 > the room
     # (a line at a time, as typed: the status bar's next line number before the next - a key queue of 128)
     want = typed.replace(b'\r', b'\n') + BIG
-    st, t, rc, fl = session({'BIG.TXT': BIG}, b'LW3 BIG.TXT\r', [
+    st, t, rc, fl = session({'BIG.TXT': BIG}, b'LTWRITER BIG.TXT\r', [
         ('press any key', b' ')] + [(('^W writes it back', 'Line %d ' % (i + 1))[i > 0], typed[41 * i:41 * i + 41])
                                     for i in range(28)] + [('Line 29 ', b'\x17'), ('bytes to BIG.TXT', b'\x18')])
     e = []
@@ -181,24 +181,24 @@ def main():
     HUGE = b''.join(b'%05d the quick brown fox jumps over it\n' % i for i in range(1, 3000))[:59000]
     h1 = cut1(HUGE, 0)
     want = HUGE[:h1] + b'X' + HUGE[h1:] + b'END'
-    st, t, rc, fl = session({'HUGE.TXT': HUGE}, b'LW3 HUGE.TXT\r', [
+    st, t, rc, fl = session({'HUGE.TXT': HUGE}, b'LTWRITER HUGE.TXT\r', [
         ('press any key', b' '), ('^W writes it back', b'\x0e'), ('Line %d ' % (HUGE[:h1].count(b'\n') + 1), b'X\x02'),
         ('Line %d ' % (want.count(b'\n') + 1), b'END\x17'), ('bytes to HUGE.TXT', b'\x18')], cap=30_000_000_000)
     e = []
     if st != 'stop' or rc: e.append('the end %s, fsck %d: %r' % (st, rc, t[-300:]))
     got = fl.get('HUGE.TXT')
     if got != want: e.append('HUGE.TXT: %d bytes, want %d' % (len(got or b''), len(want)))
-    report('LW3 HUGE.TXT (59,000 bytes): ^N, X at part 2\'s top (56 KB move up the card), ^B, END, ^W: the Mac reads '
+    report('LTWRITER HUGE.TXT (59,000 bytes): ^N, X at part 2\'s top (56 KB move up the card), ^B, END, ^W: the Mac reads '
            'the model\'s %d bytes, fsck clean' % len(want), e)
 
-    # ---- LW3 alone: a new document, named at ^W
-    st, t, rc, fl = session({}, b'LW3\r', [
+    # ---- LTWRITER alone: a new document, named at ^W
+    st, t, rc, fl = session({}, b'LTWRITER\r', [
         ('press any key', b' '), ('^W asks for a name', b'Hello there\x17'), ('Save as', b'note\r'),
         ('bytes to NOTE.TXT', b'\x18')])
     e = []
     if st != 'stop' or rc: e.append('the end %s, fsck %d: %r' % (st, rc, t[-300:]))
     if fl.get('NOTE.TXT') != b'Hello there': e.append('NOTE.TXT %r (files %r)' % (fl.get('NOTE.TXT'), sorted(fl)))
-    report('LW3 alone: "Hello there", ^W, Save as note: NOTE.TXT; fsck clean', e)
+    report('LTWRITER alone: "Hello there", ^W, Save as note: NOTE.TXT; fsck clean', e)
 
     print('\nLTOS + Lite-Writer 3: %s' % ('ALL PASS' if ok else 'FAIL'))
     return ok

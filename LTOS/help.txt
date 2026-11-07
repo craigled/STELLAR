@@ -305,7 +305,7 @@ words. Put one verse on each line; blank lines are skipped.
 @LTCALC A small spreadsheet
 Usage:  LTCALC [name]
 
-One page of 8 columns (A-H) by 20 rows. A name with no extension gets .CAL.
+One page of 8 columns (A-H) by 20 rows. A name with no extension gets .CLC.
 Type in a cell: a number, text, or a formula that starts with =
 
     =A1+B1*2     =(A1-B2)/3     =SUM(A1:A10)     =AVG(A1:A3,C1:C3)
@@ -411,9 +411,9 @@ new file. LW2 alone starts a new document here: its first ^W asks for a
 name. Inside Lite-Writer: ^G help, ^W writes the file to the card, ^X
 leaves (it offers to write first). Under LTOS there are no slots (^S, ^L):
 they are only for Lite-Writer run on its own, with no card. Longer
-documents: LW3.
-@LW3 Lite-Writer 3, for documents longer than memory
-Usage:  LW3 [NAME.TXT]       (or STELLAR LW3 [NAME.TXT])
+documents: LTWRITER.
+@LTWRITER Lite-Writer 3, for documents longer than memory
+Usage:  LTWRITER [NAME.TXT]  (or STELLAR LTWRITER [NAME.TXT])
 
 Lite-Writer 2's editor for documents up to 60,000 bytes: a part of the
 document is in memory, the rest stays on the card. Moving past a part's
@@ -426,8 +426,8 @@ A line longer than 72 characters (a paragraph from a PC/Mac/Linux) is shown
 wrapped; the file keeps it one line. Line numbers count the rows on the
 screen.
 
-  LW3 BOOK.TXT
-  LW3                         a new document, named at the first ^W
+  LTWRITER BOOK.TXT
+  LTWRITER                    a new document, named at the first ^W
 @NANO A small full-screen editor (in 1802 code)
 Usage:  NANO [name]          (no name: it asks for one)
 

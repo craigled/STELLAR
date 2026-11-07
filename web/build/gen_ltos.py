@@ -26,7 +26,7 @@ SAMPLES = os.path.join(WEB, 'samples')
 APPS = [                                         # (NAME on the card, the .lst)
     ('GALAXIA', os.path.join(WORK, 'APPLICATIONS', 'Galaxia', 'Galaxia.lst')),
     ('LW2', os.path.join(WORK, 'APPLICATIONS', 'Lite-Writer-2', 'Lite-Writer-2.lst')),
-    ('LW3', os.path.join(WORK, 'APPLICATIONS', 'Lite-Writer-3', 'Lite-Writer-3.lst')),
+    ('LTWRITER', os.path.join(WORK, 'APPLICATIONS', 'Lite-Writer-3', 'Lite-Writer-3.lst')),
     ('FREEFALL', 'Freefall.lst'), ('BREAKOUT', 'Breakout.lst'), ('SNAKE', 'Snake.lst'),
     ('LANDER', 'Lunar-Lander.lst'), ('RACER', 'Racer.lst'), ('BOUNCE', 'Bounce.lst'), ('INVADERS', 'Invaders.lst'),
     ('TICTAC', 'Tic-Tac-Toe.lst'), ('MOONBASE', 'Moonbase.lst'), ('WARMER', 'Getting-Warmer.lst'),
@@ -57,7 +57,8 @@ Some things to try:
   DIR /BIN          the programs           TYPE DEMO.SH   a shell script
   DEMO you          run DEMO.SH            SH -x TEST     each line shown as it runs
   LW2 DOCS/LETTER.TXT                      the Lite-Writer 2 editor (^X: menu)
-  LW3 DOCS/BOOK.TXT   Lite-Writer 3: a 20 KB file, a part at a time (^N ^P ^T ^B)
+  LTWRITER DOCS/BOOK.TXT   Lite-Writer 3: a 20 KB file, a part at a time (^N ^P ^T ^B)
+  LTCALC DOCS/BUDGET   LTCALC: a small spreadsheet (arrows move, = starts a formula)
   NANO DOCS/BOOK.TXT   NANO: a small editor; Shift+arrow selects (^G: every key)
   GALAXIA           a game (arrows, SPACE; Esc quits back to LTOS)
   ORBIT             STELLAR ORBIT: fly Apollo 7 on three VMs (SPACE starts the count)
@@ -83,7 +84,9 @@ Best wishes,
 The 1802
 '''
 
-BOOK = b''.join(b'Line %04d of a long document: LW3 holds one part at a time.\n' % i for i in range(1, 341))
+BUDGET = (b'A1 Item\nB1 Cost\nC1 Qty\nD1 Total\nA2 Paper\nB2 4.25\nC2 3\nD2 =B2*C2\nA3 Ink\nB3 18.50\nC3 2\nD3 =B3*C3\n'
+          b'A4 Stamps\nB4 0.73\nC4 20\nD4 =B4*C4\nA6 Sum\nD6 =SUM(D2:D4)\nA7 Average\nD7 =AVG(D2:D4)\nA8 Largest\nD8 =MAX(D2:D4)\n')
+BOOK = b''.join(b'Line %04d of a long document: LTWRITER holds one part at a time.\n' % i for i in range(1, 341))
 
 SALES = b'''north 120
 south 75
@@ -113,6 +116,7 @@ def add_files(m):
     open(os.path.join(m, 'DOCS', 'LETTER.TXT'), 'wb').write(LETTER)
     open(os.path.join(m, 'DOCS', 'SALES.TXT'), 'wb').write(SALES)
     open(os.path.join(m, 'DOCS', 'BOOK.TXT'), 'wb').write(BOOK)
+    open(os.path.join(m, 'DOCS', 'BUDGET.CLC'), 'wb').write(BUDGET)
     for junk in ('.fseventsd', '.Spotlight-V100', '.Trashes'):        # what the Mac leaves on a volume
         shutil.rmtree(os.path.join(m, junk), ignore_errors=True)
     for d, ds, fs in os.walk(m):
