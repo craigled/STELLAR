@@ -110,6 +110,27 @@ With several files, each line starts with its file's name.
 
   GREP Lot DOCS/LOTSLOSS.TXT
   GREP -i -n "the end" *.TXT     (quotes: text with spaces)
+@SED Edit a file's lines by script: the stream editor
+Usage:  SED [-n] [-E] [-e script] [-f file] [script] names
+
+Reads the files a line at a time, runs the script on each line and prints
+the result. The files are not changed: use > to keep the result, even onto
+the same file. Put the script in quotes.
+  -n   print only what p asks for      -E   extended regular expressions
+  -e   a script (more than one is fine)   -f   the script is in a file
+
+  SED 's/old/new/g' A.TXT         every old becomes new
+  SED -n '2,4p' A.TXT             lines 2 to 4
+  SED '/^$/d' A.TXT               no blank lines
+  SED 's/\(.*\) \(.*\)/\2 \1/' A.TXT > B.TXT    swap two words
+  SED '$!N;s/\n/ /' A.TXT         join lines in pairs
+
+Addresses: 3  $  /re/  /re/I  3,7  /a/,/b/  and ! after them for the rest.
+Commands:  s y d D p P n N g G h H x a i c = l q Q b t T : { } #
+s flags:   g  p  a number  I         In the replacement: & \1-\9 \n
+Patterns:  . * [a-z] [^a-z] [[:alpha:]] ^ $ \( \) \1 \{m,n\} \+ \? \|
+
+Not here: r and w. A line holds 1,023 characters at most (511 as read).
 @CAT Show files one after another
 Usage:  CAT names
 
