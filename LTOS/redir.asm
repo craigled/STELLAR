@@ -640,10 +640,10 @@ KOS:    IRX
         LBR     F_TYPE
 ; KMSG: F_MSG's string at RF, a character at a time through KOUT (RF ends past its 0, as the BIOS's)
 KMSG:   LDA     RF
-        LBZ     KM9
+        BZ      KM9
         SEP     R4
         DW      KOUT
-        LBR     KMSG
+        BR      KMSG
 KM9:    SEP     R5
 ; TTYON (K_TTYON): the output to the screen until the next K_YESNO's answer (or the prompt). Every register kept.
 TTYON:  STXD
@@ -700,7 +700,7 @@ RFLUSH: GHI     R7
         STXD
         SEP     R4
         DW      RWRBLK
-        LBNF    RFL2
+        BNF     RFL2
         STXD
         SEP     R4
         DW      RVAR
@@ -711,7 +711,7 @@ RFLUSH: GHI     R7
         LOAD    RD, KRDIR
         LDI     2
         STR     RD
-        LBR     RFL3
+        BR      RFL3
 RFL2:   SEP     R4              ; RSIZE + 512
         DW      RVAR
         DB      RSIZE+2 - RVARS
@@ -793,7 +793,7 @@ RWRBLK: SEP     R4
         STR     R2
         LDN     RD
         OR
-        LBNZ    RW1
+        BNZ     RW1
         GLO     RC
         STR     RD
         DEC     RD
@@ -818,9 +818,9 @@ RW1:    LOAD    R9, 0FFFFH      ; it ends the chain ...
         LDN     RD
         PLO     R9
         GHI     RC
-        LBNZ    RW2
+        BNZ     RW2
         GLO     RC
-        LBNZ    RW2
+        BNZ     RW2
         SEP     R4
         DW      RVAR
         DB      RFIRST - RVARS
@@ -829,7 +829,7 @@ RW1:    LOAD    R9, 0FFFFH      ; it ends the chain ...
         INC     RD
         GLO     R9
         STR     RD
-        LBR     RW3
+        BR      RW3
 RW2:    SEP     R4
         DW      FATPUT
         LBDF    RWERR
@@ -956,9 +956,9 @@ RCLOSE: SEP     R4
         ADCI    0
         STR     RD
         GHI     RC              ; any? then 0s to the sector's end, and it is written
-        LBNZ    RC1
+        BNZ     RC1
         GLO     RC
-        LBZ     RC3
+        BZ      RC3
 RC1:    SEP     R4
         DW      RVAR
         DB      RPTR - RVARS
@@ -971,7 +971,7 @@ RC2:    LDI     0
         INC     RF
         GHI     RF
         XRI     HIGH(OBUF + 512)
-        LBNZ    RC2
+        BNZ     RC2
         SEP     R4
         DW      RWRBLK
         LBDF    RCF0
@@ -999,7 +999,7 @@ RC3:    SEP     R4
         DW      RVAR
         DB      RNEWF - RVARS
         LDN     RD
-        LBZ     RC4
+        BZ      RC4
         SEP     R4
         DW      PUTST
         LOAD    RD, STD
@@ -1043,7 +1043,7 @@ RC5:    LDN     RD
         DEC     RD
         DEC     RB
         GLO     RB
-        LBNZ    RC5
+        BNZ     RC5
         SEP     R4
         DW      RENTWR
         LBDF    RCF3
@@ -1060,7 +1060,7 @@ RC5:    LDN     RD
         LDN     RD
         PLO     RC
         GHI     RC
-        LBNZ    RC6
+        BNZ     RC6
         GLO     RC
         LBZ     RWCWD
 RC6:    SEP     R4
@@ -1083,9 +1083,9 @@ RCF:    SEP     R4              ; ">>": the old last cluster ends the chain agai
         LDN     RD
         PLO     RC
         GHI     RC
-        LBNZ    RCF1
+        BNZ     RCF1
         GLO     RC
-        LBZ     RCF2
+        BZ      RCF2
 RCF1:   LOAD    R9, 0FFFFH
         SEP     R4
         DW      FATPUT
@@ -1097,12 +1097,12 @@ RCF2:   SEP     R4              ; the clusters taken: free again
         LDN     RD
         PLO     RC
         GHI     RC
-        LBNZ    RCF4
+        BNZ     RCF4
         GLO     RC
-        LBNZ    RCF4
+        BNZ     RCF4
         SEP     R4
         DW      FATFLUSH
-        LBR     RCF5
+        BR      RCF5
 RCF4:   SEP     R4
         DW      FREECH
 RCF5:   SEP     R4
@@ -1110,11 +1110,11 @@ RCF5:   SEP     R4
         DB      RERR - RVARS
         LDN     RD
         XRI     2
-        LBNZ    RCF6
+        BNZ     RCF6
         SEP     R4
         DW      PIN
         DB      'The card is full - ',0
-        LBR     RCF7
+        BR      RCF7
 RCF6:   SEP     R4
         DW      PIN
         DB      'The card did not answer - ',0

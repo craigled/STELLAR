@@ -21,7 +21,8 @@ import opcode_sweep as S
 import build
 
 # BACK: STELLAR.PRG puts it at $0180 (the firmware's free bytes) and makes it R1, so a program's end boots LTOS
-BACK = bytes([0xF8, 0x01, 0xBE, 0xF8, 0xFF, 0xB3, 0xF8, 0x00, 0xA3, 0xE2, 0xF8, 0x23, 0x52, 0x71])
+_SM, _SY = build.assemble('stellar')
+BACK = bytes(_SM[_SY['BACK'] + i] for i in range(_SY['BACKN']))
 def with_back(fw):
     b = bytearray(fw); b[0x180:0x180 + len(BACK)] = BACK; return bytes(b)
 def run_to_back(b, cap):
@@ -111,7 +112,7 @@ def main():
                'entry' % how, e)
     cf, e2k, st = P1.installed_full(mem, 16384)
     b, st, t = P3.session(cf, b'STELLAR NOPE.BIN\rSTELLAR A.TXT B.TXT\rSTELLAR A*\rSTELLAR NOAPP\rMON\r', rtc=P3.clock())
-    e = [] if (t.count('not a STELLAR firmware (12 KB)') == 1 and t.count('STELLAR [-M] [firmware.BIN] [app ...]') == 2
+    e = [] if (t.count('or not STELLAR firmware.') == 1 and t.count('STELLAR [-M] [firmware.BIN] [app ...]') == 2
                and 'NOAPP.STL is not on the card.' in t and st == 'stop') else [repr(t[-500:])]
     report('STELLAR with a missing file, a file that is not a firmware, a wildcard: refused, LTOS goes on', e)
 

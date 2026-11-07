@@ -14,9 +14,9 @@
         INCL    "kapi.inc"
         INCL    "out/ksyms.inc"
 
-MAXJOBS EQU     MJOBS + 0F0H    ; the jobs must end before the stub's stack (it grows down from $33FF)
+MAXJOBS EQU     MJOBS + 0E0H    ; the jobs must end before the stub's stack (it grows down from $33FF)
 BACKA   EQU     0180H           ; BACK, the way back to LTOS: in the firmware's free bytes $0175-$019F (Craig)
-BACKS   EQU     MAXJOBS         ;  ... kept at $32F0 (between the jobs and NOTEB) until MON's stub copies it
+BACKS   EQU     MAXJOBS         ;  ... kept at $32E0 (between the jobs and NOTEB) until MON's stub copies it
 
         ORG     4000H - 6
         DW      START, PEND - START, START
@@ -293,7 +293,7 @@ FW0:    LOAD    RD, FWNAME
         DW      PNAME
         SEP     R4
         DW      K_PIN
-        DB      ' is not on the card, or not a STELLAR firmware (12 KB).',0DH,0AH,0
+        DB      ' is not on the card, or not STELLAR firmware.',0DH,0AH,0
         SEP     R5
 ; TRYFW: the firmware's sectors listed (KS_SECLST) from WDIR: DF = 1 there (KS_STLN not 0)
 TRYFW:  LOAD    RD, FWNAME
@@ -1195,9 +1195,14 @@ ATTN:   DB      'ATTACH  PRG'
 LW2N:   DB      'LW2     STL'
 DEFNM:  DB      'STELLAR BIN'
 STLID:  DB      'STL1'
-; BACK - run with P = R1 when a STELLAR program ends: interrupts off, then the BIOS's F_BOOT ($FF00, P = R3,
-; RE.1 = 1: the UART), which loads LTOS again. STELLAR's own stack (R2) is still good.
-BACK:   DB      0F8H,01H,0BEH           ; LDI 1 / PHI RE
+; BACK - run with P = R1 when a STELLAR program ends: 'S','L' at BACKMK (so LTOS goes straight to its prompt,
+; without /AUTOEXEC.SH), interrupts off, then the BIOS's F_BOOT ($FF00, P = R3, RE.1 = 1: the UART), which loads
+; LTOS again. STELLAR's own stack (R2) is still good. 27 bytes: $0180-$019A, in the firmware's free $0175-$019F.
+BACK:   DB      0F8H,HIGH(BACKMK),0BFH  ; LDI hi / PHI RF
+        DB      0F8H,LOW(BACKMK),0AFH   ; LDI lo / PLO RF
+        DB      0F8H,'S',5FH,1FH        ; LDI 'S' / STR RF / INC RF
+        DB      0F8H,'L',5FH            ; LDI 'L' / STR RF
+        DB      0F8H,01H,0BEH           ; LDI 1 / PHI RE
         DB      0F8H,0FFH,0B3H          ; LDI FF / PHI R3
         DB      0F8H,00H,0A3H           ; LDI 0 / PLO R3
         DB      0E2H                    ; SEX R2

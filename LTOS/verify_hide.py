@@ -13,6 +13,8 @@ import verify_phase1 as P1
 import verify_phase2 as P2
 import verify_phase3 as P3
 import build
+sys.path.insert(0, os.path.join(HERE, '..', 'Firmware-Math'))
+import opcode_sweep as S
 
 
 def attr(img, name):
@@ -65,6 +67,24 @@ def main():
     s, t = go([('Type HELP', b''), c('MON')])
     if 'startup ran' not in t: e.append('not run at boot: %r' % t[-200:])
     report('Hidden, it still runs at boot', e)
+
+    e = []                                          # the way back from a STELLAR program: BACK (STELLAR.PRG's, at
+    sm, sy = build.assemble('stellar')              # $0180) marks it, and LTOS goes straight to its prompt
+    back = bytes(sm[sy['BACK'] + i] for i in range(sy['BACKN']))
+    b = V.Elf2K(cf, keys=b'', later=[c('MON'), c('MON')]); b.rtc = P3.clock(); M = b.c.M
+    M[0:0x2F00] = S.image('37')[0:0x2F00]; M[0x180:0x180 + len(back)] = back
+    M[0x7EF0:0x7EF2] = b'\0\0'
+    b.c.R[1] = 0x0180; b.c.P = 1; b.c.X = 2; b.c.R[2] = 0x2FF0      # a program's end: P = R1, STELLAR's stack
+    s1 = b.run(3_000_000_000, stop=0x8003)
+    t1 = b.text().replace('\r', '')
+    mark = bytes(M[0x7EF0:0x7EF2])
+    s2 = b.boot_rom(3_000_000_000)                  # then the monitor's BOOT
+    t2 = b.text().replace('\r', '')[len(t1):]
+    if s1 != 'stop' or 'LiteOS' not in t1: e.append('back: %s %r' % (s1, t1[-200:]))
+    if 'startup ran' in t1: e.append('AUTOEXEC.SH ran on the way back: %r' % t1[-200:])
+    if mark[1] != 0: e.append('the mark was not used up: %r' % mark)
+    if s2 != 'stop' or 'startup ran' not in t2: e.append('BOOT after it: no AUTOEXEC.SH: %s %r' % (s2, t2[-200:]))
+    report('Back from a STELLAR program (through the BIOS\'s F_BOOT): no AUTOEXEC.SH; the next BOOT runs it', e)
 
     e = []
     s, t = go([c('ECHO ECHO appended >> /AUTOEXEC.SH'), c('MON')])

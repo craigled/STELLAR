@@ -45,11 +45,11 @@ def built(d):
 
 
 def pad_kernel(d):
-    """8 bytes ahead of COLD (never run - $0300 jumps over them): every kernel routine and variable moves.
-    (8, not 16: the kernel has only a few bytes to spare.)"""
+    """4 bytes ahead of COLD (never run - $0300 jumps over them): every kernel routine and variable moves.
+    (4: the kernel has only 4 bytes to spare.)"""
     p = os.path.join(d, 'kernel.asm'); s = open(p).read()
-    s = s.replace('\nCOLD:', '\n        DB      0,0,0,0,0,0,0,0\nCOLD:', 1)
-    s = s.replace('ORG     2D00H', 'ORG     2D08H', 1)         # (the variables are at a fixed place: moved too)
+    s = s.replace('\nCOLD:', '\n        DB      0,0,0,0\nCOLD:', 1)
+    s = s.replace('ORG     2D00H', 'ORG     2D04H', 1)         # (the variables are at a fixed place: moved too)
     open(p, 'w').write(s)
 
 
