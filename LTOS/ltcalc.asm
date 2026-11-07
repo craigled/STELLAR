@@ -463,6 +463,27 @@ RXPOLL: LDI     15H
         INP     DATPORT
         LBR     PUSHK
 RXP9:   SEP     R5
+; POLLS: RXPOLL with RD and RF kept
+POLLS:  GLO     RD
+        STXD
+        GHI     RD
+        STXD
+        GLO     RF
+        STXD
+        GHI     RF
+        STXD
+        SEP     R4
+        DW      RXPOLL
+        IRX
+        LDXA
+        PHI     RF
+        LDXA
+        PLO     RF
+        LDXA
+        PHI     RD
+        LDX
+        PLO     RD
+        SEP     R5
 ; PUSHK: D -> the ring (dropped when it is full). RD RF.1 used.
 PUSHK:  PHI     RF
         LOAD    RD, RTAIL
@@ -1363,6 +1384,8 @@ SE2:    SEP     R4
         LBZ     SE9
 SE3:    SEP     R4
         DW      REMOVE
+        SEP     R4
+        DW      RXPOLL
         GLO     R7
         PLO     RD
         LDI     HIGH(TYP)
@@ -1438,6 +1461,11 @@ RM2:    GHI     RB              ; the rest down over it
 RM3:    LDA     RB
         STR     RD
         INC     RD
+        GLO     RD              ; (now and then, a key typed meanwhile is kept)
+        ANI     3FH
+        LBNZ    RM2
+        SEP     R4
+        DW      POLLS
         LBR     RM2
 RM4:    GHI     RD              ; (RD = the new top)
         PHI     RB
@@ -1558,6 +1586,11 @@ RI6:    DEC     RF
         DEC     RD
         LDN     RF
         STR     RD
+        GLO     RD              ; (now and then, a key typed meanwhile is kept)
+        ANI     3FH
+        LBNZ    RI5
+        SEP     R4
+        DW      POLLS
         LBR     RI5
 RI7:    SEP     R4
         DW      ADJ
@@ -1801,7 +1834,8 @@ RP1:    GLO     R7
         LBZ     RP2
         XRI     K_FORM XOR K_FERR
         LBNZ    RP4
-RP2:
+RP2:    SEP     R4              ; (a key typed meanwhile is kept)
+        DW      RXPOLL
         SEP     R4
         DW      DEPS
         LBNF    RP4
@@ -2568,7 +2602,9 @@ FG4:    GHI     RA
         LBNF    FG5
         SEP     R4
         DW      FACC
-FG5:    LOAD    RD, C2V
+FG5:    SEP     R4              ; (a long range: a key typed meanwhile is kept)
+        DW      RXPOLL
+        LOAD    RD, C2V
         LDN     RD
         STR     R2
         GLO     RA
