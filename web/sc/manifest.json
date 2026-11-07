@@ -94,9 +94,9 @@
   {
    "name": "Dice (rand and rand(n))",
    "file": "dice.sc",
-   "input": "aasq",
+   "input": "",
    "speed": "Elf2K",
-   "blurb": "rand() is STELLAR's RAND opcode, a number 0 to 65535; rand(n) is 0 to n - 1, so rand(6) + 1 is a die. It stirs rand() while waiting for a key. The input box rolls twice, then S rolls 600 times to show the spread, and q quits; click the terminal to roll your own."
+   "blurb": "rand() is STELLAR's RAND opcode, a number 0 to 65535; rand(n) is 0 to n - 1, so rand(6) + 1 is a die. It stirs rand() while waiting for a key. Click the terminal, then press any key to roll, S to roll 600 times and see the spread, or Q to quit."
   },
   {
    "name": "Native 1802: native { }",

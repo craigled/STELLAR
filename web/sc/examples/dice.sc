@@ -10,7 +10,7 @@ void main() {
     while (1) {
         while (!keyready()) { rand(); }          // stir while waiting
         k = getc();
-        if (k == 'q' || k == 'Q') { halt(); }
+        if (k == 'q' || k == 'Q') { print("Goodbye\r\n"); halt(); }
         if (k == 's' || k == 'S') {
             for (i = 0; i < 6; i++) { counts[i] = 0; }
             for (i = 0; i < 600; i++) { counts[rand(6)]++; }
