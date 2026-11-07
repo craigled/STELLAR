@@ -202,7 +202,7 @@ STELLAR is a project started back in 2020 (Covid days) to make the 1802 micropro
 
 Copyright (C) 2026 Craig Ledbetter.
 
-LTOS, the STELLAR firmware, the Stellar C compiler and the programs here are free software: you can use, change and share them under the GNU General Public License, version 3 or any later version (GPL-3.0-or-later). They come with no warranty. The full text is in `COPYING`, and on the card as `COPYRITE.TXT`.
+LTOS, the STELLAR firmware, the Stellar C compiler and the programs here are free software: you can use, change and share them under the GNU General Public License, version 3 or any later version (GPL-3.0-or-later). They come with no warranty. The full text is in `COPYING`, and on the card as `LICENSE.TXT`.
 
 **Programs you compile are yours.** The Stellar C compiler copies some of its library routines into your program, so an exception (`COPYING.EXCEPTION`) lets you use what it produces on any terms you like.
 

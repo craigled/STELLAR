@@ -615,8 +615,8 @@ LTOS, STELLAR and Stellar C: Copyright (C) 2026 Craig Ledbetter.
 
 This is free software: you may use, change and share it under the GNU
 General Public License, version 3 or any later version. It comes with
-NO WARRANTY. COPYRITE.TXT, in the root of the card, is the full licence:
-  TYPE /COPYRITE.TXT
+NO WARRANTY. LICENSE.TXT, in the root of the card, is the full licence:
+  TYPE /LICENSE.TXT
 
 Programs you compile with Stellar C are yours, on whatever terms you like:
 see the README.TXT's License section.

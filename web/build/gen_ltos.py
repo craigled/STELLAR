@@ -112,7 +112,7 @@ def add_files(m):
     open(os.path.join(m, 'README.TXT'), 'wb').write(README)
     os.makedirs(os.path.join(m, 'BIBLE'), exist_ok=True)
     shutil.copyfile(os.path.join(WORK, 'BIBLE', 'MEMVERSE.txt'), os.path.join(m, 'BIBLE', 'MEMVERSE.TXT'))
-    open(os.path.join(m, 'COPYRITE.TXT'), 'wb').write(open(os.path.join(WORK, 'COPYING'), 'rb').read().replace(b'\n', b'\r\n'))
+    open(os.path.join(m, 'LICENSE.TXT'), 'wb').write(open(os.path.join(WORK, 'COPYING'), 'rb').read().replace(b'\n', b'\r\n'))
     open(os.path.join(m, 'DOCS', 'LETTER.TXT'), 'wb').write(LETTER)
     open(os.path.join(m, 'DOCS', 'SALES.TXT'), 'wb').write(SALES)
     open(os.path.join(m, 'DOCS', 'BOOK.TXT'), 'wb').write(BOOK)
