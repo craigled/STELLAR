@@ -73,9 +73,9 @@
   {
    "name": "A menu (print, getc, switch)",
    "file": "menu.sc",
-   "input": "2x3q",
+   "input": "",
    "speed": "Elf2K",
-   "blurb": "A hard-coded menu: the whole menu printed with one print(), a key read with getc(), a small letter turned into a capital, and switch picking what to do - each choice says which program it would run. The input box presses 2, x, 3 and q; empty it to choose in the terminal."
+   "blurb": "A hard-coded menu: the whole menu printed with one print(), a key read with getc(), a small letter turned into a capital, and switch picking what to do - each choice says which program it would run. Click the terminal and press 1, 2, 3 or another key to choose, or Q to quit."
   },
   {
    "name": "Three VMs talking (chan, shared, wait)",

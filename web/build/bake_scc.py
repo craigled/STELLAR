@@ -64,10 +64,10 @@ EXAMPLES = [
      'Four VMs check themselves: main() stops a counting task and sees the count hold still, starts it again; '
      'a stopped task is not woken by the variable it waits for until it is started; a task stops itself and '
      'carries on only when main() starts it. Each line printed is one check passed. HW-verified on the Elf2K.'),
-    ('menu', 'A menu (print, getc, switch)', '2x3q', 'Elf2K',
+    ('menu', 'A menu (print, getc, switch)', '', 'Elf2K',
      'A hard-coded menu: the whole menu printed with one print(), a key read with getc(), a small '
      'letter turned into a capital, and switch picking what to do - each choice says which program it '
-     'would run. The input box presses 2, x, 3 and q; empty it to choose in the terminal.'),
+     'would run. Click the terminal and press 1, 2, 3 or another key to choose, or Q to quit.'),
     ('vmtalk', 'Three VMs talking (chan, shared, wait)', '1922', 'Elf2K',
      'The menu again, now with three VMs: main() runs the menu, worker() waits on a chan for a job and '
      'hands back the sum of 1..N through a shared variable while main() wait()s for it, and ticker() counts '
