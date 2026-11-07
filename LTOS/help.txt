@@ -302,6 +302,25 @@ Usage:  MEMVERSE
 
 Shows one line of /BIBLE/MEMVERSE.TXT, picked at random, wrapped at the
 words. Put one verse on each line; blank lines are skipped.
+@LTCALC A small spreadsheet
+Usage:  LTCALC [name]
+
+One page of 8 columns (A-H) by 20 rows. A name with no extension gets .CAL.
+Type in a cell: a number, text, or a formula that starts with =
+
+    =A1+B1*2     =(A1-B2)/3     =SUM(A1:A10)     =AVG(A1:A3,C1:C3)
+
+The functions are SUM AVG MIN MAX COUNT. Numbers keep two decimals, up to
+21,474,836.47 either way. ######### means a number too wide for its column
+(the line above the sheet shows it all). ERR means a bad formula, a number
+too big, dividing by 0, or a cell that needs itself.
+
+Arrows, Tab and Enter move, and finish what you typed. Esc drops what you
+typed, or leaves. Backspace empties a cell. ^E edits it. ^S saves, ^A saves
+under a new name, ^O opens another sheet.
+
+The file is plain text, one line for each cell, such as A3 =A1+A2, so TYPE,
+GREP, RAWK and NANO can all read it.
 @RUNNING A man on the move, in 1802 code
 Usage:  RUNNING
 
