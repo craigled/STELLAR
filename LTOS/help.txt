@@ -87,9 +87,10 @@ Type RECV, then send the file from your terminal program.
                       most; bigger: elfser.py putstl NAME.lst on the
                       PC/Mac/Linux)
   text             -> ends with a line holding just .  (or Ctrl-Z)
-  RECV SYSTEM      -> LTOS-SYSTEM.HEX, then again with 2.HEX .. 5.HEX:
-                      every LTOS program, added or replaced (into /BIN
-                      when the card has one)
+  RECV SYSTEM      -> LTOS-SYSTEM.HEX, then again with 2.HEX, 3.HEX and
+                      on: every LTOS program, added or replaced (into
+                      /BIN when the card has one). Quicker, in one go:
+                      elfser.py system on the PC/Mac/Linux
 Checksums are checked. Ctrl-C stops.
 @WC Count lines, words and bytes
 Usage:  WC names
@@ -110,6 +111,12 @@ With several files, each line starts with its file's name.
 
   GREP Lot DOCS/LOTSLOSS.TXT
   GREP -i -n "the end" *.TXT     (quotes: text with spaces)
+@SYSRX Every LTOS program from the PC/Mac/Linux, in one go
+Usage:  (on the PC/Mac/Linux, with LTOS at its prompt)  elfser.py system
+
+Makes /BIN if it is not there, runs SYSRX and sends LTOS-ALL.PAK: every
+program added or replaced, checked block by block. It does RECV SYSTEM's
+job in one step, in about half the bytes.
 @SED Edit a file's lines by script: the stream editor
 Usage:  SED [-n] [-E] [-e script] [-f file] [script] names
 

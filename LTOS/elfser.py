@@ -9,6 +9,7 @@ Talk to the Elf2K over /dev/cu.usbserial-300005D8 at 19200 8N1 (no pyserial: ter
    python3 elf.py putstl LST [NAME] - a STELLAR app's .lst made into NAME.STL here (as RECV NAME.STL would),
                                      then put: for apps too big for RECV (over 15 KB, e.g. ORBIT's 31 blocks)
    python3 elf.py pull NAME [FILE] - XFER -S NAME on the Elf2K: the file from the card, any size
+   python3 elf.py system [FILE]   - every LTOS program, in one go (SYSRX on the Elf2K, out/LTOS-ALL.PAK here)
    options: --wait S (quiet time to stop reading, default 1.0), --max S (longest to read)"""
 import os, sys, termios, time, select, tty, binascii
 DEV = '/dev/cu.usbserial-300005D8'
@@ -74,6 +75,23 @@ def xput(data, say=print):
             if r in (ACK, CAN): break
         if r != ACK: say('** XFER stopped it' if r == CAN else '** no answer from the Elf2K'); return False
         if blk % 32 == 0 or blk == nb: say('  %d of %d bytes' % (min(blk * 512, len(data)), len(data)))
+    return True
+def xsys(data, say=print):
+    """Mac to card (SYSRX is waiting): LTOS-ALL.PAK, block by block. A part's last block is ACKed once its files are
+    on the card, so that wait is long. -> True when the last one is ACKed."""
+    r = yield from xstart(say)
+    if r != ACK: return False
+    nb = len(data) // 512
+    ends, at = set(), 0
+    for c in data[5:5 + data[4]]: at += c; ends.add(at)
+    for blk in range(nb):
+        fr = xframe(blk, data[blk * 512:blk * 512 + 512])
+        for tries in range(8):
+            yield ('send', fr)
+            r = yield ('recv', 1, 240.0 if blk in ends else 45.0)
+            if r in (ACK, CAN): break
+        if r != ACK: say('** SYSRX stopped it' if r == CAN else '** no answer from the Elf2K'); return False
+        if blk in ends: say('  %d of %d parts on the card, %d s' % (sorted(ends).index(blk) + 1, len(ends), time.time() - xsys.t0))
     return True
 def xpull(say=print):
     """Card to Mac (XFER -S is waiting): -> the file's bytes, or None."""
@@ -162,6 +180,21 @@ def main():
         for ch in data:                                # a character at a time: the 1802 reads them one by one
             os.write(fd, bytes([ch])); time.sleep(0.002)
         show(read_until_quiet(fd, quiet, most))
+    elif args[0] == 'system':                          # system [FILE]: every program, at LTOS's prompt (RECV SYSTEM's job)
+        data = open(args[1] if len(args) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out', 'LTOS-ALL.PAK'), 'rb').read()
+        def cmd(c, most=30.0):
+            for ch in (c + '\r').encode():
+                os.write(fd, bytes([ch])); echo1(fd)
+            return read_until_quiet(fd, 6.0, most, until=b'LTOS> ')
+        os.write(fd, b'\r'); read_until_quiet(fd, 2.0, 6.0)
+        cmd('MKDIR /BIN')                              # (a fresh card has none; there already: it only says so)
+        xsys.t0 = time.time()
+        if not xcommand(fd, 'SYSRX'): os.close(fd); return
+        okd = xrun(fd, xsys(data))
+        show(read_until_quiet(fd, 6.0, 20.0, until=b'LTOS> '))
+        if okd:
+            for n in ('RECV', 'MON', 'MKDIR', 'SYSRX'): cmd('RM /%s.PRG' % n)   # (a fresh card's first copies: /BIN has them now)
+        print('\ndone in %d s' % (time.time() - xsys.t0) if okd else '\n** it did not finish')
     elif args[0] == 'recv':                            # recv 'RECV NAME' FILE [line-delay-ms]: the file at full speed
         got = b''
         for ch in (args[1] + '\r').encode():          # the command at typing pace (the BIOS echoes it)

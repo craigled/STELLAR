@@ -877,7 +877,7 @@ A27:    SEP     R4
         SEP     R4
         DW      PIN
         DB      0DH,0AH,'The card is ready. Type BOOT.',0DH,0AH
-        DB      'Then RECV SYSTEM with LTOS-SYSTEM.HEX, then 2.HEX .. 5.HEX: the rest of the programs.',0DH,0AH,0
+        DB      'Then the rest of the programs: elfser.py system, or RECV SYSTEM with each LTOS-SYSTEM.HEX.',0DH,0AH,0
         LBR     FATAL           ; (back to the monitor)
 
 ; ---- U: a new kernel and boot sector on an LTOS card; its partition, files and STELLAR.BIN stay

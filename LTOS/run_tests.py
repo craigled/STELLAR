@@ -12,7 +12,7 @@ import os, sys, time, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 ALL = ['diskinfo', 'phase1', 'phase2', 'phase3', 'phase4', 'phase5', 'lw2io', 'lw3', 'enano', 'dir', 'help', 'hex', 'cfprogs', 'tools', 'rawk', 'eroff', 'uniqsort',
-       'update', 'recv', 'xfer', 'edit', 'redir', 'cards', 'sh', 'sh3', 'sh4', 'input', 'trash', 'running', 'memverse', 'hide', 'ltcalc', 'sed']
+       'update', 'recv', 'xfer', 'edit', 'redir', 'cards', 'sh', 'sh3', 'sh4', 'input', 'trash', 'running', 'memverse', 'hide', 'ltcalc', 'sed', 'sysrx']
 OWNBUILD = ('update',)
 
 

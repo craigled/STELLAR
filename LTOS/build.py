@@ -220,7 +220,7 @@ def samples():
             (b'ECHO    PRG', prg('echo')), (b'CAT     PRG', prg('cat')), (b'HEAD    PRG', prg('head')), (b'TAIL    PRG', prg('tail')), (b'TOUCH   PRG', prg('touch')), (b'SH      PRG', prg('sh')), (b'EROFF   PRG', prg('eroff')), (b'PWD     PRG', prg('pwd')), (b'SORT    PRG', prg('sort')), (b'UNIQ    PRG', prg('uniq')),
             (b'ATTACH  PRG', prg('attach')), (b'HELP    PRG', prg('help')), (b'NANO    PRG', prg('enano')), (b'NANO    OVL', enano_ovl()),
             (b'GETSTR  PRG', prg('getstr')), (b'FETCH   PRG', prg('fetch')), (b'POS     PRG', prg('pos')),
-            (b'DELETE  PRG', prg('delete')), (b'EMPTY   PRG', prg('empty')), (b'RUNNING PRG', prg('running')), (b'MEMVERSEPRG', prg('memverse')), (b'LTCALC  PRG', prg('ltcalc')), (b'SED     PRG', prg('sed')), (b'HIDE    PRG', prg('hide'))] + help_dats()
+            (b'DELETE  PRG', prg('delete')), (b'EMPTY   PRG', prg('empty')), (b'RUNNING PRG', prg('running')), (b'MEMVERSEPRG', prg('memverse')), (b'LTCALC  PRG', prg('ltcalc')), (b'SED     PRG', prg('sed')), (b'SYSRX   PRG', prg('sysrx')), (b'HIDE    PRG', prg('hide'))] + help_dats()
 
 
 def stl_of(lst):
@@ -290,6 +290,11 @@ def build(kernel=b''):
             if len(pak(p + [f])) <= room: p.append(f); break
         else: parts.append([f])
     assert len(parts) <= SYSMAX and all(len(pak(p)) <= room for p in parts), 'LTOS-SYSTEM does not fit in %d parts' % SYSMAX
+    sy = assemble('sysrx')[1]                                  # LTOS-ALL.PAK (SYSRX, elfser.py system): one file, in 512-byte
+    assert all(len(pak(p)) + 511 & ~511 <= 0x6C00 - sy['BUF'] for p in parts), 'a part is too big for SYSRX.PRG'
+    paks = [pak(p).ljust((len(pak(p)) + 511) // 512 * 512, b'\0') for p in parts]      # blocks: first the plan, then the parts
+    plan = sum(map(len, paks)).to_bytes(4, 'little') + bytes([len(paks)]) + bytes(len(x) // 512 for x in paks)
+    open(os.path.join(OUT, 'LTOS-ALL.PAK'), 'wb').write(plan.ljust(512, b'\0') + b''.join(paks))
     for k in range(SYSMAX):                                    # LTOS-SYSTEM.HEX, LTOS-SYSTEM2.HEX .. (as many as needed)
         nm = 'LTOS-SYSTEM%s' % ('' if k == 0 else str(k + 1))
         if k < len(parts):
@@ -336,7 +341,7 @@ def build(kernel=b''):
     # INSTALL2.HEX (CALL 3003 after F): the files INSTALL.HEX had no room for, in samples() order, as many as fit at
     # I2AT (the kernel image's place, on the card by then) below SBUF, in the root's first sector and the FAT's
     m2, a2 = {}, syms['I2AT'] + 4
-    rest = [f for f in samples()[len(files):] if f[0] in (b'RECV    PRG', b'MON     PRG')]   # (RECV SYSTEM: the rest, into /BIN)
+    rest = [f for f in samples()[len(files):] if f[0] in (b'RECV    PRG', b'MON     PRG', b'MKDIR   PRG', b'SYSRX   PRG')]   # (RECV SYSTEM: the rest, into /BIN)
     files2 = []
     for n, d in rest:                                          # 16 entries: the label, STELLAR.BIN, the files
         if (a2 + 1 + 15 * (len(files2) + 1) + sum(len(x) for _, x in files2) + len(d) > syms['SBUF']
