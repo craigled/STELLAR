@@ -117,6 +117,16 @@ Usage:  (on the PC/Mac/Linux, with LTOS at its prompt)  elfser.py system
 Makes /BIN if it is not there, runs SYSRX and sends LTOS-ALL.PAK: every
 program added or replaced, checked block by block. It does RECV SYSTEM's
 job in one step, in about half the bytes.
+@SQUEEZE Take the deleted entries out of the root folder
+Usage:  SQUEEZE
+
+LTOS looks in the root folder for every command before /BIN, and reads it
+up to its last entry - deleted ones too. A root that once held many files
+is read much further than it needs to be, which slows every command.
+
+SQUEEZE counts the entries, asks, then packs the ones in use together, in
+the same order, and clears the rest. Your files and their data are not
+moved. Run FSCK afterwards if the power went off while it worked.
 @SED Edit a file's lines by script: the stream editor
 Usage:  SED [-n] [-E] [-e script] [-f file] [script] names
 
