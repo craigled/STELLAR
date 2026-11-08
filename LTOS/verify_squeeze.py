@@ -94,7 +94,7 @@ def main():
     if 'Nothing to squeeze.' not in t or 'HELP SQUEEZE' not in t: e.append('again / with a word: %r' % t[-300:])
     hid = [x for x in es1 if x[:11] == b'AUTOEXECSH ']
     if not hid or not hid[0][11] & 2: e.append('AUTOEXEC.SH not hidden now')
-    if 'startup ran' not in t: e.append('AUTOEXEC.SH did not run at boot')
+    if 'startup ran' in t: e.append('AUTOEXEC.SH ran at boot')
     report('Y: the same entries in the same order, packed into %d sectors, nothing after them; the Mac reads every file '
            'the same; hidden stays hidden; fsck clean; DIR, TYPE, programs work; again: nothing to do' % ((len(live0) + 15) // 16), e)
 

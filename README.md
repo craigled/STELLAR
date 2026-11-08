@@ -66,12 +66,12 @@ What it can do:
 
 - **Files and folders:** DIR, TYPE, COPY, MV, REN, RM, MKDIR, RMDIR, CD, PWD, TREE and FIND, with paths and wildcards.
 - **A trash folder:** DELETE moves files to /TRASH, and EMPTY deletes them for good.
-- **Hidden files:** HIDE keeps a file out of DIR, and DIR -h shows it again. Good for /AUTOEXEC.SH, which runs at every boot.
+- **Hidden files:** HIDE keeps a file out of DIR, and DIR -h shows it again.
 - **Text tools:** GREP, SORT, UNIQ, WC, HEAD, TAIL, CAT, and EROFF, a small nroff.
 - **awk:** RAWK is an awk written in 1802 code.
 - **Editors:** NANO, a small editor in the style of GNU nano, written from scratch in 1802 code and not part of the GNU project; Lite-Writer 2 (LW2) and Lite-Writer 3 (LTWRITER) on STELLAR, for files up to 60 KB.
 - **Spreadsheet:** LTCALC, in 1802 code: one page of 8 columns by 20 rows, two decimals, formulas with SUM, AVG, MIN, MAX and COUNT, saved as plain text.
-- **A shell:** line editing with the last command recalled, `>` and `>>` on any command, scripts with variables, `if`, loops, functions, `case` and `$(command)`, and /AUTOEXEC.SH at boot.
+- **A shell:** line editing with the last command recalled, `>` and `>>` on any command, scripts with variables, `if`, loops, functions, `case` and `$(command)`.
 - **Moving files:** XFER sends files of any size to and from a PC/Mac/Linux with error checking. RECV and SEND use plain Intel HEX.
 - **Looking after the card:** FSCK checks it, FREE shows the space, and DISKINFO reports everything about the card.
 - **Running STELLAR:** type an app's name, such as GALAXIA, and LTOS loads the STELLAR firmware and the app. Esc comes back to LTOS.

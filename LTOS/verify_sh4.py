@@ -141,12 +141,12 @@ def main():
     if 'HELLO.SH' in T.out(t, 'HELLO.PRG') or not T.out(t, 'HELLO.PRG'): e.append('HELLO.PRG: %r' % T.out(t, 'HELLO.PRG'))
     report('a name alone: NAME.SH before NAME.PRG (in the same folder too) and before NAME.STL, the nearer folder first; a path; an extension typed; '
            'programs and unknown names as before', e)
-    # ---- AUTOEXEC.SH: run at the boot if it is there; not there: SH not even loaded (RAM from $3000 kept, for SAVE)
+    # ---- no start-up script (Craig, 2026-11-08): an AUTOEXEC.SH is not run, and the boot leaves RAM from $3000 alone
     e = []
     R.TEXTS['AUTOEXEC.SH'] = b'echo autoexec ran\nX=1\nCD DOCS\n'
     cf = R.card(mem)
-    b, st, t = P3.session(cf, b'', rtc=P3.clock(), later=[('LTOS /DOCS> ', b'MON\r')])
-    if 'Type HELP for the commands.\r\nautoexec ran\r\nLTOS /DOCS> ' not in t: e.append('with AUTOEXEC.SH: %r' % t[-200:])
+    b, st, t = P3.session(cf, b'MON\r', rtc=P3.clock())
+    if 'Type HELP for the commands.\r\nLTOS> ' not in t or 'autoexec ran' in t: e.append('with AUTOEXEC.SH: %r' % t[-200:])
     del R.TEXTS['AUTOEXEC.SH']
     cf = R.card(mem)
     pat = bytes((i * 7 + 3) & 0xFF for i in range(0x3C00))
@@ -154,7 +154,7 @@ def main():
     b, st, t = P3.session(cf, b'MON\r', rtc=P3.clock(), ram=ram)
     if 'Type HELP for the commands.\r\nLTOS> ' not in t: e.append('without: %r' % t[-200:])
     if bytes(b.c.M[0x4000:0x6800]) != pat[0x1000:0x3800]: e.append('without: RAM where SH would go ($4000-$67FF) changed by the boot')
-    report('AUTOEXEC.SH at the boot (it runs, its CD lasts); none: nothing said, SH not loaded (RAM kept; MON uses $3000-$3FFF)', e)
+    report('no start-up script: an AUTOEXEC.SH is not run; the boot goes to the prompt and leaves RAM alone (MON uses $3000-$3FFF)', e)
     print('\nLTOS SH phase 4: %s' % ('ALL PASS' if ok else 'FAILURES'))
     return ok
 

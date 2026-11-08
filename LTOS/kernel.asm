@@ -176,29 +176,7 @@ W3:     SEP     R4
         LOAD    RD, HIST        ; no last command yet
         LDI     0
         STR     RD
-        LBR     AUTOCK          ; back from a STELLAR program? then not AUTOEXEC.SH (AUTOCK: no room here)
-        DB      0, 0, 0         ; (what follows stays where it was)
-AUTOB:  LDN     RD              ; AUTOEXEC.SH in the root: "SH -a" runs it first (not there: SH is not loaded -
-                                ;  RAM from $3000 up stays as it was, for SAVE)
-        LBZ     MAIN
-        LOAD    RD, WDIR
-        LDI     0
-        STR     RD
-        INC     RD
-        STR     RD
-        LOAD    RD, AUTONM
-        SEP     R4
-        DW      FINDN
-        LBDF    MAIN
-        LOAD    RF, LINE
-        LOAD    RD, AUTOLN
-AUTO1:  LDA     RD
-        STR     RF
-        INC     RF
-        LBNZ    AUTO1
-        LBR     KEXEC
-AUTOLN: DB      'SH -a',0
-AUTONM: DB      'AUTOEXECSH '
+                                ; (then the prompt: no start-up script - Craig, 2026-11-08)
 ; ---- the command loop
 MAIN:   LOAD    R2, STACK       ; (a fresh stack for every command)
         SEX     R2
@@ -1857,19 +1835,6 @@ DOTDOT: DB      '..         '
         INCL    "cons.asm"
         INCL    "nums.asm"
         INCL    "redir.asm"
-; AUTOCK: a STELLAR program has just ended (STELLAR.PRG's BACK left 'S','L' at BACKMK): straight to the prompt,
-; the mark used up - /AUTOEXEC.SH is for a start, not for every way back. Else on to AUTOEXEC.SH (AUTOB).
-AUTOCK: LOAD    RD, BACKMK
-        LDA     RD
-        XRI     'S'
-        BNZ     AK1
-        LDN     RD
-        XRI     'L'
-        BNZ     AK1
-        STR     RD              ; (D = 0)
-        LBR     MAIN
-AK1:    LOAD    RD, MOUNTED
-        LBR     AUTOB
 
 DATEV:  DB      0, 0, 21H, 5CH  ; the time and date LTOS was built (build.py): files' dates with no clock
 

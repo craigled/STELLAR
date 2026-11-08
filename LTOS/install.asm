@@ -1132,6 +1132,9 @@ WV1:    LDA     RD
         LDA     RC
         XOR
         LBNZ    WVBAD
+        GLO     RD              ; all 512 (VBUF is not page-aligned: the high byte alone stopped 32 bytes short)
+        XRI     LOW(VBUF+512)
+        LBNZ    WV1
         GHI     RD
         XRI     HIGH(VBUF+512)
         LBNZ    WV1

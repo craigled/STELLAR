@@ -334,7 +334,7 @@ Usage:  HIDE name         hide it
         HIDE -U name      show it again
 
 A hidden file still works: TYPE, NANO and SH find it by name, and DIR -h
-lists it. Good for /AUTOEXEC.SH, the script LTOS runs at every boot.
+lists it. Good for files you want kept out of the way.
 @MEMVERSE A verse from /BIBLE/MEMVERSE.TXT
 Usage:  MEMVERSE
 

@@ -700,7 +700,7 @@ RFLUSH: GHI     R7
         STXD
         SEP     R4
         DW      RWRBLK
-        BNF     RFL2
+        LBNF    RFL2
         STXD
         SEP     R4
         DW      RVAR

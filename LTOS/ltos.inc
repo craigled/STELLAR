@@ -45,7 +45,6 @@ IDE_DEV  EQU    6               ;   E0 + LBA 24-27
 IDE_CMD  EQU    7               ;   status (read) / command (write)
 IDE_CTL  EQU    0EH             ;   device control: 04 soft reset, 02 interrupts off
 
-BACKMK  EQU     7EF0H           ; STELLAR.PRG's BACK leaves 'S','L' here: LTOS then does not run /AUTOEXEC.SH
 MR1     EQU     31FDH           ; MON's stub, MACT = 1: R1 for STELLAR (the monitor's breakpoint entry)
 MACT    EQU     31FFH           ; MON's last step (monstub, at $3000): 0 = then the monitor, 1 = start STELLAR
 MJOBS   EQU     3200H           ;  its jobs: [sectors, where (2), the sectors' numbers (2 each)] ..., 0
