@@ -14,7 +14,7 @@
 
     python3 LTOS/verify_cards.py [-v]
 """
-import os, sys, importlib.util
+import os, struct, sys, importlib.util
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import verify_phase0 as V
@@ -118,6 +118,37 @@ def main():
     if '-v' in sys.argv: print(t)
     report('a card that keeps "7C 00 A8" wrong but gives its buffer back (before: "read back right", then the boot '
            'failed its sum): the installer reads another sector first - VERIFY FAILED, not ready', e)
+
+    # 4. a card whose IDENTIFY says 0 sectors (a 256 MB card read wrong on the Elf2K, 2026-11-09): too small, nothing written
+    e = []
+    class ZeroCF(CV.CF):
+        def command(s, v):
+            r = super().command(v)
+            if v == 0xEC: b = bytearray(s.buf); b[120:124] = bytes(4); b[2:4] = b[6:8] = b[12:14] = bytes(2); s.buf = bytes(b)
+            return r
+    cf = ZeroCF(sectors=N); t = install(mem, cf, two=False)
+    if 'too small' not in t or any(k[0] == 'write' for k in cf.log): e.append('%r, %d writes' % (t[-300:], sum(1 for k in cf.log if k[0] == 'write')))
+    report('a card that says it has 0 sectors (and no geometry): too small - nothing written (before: it wrapped round to a 2 GB partition)', e)
+
+    # 5. as the Toshiba THNCF256MMA reads on the Elf2K: words 60-61 0, its geometry 978 x 16 x 32 right: that size used
+    e = []
+    T = 978 * 16 * 32
+    class ToshibaCF(CV.CF):
+        def command(s, v):
+            r = super().command(v)
+            if v == 0xEC:
+                b = bytearray(s.buf); b[120:124] = bytes(4)
+                b[2:4], b[6:8], b[12:14] = (978).to_bytes(2, 'little'), (16).to_bytes(2, 'little'), (32).to_bytes(2, 'little')
+                s.buf = bytes(b)
+            return r
+    cf = ToshibaCF(sectors=T); t = install(mem, cf)
+    if 'The card is ready. Type BOOT.' not in t or 'Size:                     244 MB' not in t: e.append('install: %r' % t[-500:])
+    else:
+        part = struct.unpack_from('<I', cf.sector(0), 0x1CA)[0]
+        if part != T - 64: e.append('the partition: %d sectors, want %d' % (part, T - 64))
+        t = boots(cf)
+        if 'LTOS> VER' not in t: e.append('the boot: %r' % t[-300:])
+    report('a card whose IDENTIFY says 0 sectors but 978 x 16 x 32 (the Toshiba): 244 MB, all of it partitioned, it boots', e)
 
     print('\nCards: %s' % ('ALL PASS' if ok else 'FAILURES'))
     return ok

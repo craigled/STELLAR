@@ -161,7 +161,7 @@ ID4:    INC     RC
         LBNZ    ID0
         SEP     R4
         DW      PIN
-        DB      0DH,0AH,'The card gives a different model or size each time it is asked - nothing written.',0DH,0AH,0
+        DB      0DH,0AH,'The model or size changes each time the card is asked - nothing written.',0DH,0AH,0
         LBR     FATAL
 ID3:    GLO     RB
         LBZ     ID3B
@@ -201,7 +201,76 @@ MOD1:   GLO     RC
         PLO     R8
         LDN     RF
         PHI     R8
-        SEP     R4
+        GLO     R7              ; 0 sectors? (a 256 MB Toshiba THNCF256MMA on the Elf2K, 2026-11-09: its IDENTIFY
+        STR     R2              ;  loses bytes, and words 60-61 read 0 - but its geometry comes through whole)
+        GHI     R7
+        OR
+        STR     R2
+        GLO     R8
+        OR
+        STR     R2
+        GHI     R8
+        OR
+        LBNZ    SZOK
+        LDI     HIGH(SBUF)      ; then cylinders x heads x sectors (words 1, 3, 6)
+        PHI     RF
+        LDI     LOW(SBUF+2)
+        PLO     RF
+        LDA     RF
+        PLO     RC
+        LDN     RF
+        PHI     RC              ; RC = cylinders
+        LDI     LOW(SBUF+6)
+        PLO     RF
+        LDN     RF
+        PLO     RB              ; RB.0 = heads
+        LDI     LOW(SBUF+12)
+        PLO     RF
+        LDN     RF
+        PHI     RB              ; RB.1 = sectors a track
+        LDI     0
+        PHI     RD
+        PLO     RD
+        PHI     R8
+        PLO     R8
+        PHI     R7
+        PLO     R7
+SZ1:    GLO     RB              ; RD = heads x sectors
+        LBZ     SZ2
+        GHI     RB
+        STR     R2
+        GLO     RD
+        ADD
+        PLO     RD
+        GHI     RD
+        ADCI    0
+        PHI     RD
+        DEC     RB
+        LBR     SZ1
+SZ2:    GHI     RD              ; R8:R7 = that x cylinders
+        STR     R2
+        GLO     RD
+        OR
+        LBZ     SZOK
+        GLO     RC
+        STR     R2
+        GLO     R7
+        ADD
+        PLO     R7
+        GHI     RC
+        STR     R2
+        GHI     R7
+        ADC
+        PHI     R7
+        GLO     R8
+        ADCI    0
+        PLO     R8
+        GHI     R8
+        ADCI    0
+        PHI     R8
+        DEC     RD
+        LBR     SZ2
+SZOK:   SEP     R4
         DW      PIN
         DB      0DH,0AH,'Size:                     ',0
         SEP     R4
@@ -232,6 +301,8 @@ LBAOK:
         GHI     R8
         SMBI    0
         PHI     R8
+        LBNF    SMALL           ; under 64 sectors - or 0, from an IDENTIFY that came back wrong (it wrapped round to
+        GHI     R8              ;  the 2 GB cap before, and F would have formatted that)
         LBNZ    CAP
         GLO     R8
         SMI     40H
@@ -249,7 +320,7 @@ NOCAP:  GLO     R8
         GHI     R7
         SMI     20H
         LBDF    BIGOK
-        SEP     R4
+SMALL:  SEP     R4
         DW      PIN
         DB      0DH,0AH,'The card is too small for FAT16 (4 MB at least).',0DH,0AH,0
         LBR     FATAL
@@ -662,6 +733,16 @@ FL2:    SEP     R4
         PLO     RC
         SEP     R4
         DW      COPYN
+        LOAD    RD, KERNIMG+7   ; the formatter's name: LTOS and the kernel's version (its $0307: major, minor)
+        LOAD    RF, SBUF+7
+        LDA     RD
+        ADI     '0'
+        STR     RF
+        INC     RF
+        INC     RF
+        LDN     RD
+        ADI     '0'
+        STR     RF
         LDI     HIGH(SBUF+13)   ; sectors per cluster
         PHI     RF
         LDI     LOW(SBUF+13)
@@ -853,7 +934,7 @@ A24:    LOAD    RD, I2AT
         LBZ     A25
 A2BAD:  SEP     R4
         DW      PIN
-        DB      'INSTALL2.HEX did not load as it was built - load it again, then CALL 3003.',0DH,0AH,0
+        DB      'INSTALL2.HEX did not load right - load it again, then CALL 3003.',0DH,0AH,0
         LBR     FATAL
 A25:    LOAD    RD, FDONE       ; (only once)
         LDI     0
@@ -877,7 +958,7 @@ A27:    SEP     R4
         SEP     R4
         DW      PIN
         DB      0DH,0AH,'The card is ready. Type BOOT.',0DH,0AH
-        DB      'Then the rest of the programs: elfser.py system, or RECV SYSTEM with each LTOS-SYSTEM.HEX.',0DH,0AH,0
+        DB      'Then elfser.py system (or RECV SYSTEM) for the rest.',0DH,0AH,0
         LBR     FATAL           ; (back to the monitor)
 
 ; ---- U: a new kernel and boot sector on an LTOS card; its partition, files and STELLAR.BIN stay
@@ -1669,7 +1750,7 @@ COPYN:  LDA     RD
         INCL    "nums.asm"
 
 ; ---- the partition's boot record: jump, OEM, BPB (fields filled in above), the FAT16 extension
-VBRTPL: DB      0EBH, 3CH, 90H, 'LTOS1.0 '
+VBRTPL: DB      0EBH, 3CH, 90H, 'LTOS?.? ' ; (the version's digits put in from the kernel image)
         DB      00H, 02H        ; 11 bytes per sector: 512
         DB      1               ; 13 sectors per cluster (set)
         DB      RESV, 0         ; 14 reserved sectors
