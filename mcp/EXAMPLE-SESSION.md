@@ -365,9 +365,6 @@ It is still drawing. Let it finish.
 
 ```
 [+185.775 s of Elf2K time (69665573 cycles), 245.775 s since power-on | the 1802 stopped (IDL) | cursor row 24 col 1]
----- scrolled off the top (2 lines) ----
-STELLAR MANDELBROT
-...........:::::---------------:::::::::
 ---- screen ----
 ..........::::----------==+x+==---::::::
 .........:::----------===+c***===--:::::

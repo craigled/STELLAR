@@ -29,19 +29,19 @@ const TOOLS = [
              clock: { type: 'string', description: 'What the real-time clock says at power-on (default ' + DEFAULT_CLOCK + '). It then runs on machine cycles.' },
              authentic_uart: { type: 'boolean', description: 'The Elf2K\'s own UART: it holds ONE byte at 19200 baud, so keys sent faster than a program reads them are lost. Default: off, keys queue.' } } },
   { name: 'command',
-    description: 'Type a line at the LTOS> prompt, press Enter, and run until the machine waits for a key again. Returns what was printed (lines that scrolled off the top too) and the screen. For LTOS commands: HELP, DIR /BIN, TYPE README.TXT, SORT -r DOCS/SALES.TXT, ECHO hello > HI.TXT.',
+    description: 'Type a line at the LTOS> prompt, press Enter, and run until the machine waits for a key again. Returns the whole screen, so earlier commands may still be on it: the new output starts at the line with your command. Output too long for the screen comes first, under "printed, then scrolled off the top". For LTOS commands: HELP, DIR /BIN, TYPE README.TXT, SORT -r DOCS/SALES.TXT, ECHO hello > HI.TXT.',
     props: { line: { type: 'string', description: 'The command, without the Enter.' }, max_seconds: seconds(60) },
     required: ['line'] },
   { name: 'type',
-    description: 'Type text at the terminal as it is, then run until the machine waits for a key. A newline in the text is Enter. For text typed into an editor or a program\'s own prompt.',
+    description: 'Type text at the terminal as it is, then run until the machine waits for a key. A newline in the text is Enter. For text typed into an editor (NANO, LW2) or a program\'s own prompt.',
     props: { text: { type: 'string' }, enter: { type: 'boolean', description: 'Press Enter after the text.' }, max_seconds: seconds(30) },
     required: ['text'] },
   { name: 'press',
-    description: 'Press named keys, in order, then run until the machine waits for a key. Keys: Enter, Esc, Tab, Space, Backspace, Delete, Up, Down, Left, Right, Home, End, PageUp, PageDown, Ctrl-A to Ctrl-Z, or one character such as "y". Esc leaves every app. In a game, give a small max_seconds (0.2) to move a step at a time.',
+    description: 'Press named keys, in order, then run until the machine waits for a key. Keys: Enter, Esc, Tab, Space, Backspace, Delete, Up, Down, Left, Right, Home, End, PageUp, PageDown, Ctrl-A to Ctrl-Z, or one character such as "y". Esc leaves every app. In a game, give a small max_seconds (0.2) to move a step at a time; the screen may then be caught part-way through a redraw.',
     props: { keys: { type: 'array', items: { type: 'string' }, description: 'For example ["Ctrl-O", "Enter", "Ctrl-X"].' }, max_seconds: seconds(5) },
     required: ['keys'] },
   { name: 'run',
-    description: 'Let the machine run with no keys: for a program that is still working (FSCK, PI) or to watch a game or a clock move.',
+    description: 'Let the machine run with no keys: for a program that is still working (FSCK, PI) or to watch a game or a clock move. In a game, short runs with stop_when_waiting false show where things are; a screen may be caught part-way through a redraw.',
     props: { seconds: seconds(10, 'How long to run, in seconds of Elf2K time'),
              stop_when_waiting: { type: 'boolean', description: 'Stop early once the machine waits for a key (default true). False runs the whole time, for programs that animate while they wait.' } } },
   { name: 'screen',
@@ -51,7 +51,7 @@ const TOOLS = [
     description: 'The STELLAR apps: the .STL files in /BIN on the card (start one with launch_app) and the sample .lst programs for stellar_load.',
     props: {} },
   { name: 'launch_app',
-    description: 'Start a STELLAR app from the LTOS> prompt by its name (GALAXIA, SNAKE, WALK, LW2 ...). LTOS loads the STELLAR firmware and the app. Esc comes back to LTOS.',
+    description: 'Start a STELLAR app from the LTOS> prompt by its name (GALAXIA, SNAKE, WALK, LW2 ...). LTOS loads the STELLAR firmware and the app. Most games show a title and start on any key. Esc comes back to LTOS, which loads again and clears the screen.',
     props: { name: { type: 'string', description: 'An app from list_apps, with or without .STL.' }, max_seconds: seconds(30) },
     required: ['name'] },
   { name: 'stellar_load',
@@ -104,7 +104,7 @@ function report(ran, note) {
     ' | cursor row ' + s.cursor.row + ' col ' + s.cursor.col + (s.cursor.visible ? '' : ' (hidden)') + ']';
   const parts = [head];
   if (note) parts.push(note);
-  if (scrolled.length) parts.push('---- scrolled off the top (' + scrolled.length + ' lines) ----', ...scrolled);
+  if (scrolled.length) parts.push('---- printed, then scrolled off the top (' + scrolled.length + ' lines) ----', ...scrolled);
   parts.push('---- screen ----', ...s.rows.slice(0, last));
   return {
     text: parts.join('\n'),
@@ -278,7 +278,9 @@ function handle(msg) {
       const missing = (TOOLS.find(t => t.name === params.name).required || []).filter(k => args[k] === undefined);
       if (missing.length) throw new Error(params.name + ' needs: ' + missing.join(', '));
       const r = fn(args);
-      return result({ content: [{ type: 'text', text: r.text }], structuredContent: r.data, isError: !!r.isError });
+      // the text is the whole answer; the same facts as fields ride in _meta for the test (a client shown
+      // structuredContent may show it INSTEAD of the text)
+      return result({ content: [{ type: 'text', text: r.text }], isError: !!r.isError, _meta: { elf2k: r.data } });
     } catch (e) {
       return result({ content: [{ type: 'text', text: e.message }], isError: true });
     }

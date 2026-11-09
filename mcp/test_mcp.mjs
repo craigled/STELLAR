@@ -26,7 +26,9 @@ async function session(check) {
   if (!r.text.includes('The machine is off')) e.push('status before boot: ' + tail(r));
   r = await call('command', { line: 'DIR' });
   if (!r.isError) e.push('command before boot was not an error');
-  check('the handshake, 15 tools, and the machine off until boot', e);
+  const raw = (await c.request('tools/call', { name: 'status', arguments: {} })).result;
+  if (raw.structuredContent !== undefined || raw.content.length !== 1 || raw.content[0].type !== 'text') e.push('a result is more than its text: ' + JSON.stringify(raw));
+  check('the handshake, 15 tools, the machine off until boot, a result that is one block of text', e);
 
   e = [];
   r = await call('boot');

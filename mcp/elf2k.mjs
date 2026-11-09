@@ -254,6 +254,7 @@ export class Elf2K {
     this._on();
     const c = this.cpu, start = c.cycles, budget = Math.round(seconds * CYCLES_PER_SECOND);
     const early = opts.stopWhenWaiting !== false;
+    const row0 = this.vt.cy, kept = this.scrolled.length;
     let stop = 'time';
     if (c.halted) stop = 'halted';
     else while (c.cycles - start < budget) {
@@ -262,6 +263,9 @@ export class Elf2K {
       if (opts.until && this.out.length && (this._flush(), opts.until())) { stop = 'until'; break; }
     }
     this._flush();
+    // of the lines pushed off the top, the rows that were above the cursor when this began are old
+    const gone = this.scrolled.splice(kept);
+    this.scrolled.push(...gone.slice(Math.min(row0, gone.length)));
     return { stop, cycles: c.cycles - start };
   }
   _flush() { if (this.out.length) { this.vt.write(this.out); this.out = []; } }

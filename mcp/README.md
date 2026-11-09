@@ -46,7 +46,7 @@ It should end with `ELF2K MCP: ALL PASS`.
 | `read_file` | A file from the card image. |
 | `write_file` | A file onto the card, by `RECV` and Intel HEX at the prompt. Up to about 16 KB. |
 
-Every tool that runs the machine says how much Elf2K time passed, in seconds and in machine cycles, and why it stopped.
+Every tool that runs the machine says how much Elf2K time passed, in seconds and in machine cycles, and why it stopped. It shows the whole screen. Lines printed in that call that have already scrolled off the top come first.
 
 ## How it works
 
@@ -76,7 +76,7 @@ Checked, on a Mac with Node 22.23.4:
 - `node mcp/test_mcp.mjs` prints `ELF2K MCP: ALL PASS`. It talks to the server over stdin and stdout and does these: the handshake and the 15 tools; boot to `LTOS>`; `DIR /BIN`, whose count and bytes must equal the card image's (93 files, 301979 bytes); a file written, then read back from the image and by `TYPE`; three lines typed into NANO, saved, and sorted by `SORT`; GALAXIA started, VM1 active, and a lone Esc back to `LTOS>`; the card kept across a boot and restored; Prime-Gen v07 and three VMs on the bare firmware; then the whole session again in a second server, which must print the same text.
 - `node mcp/example_session.mjs` wrote `EXAMPLE-SESSION.md`. Run twice, it wrote the same file (`cmp`).
 - `node web/build/test_ltos.mjs` still prints `LTOS WEB: ALL PASS` with this folder added.
-- Claude Code 2.1.321, run once with `claude --mcp-config ... -p`, booted the machine and ran `WC DOCS/SALES.TXT` through the server.
+- Claude Code 2.1.321, run with `claude --mcp-config ... -p` and told only what to get done, not how. In 32 tool calls with no errors it booted, read `HELP NANO`, typed five names into NANO, saved, ran `SORT CREW.TXT > SORTED.TXT` and `WC`, started SNAKE, ate one piece of food (SCORE 001) and left with Esc. That run found a fault: Claude Code showed a result's `structuredContent` in place of its text, so `read_file` showed only a size. Results are now text alone, the test checks it, and a second run read the file.
 
 Not checked:
 
@@ -84,7 +84,7 @@ Not checked:
 - Windows and Linux.
 - Anything against the real Elf2K. The cycle counts are the emulator's.
 - `authentic_uart`, beyond one `ECHO` typed at the prompt.
-- Whether Claude plays the games well.
+- Whether Claude plays the games well. One piece of food in SNAKE is all that was seen.
 
 ## Small changes in `web/js` that would make this simpler
 

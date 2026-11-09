@@ -31,7 +31,7 @@ export async function connect() {
     // -> { text, data, isError }
     call: async (name, args) => {
       const r = (await request('tools/call', { name, arguments: args || {} })).result;
-      return { text: r.content[0].text, data: r.structuredContent || {}, isError: !!r.isError };
+      return { text: r.content[0].text, data: (r._meta && r._meta.elf2k) || {}, isError: !!r.isError };
     },
     close: () => child.stdin.end()
   };
