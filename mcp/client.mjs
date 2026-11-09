@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Joshua Ledbetter
+// Copyright (C) 2026 Craig Ledbetter
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The smallest MCP client: starts server.mjs, does the handshake, and calls tools one at a time. For the
 // test and the example session.

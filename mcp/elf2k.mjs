@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Joshua Ledbetter
+// Copyright (C) 2026 Craig Ledbetter
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The website's Elf2K with no page around it: the same modules (web/js, unchanged), a VT100 that is only
 // a grid, keys by name, and a clock that counts the 1802's machine cycles. Two machines:

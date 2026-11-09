@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Joshua Ledbetter
+// Copyright (C) 2026 Craig Ledbetter
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The MCP server (mcp/server.mjs) driven as an agent drives it: over stdin/stdout, one tool call at a time.
 // A session that boots LTOS, lists /BIN, writes a file and reads it back three ways, edits one in NANO and

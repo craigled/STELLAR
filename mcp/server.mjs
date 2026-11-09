@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Copyright (C) 2026 Joshua Ledbetter
+// Copyright (C) 2026 Craig Ledbetter
 // SPDX-License-Identifier: GPL-3.0-or-later
 // An MCP server for the emulated Elf2K: an AI agent boots LTOS, types at the terminal, reads the screen,
 // moves files on and off the card, starts STELLAR apps and looks at memory. JSON-RPC 2.0 on stdin/stdout,
