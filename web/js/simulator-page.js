@@ -135,7 +135,7 @@
     else { t.scrollIntoView({ block: 'center' }); t.focus({ preventScroll: true }); }
   }
 
-  fetch('samples/manifest.json?v=157')
+  fetch('samples/manifest.json?v=158')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       // Most samples are one VM. This one is four, so the VM selector has something to show.
@@ -182,7 +182,7 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=157')
+    fetch('samples/' + s.file + '?v=158')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
@@ -304,7 +304,7 @@
 
   // The full catalogue (web/build/gen_downloads.py): every finished app, grouped.
   var catalog = [];
-  fetch('downloads/catalog.json?v=157')
+  fetch('downloads/catalog.json?v=158')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       catalog = list;
@@ -331,7 +331,7 @@
     var a = catalog[+btn('dlPick').value];
     if (!a) return;
     var fn = a.href.split('/').pop();
-    fetch(a.href + '?v=157')
+    fetch(a.href + '?v=158')
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         saveFile(fn, text);
@@ -409,7 +409,7 @@
     });
     b.textContent = '🎤 Listening…'; b.setAttribute('aria-pressed', 'true');
     note.textContent = 'Allow the microphone, then send a tone (another laptop, Sound on, Morse Sender v18).';
-    listener.start('js/tone-detect.js?v=157').catch(function (e) {
+    listener.start('js/tone-detect.js?v=158').catch(function (e) {
       listener = null; b.textContent = '🎤 Listen'; b.setAttribute('aria-pressed', 'false');
       note.textContent = 'Could not listen: ' + (e && e.message || e);
     });

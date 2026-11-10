@@ -65,6 +65,7 @@ Some things to try:
   EROFF EROFF.RF    a small nroff: plain text made into pages (> EROFF.TXT keeps it)
   SORT -n -r DOCS/SALES.TXT    SORT, UNIQ, PWD, WC, GREP ... - HELP has them all
   RAWK '{ s += $2 } END { print s }' DOCS/SALES.TXT
+  PLAY -s 3 /MUSIC/ODE   music on Q: press Sound, clock Elf2K (this one is 3 MHz)
   ECHO hello > HI.TXT ; TYPE HI.TXT ; FSCK
 
 Changes you make stay in this browser. "Restore the card" puts every file back.
@@ -113,6 +114,9 @@ def add_files(m):
     os.makedirs(os.path.join(m, 'BIBLE'), exist_ok=True)
     shutil.copyfile(os.path.join(WORK, 'BIBLE', 'MEMVERSE.txt'), os.path.join(m, 'BIBLE', 'MEMVERSE.TXT'))
     open(os.path.join(m, 'LICENSE.TXT'), 'wb').write(open(os.path.join(WORK, 'COPYING'), 'rb').read().replace(b'\n', b'\r\n'))
+    os.makedirs(os.path.join(m, 'MUSIC'), exist_ok=True)              # PLAY's songs
+    for f in sorted(os.listdir(os.path.join(LTOS, 'music'))):
+        if f.upper().endswith('.MUS'): shutil.copyfile(os.path.join(LTOS, 'music', f), os.path.join(m, 'MUSIC', f.upper()))
     open(os.path.join(m, 'DOCS', 'LETTER.TXT'), 'wb').write(LETTER)
     open(os.path.join(m, 'DOCS', 'SALES.TXT'), 'wb').write(SALES)
     open(os.path.join(m, 'DOCS', 'BOOK.TXT'), 'wb').write(BOOK)

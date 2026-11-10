@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LTOS on the Elf2K</title>
 <meta name="description" content="LTOS 0.5, the disk operating system for the Elf2K, running in your browser: the real kernel, shell and programs on an emulated RCA 1802 with a CF card.">
-<link rel="stylesheet" href="css/site.css?v=157">
+<link rel="stylesheet" href="css/site.css?v=158">
 <style>
   .ltos-body{display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:18px; align-items:start}
   @media (max-width:900px){ .ltos-body{grid-template-columns:minmax(0,1fr)} }
@@ -28,6 +28,7 @@
   <div class="sim-controls">
     <button id="boot" class="primary" title="Power on: the BIOS boots LTOS from the card">Boot ⏻</button>
     <button id="fresh" title="Every file back as it was: removed, changed or new files are undone, and LTOS boots again">Restore the card ↺</button>
+    <button id="sound" aria-pressed="false" title="Play the Q line as a speaker would (PLAY's music) - at the Elf2K clock only">🔈 Sound off</button>
     <button id="saveImg" title="Download the whole card as an 8 MB disk image (a PC/Mac/Linux can mount it)">⤓ Card image</button>
     <span class="grow"></span>
     <label class="small mono" title="One received byte at a time, at 19200 baud, as on the Elf2K: a key typed while the 1802 is busy can be lost">
@@ -85,13 +86,14 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a> · <a href="license.html">license</a></footer>
 
-<script src="js/firmware-0061-37.js?v=157"></script>
-<script src="js/stellar-vm.js?v=157"></script>
-<script src="js/webbios.js?v=157"></script>
-<script src="js/elf2k.js?v=157"></script>
-<script src="js/vt100.js?v=157"></script>
-<script src="js/term-input.js?v=157"></script>
-<script src="js/ltos-page.js?v=157"></script>
-<script src="js/nav.js?v=157"></script>
+<script src="js/firmware-0061-37.js?v=158"></script>
+<script src="js/stellar-vm.js?v=158"></script>
+<script src="js/webbios.js?v=158"></script>
+<script src="js/elf2k.js?v=158"></script>
+<script src="js/vt100.js?v=158"></script>
+<script src="js/term-input.js?v=158"></script>
+<script src="js/q-audio.js?v=158"></script>
+<script src="js/ltos-page.js?v=158"></script>
+<script src="js/nav.js?v=158"></script>
 </body>
 </html>

@@ -175,6 +175,18 @@
     return true;
   };
 
+  // run until the 1802 has used `budget` machine cycles (the Elf2K's own clock: 375,000 a second at 3 MHz);
+  // false if it stopped (IDL). At Elf2K speed this keeps Q, and so the sound, in real time.
+  Machine.prototype.runCycles = function (budget) {
+    var c = this.cpu, end = c.cycles + budget, i = 0;
+    while (c.cycles < end) {
+      if (!c.step()) { this.instr += i; return false; }
+      i++;
+    }
+    this.instr += i;
+    return true;
+  };
+
   // type bytes at the terminal
   Machine.prototype.keys = function (bytes) {
     for (var i = 0; i < bytes.length; i++) this.uart.buf.push(bytes[i] & 0xFF);
