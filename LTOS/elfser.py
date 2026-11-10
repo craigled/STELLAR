@@ -140,7 +140,7 @@ def xcommand(fd, cmd, yes=False):
     for ch in (cmd + '\r').encode():
         os.write(fd, bytes([ch])); got += echo1(fd)
     while True:
-        got += read_until_quiet(fd, 5.0, 30.0, until=b'Ctrl-C stops.')
+        got += read_until_quiet(fd, 15.0, 30.0, until=b'Ctrl-C stops.')   # (XFER can take over 5 s to load)
         if b'Ctrl-C stops.' in got:
             read_until_quiet(fd, 0.1, 1.0); return True
         if got.endswith(b'(Y/N) '):

@@ -220,7 +220,7 @@ def samples():
             (b'ECHO    PRG', prg('echo')), (b'CAT     PRG', prg('cat')), (b'HEAD    PRG', prg('head')), (b'TAIL    PRG', prg('tail')), (b'TOUCH   PRG', prg('touch')), (b'SH      PRG', prg('sh')), (b'EROFF   PRG', prg('eroff')), (b'PWD     PRG', prg('pwd')), (b'SORT    PRG', prg('sort')), (b'UNIQ    PRG', prg('uniq')),
             (b'ATTACH  PRG', prg('attach')), (b'HELP    PRG', prg('help')), (b'NANO    PRG', prg('enano')), (b'NANO    OVL', enano_ovl()),
             (b'GETSTR  PRG', prg('getstr')), (b'FETCH   PRG', prg('fetch')), (b'POS     PRG', prg('pos')),
-            (b'DELETE  PRG', prg('delete')), (b'EMPTY   PRG', prg('empty')), (b'RUNNING PRG', prg('running')), (b'MEMVERSEPRG', prg('memverse')), (b'LTCALC  PRG', prg('ltcalc')), (b'SED     PRG', prg('sed')), (b'SYSRX   PRG', prg('sysrx')), (b'SQUEEZE PRG', prg('squeeze')), (b'HIDE    PRG', prg('hide'))] + help_dats()
+            (b'DELETE  PRG', prg('delete')), (b'EMPTY   PRG', prg('empty')), (b'RUNNING PRG', prg('running')), (b'MEMVERSEPRG', prg('memverse')), (b'LTCALC  PRG', prg('ltcalc')), (b'SED     PRG', prg('sed')), (b'SYSRX   PRG', prg('sysrx')), (b'SQUEEZE PRG', prg('squeeze')), (b'HIDE    PRG', prg('hide')), (b'PLAY    PRG', prg('play'))] + help_dats()
 
 
 def stl_of(lst):
@@ -256,7 +256,7 @@ def pak(files):
 
 
 SYSPARTS = []
-SYSMAX = 11                                                   # LTOS-SYSTEM's parts at most (each one RECV SYSTEM)
+SYSMAX = 12                                                   # LTOS-SYSTEM's parts at most (each one RECV SYSTEM)
 
 
 def build(kernel=b''):
@@ -266,6 +266,7 @@ def build(kernel=b''):
     assert syms['INSTEND'] <= syms['BOOTIMG'], 'the installer runs into the boot image ($%04X)' % syms['INSTEND']
     for i, b in enumerate(boot): mem[syms['BOOTIMG'] + i] = b
     nk = (len(kernel) + 511) // 512
+    assert not kernel or (kernel[7] <= 9 and kernel[8] <= 9), 'the installer writes the version as one digit each (LTOSx.y)'
     assert nk <= 31, 'the kernel is %d sectors; there are 31' % nk
     assert syms['KERNIMG'] + nk * 512 <= syms['FTABMAX'], 'the kernel image runs past $%04X' % syms['FTABMAX']
     for i, b in enumerate(kernel.ljust(nk * 512, b'\0')): mem[syms['KERNIMG'] + i] = b

@@ -419,6 +419,23 @@ Usage:  LOAD name [a]
 
   LOAD X.PRG        a program, to where its header says (it does not run)
   LOAD X.BIN 4000   any file, as it is, at address a (hex, $3000-$6BFF)
+@PLAY Play a tune on the speaker (Q)
+Usage:  PLAY name         a tune file (no extension: .MUS)
+        PLAY -n notes     the notes on the line: PLAY -n T180 C E G O5 C
+                          (there, use O: > and < send output to a file)
+        PLAY -s MHz ...   for an Elf2K clocked at MHz (1.00-9.99; 3.58 if
+                          not given):  PLAY -s 1.79 ODE
+
+  C D E F G A B  a note: # or + sharp, - flat; a length 1 2 4 8 16 32
+                 (3 6 12: triplets; none: L's); . dotted   C#8 E-4. G
+  R              a rest, with a length too         R4  R2.
+  O4  > <        the octave (1-7; O4 is middle C); up one, down one
+  L4             the length of notes that give none
+  T120           the tempo: quarter notes a minute (32-255)
+  MN ML MS       normal, legato (smooth), staccato (short)
+  ; text         printed as it is reached: a title, the words
+Spaces, new lines, | and , are only for reading. Any key stops it.
+Songs to try: CD /MUSIC, then PLAY TWINKLE (ODE GRACE BIRTHDAY ...).
 @BIN Where programs are found
 Typing NAME runs, the first one found of:
   NAME.SH    a script (here, else the root, else /BIN): SH NAME

@@ -71,7 +71,7 @@ What it can do:
 - **awk:** RAWK is an awk written in 1802 code.
 - **Editors:** NANO, a small editor in the style of GNU nano, written from scratch in 1802 code and not part of the GNU project; Lite-Writer 2 (LW2) and Lite-Writer 3 (LTWRITER) on STELLAR, for files up to 60 KB.
 - **Spreadsheet:** LTCALC, in 1802 code: one page of 8 columns by 20 rows, two decimals, formulas with SUM, AVG, MIN, MAX and COUNT, saved as plain text.
-- **Music:** PLAY plays tunes on the Q output, from text files of notes (C D E, sharps, lengths, rests, octaves, tempo); `-s 1.79` sets it for a slower Elf2K's clock. Songs are in /MUSIC.
+- **Music:** PLAY plays tunes on the Q output, from text files of notes (C D E, sharps, lengths, rests, octaves, tempo); `-s 1.79` sets it for a slower Elf2K's clock. Songs are in /MUSIC, and `LTOS/tomus.py` makes more from ABC, MIDI, RTTTL or BASIC music found on the internet.
 - **A shell:** line editing with the last command recalled, `>` and `>>` on any command, scripts with variables, `if`, loops, functions, `case` and `$(command)`.
 - **Moving files:** XFER sends files of any size to and from a PC/Mac/Linux with error checking. RECV and SEND use plain Intel HEX.
 - **Looking after the card:** FSCK checks it, FREE shows the space, and DISKINFO reports everything about the card.

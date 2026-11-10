@@ -234,3 +234,39 @@ can model the RTC).
 * **RE.1 is the BIOS's console selector** (0 = the video card, 1 = the UART). Never `DEC`/`INC`/`PHI` RE:
   a timeout counted down in RE once borrowed into RE.1 and silenced the console.
 * The BIOS's SCRT keeps D and DF across CALL and RETURN (in RE.0, which is lost).
+
+## PLAY - tunes on Q (2026-11-10)
+
+`PLAY name` plays a text file of notes (`.MUS`) as a square wave on Q; `PLAY -n notes` plays the notes on the command
+line; `PLAY -s MHz` is for an Elf2K at another clock (1.00-9.99; 3.58 if not given - Craig's Elf2K runs at 1.79).
+`HELP PLAY` has the notes. `play.asm`, the note table from `play_gen.py` (`playtab.inc`), `verify_play.py` (every
+edge of Q timed in a cycle-counting 1802: C1-B7 within 2 cents, lengths, `-s` at 1-8 MHz). Songs in `music/`, for
+`/MUSIC` on the card.
+
+### Songs from the internet: tomus.py
+
+`tomus.py` makes `.MUS` files on a PC/Mac/Linux from music in four common forms:
+
+    python3 LTOS/tomus.py TUNE.abc                 ABC - the first tune (--tune N for X:N)
+    python3 LTOS/tomus.py HYMN.mid                 a MIDI file: the melody (--list, then --track N to choose)
+    python3 LTOS/tomus.py RING.txt                 an RTTTL ringtone line
+    python3 LTOS/tomus.py OLD.BAS                  a BASIC program's PLAY strings (GW-BASIC, QBasic)
+    options: -o NAME.MUS, --transpose N, --tempo N, --grid N (MIDI), --title TEXT
+
+Where to find music (choose tunes old enough to be free to share - traditional, classical, older hymns):
+
+| | |
+|---|---|
+| ABC | abcnotation.com (a search over most collections), thesession.org (Irish), the Nottingham Music Database (English folk) |
+| MIDI | Mutopia Project (classical), Hymnary.org and hymntime.com (hymns) |
+| RTTTL | ringtone collections in Arduino and PICAXE tune libraries |
+| BASIC | QBasic / GW-BASIC music programs (archive.org) - this notation is PLAY's own, almost letter for letter |
+
+ABC: notes, the key, lengths, `>` `<`, triplets, ties, chords (the top note), accidentals for the bar, repeats and
+1st/2nd endings; grace notes, decorations, chord names and words are left out; the first voice only. MIDI: the
+highest-pitched of the busier tracks (drums left out), the top note where notes overlap, snapped to a 16th (`--grid
+24` keeps triplets), tempo changes kept. Notes outside PLAY's C1-B7 move by octaves. A note longer than PLAY can
+write as one is played in pieces, legato. Then onto the card: `python3 LTOS/elfser.py put HYMN.MUS /MUSIC/HYMN.MUS`,
+or `RECV /MUSIC/HYMN.MUS` and send the text from a terminal program. `verify_tomus.py`: each format read as worked
+out by hand, then played by PLAY in the simulator; all 46 tunes of the Nottingham file ashover.abc convert, and the
+six tried play note for note.

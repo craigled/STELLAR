@@ -1,0 +1,5 @@
+; Westminster Chimes
+T80 O4 L4 ML
+E C D < G2 | G > D E C2 | E D C < G2 | G > D E C2
+; and the hour
+MS T60 < C2 R C2 R C2
