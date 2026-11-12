@@ -170,6 +170,21 @@ The last N lines of the file (10 if N is not given; -N works too).
 
   TAIL LOG.TXT
   TAIL -n 2 LOG.TXT >> OLD.TXT   the last 2, added to OLD.TXT
+@NL Number the lines of a file
+Usage:  NL [-b a|t|n] [-n ln|rn|rz] [-w N] [-s sep] [-v N] [-i N] name
+
+The file's lines with a number in front, as Unix nl:
+  -b t   number the lines with text (the default); -b a all; -b n none
+  -n rn  the number on the right of its field (the default); -n ln on the
+         left; -n rz on the right with leading zeros
+  -w 6   the field's width (1-40)      -s sep  between the number and the
+  -v 1   the first number                      line: a TAB, or -s ': '
+  -i 1   the step
+A line with no number gets the field's width in spaces. Options may be
+joined (-ba -nrz -w4).
+
+  NL LETTER.TXT
+  NL -ba -nrz -w3 -s ': ' LIST.TXT > NUMBERED.TXT
 @EROFF Format text into pages (a small nroff, with -ms's best bits)
 Usage:  EROFF name                (EROFF name > NEW.TXT keeps it)
 
@@ -436,6 +451,24 @@ Usage:  PLAY name         a tune file (no extension: .MUS)
   ; text         printed as it is reached: a title, the words
 Spaces, new lines, | and , are only for reading. Any key stops it.
 Songs to try: CD /MUSIC, then PLAY TWINKLE (ODE GRACE BIRTHDAY ...).
+@MORSE Send and receive Morse code
+Usage:  MORSE -s name     send the file as Morse: a tone on Q
+        MORSE -t          type lines; each is sent as written, shown as
+                          its letters and their dots and dashes
+        MORSE -r name     receive: key Morse on EF4 (the INPUT switch);
+                          the letters show as they come; Esc saves them
+
+  -w 12    the speed, 5-40 words a minute (a dot is 1.2 s / WPM)
+  -f 700   the tone, 200-2000 Hz (sent, and the sidetone as you key)
+  -e 4     the EF line the key is on, 1-4
+  -c 3.58  the Elf2K's clock in MHz (1.00-9.99): -c 1.79 on a 1.79 MHz one
+
+Receiving learns your speed as you key: start -w near it. A gap of 3 dots
+ends a letter, 7 a word; a long pause starts a new line. Esc stops
+sending.
+
+  MORSE -c 1.79 -w 15 -s /DOCS/MYDOC.TXT
+  MORSE -r QSO.TXT
 @BIN Where programs are found
 Typing NAME runs, the first one found of:
   NAME.SH    a script (here, else the root, else /BIN): SH NAME
