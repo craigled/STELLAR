@@ -106,16 +106,31 @@ def put(path, data, say):
     return ok
 
 
-def start(cr=True):
-    """To the prompt: on the Elf2K, an Enter first (in the simulator it is coming up by itself)."""
+def start(cr=True, say=print):
+    """To LTOS's prompt -> True; False if LTOS is not there. On the Elf2K an Enter first (in the simulator it is
+    coming up by itself). At the ROM monitor (>>>, after a reset or a card swap): BOOT typed, LTOS waited for."""
     if cr: yield ('send', b'\r')
-    yield from until([PROMPT], 6.0 if cr else 90.0)
+    got = yield from until([PROMPT, b'>>>', b'>>> '], 6.0 if cr else 90.0)
+    if got.endswith(PROMPT): return True
+    if got.rstrip().endswith(b'>>>'):
+        say('The Elf2K is at its monitor (>>>): BOOT, to start LTOS ...')
+        yield from typed('BOOT')
+        got = yield from until([PROMPT], 40.0)
+        if got.endswith(PROMPT): return True
+    say('** LTOS is not answering (%r) - nothing done. Start LTOS on the Elf2K (BOOT at >>>) and try again.' % got[-60:])
+    return False
+
+
+def card_name(info):
+    m = re.search(r'Model:\s*(.+)', info); s = re.search(r'Size:\s*(.+)', info)
+    return '%s, %s' % (m.group(1).strip() if m else '?', s.group(1).strip() if s else '?')
 
 
 def backup_session(say, cr=True):
     """-> (manifest, {path: bytes}): every folder walked, every file pulled and its size checked."""
-    yield from start(cr)
+    if not (yield from start(cr, say)): return None, None
     info = yield from cmd('DISKINFO -Q', 20.0)
+    say('The card: ' + card_name(info))
     dirs, files, todo = [], [], ['/']
     while todo:
         folder = todo.pop(0)
@@ -142,7 +157,9 @@ def backup_session(say, cr=True):
 
 def restore_session(man, datas, say, everything=False, cr=True):
     """-> a list of problems ([] = all well): folders made, files sent, hidden ones hidden, DIR sizes checked, FSCK."""
-    yield from start(cr)
+    if not (yield from start(cr, say)): return ['LTOS did not answer - nothing written']
+    info = yield from cmd('DISKINFO -Q', 20.0)
+    say('Restoring onto: ' + card_name(info))
     probs = []
     for d in sorted(man['folders'], key=lambda d: d['path'].count('/')):
         out = yield from cmd('MKDIR ' + d['path'])
@@ -201,6 +218,7 @@ def main(argv):
         folder = argv[1] if len(argv) > 1 else os.path.expanduser('~/Elf2K-backups/card-' + datetime.datetime.now().strftime('%Y-%m-%d-%H%M'))
         t0 = time.time()
         man, datas = run_serial(backup_session(say))
+        if man is None: raise SystemExit(1)
         save_backup(folder, man, datas)
         say('Backed up %d files (%d bytes) to %s in %d s%s' % (len(datas), sum(map(len, datas.values())), folder, time.time() - t0,
             ('; NOT read: ' + ', '.join(man['not_read'])) if man['not_read'] else ''))
