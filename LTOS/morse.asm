@@ -15,6 +15,10 @@
         INCL    "ltos.inc"
         INCL    "kapi.inc"
 ESC     EQU     1BH
+DGK     EQU     4               ; the gap loop's extra cycles over the mark loop's, / 6: a key (22), -a (32)
+DGA     EQU     5
+NDOWN   EQU     3               ; -a: samples hearing sound that start a mark
+SRAUD   EQU     4000            ; -a: samples a second (a sound module's short pulses are caught at any pitch)
 RXOVH   EQU     30              ; the receive loops' own cycles a sample, outside the delay (measured in the sim)
 OVE     EQU     220             ; sending: cycles of work around each element's quiet, a letter's, a word's
 OVL     EQU     360             ;  (measured in the sim; taken off those quiets, as half-periods)
@@ -79,7 +83,7 @@ TKEY:   REQ
 ;      in a row (the debounce), RA.1 = how many make a change, RD = the delay (K + $FF). KEYM / KEYG are B1-B4,
 ;      patched for the EF line. While the key is down Q toggles: a sidetone at the tone's pitch.
 RXM:    BQ      RXM1
-        SEQ
+RXMQ:   SEQ                     ; (-a: patched to REQ - no sidetone, the microphone would hear it)
         BR      RXM2
 RXM1:   REQ
         SEX     R2
@@ -158,6 +162,30 @@ RXGD:   DEC     R9
         BR      RXG
 RXGDN:  LBR     GAPEND
 RXKG:   LBR     RXKEY
+; -a: a sound module flickers at the tone's pitch, so in the gap KEYG is patched to BR TGSUB: a mark starts at the
+;   NDOWN-th sample that hears sound, the count forgotten after RA.1 (the hold) samples of quiet. (In the mark, RXM's
+;   own rule - RA.1 samples of quiet end it - already rides over the flicker.)
+TGSUB:
+KEYT:   B4      TG5             ; (patched) sound?
+        GHI     RB              ; quiet: RB.1 counts it
+        ADI     1
+        PHI     RB
+        STR     R2
+        GHI     RA
+        XOR
+        BNZ     RXG6
+        LDI     0               ; the hold's worth of quiet: what was heard is forgotten
+        PLO     RB
+        PHI     RB
+        BR      RXG6
+TG5:    LDI     0
+        PHI     RB
+        GLO     RB
+        ADI     1
+        PLO     RB
+        XRI     NDOWN
+        BZ      RXGDN
+        BR      RXG6
 RXEND:
 
 ; =================================================================================================== the options
@@ -185,6 +213,12 @@ START:  SEX     R2
         LDI     0
         STR     RD
         INC     RD              ; VERB
+        STR     RD
+        INC     RD              ; AUDIO
+        STR     RD
+        INC     RD              ; INV
+        STR     RD
+        INC     RD              ; HOLD (0: the default)
         STR     RD
 OPT:    SEP     R4
         DW      K_SKIPSP
@@ -222,7 +256,39 @@ OPT:    SEP     R4
         GLO     RB
         XRI     'V'
         LBZ     OVERB
+        GLO     RB
+        XRI     'A'
+        LBZ     OAUD
+        GLO     RB
+        XRI     'I'
+        LBZ     OINV
+        GLO     RB
+        XRI     'H'
+        LBZ     OHOLD
         LBR     USAGE
+OAUD:   LOAD    RD, AUDIO       ; -a: a sound module on the EF line
+        LDI     1
+        STR     RD
+        LBR     OPT
+OINV:   LOAD    RD, INV         ; -i: the line the other way up (a module whose output goes high on sound)
+        LDI     1
+        STR     RD
+        LBR     OPT
+OHOLD:  SEP     R4              ; -h ms: 1-50, the hold (-a: 8) or the key's debounce (5)
+        DW      NUMARG
+        LBDF    USAGE
+        GHI     RD
+        LBNZ    USAGE
+        GLO     RD
+        LBZ     USAGE
+        SMI     51
+        LBDF    USAGE
+        GLO     RD
+        PLO     RB
+        LOAD    RD, HOLD
+        GLO     RB
+        STR     RD
+        LBR     OEND
 OVERB:  LOAD    RD, VERB        ; -v: each mark and gap shown, in samples
         LDI     1
         STR     RD
@@ -407,7 +473,8 @@ USAGE:  SEP     R4
         DB      'MORSE -t        type lines; each is sent as written',0DH,0AH
         DB      'MORSE -r name   receive Morse keyed on EF4 (the INPUT switch); Esc saves',0DH,0AH
         DB      '  -w WPM 5-40 (12)  -f Hz 200-2000 (700)  -e EF 1-4 (4)  -c MHz clock (3.58)',0DH,0AH
-        DB      '  -v  with -r: each mark and gap shown as it is timed (in half-periods of the tone)',0DH,0AH,0
+        DB      '  -r with: -v each mark and gap shown (in samples)  -a a sound module on the line',0DH,0AH
+        DB      '           -i the line the other way up  -h ms the hold (-a 8) / debounce (5)',0DH,0AH,0
         LOAD    RD, K_STAT
         LDI     1
         STR     RD
@@ -467,6 +534,15 @@ SU2:    GLO     RB
         LBNZ    SU1
         GLO     RA
         LBNZ    SU1
+        LOAD    RF, MCB         ; kept: the cycles a second (-r -a works its sampling out from it)
+        GLO     RD
+        STR     RF
+        INC     RF
+        GHI     RC
+        STR     RF
+        INC     RF
+        GLO     RC
+        STR     RF
         LDI     2               ; RD.0:RC = MC x 4
         PLO     RA
 SUX:    GLO     RC
@@ -1183,17 +1259,48 @@ RF1:    SEP     R4
         DW      F_TYPE
         SEP     R4
         DW      K_PIN
-        DB      ' - key away. It learns your speed as you go. Esc saves.',0DH,0AH,0DH,0AH,0
-        LOAD    RD, EFN         ; the key's line: B1-B4 ($34-$37) at KEYM and KEYG
+        DB      ' - key away. It learns your speed as you go. Esc saves.',0DH,0AH,0
+        LOAD    RD, AUDIO
+        LDN     RD
+        LBZ     RF4
+        SEP     R4
+        DW      K_PIN
+        DB      '(-a: a sound module - no sidetone on Q, so it cannot hear itself.)',0DH,0AH,0
+RF4:    SEP     R4
+        DW      K_PCRLF
+        LOAD    RD, EFN         ; the key's line: B1-B4 ($34-$37), -i BN1-BN4 ($3C-$3F), at KEYM, KEYG, KEYT
         LDN     RD
         ADI     33H
         PLO     RB
-        LOAD    RD, KEYM
+        LOAD    RD, INV
+        LDN     RD
+        LBZ     RF2
+        GLO     RB
+        ADI     8
+        PLO     RB
+RF2:    LOAD    RD, KEYM
         GLO     RB
         STR     RD
         LOAD    RD, KEYG
         GLO     RB
         STR     RD
+        LOAD    RD, KEYT
+        GLO     RB
+        STR     RD
+        LOAD    RD, AUDIO       ; -a: no sidetone (RXMQ: REQ); the gap's sound test is TGSUB's (KEYG: BR TGSUB)
+        LDN     RD
+        LBZ     RF3
+        LOAD    RD, RXMQ
+        LDI     7AH
+        STR     RD
+        LOAD    RD, KEYG
+        LDI     30H
+        STR     RD
+        INC     RD
+        LDI     LOW(TGSUB)
+        STR     RD
+RF3:    SEP     R4
+        DW      RXTIME          ; the samples: how many a second, the dot, the hold
         LOAD    RF, UNIT        ; the averages start at the speed given: dot 1, dash 3; gaps 1, 3, 7
         SEP     R4
         DW      LDW
@@ -1369,13 +1476,302 @@ SHOWMS: LOAD    RF, MSAV
         SEP     R4
         DW      F_TYPE
         SEP     R5
-; LOOPREG: RB.0 = 0, RA.1 = DEB, RD = KRX, the UART's status selected
+; RXTIME: the receive timing. Key: a sample a half-period of the tone (SETUP's KRX, UNIT, U3, U4): SR = 2 x FREQ.
+;   -a: about SRAUD a second - K = (MCB / SRAUD - RXOVH) / 6, SR = MCB / (RXOVH + 6 K), and the dot UNIT, U3, U4 in
+;   those samples. Then DEB = SR x the hold (-h, else -a 8 ms, the key 5 ms) / 1000, at least 2.
+RXTIME: LOAD    RF, FREQ        ; SR = 2 x FREQ
+        LDA     RF
+        PHI     RA
+        LDN     RF
+        SHL
+        PLO     RA
+        GHI     RA
+        SHLC
+        PHI     RA
+        LOAD    RD, AUDIO
+        LDN     RD
+        LBZ     RT9
+        SEP     R4
+        DW      LDMC            ; RD.0:RC = MCB
+        LOAD    RB, SRAUD
+        SEP     R4
+        DW      SETDVS
+        SEP     R4
+        DW      DIV             ; RC = cycles a sample wanted
+        GLO     RC              ; K = (that - RXOVH) / 6, at least 1
+        SMI     RXOVH + 6
+        GHI     RC
+        SMBI    0
+        LBDF    RT1
+        LOAD    RC, 1
+        LBR     RT2
+RT1:    GLO     RC
+        SMI     RXOVH
+        PLO     RC
+        GHI     RC
+        SMBI    0
+        PHI     RC
+        LDI     0
+        PLO     RD
+        LOAD    RB, 6
+        SEP     R4
+        DW      SETDVS
+        SEP     R4
+        DW      DIV
+RT2:    GHI     RC              ; at least DGA + 1, so the gap loop can be DGA shorter (below)
+        LBNZ    RT2A
+        GLO     RC
+        SMI     DGA + 1
+        LBDF    RT2A
+        LDI     DGA + 1
+        PLO     RC
+RT2A:   LOAD    RF, KRX         ; KRX = K + $FF
+        GLO     RC
+        ADI     0FFH
+        PLO     RB
+        GHI     RC
+        ADCI    0
+        STR     RF
+        INC     RF
+        GLO     RB
+        STR     RF
+        GLO     RC              ; RB = RXOVH + 6 K: the cycles a sample really
+        SHL
+        PLO     RB
+        GHI     RC
+        SHLC
+        PHI     RB
+        GLO     RC
+        STR     R2
+        GLO     RB
+        ADD
+        PLO     RB
+        GHI     RC
+        STR     R2
+        GHI     RB
+        ADC
+        PHI     RB
+        GLO     RB
+        SHL
+        PLO     RB
+        GHI     RB
+        SHLC
+        PHI     RB
+        GLO     RB
+        ADI     RXOVH
+        PLO     RB
+        GHI     RB
+        ADCI    0
+        PHI     RB
+        SEP     R4
+        DW      SETDVS
+        SEP     R4
+        DW      LDMC
+        SEP     R4
+        DW      DIV             ; RC = SR
+        GHI     RC
+        PHI     RA
+        GLO     RC
+        PLO     RA
+        LOAD    RF, SR          ; (kept while the dot is worked out)
+        GHI     RA
+        STR     RF
+        INC     RF
+        GLO     RA
+        STR     RF
+        LDI     0               ; UNIT = (12 x SR + 5 x WPM) / (10 x WPM): 1.2 s / WPM in samples
+        PLO     RD
+        PHI     RC
+        PLO     RC
+        LDI     12
+        PLO     R9
+RT3:    GLO     RA
+        STR     R2
+        GLO     RC
+        ADD
+        PLO     RC
+        GHI     RA
+        STR     R2
+        GHI     RC
+        ADC
+        PHI     RC
+        GLO     RD
+        ADCI    0
+        PLO     RD
+        DEC     R9
+        GLO     R9
+        LBNZ    RT3
+        LOAD    RF, WPM
+        LDN     RF
+        PLO     R9
+        SHL
+        SHL
+        STR     R2
+        GLO     R9
+        ADD
+        STR     R2
+        GLO     RC
+        ADD
+        PLO     RC
+        GHI     RC
+        ADCI    0
+        PHI     RC
+        GLO     RD
+        ADCI    0
+        PLO     RD
+        GLO     R9
+        SHL
+        SHL
+        STR     R2
+        GLO     R9
+        ADD
+        SHL
+        PLO     RB
+        LDI     0
+        SHLC
+        PHI     RB
+        SEP     R4
+        DW      SETDVS
+        SEP     R4
+        DW      DIV             ; RC = UNIT
+        LOAD    RF, UNIT        ; UNIT, U3 = 3 x, U4 = 4 x (what RFILE starts the averages from)
+        GHI     RC
+        STR     RF
+        INC     RF
+        GLO     RC
+        STR     RF
+        GLO     RC
+        SHL
+        PLO     RB
+        GHI     RC
+        SHLC
+        PHI     RB
+        LOAD    RF, U3
+        GLO     RC
+        STR     R2
+        GLO     RB
+        ADD
+        PLO     RA
+        GHI     RC
+        STR     R2
+        GHI     RB
+        ADC
+        STR     RF
+        INC     RF
+        GLO     RA
+        STR     RF
+        INC     RF              ; U4
+        GLO     RB
+        SHL
+        PLO     RA
+        GHI     RB
+        SHLC
+        STR     RF
+        INC     RF
+        GLO     RA
+        STR     RF
+        LOAD    RF, SR
+        LDA     RF
+        PHI     RA
+        LDN     RF
+        PLO     RA
+RT9:    LOAD    RD, AUDIO       ; KRXG = KRX less DGK (a key) or DGA (-a): the gap loop's extra work - its counting
+        LDN     RD              ;  down, TGSUB - so a sample takes as long in a gap as in a mark (measured in the sim)
+        LBZ     RT9A
+        LDI     DGA
+        LBR     RT9B
+RT9A:   LDI     DGK
+RT9B:   PLO     RB
+        LOAD    RF, KRX+1
+        LDN     RF
+        STR     R2
+        GLO     RB
+        SD                      ; KRX.lo - DG
+        PLO     RC
+        DEC     RF
+        LDN     RF
+        SMBI    0
+        PHI     RC
+        GHI     RC              ; below K = 1 ($0100): 1
+        LBNZ    RT9C
+        LOAD    RC, 0100H
+RT9C:   LOAD    RF, KRXG
+        GHI     RC
+        STR     RF
+        INC     RF
+        GLO     RC
+        STR     RF
+        LOAD    RD, HOLD        ; DEB = SR x the hold / 1000 (RA = SR)
+        LDN     RD
+        LBNZ    RT10
+        LOAD    RD, AUDIO
+        LDN     RD
+        LBZ     RT11
+        LDI     8
+        LBR     RT10
+RT11:   LDI     5
+RT10:   PLO     R9              ; R9.0 = ms
+        LDI     0
+        PLO     RD
+        PHI     RC
+        PLO     RC
+RT12:   GLO     RA              ; RD.0:RC += SR, ms times
+        STR     R2
+        GLO     RC
+        ADD
+        PLO     RC
+        GHI     RA
+        STR     R2
+        GHI     RC
+        ADC
+        PHI     RC
+        GLO     RD
+        ADCI    0
+        PLO     RD
+        DEC     R9
+        GLO     R9
+        LBNZ    RT12
+        LOAD    RB, 1000
+        SEP     R4
+        DW      SETDVS
+        SEP     R4
+        DW      DIV
+        GHI     RC              ; at most 255, at least 2
+        LBZ     RT13
+        LDI     255
+        PLO     RC
+RT13:   GLO     RC
+        SMI     2
+        LBDF    RT14
+        LDI     2
+        PLO     RC
+RT14:   LOAD    RF, DEB
+        GLO     RC
+        STR     RF
+        SEP     R5
+; LDMC: RD.0:RC = MCB
+LDMC:   LOAD    RF, MCB
+        LDA     RF
+        PLO     RD
+        LDA     RF
+        PHI     RC
+        LDN     RF
+        PLO     RC
+        SEP     R5
+; LOOPREG: RB = 0, RA.1 = DEB, RD = KRX (a mark: STATE 1) or KRXG (a gap), the UART's status selected
 LOOPREG: LDI    0
         PLO     RB
+        PHI     RB
         LOAD    RF, DEB
         LDN     RF
         PHI     RA
+        LOAD    RF, STATE
+        LDN     RF
+        LBZ     LR1
         LOAD    RF, KRX
+        LBR     LR2
+LR1:    LOAD    RF, KRXG
+LR2:
         LDA     RF
         PHI     RD
         LDN     RF
@@ -1516,10 +1912,10 @@ RESTREG: LOAD   RD, SAVR
         PLO     RC
         LOAD    RD, SAVR+4
         LDN     RD
-        PHI     RB              ; (LOOPREG clears RB.0; put it back after)
+        PLO     R9              ; (LOOPREG clears RB; put RB.0 back after)
         SEP     R4
         DW      LOOPREG
-        GHI     RB
+        GLO     R9
         PLO     RB
         SEP     R5
 ; DECODE: CODE -> the character (RTBL), '*' if none or more than 6 elements; shown and kept. CODE = 1 again.
@@ -2056,13 +2452,19 @@ FREQ:   DS      2
 EFN:    DS      1
 MODE:   DS      1               ; 'S' 'T' 'R'
 VERB:   DS      1               ; -v
+AUDIO:  DS      1               ; -a
+INV:    DS      1               ; -i
+HOLD:   DS      1               ; -h ms (0: the default)
 NAMEP:  DS      2
 PNAME:  DS      11
 DVS:    DS      2
+MCB:    DS      3               ; machine cycles a second
+SR:     DS      2               ; -r: samples a second
 HALF:   DS      2               ; the half-period, machine cycles
 KB:     DS      2               ; (FRAC follows it)
 FRAC:   DS      1
 KRX:    DS      2
+KRXG:   DS      2               ; the gap loop's delay
 UNIT:   DS      2               ; half-periods: a dot  (U2 U3 U4 follow it)
 U2:     DS      2
 U3:     DS      2

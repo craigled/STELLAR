@@ -224,16 +224,49 @@ def main():
     marks = [(c, int(n)) for c, n in shown if c in '.-']; gaps = [int(n) for c, n in shown if c == '_']
     want = [('.', 140)] * 3 + [('-', 420)] * 3 + [('.', 140)] * 3
     if r.saved.get('V.TXT') != b'SOS\n' or len(marks) != 9 or any(c != wc or abs(n - wn) > 6 for (c, n), (wc, wn) in zip(marks, want)) \
-            or len(gaps) != 8 or any(abs(g - (420 if k in (2, 5) else 140)) > (40 if k in (2, 5) else 20) for k, g in enumerate(gaps)):
-        # (gaps read short - ~14 samples, ~30 between letters: none are counted while a mark is judged or a letter shown - to look at)
+            or len(gaps) != 8 or any(abs(g - (420 if k in (2, 5) else 140)) > 8 for k, g in enumerate(gaps)):
         e.append('-v: %r saved %r' % (shown, r.saved.get('V.TXT')))
+    report('MORSE -r: a sloppy, bouncing hand at another speed than -w, decoded and saved on Esc (EF4, EF3, 1.79 MHz); '
+           '-v shows each mark and gap in samples', e)
+    e = []
+
+    # -a: a sound module on the line - while a tone sounds its output pulses at the tone's pitch (here 25% of each
+    # cycle), and between marks a noise blip now and then; -i: a module that goes the other way up
+    def audio(text, wpm, fin, duty=0.25, sloppy=0.1, seed=6, invert=False, blips=True):
+        ev, end = keying(text, wpm, sloppy, False, 0.3, seed)
+        rnd = random.Random(seed); out = []; on, off = (1, 0) if not invert else (0, 1)
+        out.append((0.0, off))
+        for (t0, a), (t1, b) in zip(ev, ev[1:] + [(end + 0.5, 0)]):
+            if a == 1:                                  # a mark: pulses at fin
+                t = t0
+                while t < t1:
+                    out += [(t, on), (min(t + duty / fin, t1), off)]; t += 1 / fin
+            elif blips:                                 # a gap: a blip of 0.1 ms every so often
+                t = t0 + rnd.uniform(0.005, 0.03)
+                while t < t1 - 0.005:
+                    out += [(t, on), (t + 0.0001, off)]; t += rnd.uniform(0.02, 0.06)
+        return out, end
+    for mhz, args, wpm, fin, inv, text in [(3.5795, '-a -e 3 -w 15 -r RX.TXT', 15, 700, False, 'CQ CQ DE ELF2K'),
+                                            (1.7898, '-c 1.79 -a -e 3 -w 12 -r RX.TXT', 13, 600, False, 'SOS 73'),
+                                            (3.5795, '-a -i -e 3 -w 20 -r RX.TXT', 18, 1000, True, 'PARIS NOW'),
+                                            (3.5795, '-a -h 12 -e 3 -w 10 -r RX.TXT', 10, 400, False, 'THE END')]:
+        ev, end = audio(text, wpm, fin, invert=inv)
+        r = Run(prg, args, mhz, keyed=ev, ef=3, key_at=end + 2.0, max_s=end + 8)
+        saved = r.saved.get('RX.TXT', b'').decode()
+        if r.end != 'returned' or saved != text + '\n':
+            e.append('%s: a %d Hz tone at %d WPM: saved %r, want %r' % (args, fin, wpm, saved, text))
+        if r.morse(): e.append('%s: Q sounded (no sidetone with -a)' % args)
+        if '(-a: a sound module' not in r.out: e.append('%s: %r' % (args, r.out[:200]))
+        if v: print(args, '->', repr(saved))
+    report('MORSE -r -a: a sound module\'s pulses at the tone\'s pitch (400-1000 Hz, noise blips between) decoded, at '
+           '3.58 and 1.79 MHz, -i the other way up, -h a longer hold; no sidetone', e)
+    e = []
     r = Run(prg, '-r NONE.TXT', key_at=1.0, max_s=5)
     if 'Nothing received' not in r.out or r.saved: e.append('nothing keyed: %r' % r.out)
-    report('MORSE -r: a sloppy, bouncing hand at another speed than -w, decoded and saved on Esc (EF4, EF3, 1.79 MHz); '
-           '-v shows each mark and gap in samples; nothing keyed: nothing saved', e)
+    report('MORSE -r: nothing keyed: nothing saved', e)
 
     e = []
-    for bad in ('', '-w 12', '-s A -t', '-w 50 -t', '-w 4 -t', '-c 0.5 -t', '-c 12 -t', '-e 5 -t', '-f 100 -t', '-q -t', '-s'):
+    for bad in ('', '-w 12', '-s A -t', '-w 50 -t', '-w 4 -t', '-c 0.5 -t', '-c 12 -t', '-e 5 -t', '-f 100 -t', '-q -t', '-s', '-h 0 -t', '-h 60 -t', '-h -t'):
         r = Run(prg, bad, max_s=3)
         if 'MORSE -s name' not in r.out or r.mem[0x33F] != 1: e.append('%r: %r' % (bad, r.out[:60]))
     r = Run(prg, '-r BAD*NAME', max_s=3)

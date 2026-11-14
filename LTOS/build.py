@@ -256,7 +256,7 @@ def pak(files):
 
 
 SYSPARTS = []
-SYSMAX = 12                                                   # LTOS-SYSTEM's parts at most (each one RECV SYSTEM)
+SYSMAX = 13                                                   # LTOS-SYSTEM's parts at most (each one RECV SYSTEM)
 
 
 def build(kernel=b''):

@@ -462,6 +462,10 @@ Usage:  MORSE -s name     send the file as Morse: a tone on Q
   -f 700   the tone, 200-2000 Hz (sent, and the sidetone as you key)
   -e 4     the EF line the key is on, 1-4
   -c 3.58  the Elf2K's clock in MHz (1.00-9.99): -c 1.79 on a 1.79 MHz one
+With -r:  -v each mark and gap shown as it is timed
+  -a       a sound module on the line (HW-484, KY-038): it hears a tone; no
+           sidetone on Q   -i  a module whose output goes high on sound
+  -h 8     the hold, ms: quiet this long ends a mark (-a 8; a key: 5)
 
 Receiving learns your speed as you key: start -w near it. A gap of 3 dots
 ends a letter, 7 a word; a long pause starts a new line. Esc stops
