@@ -270,3 +270,26 @@ write as one is played in pieces, legato. Then onto the card: `python3 LTOS/elfs
 or `RECV /MUSIC/HYMN.MUS` and send the text from a terminal program. `verify_tomus.py`: each format read as worked
 out by hand, then played by PLAY in the simulator; all 46 tunes of the Nottingham file ashover.abc convert, and the
 six tried play note for note.
+
+## Backing up a card's files: cardfiles.py (2026-11-14)
+
+The FILES on whichever card is in the Elf2K, copied to the Mac over the serial port with XFER, and put back on any
+LTOS card - not an image, so a 32 MB card's files go back on an 8 MB card and the other way round:
+
+    python3 LTOS/cardfiles.py backup [FOLDER]           every folder and file, hidden ones too
+                                                        (default ~/Elf2K-backups/card-YYYY-MM-DD-HHMM)
+    python3 LTOS/cardfiles.py list FOLDER               what a backup holds
+    python3 LTOS/cardfiles.py restore FOLDER [--all] [--yes]
+
+A backup is the card's folders on the Mac plus MANIFEST.json (each path, size, date, hidden or not, and the card's
+DISKINFO). Each file's size is checked against DIR. Restore makes the folders, sends every file (replacing), hides the
+hidden ones again (files; HIDE takes no folders), then checks DIR's sizes and runs FSCK. It leaves the card's own LTOS
+as it is - /STELLAR.BIN, /BIN's .PRG and .OVL, /*.HLP, /NANO.OVL go with its kernel - unless --all. So for a new
+card: install LTOS, elfser.py system, then restore. Files get the date they are written. About 1.5 KB a second, plus
+a few seconds a file for XFER to start.
+
+The session is one generator (as elfser.py's XFER code), so `verify_cardfiles.py` runs it against the simulated
+Elf2K: a 32 MB card with folders in folders, a hidden file, an empty file, a binary, a .STL, backed up byte for byte
+and restored onto a fresh 8 MB card (the Mac reads it: the same files, the hidden one hidden, LTOS left alone, fsck
+clean), and again with --all. It found that XFER -S could not send hidden files (it used NAMEARG, which skips them):
+now it looks names up with FINDN, as TYPE does.

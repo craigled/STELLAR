@@ -874,8 +874,19 @@ RF9:    SEP     R4
         DB      'The card did not answer.',0
 
 ; ==== XFER -S name: the card to the Mac
-SMAIN:  SEP     R4              ; the file (or a message, and back to the prompt)
-        DW      KS_NAMEARG
+SMAIN:  SEP     R4              ; the file (or a message, and back to the prompt) - as TYPE: not NAMEARG, FINDN
+        DW      KS_MNTCHK       ;  finds hidden files too (cardfiles.py backs them up)
+        LOAD    RD, KS_FNAME
+        SEP     R4
+        DW      KS_NAMEP
+        LOAD    RD, KS_FNAME
+        SEP     R4
+        DW      KS_FINDN
+        LBDF    KS_NOFILE
+        LOAD    RD, KS_DATTR
+        LDN     RD
+        ANI     10H
+        LBNZ    KS_ISDIR
         SEP     R4
         DW      KS_FOPEN
         LOAD    RD, SIZE
