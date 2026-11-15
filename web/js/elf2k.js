@@ -128,6 +128,7 @@
     var sel = { 0: 0x15, length: 1, push: function (v) { this[0] = v; } };   // port 2: only the last matters
     var cf = this.cf, uart = this.uart = { buf: [], rbr: -1, lost: 0, next: 0 };
     c.rtc = new LIB.RTC();                  // (a test may put its own clock here)
+    c.rtc.cycles = function () { return c.cycles; }; c.rtc.cps = 375000;   // (its periodic flag: SLEEP)
     c.io_out[2] = sel;
     c.io_out[3] = { push: function (v) {
       var s = sel[0];

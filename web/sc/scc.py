@@ -1885,9 +1885,17 @@ class Program:
     """A compiled program: one Part per VM it uses (a one-VM program has one, built for VM N by --vm N)."""
     def __init__(s, name, parts, single, shared=None, warnings=()):
         s.name, s.parts, s.single, s.shared, s.warnings = name, parts, single, shared or {}, list(warnings)
+        s.version = None
 
     def lst(s, path):
-        """The .lst: every part's disassembly, then one block of D-lines for all of them."""
+        """The .lst: every part's disassembly, then one block of D-lines for all of them; '; VERSION:  x' as its
+        4th line when the source said #version x."""
+        text = s._lst(path)
+        if s.version:
+            ls = text.split('\n'); ls.insert(3, '; VERSION:  %s' % s.version); text = '\n'.join(ls)
+        return text
+
+    def _lst(s, path):
         old = VM
         try:
             if s.single:
@@ -2017,8 +2025,30 @@ def _chans(items, chans):
     return [it[:5] + (st(it[5]),) if it[0] == 'func' else it for it in items]
 
 
+VERRE = re.compile(r'^[ \t]*#version\b(.*)$', re.M)
+
+def take_version(src):
+    """'#version 1.2' (a line of its own) -> the source without it (its line kept, empty) and '1.2' - the .lst gets
+    '; VERSION:  1.2', which RECV NAME.STL keeps and APPS shows. The last one counts."""
+    ver = None
+    for m in VERRE.finditer(src):
+        ln = src.count('\n', 0, m.start()) + 1
+        w = m.group(1).split('//')[0].strip()
+        if not re.fullmatch(r'[!-~]{1,15}', w):
+            raise Error('line %d: #version takes one word of 1-15 characters (no spaces): #version 1.2' % ln)
+        ver = w
+    return VERRE.sub('', src), ver
+
+
 def compile_program(src, name):
     """Any program -> Program. Without a task it is compile_source's, for the VM set_vm() chose."""
+    src, ver = take_version(src)
+    prog = _compile_program(src, name)
+    prog.version = ver
+    return prog
+
+
+def _compile_program(src, name):
     items = Parser(lex(src)).program()
     if not any(it[0] in MULTI for it in items):
         c, em, labels, data = compile_items(items, src, name)

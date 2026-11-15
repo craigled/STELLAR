@@ -308,16 +308,16 @@ LTNO:   SEP     R4
         DW      K_PIN
         DB      'HELP.HLP (the pages) is not on the card, or could not be read.',0DH,0AH,0
         LBR     K_MAIN
-; NXPART: a part's end reached - the next (HELP2.HLP, then HELP3.HLP) into TEXT, RA = TEXT, DF = 0; DF = 1: there
-;         is no more (HELP3.HLP's end, or the next is not there). PART: the part in TEXT (1, 2, 3)
+; NXPART: a part's end reached - the next (HELP2.HLP, HELP3.HLP, then HELP4.HLP) into TEXT, RA = TEXT, DF = 0;
+;         DF = 1: there is no more (HELP4.HLP's end, or the next is not there). PART: the part in TEXT (1-4)
 NXPART: LOAD    RD, PART
         LDN     RD
-        XRI     3
+        XRI     4
         LBZ     NXP9
-        XRI     3
+        XRI     4
         ADI     1
         STR     RD
-        ADI     '0'             ; HELP2 / HELP3
+        ADI     '0'             ; HELP2 / HELP3 / HELP4
         STR     R2
         LOAD    RF, DAT2N+4
         LDN     R2

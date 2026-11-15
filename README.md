@@ -67,7 +67,9 @@ What it can do:
 - **Files and folders:** DIR, TYPE, COPY, MV, REN, RM, MKDIR, RMDIR, CD, PWD, TREE and FIND, with paths and wildcards.
 - **A trash folder:** DELETE moves files to /TRASH, and EMPTY deletes them for good.
 - **Hidden files:** HIDE keeps a file out of DIR, and DIR -h shows it again.
-- **Text tools:** GREP, SORT, UNIQ, WC, HEAD, TAIL, CAT, NL, and EROFF, a small nroff.
+- **Text tools:** GREP, SORT, UNIQ, WC, HEAD, TAIL, CAT, NL, EROFF (a small nroff) and DEROFF, which takes the formatting back out.
+- **Knowing your files:** FILE tells what a file is from what is in it, and APPS lists the STELLAR apps (or, with -P, the programs) with their sizes and versions.
+- **Time:** CAL shows a calendar as Unix cal does, today marked; SLEEP waits a number of seconds, timed by the clock card.
 - **awk:** RAWK is an awk written in 1802 code.
 - **Editors:** NANO, a small editor in the style of GNU nano, written from scratch in 1802 code and not part of the GNU project; Lite-Writer 2 (LW2) and Lite-Writer 3 (LTWRITER) on STELLAR, for files up to 60 KB.
 - **Spreadsheet:** LTCALC, in 1802 code: one page of 8 columns by 20 rows, two decimals, formulas with SUM, AVG, MIN, MAX and COUNT, saved as plain text.

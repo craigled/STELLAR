@@ -122,7 +122,13 @@ def main():
     if [m for m, q in events(s3)] != [69, 71, 69, 71, 73, 74, 73, 74]: e.append('|: :|: :| %r' % events(s3))
     s4 = tomus.read_abc('X:1\nT:Dor\nM:4/4\nL:1/4\nK:Edor\nF C C, _B\n')
     if [m for m, q in events(s4)] != [66, 61, 49, 70]: e.append('E dorian (F# C#), C, lower octave, flat: %r' % events(s4))
-    report('ABC: key, lengths, > , triplet, tie, chord top, accidentals in a bar, repeat and endings, words left out', e)
+    s5 = tomus.read_abc('X:1\nT:Hymn\nM:3/2\nL:1/4\nV: S1V1 clef=treble\nV: S1V2\nV: S2V1 clef=bass\nK:G\n'
+                        '[V: S1V1] [Q:1/4=120] D | G A B3 G |\nw: words\n[V: S1V2]  D | D D G3 D |\n'
+                        '[V: S2V1]  D, | B, C D3 B, |\n[V: S1V1] d3/2 d/ |]\n')
+    if events(s5) != [(62, 1), (67, 1), (69, 1), (71, 3), (67, 1), (74, F(3, 2)), (74, F(1, 2))]:
+        e.append('voices named at the start of each line ([V: S1V1] ...): the first voice only: %r' % events(s5))
+    report('ABC: key, lengths, > , triplet, tie, chord top, accidentals in a bar, repeat and endings, words left out, '
+           'voices', e)
 
     # ---- RTTTL
     e = []

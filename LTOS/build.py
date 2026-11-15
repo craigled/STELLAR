@@ -106,7 +106,7 @@ def help_list():
 
 
 def help_dats(most=12000):
-    """HELP.HLP, HELP2.HLP (and HELP3.HLP): the records split where one starts, each ending with a 0 - so each fits in
+    """HELP.HLP, HELP2.HLP, HELP3.HLP (and HELP4.HLP): the records split where one starts, each ending with a 0 - so each fits in
     one part of LTOS-SYSTEM, and in memory: HELP.PRG holds one at a time (the next once it reaches one's end)."""
     b = help_dat()[:-1]
     starts = [i for i in range(len(b)) if b[i] in (1, 2) and (i == 0 or b[i - 1] == 0)] + [len(b)]
@@ -115,7 +115,7 @@ def help_dats(most=12000):
         cut = max(i for i in starts if i <= at + most - 1)
         assert cut > at, 'a help record is too big'
         parts.append(b[at:cut] + b'\0'); at = cut
-    assert len(parts) <= 3, 'the help needs a HELP4.HLP (HELP.PRG reads 3 parts at most)'
+    assert len(parts) <= 4, 'the help needs a HELP5.HLP (HELP.PRG reads 4 parts at most)'
     return [((b'HELP%-4sHLP' % (b'' if k == 0 else str(k + 1).encode())), p) for k, p in enumerate(parts)]
 
 
@@ -220,15 +220,20 @@ def samples():
             (b'ECHO    PRG', prg('echo')), (b'CAT     PRG', prg('cat')), (b'HEAD    PRG', prg('head')), (b'TAIL    PRG', prg('tail')), (b'TOUCH   PRG', prg('touch')), (b'SH      PRG', prg('sh')), (b'EROFF   PRG', prg('eroff')), (b'PWD     PRG', prg('pwd')), (b'SORT    PRG', prg('sort')), (b'UNIQ    PRG', prg('uniq')),
             (b'ATTACH  PRG', prg('attach')), (b'HELP    PRG', prg('help')), (b'NANO    PRG', prg('enano')), (b'NANO    OVL', enano_ovl()),
             (b'GETSTR  PRG', prg('getstr')), (b'FETCH   PRG', prg('fetch')), (b'POS     PRG', prg('pos')),
-            (b'DELETE  PRG', prg('delete')), (b'EMPTY   PRG', prg('empty')), (b'RUNNING PRG', prg('running')), (b'MEMVERSEPRG', prg('memverse')), (b'LTCALC  PRG', prg('ltcalc')), (b'SED     PRG', prg('sed')), (b'SYSRX   PRG', prg('sysrx')), (b'SQUEEZE PRG', prg('squeeze')), (b'HIDE    PRG', prg('hide')), (b'PLAY    PRG', prg('play')), (b'NL      PRG', prg('nl')), (b'MORSE   PRG', prg('morse')), (b'EARTEST PRG', prg('eartest'))] + help_dats()
+            (b'DELETE  PRG', prg('delete')), (b'EMPTY   PRG', prg('empty')), (b'RUNNING PRG', prg('running')), (b'MEMVERSEPRG', prg('memverse')), (b'LTCALC  PRG', prg('ltcalc')), (b'SED     PRG', prg('sed')), (b'SYSRX   PRG', prg('sysrx')), (b'SQUEEZE PRG', prg('squeeze')), (b'HIDE    PRG', prg('hide')), (b'PLAY    PRG', prg('play')), (b'NL      PRG', prg('nl')), (b'MORSE   PRG', prg('morse')), (b'EARTEST PRG', prg('eartest')), (b'CAL     PRG', prg('cal')), (b'SLEEP   PRG', prg('sleep')), (b'DEROFF  PRG', prg('deroff')), (b'FILE    PRG', prg('file'))] + help_dats()
 
 
 def stl_of(lst):
-    """What RECV NAME.STL makes of a STELLAR .lst: only its 'D aaaa bb ...' lines; sector 0 = 'STL1', the block
-    count, each 512-byte block's address (in the order its first byte appears); then the blocks (undefined bytes 0)."""
+    """What RECV NAME.STL makes of a STELLAR .lst: only its 'D aaaa bb ...' lines (and a '; VERSION:  v02 ...' line); sector 0 =
+    'STL1', the block count, each 512-byte block's address (in the order its first byte appears), at +128 the version;
+    then the blocks (undefined bytes 0)."""
     import re
-    order, blocks = [], {}
+    order, blocks, ver = [], {}, bytearray(17)
     for line in lst.replace('\r', '\n').split('\n'):
+        v = re.match(r'; VERSION: *([^ ]+)', line)                     # "; VERSION:  v02 ...": the app's version (its first
+        if v:                                                   #  word), sector 0 at +128: 15 bytes at most, a 0 after each (as RECV keeps it)
+            for k, c in enumerate(v.group(1).encode('utf-8')[:15]): ver[k], ver[k + 1] = c, 0
+            continue
         m = re.match(r'D +([0-9A-F]{4})((?: +[0-9A-F]{2})+) *$', line)
         if not m: continue
         a = int(m.group(1), 16)
@@ -237,7 +242,12 @@ def stl_of(lst):
             if blk not in blocks: blocks[blk] = bytearray(512); order.append(blk)
             blocks[blk][(a + k) & 511] = int(x, 16)
     head = b'STL1' + bytes([len(order)]) + b''.join(bytes([(b << 9) >> 8, 0]) for b in order)
-    return head.ljust(512, b'\0') + b''.join(bytes(blocks[b]) for b in order)
+    return (head.ljust(128, b'\0') + bytes(ver)).ljust(512, b'\0') + b''.join(bytes(blocks[b]) for b in order)
+
+
+def stl_version(stl):
+    """The version an .STL carries (sector 0 at +128), as APPS shows it; '' if none."""
+    return stl[128:144].split(b'\0')[0].decode('latin-1')
 
 
 def vms_of(stl):

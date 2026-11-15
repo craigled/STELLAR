@@ -154,10 +154,15 @@ def xcommand(fd, cmd, yes=False):
 def show(b): sys.stdout.write(b.decode('latin1').replace('\r\n', '\n').replace('\r', '\n')); sys.stdout.flush()
 def stl_of(lst):
     """What RECV NAME.STL makes of a STELLAR .lst (build.py's stl_of): only its 'D aaaa bb ...' lines; sector 0 =
-    'STL1', the block count, each 512-byte block's address (in the order its first byte appears); then the blocks."""
+    'STL1', the block count, each 512-byte block's address (in the order its first byte appears), at +128 the first word
+    of a '; VERSION:  v02 ...' line; then the blocks."""
     import re
-    order, blocks = [], {}
+    order, blocks, ver = [], {}, bytearray(17)
     for line in lst.replace('\r', '\n').split('\n'):
+        v = re.match(r'; VERSION: *([^ ]+)', line)
+        if v:
+            for k, c in enumerate(v.group(1).encode('utf-8')[:15]): ver[k], ver[k + 1] = c, 0
+            continue
         m = re.match(r'D +([0-9A-F]{4})((?: +[0-9A-F]{2})+) *$', line)
         if not m: continue
         a = int(m.group(1), 16)
@@ -166,7 +171,7 @@ def stl_of(lst):
             if blk not in blocks: blocks[blk] = bytearray(512); order.append(blk)
             blocks[blk][(a + k) & 511] = int(x, 16)
     head = b'STL1' + bytes([len(order)]) + b''.join(bytes([(b << 9) >> 8, 0]) for b in order)
-    return head.ljust(512, b'\0') + b''.join(bytes(blocks[b]) for b in order)
+    return (head.ljust(128, b'\0') + bytes(ver)).ljust(512, b'\0') + b''.join(bytes(blocks[b]) for b in order)
 def main():
     args = sys.argv[1:]; quiet = 1.0; most = 30.0
     if '--wait' in args: i = args.index('--wait'); quiet = float(args[i + 1]); del args[i:i + 2]

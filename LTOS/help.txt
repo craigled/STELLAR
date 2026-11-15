@@ -85,7 +85,8 @@ Type RECV, then send the file from your terminal program.
   Intel HEX        -> the file's bytes (NAME.PRG gets the program header)
   NAME.STL         -> send the STELLAR app's .lst as it is (15 KB at
                       most; bigger: elfser.py putstl NAME.lst on the
-                      PC/Mac/Linux)
+                      PC/Mac/Linux); a line "; VERSION: 1.2" gives
+                      its version
   text             -> ends with a line holding just .  (or Ctrl-Z)
   RECV SYSTEM      -> LTOS-SYSTEM.HEX, then again with 2.HEX, 3.HEX and
                       on: every LTOS program, added or replaced (into
@@ -208,6 +209,16 @@ Bold and italic show in elfprint's PDF; on the screen they are left out.
 
   EROFF EROFF.RF > EROFF.TXT
                   then on the PC/Mac/Linux: elfprint -p EROFF.TXT
+@DEROFF Take the formatting out of an EROFF / nroff file
+Usage:  DEROFF [-w] name
+
+The text alone, as Unix deroff: request lines (. or ') left out - but the
+text of .sh, .nh, .ip TAG, .B, .I and .R kept; .TS-.TE and .EQ-.EN blocks
+left out; escapes in the text (\fB \s+2 \(em \*x ...) removed, \- is -.
+  -w   the words instead, one to a line (two letters or more)
+
+  DEROFF EROFF.RF > PLAIN.TXT
+  DEROFF -w EROFF.RF > WORDS.TXT ; SORT -u WORDS.TXT
 @SORT Put a file's lines in order
 Usage:  SORT [-r] [-n] [-u] name
 
@@ -229,6 +240,17 @@ row. -d: only the lines that came more than once.
 
   UNIQ LOG.TXT
   SORT WORDS.TXT > S.TXT ; UNIQ -c S.TXT
+@FILE What kind of file it is, from what is in it
+Usage:  FILE names                (paths and patterns: FILE *.*, FILE /BIN/)
+
+One line each, as Unix file: a folder; empty; an LTOS program (where it
+loads, its version); a STELLAR app (its blocks, its version); a RECV
+bundle; Intel HEX; a STELLAR listing (.lst); an LTCALC sheet; EROFF text;
+ASCII, UTF-8 or 8-bit text (and CR LF line ends); PNG GIF JPEG PDF ZIP
+gzip MIDI WAV ELF; else data.
+
+  FILE NOTES.TXT
+  FILE /BIN/*.PRG
 @TOUCH Make an empty file, or set a file's time
 Usage:  TOUCH names
 
@@ -561,10 +583,16 @@ Alt-6 copies it, ^U pastes it; Esc drops the mark. NANO needs NANO.OVL.
 
   NANO NOTES.TXT
   NANO DOCS/BOOK.TXT
-@APPS List the STELLAR apps on the card
-Usage:  APPS
+@APPS List the STELLAR apps, or the programs in /BIN
+Usage:  APPS [-P]
 
-The .STL apps here, with their blocks and the VMs they use.
+The .STL apps here, with their blocks (512 bytes each), their size in KB,
+the VMs they use and their version.
+  -P       the programs in /BIN instead: each one's size and version
+
+Versions: an app's .lst has a line "; VERSION:  1.2" (RECV NAME.STL keeps
+its first word); a program starts with DB 'VER:1.2',0 at its load
+address, its header's start address just past it.
 @FW Load the STELLAR firmware into memory
 Usage:  FW [name]
 
@@ -652,6 +680,15 @@ Quotes keep spaces and the like as they are: ECHO "a   b".
 
   ECHO Hello there
   ECHO Backed up >> LOG.TXT
+@SLEEP Wait a number of seconds
+Usage:  SLEEP seconds          (0-65535, two decimals at most)
+
+Waits, then goes on - in a script, a pause. Timed by the clock card's
+DS12887 (64 ticks a second), so it is right at any CPU speed. Ctrl-C or
+Esc stops it early ($? is then 1).
+
+  SLEEP 5
+  SLEEP 0.25
 @GETSTR Read a line typed, into a file or a variable
 Usage:  GETSTR [-p "prompt"] [file]
 
@@ -727,6 +764,16 @@ Usage:  TIME [hh:mm[:ss]]
 
   TIME              the time now
   TIME 14:30        sets it
+@CAL A calendar
+Usage:  CAL [[month] year]
+
+A calendar, as Unix cal: this month (today in reverse video), one month,
+or a whole year three months across. Julian to 1752, Gregorian after (as
+Unix cal: September 1752 goes from the 2nd to the 14th). Years 1-9999.
+
+  CAL               this month, from the clock
+  CAL 12 2026       December 2026
+  CAL 2027          the whole year
 @DUMP Show memory in hex
 Usage:  DUMP [a [n]]
 

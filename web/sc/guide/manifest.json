@@ -1,74 +1,74 @@
 {
  "hello": {
   "input": "",
-  "line": 42
+  "line": 46
  },
  "numbers": {
   "input": "",
-  "line": 68
+  "line": 72
  },
  "fizzbuzz": {
   "input": "",
-  "line": 103
+  "line": 107
  },
  "loops": {
   "input": "",
-  "line": 130
+  "line": 134
  },
  "functions": {
   "input": "",
-  "line": 154
+  "line": 158
  },
  "echo": {
   "input": "Hello\\r",
-  "line": 199
+  "line": 203
  },
  "names": {
   "input": "Ada Lovelace\\r",
-  "line": 229
+  "line": 233
  },
  "arrays": {
   "input": "",
-  "line": 256
+  "line": 260
  },
  "signed": {
   "input": "",
-  "line": 300
+  "line": 304
  },
  "switch": {
   "input": "+-*/x",
-  "line": 338
+  "line": 342
  },
  "screen": {
   "input": "",
-  "line": 374
+  "line": 378
  },
  "game": {
   "input": "\\x1b[C\\x1b[C\\x1b[C\\x1b[Bq",
-  "line": 422
+  "line": 426
  },
  "clock": {
   "input": "",
-  "line": 493
+  "line": 497
  },
  "asmdemo": {
   "input": "",
-  "line": 552
+  "line": 556
  },
  "hilo": {
   "input": "50\\r25\\rabc\\r12\\r18\\r21\\r23\\rn\\r",
-  "line": 644
+  "line": 648
  },
  "pipeline": {
   "input": "hello\\r",
-  "line": 716
+  "line": 720
  },
  "together": {
   "input": "",
-  "line": 778
+  "line": 782
  },
  "pausing": {
   "input": "",
-  "line": 805
+  "line": 809
  }
 }

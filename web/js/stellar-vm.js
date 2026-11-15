@@ -229,7 +229,10 @@
   // 24-hour, year = 1972 + value, Monday = 1 (regB $07). Setting it (regB SET, the fields, SET
   // off) stores an offset from the computer's clock, shared by every load on the page, so a
   // time set with $07 RTCSET keeps running. Only what STELLAR's $07 handler uses is modelled:
-  // UIP never shows (no update cycles), periodic/alarm interrupts are absent.
+  // UIP never shows (no update cycles), alarm and interrupts are absent. The periodic flag (register C
+  // bit 6, cleared by reading C) is there when the machine gives the clock its cycles (rtc.cycles: a
+  // function, rtc.cps: machine cycles a second): register A's rate bits RS (3-15: 2^(RS-1)/32768 s)
+  // set it once a period, missed periods lost - as the chip. LTOS's SLEEP counts it at 64 Hz.
   var RTC_OFFSET = 0;
   function RTC() {
     this.r = new Uint8Array(128);
@@ -251,7 +254,16 @@
     var t = new Date(y, this._dec(r[8]) - 1, this._dec(r[7]), this._dec(r[4]), this._dec(r[2]), this._dec(r[0]));
     if (!isNaN(t.getTime())) RTC_OFFSET = t.getTime() - Date.now();
   };
+  RTC.prototype._period = function () {            // the periodic flag's period in machine cycles (0: none)
+    var rs = this.r[0x0A] & 0x0F;
+    return (rs >= 3 && this.cycles) ? Math.round(this.cps * Math.pow(2, rs - 1) / 32768) : 0;
+  };
   RTC.prototype.read = function (n) {
+    if (n === 0x0C) {
+      var p = this._period(), now = p ? this.cycles() : 0, f = 0;
+      if (p && now >= this.next) { f = 0xC0; this.next += p * (Math.floor((now - this.next) / p) + 1); }
+      return f;
+    }
     if (n <= 9 && !this.setting) this._load();
     return n === 0x0A ? this.r[n] & 0x7F : this.r[n];
   };
@@ -264,6 +276,7 @@
     }
     if (n <= 9 && !this.setting) { this._load(); this.r[n] = v; this._commit(); return; }
     this.r[n] = n === 0x0A ? v & 0x7F : v;
+    if (n === 0x0A && this._period()) this.next = this.cycles() + this._period();
   };
 
   // ---- helpers ----

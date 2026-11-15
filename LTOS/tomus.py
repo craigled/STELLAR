@@ -154,6 +154,9 @@ def read_abc(text, tune=None):
                 if st['Q']: items.append(('t', st['Q']))
             continue
         if not inbody: continue
+        mv = re.match(r'\s*\[V:([^\]]*)\]', line)      # a line that starts by naming its voice: [V: S1V1] ...
+        if mv:
+            field('V', mv.group(1)); line = line[mv.end():]
         if st['first_voice'] is not None and st['voice'] != st['first_voice']: continue
         s, i = line, 0
         while i < len(s):

@@ -545,17 +545,63 @@ DLSLOW: GLO     R9
         LBZ     DS0
         XRI     1
         LBZ     DS1
+        XRI     5               ; (1 XOR 4)
+        LBZ     DSV
 DSSKIP: LDI     3               ; skip the rest of the line
         PLO     R9
         LBR     DLL
 DS0:    GLO     RD              ; a line's start: 'D' - or the end, or stop
         XRI     'D'
-        LBNZ    DS0A
+        LBNZ    DS0V
         LDI     1
         PLO     R9
         LDI     0
         PLO     RC
         LBR     DLL
+DS0V:   XRI     7FH             ; ('D' XOR ';') ';': perhaps "; VERSION:  v02 ..." - the app's version (its first word),
+        LBNZ    DS0A            ;  kept in sector 0 at +128
+        LDI     4
+        PLO     R9
+        LDI     0
+        PLO     RC
+        LOAD    RF, BUF+128     ; (RF is free between lines: each D-line sets it from its address)
+        LBR     DLL
+; DSV: state 4, RC.0 = 0-8 " VERSION:" matched so far, 9 spaces before the word, 10 and on: the word (up to a space,
+;      15 characters at most, a 0 after each - what stl_of in build.py does)
+DSV:    GLO     RC
+        SMI     9
+        LBDF    DSV9
+        GLO     RC              ; " VERSION:"[RC.0]?
+        ADI     LOW(VERW)
+        PLO     RA
+        LDI     HIGH(VERW)
+        ADCI    0
+        PHI     RA
+        LDN     RA
+        STR     R2
+        GLO     RD
+        XOR
+        LBNZ    DSSKIP
+        INC     RC
+        LBR     DLL
+DSV9:   GLO     RD
+        XRI     ' '
+        LBNZ    DSVW
+        GLO     RC
+        XRI     9
+        LBZ     DLL             ; (spaces before the word)
+        LBR     DSSKIP          ; (the word's end)
+DSVW:   GLO     RD
+        STR     RF
+        INC     RF
+        LDI     0
+        STR     RF
+        INC     RC
+        GLO     RC
+        XRI     9 + 15
+        LBZ     DSSKIP          ; 15 characters: the rest is not kept
+        LBR     DLL
+VERW:   DB      ' VERSION:'
 DS0A:   GLO     RD
         XRI     1AH
         LBZ     DLEND

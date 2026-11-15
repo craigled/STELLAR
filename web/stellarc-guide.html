@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stellar C guide</title>
 <meta name="description" content="Programming in Stellar C: the language taught step by step, from the first line to a finished game - every example checked by compiling and running it.">
-<link rel="stylesheet" href="css/site.css?v=159">
+<link rel="stylesheet" href="css/site.css?v=160">
 <style>
 .guide{max-width:82ch}
 .guide h2{margin-top:2.2em; border-top:1px solid var(--line); padding-top:.9em}
@@ -42,6 +42,7 @@
 <p><b>On your computer</b> - Python 3 and the work repository (<code>stellar-1802</code>):</p>
 <pre><code>python3 SC/scc.py myprog.sc          # writes myprog.lst beside it (and myprog.sym.json)</code></pre>
 <p>Then either load <code>myprog.lst</code> into the Elf2K - its D-lines go to the monitor like any STELLAR app - and cold-boot STELLAR; or open it in the web Simulator (<b>Open .lst...</b>, or drag the file onto the page) and press <b>Run</b>. The <code>.lst</code> header says how many STELLAR commands it compiled to and how much memory it uses; below that is the compiled program, each command beside the source line it came from.</p>
+<p><b>A version number.</b> A line <code>#version 1.2</code> (one word, up to 15 characters) puts <code>; VERSION:  1.2</code> near the top of the <code>.lst</code>. On LTOS, <code>RECV NAME.STL</code> keeps it, and <code>APPS</code> shows it beside the app's size and VMs.</p>
 <hr>
 <h2 id="1-your-first-program">1. Your first program</h2>
 <div class="g-ex"><div class="g-exh"><span class="mono">hello.sc</span><a class="g-try" href="stellarc.html#guide=hello">Try it &rarr;</a></div><pre><code>void main() {
@@ -512,9 +513,9 @@ void main() { count = 2; }</code></pre></div>
 <ul><li><b>Tasks make a program more responsive, not faster.</b> There is still one 1802: splitting a loop in two tasks makes it about 1.5 times *slower* (the switching costs time). Use tasks so one part can wait - for a key, a line, another task - while the others carry on.</li><li><b>Turns.</b> A VM runs 3 commands, then the next one gets a turn. <code>turns(n)</code> changes that for the task that runs it (1-255): longer turns waste less time switching, shorter ones answer sooner. Time inside <code>atomic { }</code> does not count towards a turn.</li><li><b>One keyboard.</b> If two tasks read keys, whichever asks first gets each one - the compiler warns. Give the keyboard to one task, as <code>keyboard()</code> does above.</li><li><b>Printing.</b> One <code>print("...")</code> comes out whole; two prints from two tasks can mix. Put them in <code>atomic { }</code>.</li><li><code>native { }</code> stops every VM while it runs (the compiler warns).</li></ul>
 <hr>
 <h2 id="quick-reference">Quick reference</h2>
-<ul><li>Types: <code>u16</code>, <code>i16</code>, <code>u8</code> (and arrays of each); <code>const</code>; <code>patched</code> arrays.</li><li>Statements: <code>if</code>/<code>else</code>, <code>while</code>, <code>for</code>, <code>switch</code>/<code>case</code>/<code>default</code>, <code>break</code>, <code>continue</code>, <code>return</code>; assignment <code>= += -= *= /= %= &amp;= |= ^=</code>, <code>++</code>, <code>--</code>.</li><li>Operators: <code>+ - * / %  &amp; | ^ ~  &lt;&lt; &gt;&gt;</code> (by a constant)  <code>== != &lt; &lt;= &gt; &gt;=  &amp;&amp; || !</code>, unary <code>-</code>.</li><li>Output: <code>putc print printu printi printw printz printh</code>; screen: <code>cls at rev eol cursor</code>.</li><li>Input: <code>getc keyready getline</code>. Other: <code>rand delay halt fill copy</code>.</li><li>Tasks: <code>task f()</code>, <code>task(N) f()</code>, <code>shared</code>, <code>chan c[n]</code>, <code>send recv ready wait turns</code>, <code>stop(t) start(t)</code>, <code>atomic { }</code>.</li><li>Hardware: <code>out q ef waitef getin scanin outport inport efsource rtcget rtcset peek poke peekw pokew</code>.</li><li>Full details, the inline <code>asm</code> / <code>native</code> rules and how the compiler works: <code>SC/README.md</code>.</li></ul>
+<ul><li>Types: <code>u16</code>, <code>i16</code>, <code>u8</code> (and arrays of each); <code>const</code>; <code>patched</code> arrays.</li><li>Statements: <code>if</code>/<code>else</code>, <code>while</code>, <code>for</code>, <code>switch</code>/<code>case</code>/<code>default</code>, <code>break</code>, <code>continue</code>, <code>return</code>; assignment <code>= += -= *= /= %= &amp;= |= ^=</code>, <code>++</code>, <code>--</code>.</li><li>Operators: <code>+ - * / %  &amp; | ^ ~  &lt;&lt; &gt;&gt;</code> (by a constant)  <code>== != &lt; &lt;= &gt; &gt;=  &amp;&amp; || !</code>, unary <code>-</code>.</li><li>Output: <code>putc print printu printi printw printz printh</code>; screen: <code>cls at rev eol cursor</code>.</li><li>Input: <code>getc keyready getline</code>. Other: <code>rand delay halt fill copy</code>.</li><li><code>#version 1.2</code>: the app's version, in the <code>.lst</code> for LTOS's <code>APPS</code>.</li><li>Tasks: <code>task f()</code>, <code>task(N) f()</code>, <code>shared</code>, <code>chan c[n]</code>, <code>send recv ready wait turns</code>, <code>stop(t) start(t)</code>, <code>atomic { }</code>.</li><li>Hardware: <code>out q ef waitef getin scanin outport inport efsource rtcget rtcset peek poke peekw pokew</code>.</li><li>Full details, the inline <code>asm</code> / <code>native</code> rules and how the compiler works: <code>SC/README.md</code>.</li></ul>
 </main>
-<footer class="foot">STELLAR for the RCA COSMAC 1802 &middot; <a href="stellarc.html">Stellar C</a> &middot; <a href="index.html">home</a> · <a href="license.html">license</a></footer>
-<script src="js/nav.js?v=159"></script>
+<footer class="foot">STELLAR for the RCA COSMAC 1802 &middot; <a href="stellarc.html">Stellar C</a> &middot; <a href="index.html">home</a></footer>
+<script src="js/nav.js?v=160"></script>
 </body>
 </html>

@@ -193,7 +193,7 @@ def main():
         if fl.get('TIMEGRAB.STL') != want: e.append('TIMEGRAB.STL is not what the .lst says (%s bytes)' % len(fl.get('TIMEGRAB.STL', b'')))
         if 'BAD.STL' in fl or 'An address outside $4000-$7EFF - nothing saved.' not in t: e.append('BAD.STL: %r' % t[-300:])
         ao = P2.session_out(t, 'APPS\r')
-        if not (re.search(r'TIMEGRAB  4 blocks  VM %s\r?\n' % vm(lst), ao) and re.search(r'MAZERACE  8 blocks  VM %s\r?\n' % vm(mrl), ao)
+        if not (re.search(r'TIMEGRAB  4 blocks  2 KB  VM %s\r?\n' % vm(lst), ao) and re.search(r'MAZERACE  8 blocks  4 KB  VM %s\r?\n' % vm(mrl), ao)
                 and vm(lst) == '1' and vm(mrl) == '1 2 3'): e.append('APPS: %r' % ao)
         if '-v' in sys.argv and mb == 8: print(t[-1500:])
         report('%d MB: RECV TIMEGRAB.STL from the whole Time-Grab.lst (comments and all) = the D-lines exactly; an '
