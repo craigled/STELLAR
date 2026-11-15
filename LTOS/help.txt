@@ -463,8 +463,10 @@ Usage:  MORSE -s name     send the file as Morse: a tone on Q
   -e 4     the EF line the key is on, 1-4
   -c 3.58  the Elf2K's clock in MHz (1.00-9.99): -c 1.79 on a 1.79 MHz one
 With -r:  -v each mark and gap shown as it is timed
-  -a       a sound module on the line (HW-484, KY-038): it hears a tone; no
-           sidetone on Q   -i  a module whose output goes high on sound
+  -a       a sound module on the line (HW-484, KY-038, SparkFun Sound
+           Detector): it hears a tone; no sidetone on Q, so the speaker
+           cannot feed back into the microphone
+  -i       a module whose output goes high on sound
   -h 8     the hold, ms: quiet this long ends a mark (-a 8; a key: 5)
 
 Receiving learns your speed as you key: start -w near it. A gap of 3 dots
@@ -473,6 +475,22 @@ sending.
 
   MORSE -c 1.79 -w 15 -s /DOCS/MYDOC.TXT
   MORSE -r QSO.TXT
+@EARTEST Test a sound detector on an EF line
+Usage:  EARTEST [-e 3] [-i] [-f 700] [-c 3.58]
+
+A meter: each 0.1 s a bar shows how much of it heard sound, the peak,
+the sounds counted (one ends after 10 ms of quiet) and the last one's
+length in ms. Keys:
+  T  tone test: a tone on Q 5 times, 0.3 s each - how soon it is heard,
+     how much of it, and how long the detector stays on after it
+  S  sweep: a tone at 10 pitches, 300-2000 Hz - the one it hears best
+     is the one to give MORSE -f
+  I  the line the other way up   C  clear   Esc  quit
+  -e 3     the EF line, 1-4      -f 700  the tone test's pitch, Hz
+  -i       sound = the line high (the default: pulled low, as an NPN)
+  -c 3.58  the Elf2K's clock in MHz: -c 1.79 on a 1.79 MHz one
+
+  EARTEST -c 1.79
 @BIN Where programs are found
 Typing NAME runs, the first one found of:
   NAME.SH    a script (here, else the root, else /BIN): SH NAME
