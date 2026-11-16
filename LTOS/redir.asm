@@ -1060,7 +1060,7 @@ RC5:    LDN     RD
         LDN     RD
         PLO     RC
         GHI     RC
-        BNZ     RC6
+        LBNZ    RC6
         GLO     RC
         LBZ     RWCWD
 RC6:    SEP     R4

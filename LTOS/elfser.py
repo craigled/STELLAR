@@ -277,7 +277,8 @@ def main():
             for ch in (ln + '\r').encode():          # one character, then wait for its echo
                 os.write(fd, bytes([ch]))
                 got += read_until_quiet(fd, 0.2, 0.5, until=b'') if False else echo1(fd)
-            got += read_until_quiet(fd, 0.05, 2.0, until=b'>>>')
+            got += read_until_quiet(fd, 1.0, 3.0, until=b'>>>')   # (the monitor is sometimes slow to say OK:
+                                                                #  a line sent before its >>> loses characters)
             n += 1
             if b'?' in got[-200:] and n < 3: print('rejected:', got[-200:]); break
             if n % 100 == 0: print('  %d lines sent' % n, flush=True)

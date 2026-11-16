@@ -1090,12 +1090,17 @@ HANO:   LDI     1
         SEP     R5
 
 ; ==================================================================== phase 2: reading files
+; MAINE: a command that went wrong (the kernel said why): $? = 1, then MAIN
+MAINE:  LOAD    RD, KSTAT
+        LDI     1
+        STR     RD
+        LBR     MAIN
 ; NOMNT: the card has no FAT16 partition.  NAMEARG: RF -> a file name -> FNAME (no wildcards), the file
 ; found (DF = 0) - or the message given and back to MAIN.
 NOMNT:  LOAD    RF, NOFAT
         SEP     R4
         DW      PSTR
-        LBR     MAIN
+        LBR     MAINE
 NOFAT:  DB      'No FAT16 partition on this card.',0DH,0AH,0
 NAMEARG: SEP    R4
         DW      MNTCHK
@@ -1149,11 +1154,11 @@ NOFOLD: SEP     R4              ; (the folder's 11 bytes at PPRD)
         DW      PFNAMD
         SEP     R4
         DW      PCRLF
-        LBR     MAIN
+        LBR     MAINE
 BADNAME: SEP    R4
         DW      PIN
         DB      'That is not a file name.',0DH,0AH,0
-        LBR     MAIN
+        LBR     MAINE
 NOFILE: SEP     R4
         DW      PIN
         DB      'There is no file ',0
@@ -1161,13 +1166,13 @@ NOFILE: SEP     R4
         DW      PFNAME
         SEP     R4
         DW      PCRLF
-        LBR     MAIN
+        LBR     MAINE
 ISDIR:  SEP     R4
         DW      PFNAME
         SEP     R4
         DW      PIN
         DB      ' is a folder.',0DH,0AH,0
-        LBR     MAIN
+        LBR     MAINE
 ; MNTCHK: back to MAIN with a message if the card has no FAT16 partition
 MNTCHK: LOAD    RD, MOUNTED
         LDN     RD
@@ -1264,15 +1269,15 @@ NOTPROG: SEP    R4
         SEP     R4
         DW      PIN
         DB      ' is not a program (no LTOS header).',0DH,0AH,0
-        LBR     MAIN
+        LBR     MAINE
 TOOBIG: SEP     R4
         DW      PIN
         DB      'It does not fit in $3000-$6BFF.',0DH,0AH,0
-        LBR     MAIN
+        LBR     MAINE
 LDFAIL: SEP     R4
         DW      PIN
         DB      'The file could not be read.',0DH,0AH,0
-        LBR     MAIN
+        LBR     MAINE
 ; FITS: R7 bytes at LDDST: DF = 0 if $3000 <= LDDST and LDDST + R7 <= $6C00, or all of it in $7700-$7BFF
 ;      (HIGHLO-HIGHHI: free RAM above LTOS's buffers - STLRX.PRG runs there, so an app's file has $3000-$6BFF)
 FITS:   LOAD    RD, LDDST
@@ -1600,17 +1605,17 @@ WERR:   XRI     1
         SEP     R4
         DW      PIN
         DB      'The directory is full (512 files).',0DH,0AH,0
-        LBR     MAIN
+        LBR     MAINE
 WE2:    XRI     3               ; (1 xor 2)
         LBNZ    CARDF
         SEP     R4
         DW      PIN
         DB      'The card is full - nothing was saved.',0DH,0AH,0
-        LBR     MAIN
+        LBR     MAINE
 CARDF:  LOAD    RF, CARDT
         SEP     R4
         DW      PSTR
-        LBR     MAIN
+        LBR     MAINE
 CARDT:  DB      'The card did not answer.',0DH,0AH,0
 
 SV4:    SEP     R4

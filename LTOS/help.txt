@@ -661,6 +661,36 @@ HELP FUNCS: functions, case, $(command), scripts running scripts.
 
   backup() { COPY $1 /BACKUP; echo saved $1; }
   for F in *.TXT; do backup $F; done
+@MAKE Remake the files that are out of date (by a MAKEFILE)
+Usage:  MAKE [-n] [-f file] [NAME=value] [targets]
+
+Reads MAKEFILE in this folder (-f: another) and remakes each target asked
+for (none: the first rule's) when it is not there, or when a name it is
+made from is newer (the card's file times: a clock card needed). The
+names are looked at first, and their own rules run first.
+Each command is shown, then run; one that fails stops MAKE ($? 1).
+  -n          show the commands, run nothing
+  NAME=value  a variable, over the MAKEFILE's
+HELP MAKEFILE: what goes in one.
+
+  MAKE                    the first rule's target
+  MAKE -n GUIDE.TXT       what remaking GUIDE.TXT would do
+@MAKEFILE What a MAKEFILE holds (MAKE's rules)
+  # a comment             NAME = value   := the same   += adds   ?= if unset
+  target: names           a rule: target is made from the names
+  <Tab>command            its commands (spaces will do), any LTOS command
+  .PHONY: names           targets that are not files (always run)
+  $(NAME) ${NAME}  a variable    $@ the target    $< its first name
+  $^ all its names               $$ a $ (for the script's own variables)
+  @command  not shown first      -command  a failure does not stop MAKE
+MAKE writes the commands to /_MAKE.SH (hidden) and runs it, so CD and
+variables carry on from one command to the next. One rule a target.
+
+  DOC = GUIDE
+  .PHONY: all
+  all: $(DOC).TXT
+  $(DOC).TXT: $(DOC).RF HEAD.RF
+          EROFF $< > $@
 # System
 @REDIR,OUTPUT Sending what a command prints to a file
 Any command's output can go to a file instead of the screen:

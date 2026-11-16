@@ -76,6 +76,7 @@ What it can do:
 - **Music:** PLAY plays tunes on the Q output, from text files of notes (C D E, sharps, lengths, rests, octaves, tempo); `-s 1.79` sets it for a slower Elf2K's clock. Songs are in /MUSIC, and `LTOS/tomus.py` makes more from ABC, MIDI, RTTTL or BASIC music found on the internet.
 - **Morse code:** MORSE sends a file or typed lines as Morse on the Q output, and receives Morse from a key or a sound detector on an EF line, learning the sender's speed. EARTEST checks a sound detector: how soon it hears a tone, how much of it, and at which pitch it hears best.
 - **A shell:** line editing with the last command recalled, `>` and `>>` on any command, scripts with variables, `if`, loops, functions, `case` and `$(command)`.
+- **make:** MAKE remakes the files that are older than what they are made from, by the rules in a MAKEFILE (variables, `$@ $< $^`, `.PHONY`), as Unix make does.
 - **Moving files:** XFER sends files of any size to and from a PC/Mac/Linux with error checking. RECV and SEND use plain Intel HEX.
 - **Looking after the card:** FSCK checks it, FREE shows the space, and DISKINFO reports everything about the card.
 - **Running STELLAR:** type an app's name, such as GALAXIA, and LTOS loads the STELLAR firmware and the app. Esc comes back to LTOS.
