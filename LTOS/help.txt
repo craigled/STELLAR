@@ -396,6 +396,24 @@ under a new name, ^O opens another sheet.
 
 The file is plain text, one line for each cell, such as A3 =A1+A2, so TYPE,
 GREP, RAWK and NANO can all read it.
+@CONTACTS An address book
+Usage:  CONTACTS [-b file] [-d | -e | -l] [-f FIELD] [word ...]
+
+  CONTACTS                 add one: it asks NAME ADDRESS ADDRESS2 CITY
+                           STATE/CO POSTCODE COUNTRY TEL EMAIL BDAY NOTE
+                           (Esc: none added)
+  CONTACTS word ...        the contacts with every word, in any field
+  CONTACTS -f CITY word    ... in that field only (-f ADDRESS: ADDRESS2 too)
+  CONTACTS -l [word]       the names only
+  CONTACTS -d word         delete: each one found shown, Y N or Q asked
+  CONTACTS -e word         edit: Y asks each field again (Enter keeps it)
+  -b file                  another book; "two words" is one word
+
+The book is /CONTACTS.TXT: a "FIELD: value" line each, a blank line after
+each contact, so TYPE, NANO, GREP, SED and RAWK work on it. Any case
+matches. What a search shows is in the same form: CONTACTS LONDON > L.TXT
+makes a smaller book. Any size: it is read and written a sector at a time.
+A contact over 3,840 bytes is kept as it is but not searched.
 @RUNNING A man on the move, in 1802 code
 Usage:  RUNNING
 
@@ -718,6 +736,28 @@ code already made (a18 allows it).
   START:  LDI     HIGH(MSG)
           PHI     RF
 # System
+@SC Tiny Stellar C: NAME.SC -> NAME.STL (a STELLAR app)
+Usage:  SC name          (no extension: name.SC)
+
+Compiles a small C-like program into a STELLAR app, here on the Elf2K:
+type NAME to run it. One pass as the file is read; the app is 3 KB at
+most (its code, variables and strings). The language is a part of
+Stellar C (a program also compiles with scc.py on a PC). A mistake:
+shown with its line, and nothing saved ($? 1). HELP SCLANG: the language.
+
+  SC HELLO               HELLO.SC -> HELLO.STL; then HELLO runs it
+@SCLANG What Tiny Stellar C holds
+  const N = 10;  u16 a, b = 5, t[N];   16-bit unsigned (0-65535) only
+  u16 f(u16 x) { ... }  void main() { ... }   defined before a call;
+      no recursion; arrays outside functions; locals: u16 x = e;
+  if (c) s else s   while (c) s   for (i = 0; i < N; i++) s
+  break; continue; return e;  x = e  x += e (-= *= /= %= &= |= ^=)
+  x++ x--  t[i] = e   || && == != < <= > >= | ^ & << >> (by a constant)
+  + - * / % - ~ ! ( )  123 0x1F 'c'  \n \r \t \b \e \0 \\ \' \"
+  print("text")  printu(e)  putc(e)  getc()  halt()   // and /* */
+
+  void main() { u16 i; for (i = 1; i <= 5; i++) { printu(i * i);
+      putc(32); } print("\r\n"); }
 @REDIR,OUTPUT Sending what a command prints to a file
 Any command's output can go to a file instead of the screen:
 
