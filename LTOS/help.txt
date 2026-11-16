@@ -691,6 +691,32 @@ variables carry on from one command to the next. One rule a target.
   all: $(DOC).TXT
   $(DOC).TXT: $(DOC).RF HEAD.RF
           EROFF $< > $@
+@ASM An 1802 assembler (a18's language): NAME.ASM -> NAME.PRG
+Usage:  ASM [-l] [-o file] name          (no extension: name.ASM)
+
+Assembles the same source as the a18 assembler on a PC (LTOS is built
+with it), in two passes, a sector at a time - any size. INCL files are
+looked for from this folder. The .PRG holds the bytes from the lowest
+address the code uses to the highest; a mistake: shown with its file and
+line, and nothing saved ($? 1). An LTOS program starts with its header:
+  ORG PRGORG - 6 / DW START, PEND - START, START / ORG PRGORG
+  -l       a listing (address, bytes, the line): ASM -l X > X.LST
+  -o file  another name for the .PRG
+900 names at most (out/ksyms.inc alone has 665). HELP ASMLANG: the lines.
+
+  ASM HELLO               HELLO.ASM -> HELLO.PRG
+@ASMLANG What ASM's lines hold (a18's)
+  LABEL:  OPCODE  operands  ; comment   (a label in the first column)
+  the 1802's opcodes   ORG EQU SET DB DW DS FILL TEXT PAGE LOAD CALL RETN
+  INCL "file"   IF expr / ELSE / ENDI   CPU 1802   END (the last line)
+  123 0FFH $FF 101B %101 17Q @17 'A' "AB"   \n \t \r \\ \' \xHH \ooo
+  + - * / MOD  SHL SHR  = <> < > <= >= (EQ NE LT GT LE GE)  NOT AND OR XOR
+  HIGH LOW (low precedence: HIGH X+1 is HIGH(X+1))   ( )   $ (here)
+Names: case counts; opcodes: either case. An ORG may not go back over
+code already made (a18 allows it).
+
+  START:  LDI     HIGH(MSG)
+          PHI     RF
 # System
 @REDIR,OUTPUT Sending what a command prints to a file
 Any command's output can go to a file instead of the screen:

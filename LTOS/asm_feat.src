@@ -1,0 +1,69 @@
+; every kind of line ASM knows, against a18
+        CPU     1802
+X       EQU     1234H
+Y       EQU     X + 2 * 3          ; precedence
+R4      EQU     4
+lower   equ     7
+        org     3000H
+START:  LDI     LOW X
+        LDI     HIGH X + 1
+        LDI     HIGH(X) + 1
+        ldi     lower
+	GLO	R4		; tabs
+        DB      X MOD 100, X SHR 4 AND 0FFH, NOT 0 AND 0FFH, 7 SHL 2
+        DB      5 > 3, 3 >= 5, 2 = 2, 2 <> 3, 1 < 2, 4 <= 4, 3 GT 2, 2 EQ 2, 1 NE 1, 5 LT 3, 5 LE 5, 5 GE 6
+        DB      3 >< 4, 4 => 4, 4 =< 3
+        DB      -1, -128, 'A', "\n", '\t', '\x41', '\101', "\\", '\'', "a;b"
+        DW      'AB', $, $ + 2, -2, %1010, @17, $FF, 101B, 17Q, 17O, 99D, 0FFH, 0abh
+        DW      (1 + 2) * 3, 1 + 2 * 3, 100 / 7, 100 MOD 7, 1 XOR 3, 1 OR 6, -(3), - 3 + 5, NOT 5 + 1
+        DW      Y, X / 0FFH, HIGH 1234H OR 1, LOW 1234H AND 0F0H
+        DW      ,5
+        TEXT    "text", 'more'
+        FILL    0AAH, 5
+        CALL    START
+        RETN
+        LOAD    R4, START
+        LOAD    15, 0FFEEH
+CNT     SET     1
+CNT     SET     CNT + 1
+        DB      CNT
+        IF      CNT = 2
+        DB      1
+        ELSE
+        DB      2
+        ENDI
+        IF      0
+        DB      3
+        IF      1
+        DB      4
+        ENDI
+        ELSE
+        DB      5
+        ENDI
+        IF      1
+        IF      0
+        DB      6
+        ELSE
+        DB      7
+        ENDI
+        ENDI
+BACK:   BR      BACK
+        PAGE
+NEXT:   BNZ     NEXT
+        B1      NEXT
+        LBDF    FWD
+        DS      3
+FWD:    INP     1
+        OUT     7
+        LDN     R4
+        SEP     R4
+        LSKP
+        NOP
+        IDL
+        SKP
+        NBR     $
+        NLBR    $
+        DB      "long string with spaces and a quote ' inside"
+LBL::   DB      1
+END1:   END
+        DB      99
