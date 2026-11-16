@@ -55,17 +55,17 @@ Some things to try:
 
   HELP              every command          HELP SCRIPTS   what a script can do
   DIR /BIN          the programs           TYPE DEMO.SH   a shell script
-  DEMO you          run DEMO.SH            SH -x TEST     each line shown as it runs
-  LW2 DOCS/LETTER.TXT                      the Lite-Writer 2 editor (^X: menu)
-  LTWRITER DOCS/BOOK.TXT   Lite-Writer 3: a 20 KB file, a part at a time (^N ^P ^T ^B)
-  LTCALC DOCS/BUDGET   LTCALC: a small spreadsheet (arrows move, = starts a formula)
-  NANO DOCS/BOOK.TXT   NANO: a small editor; Shift+arrow selects (^G: every key)
-  GALAXIA           a game (arrows, SPACE; Esc quits back to LTOS)
-  ORBIT             STELLAR ORBIT: fly Apollo 7 on three VMs (SPACE starts the count)
-  EROFF EROFF.RF    a small nroff: plain text made into pages (> EROFF.TXT keeps it)
-  SORT -n -r DOCS/SALES.TXT    SORT, UNIQ, PWD, WC, GREP ... - HELP has them all
+  DEMO you          run DEMO.SH            SH -x TEST     each line as it runs
+  LW2 DOCS/LETTER.TXT       Lite-Writer 2 (^X: the menu)
+  LTWRITER DOCS/BOOK.TXT    Lite-Writer 3: a 20 KB file, a part at a time
+  LTCALC DOCS/BUDGET        a small spreadsheet (= starts a formula)
+  NANO DOCS/BOOK.TXT        a small editor; Shift+arrow selects (^G: keys)
+  GALAXIA           a game (Esc quits)     ORBIT          Apollo 7, three VMs
+  EROFF EROFF.RF    a small nroff: plain text made into pages
+  SORT -n -r DOCS/SALES.TXT    SORT, UNIQ, WC, GREP ... - HELP has them all
   RAWK '{ s += $2 } END { print s }' DOCS/SALES.TXT
-  PLAY -s 3 /MUSIC/ODE   music on Q: press Sound, clock Elf2K (this one is 3 MHz)
+  PLAY -s 3 /MUSIC/ODE      music on Q: press Sound, clock Elf2K (3 MHz)
+  CONTACTS          an address book        SC PRIMES      Tiny Stellar C
   ECHO hello > HI.TXT ; TYPE HI.TXT ; FSCK
 
 Changes you make stay in this browser. "Restore the card" puts every file back.
@@ -110,6 +110,7 @@ def add_files(m):
     open(os.path.join(m, 'TEST.SH'), 'wb').write(TEST_SH)
     open(os.path.join(m, 'DEMO.SH'), 'wb').write(open(os.path.join(LTOS, 'examples', 'DEMO.SH'), 'rb').read())
     open(os.path.join(m, 'EROFF.RF'), 'wb').write(open(os.path.join(LTOS, 'examples', 'EROFF.RF'), 'rb').read())
+    open(os.path.join(m, 'PRIMES.SC'), 'wb').write(open(os.path.join(LTOS, 'examples', 'PRIMES.SC'), 'rb').read())   # SC PRIMES
     open(os.path.join(m, 'README.TXT'), 'wb').write(README)
     os.makedirs(os.path.join(m, 'BIBLE'), exist_ok=True)
     shutil.copyfile(os.path.join(WORK, 'BIBLE', 'MEMVERSE.txt'), os.path.join(m, 'BIBLE', 'MEMVERSE.TXT'))

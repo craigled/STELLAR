@@ -78,6 +78,7 @@ What it can do:
 - **A shell:** line editing with the last command recalled, `>` and `>>` on any command, scripts with variables, `if`, loops, functions, `case` and `$(command)`.
 - **make:** MAKE remakes the files that are older than what they are made from, by the rules in a MAKEFILE (variables, `$@ $< $^`, `.PHONY`), as Unix make does.
 - **An assembler:** ASM turns 1802 assembly into a program on the Elf2K itself, taking the same source as the a18 assembler LTOS is built with (it makes most of LTOS's own programs byte for byte).
+- **A C compiler:** SC compiles Tiny Stellar C (16-bit numbers, functions, if/while/for, arrays) into a STELLAR app on the Elf2K itself; `SC PRIMES` makes PRIMES.STL from PRIMES.SC, then `PRIMES` runs it.
 - **An address book:** CONTACTS keeps names, addresses, phone numbers, birthdays and notes in a plain text file, finds them by any word (or a word in one field, such as CITY), and changes or deletes them.
 - **Moving files:** XFER sends files of any size to and from a PC/Mac/Linux with error checking. RECV and SEND use plain Intel HEX.
 - **Looking after the card:** FSCK checks it, FREE shows the space, and DISKINFO reports everything about the card.
