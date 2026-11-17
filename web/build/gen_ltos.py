@@ -115,7 +115,9 @@ def add_files(m):
     os.makedirs(os.path.join(m, 'BIBLE'), exist_ok=True)
     shutil.copyfile(os.path.join(WORK, 'BIBLE', 'MEMVERSE.txt'), os.path.join(m, 'BIBLE', 'MEMVERSE.TXT'))
     open(os.path.join(m, 'LICENSE.TXT'), 'wb').write(open(os.path.join(WORK, 'COPYING'), 'rb').read().replace(b'\n', b'\r\n'))
-    os.makedirs(os.path.join(m, 'MUSIC'), exist_ok=True)              # PLAY's songs
+    os.makedirs(os.path.join(m, 'MUSIC'), exist_ok=True)              # PLAY's songs (RECV SYSTEM leaves them in the root:
+    for n in os.listdir(m):                                         #  in /MUSIC, as SYSRX puts them)
+        if n.upper().endswith('.MUS'): os.remove(os.path.join(m, n))
     for f in sorted(os.listdir(os.path.join(LTOS, 'music'))):
         if f.upper().endswith('.MUS'): shutil.copyfile(os.path.join(LTOS, 'music', f), os.path.join(m, 'MUSIC', f.upper()))
     open(os.path.join(m, 'DOCS', 'LETTER.TXT'), 'wb').write(LETTER)
