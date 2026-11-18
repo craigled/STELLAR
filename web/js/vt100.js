@@ -264,8 +264,12 @@
       if (runRev !== null) line += runRev ? '<span class="rev">' + esc(run) + '</span>' : esc(run);
       html += line.replace(/\s+$/, '') + (r < this.rows - 1 ? '\n' : '');
     }
-    this.el.innerHTML = html;
-    this.el.scrollTop = this.el.scrollHeight;
+    // follow new output only while the reader is at the bottom: if they have scrolled
+    // up into the scrollback, leave them there - snapping back on every redraw meant
+    // a mouse wheel over a busy terminal could never get past it to scroll the page up
+    var el = this.el, follow = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
+    el.innerHTML = html;
+    if (follow) el.scrollTop = el.scrollHeight;
   };
 
   return function (el, opts) {

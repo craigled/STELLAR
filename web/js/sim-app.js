@@ -170,8 +170,9 @@
         var b = out[i];
         s += (b === 13) ? '' : String.fromCharCode(b);
       }
+      var follow = term.scrollTop + term.clientHeight >= term.scrollHeight - 4;   // (see vt100.js)
       term.textContent += s;
-      term.scrollTop = term.scrollHeight;
+      if (follow) term.scrollTop = term.scrollHeight;
     }
     this.serialLen = out.length;
   };

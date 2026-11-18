@@ -46,7 +46,14 @@
         this.gain.gain.value = 1;
         this.gain.connect(this.ctx.destination);
       }
-      if (this.ctx.state === 'suspended') this.ctx.resume();
+      if (this.ctx.state !== 'running') this.ctx.resume();
+      // Safari keeps Web Audio silent until a sound is STARTED inside the click itself
+      // (making and resuming the context is not enough), so start a silent sample now
+      try {
+        var b = this.ctx.createBufferSource();
+        b.buffer = this.ctx.createBuffer(1, 1, this.ctx.sampleRate);
+        b.connect(this.gain); b.start(0);
+      } catch (e) {}
     }
     this.cpu = null;     // re-sync on the next tick
     return this.enabled;
@@ -68,6 +75,12 @@
     var wall = Date.now(), gap = wall - this.lastWall;
     this.lastWall = wall;
     if (!this.enabled || !this.ctx) { if (cpu.qLog) cpu.qLog = null; this.cpu = null; return; }
+    // Safari can suspend (or 'interrupt') a context that was playing: ask it back,
+    // at most once a second, and start over in time when it returns
+    if (this.ctx.state !== 'running') {
+      if (wall - (this.lastResume || 0) > 1000) { this.lastResume = wall; try { this.ctx.resume(); } catch (e) {} }
+      this.cpu = null; return;
+    }
     // a new program, a different speed, or a pause (Step / Pause / a hidden tab):
     // what happened meanwhile is not real time, so start over from here
     if (cpu !== this.cpu || !audible || gap > 250) { this._sync(cpu); return; }
