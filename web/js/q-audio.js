@@ -32,6 +32,8 @@
     this.cpu = null;
     this.cursor = 0;     // audio-clock time the next samples play at; 0 = idle
     this.lastWall = 0;
+    // counts for the ?sounddebug readout on the Simulator page
+    this.stat = { ticks: 0, syncs: 0, late: 0, muted: 0, notRunning: 0, quiet: 0, played: 0, edges: 0, maxGap: 0 };
   }
 
   // Must be called from a click: that is when a browser lets a page make sound.
@@ -72,18 +74,23 @@
 
   // After each run-loop tick. `audible` = the clock is at Elf2K speed.
   QAudio.prototype.tick = function (cpu, audible) {
-    var wall = Date.now(), gap = wall - this.lastWall;
+    var wall = Date.now(), gap = wall - this.lastWall, st = this.stat;
     this.lastWall = wall;
+    st.ticks++; if (gap < 5000 && gap > st.maxGap) st.maxGap = gap;
     if (!this.enabled || !this.ctx) { if (cpu.qLog) cpu.qLog = null; this.cpu = null; return; }
     // Safari can suspend (or 'interrupt') a context that was playing: ask it back,
     // at most once a second, and start over in time when it returns
     if (this.ctx.state !== 'running') {
+      st.notRunning++;
       if (wall - (this.lastResume || 0) > 1000) { this.lastResume = wall; try { this.ctx.resume(); } catch (e) {} }
       this.cpu = null; return;
     }
     // a new program, a different speed, or a pause (Step / Pause / a hidden tab):
     // what happened meanwhile is not real time, so start over from here
-    if (cpu !== this.cpu || !audible || gap > 250) { this._sync(cpu); return; }
+    if (cpu !== this.cpu || !audible || gap > 250) {
+      st.syncs++; if (!audible) st.muted++; if (gap > 250) st.late++;
+      this._sync(cpu); return;
+    }
 
     var sr = this.ctx.sampleRate, spc = sr / CPS;
     var end = cpu.cycles, log = cpu.qLog;
@@ -92,7 +99,9 @@
     var now = this.ctx.currentTime, k = 0;
     if (this.cursor && this.cursor < now) this.cursor = 0;          // fell behind: idle
     if (n <= 0) return;
+    st.edges += log.length / 2;
     if (quiet) {
+      st.quiet++;
       if (this.cursor) this.cursor += n / sr;
     } else {
       var buf = this.ctx.createBuffer(1, n, sr), out = buf.getChannelData(0);
@@ -113,12 +122,26 @@
       if (!this.cursor) this.cursor = now + LEAD;
       if (this.cursor > now + 3) this.cursor = now + LEAD;          // never queue seconds of lag
       var src = this.ctx.createBufferSource();
-      src.buffer = buf; src.connect(this.gain); src.start(this.cursor);
+      src.buffer = buf; src.connect(this.gain); src.start(this.cursor); st.played++;
       this.cursor += n / sr;
     }
     if (k) log.splice(0, k);   // an edge in the last part-sample waits for the next tick
     this.frac = exact - n;
     this.c0 = end;
+  };
+
+  // A plain 440 Hz beep for half a second, straight to the speakers: tells whether the
+  // browser plays Web Audio at all (call it from a click).
+  QAudio.prototype.beep = function () {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!this.ctx) this.setEnabled(this.enabled);
+    var ctx = this.ctx || new AC();
+    if (ctx.state !== 'running') ctx.resume();
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    g.gain.value = 0.2; o.frequency.value = 440;
+    o.connect(g); g.connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime + 0.5);
   };
 
   return QAudio;

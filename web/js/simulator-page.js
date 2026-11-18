@@ -377,6 +377,22 @@
     });
   } else btn('sound').disabled = true;
   soundNote();
+  // simulator.html?sounddebug: a live line of what the sound is doing, and a test beep
+  if (qAudio && /sounddebug/.test(location.search + location.hash)) {
+    var dbg = document.createElement('p'), beep = document.createElement('button');
+    dbg.className = 'arrow-note'; dbg.style.fontFamily = 'var(--mono)';
+    beep.type = 'button'; beep.textContent = 'Test beep';
+    beep.addEventListener('click', function () { qAudio.beep(); });
+    btn('soundNote').insertAdjacentElement('afterend', dbg);
+    dbg.insertAdjacentElement('afterend', beep);
+    setInterval(function () {
+      var c = qAudio.ctx, t = qAudio.stat, sp = clock && clock.current();
+      dbg.textContent = 'v171b on=' + qAudio.enabled + ' ctx=' + (c ? c.state + ' ' + c.sampleRate + 'Hz t=' + c.currentTime.toFixed(1) : 'none') +
+        ' elf2k=' + !!(sp && sp.ips === window.ClockRow.ELF2K) + ' run=' + !!app.running +
+        ' ticks=' + t.ticks + ' syncs=' + t.syncs + ' late=' + t.late + ' muted=' + t.muted +
+        ' notRunning=' + t.notRunning + ' quiet=' + t.quiet + ' edges=' + t.edges + ' played=' + t.played + ' maxGap=' + t.maxGap;
+    }, 500);
+  }
 
   // ---- the INPUT switch (EF4): held with the mouse, a finger, or Space ----
   (function () {
