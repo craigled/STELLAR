@@ -1,27 +1,22 @@
 ; ==========================================================================
-; Bouncing-Ball-v05  -  two 3x3 balls that bounce off each other, faster
+; Bouncing-Ball-v06  -  two 3x3 balls that bounce off each other, faster again
 ; ==========================================================================
-; v04 made faster. The balls, the bounces, the collision latch and the
-; flicker-free stale-edge erase are all as before; what changed is how the
-; frame reaches the screen. Measured in the simulator on V0061.34:
+; v05 made faster: the same balls, bounces and collision latch. Measured in the
+; simulator on V0061.34 (Firmware-Math/ball5_verify.py --v05):
 ;
-;   see ball5_verify.py
+;   v06: 17,146 1802 instructions and 109 serial bytes a frame; v05: 25,919 and 134 - v06 is 1.51x faster
 ;
-; WHERE v04's TIME WENT. 41% of a frame was DIVXY splitting cursor positions
-; into digits (13 cursor moves a frame, two divides each), and most of the rest
-; was emitting bytes one SEROUTI at a time. So:
-;  - the digits come from two 81-byte tables (READIDX) instead of dividing by ten
-;  - a ball is drawn with ONE cursor move and ONE PRINTSTR of
-;    ESC[7m, three spaces, three backspaces, ESC[B (down one line), ... ESC[0m
-;    - v04 used three cursor moves and nine SEROUTIs. The stale column is erased
-;    the same way.
-;  - the collision test is TESTLXY (gap < 3) rather than dividing by three
-;  - the vertical step is gated by a 6-frame phase table (6 = 1 x 2 x 3, the
-;    three possible angles) instead of dividing a frame counter.
-;
-; ONE VISIBLE CHANGE: the balls now travel columns 2-79 (v04: 1-80). Writing in
-; column 80 leaves a VT100's cursor parked ON column 80, and the backspace that
-; follows would land one column short. Lines are still 1-23.
+; WHERE v05's TIME WENT. Over half of a frame was cursor moves and strings: each
+; ball made up to three cursor moves a frame (14 commands each) - blank its stale
+; column, blank its stale row when it moved up or down, then draw all nine cells.
+; v06 makes ONE cursor move a ball, to the top-left of the box its old and new
+; places cover, and ONE PRINTSTR of a string made for that move (right or left,
+; and up, level or down: six strings): the cells it left are blanked, the cells it
+; came to are lit, the cells it keeps are not touched. ESC[A, ESC[nC and ESC[nD
+; join ESC[B for the moves inside a string.
+; When the balls are close (under 5 apart both ways) one ball's erase could touch
+; the other, so both are then drawn whole, as v05 drew them every frame.
+; The frame delay is DLYI 01 (v05: DLYI 04).
 ;
 ; REGISTERS. R0 the frame phase 0-5, R1-R5 ball A and R6-R10 ball B as x, y,
 ; x-direction, y-direction and the ball's row in the phase table (angle x 6),
@@ -29,13 +24,14 @@
 ; Data at $4900 past the end marker: banner, the latch ($4950), the phase
 ; table ($4960), the digit tables ($4980, $49E0) and the strings ($4A40).
 ;
-; Built by Firmware-Math/build_ball5.py; checked by Firmware-Math/ball5_verify.py.
-; Any key launches, ESC stops and tidies up. DLYI 04 near the end of the loop
-; is the speed knob.
+; Built by Firmware-Math/build_ball6.py; checked by Firmware-Math/ball5_verify.py
+; (the screen is exactly the two balls after every frame, five launches).
+; Any key launches, ESC stops and tidies up.
 ;
-; HW-VERIFIED on the Elf2K (V0061.34), 2026-09-26 - Craig: "works great".
+; v05 HW-VERIFIED on the Elf2K (V0061.34), 2026-09-26. v06: not yet on hardware.
+; VERSION:  06
 ;
-; 268 STELLAR commands, $4000-$42D0 (721 bytes of code).
+; 297 STELLAR commands, $4000-$4320 (801 bytes of code).
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
@@ -107,10 +103,10 @@
 ; D 4087 CA 6C          SEROUTI 6C 'l'             l - hide the cursor
 ; D 4089 23 00 1E       COPYXY R1 -> R14
 ; D 408C 23 00 2D       COPYXY R2 -> R13
-; D 408F BD 02 8B       CALL DRAW                  Put ball A on the screen
+; D 408F BD 02 DB       CALL DRAW                  Put ball A on the screen
 ; D 4092 23 00 6E       COPYXY R6 -> R14
 ; D 4095 23 00 7D       COPYXY R7 -> R13
-; D 4098 BD 02 8B       CALL DRAW                  and ball B
+; D 4098 BD 02 DB       CALL DRAW                  and ball B
 ; LOOP:
 ; D 409B 42 00          INCX R0                    Next frame phase
 ; D 409D 86 00 00 06    TESTXI R0 0006
@@ -183,162 +179,196 @@
 ; D 4156 11 04 00 00    LOADXI R4 0000             and bounce - now heading down
 ; SYA:
 ; D 415A 88 1B          TESTGXY R1 >= R11          Did x increase?
-; D 415C A1 01 65       IFFALSEI ELA               No - the stale column is on the right
-; D 415F 23 00 BE       COPYXY R11 -> R14          Moving right: the old left edge is stale
-; D 4162 B0 01 6C       GAL ECA
-; ELA:
-; D 4165 23 00 BE       COPYXY R11 -> R14          Moving left: the old right edge is stale
-; D 4168 52 0E 00 02    ADDXI R14 0002
-; ECA:
-; D 416C 23 00 CD       COPYXY R12 -> R13          From the old top line
-; D 416F BD 02 96       CALL POSXY
-; D 4172 11 0F 0A 5E    LOADXI R15 0A5E
-; D 4176 C1 0F          PRINTSTR R15               Blank the stale column, top to bottom
-; D 4178 87 2C          TESTXY R2 = R12            Did y stay put this frame?
-; D 417A A0 01 9B       IFTRUEI NRA                Yes - nothing more to erase
-; D 417D 88 2C          TESTGXY R2 >= R12          Did y increase?
-; D 417F A1 01 88       IFFALSEI EUA               No - the stale row is the old bottom
-; D 4182 23 00 CD       COPYXY R12 -> R13          Moving down: the old top row is stale
-; D 4185 B0 01 8F       GAL ERA
-; EUA:
-; D 4188 23 00 CD       COPYXY R12 -> R13          Moving up: the old bottom row is stale
-; D 418B 52 0D 00 02    ADDXI R13 0002
-; ERA:
-; D 418F 23 00 BE       COPYXY R11 -> R14          From the old left edge
-; D 4192 BD 02 96       CALL POSXY
-; D 4195 11 0F 0A 6A    LOADXI R15 0A6A
-; D 4199 C1 0F          PRINTSTR R15               Three spaces clear the row
+; D 415C A1 01 8A       IFFALSEI MLA               No - it moved left
+; D 415F 23 00 BE       COPYXY R11 -> R14          Moving right: the box starts at the old left edge
+; D 4162 87 2C          TESTXY R2 = R12            Level?
+; D 4164 A0 01 80       IFTRUEI RSA
+; D 4167 88 2C          TESTGXY R2 >= R12          Down?
+; D 4169 A1 01 76       IFFALSEI RUA               No - up
+; D 416C 23 00 CD       COPYXY R12 -> R13          Down: from the old top line
+; D 416F 11 0F 0A B1    LOADXI R15 0AB1
+; D 4173 B0 01 B2       GAL GOA
+; RUA:
+; D 4176 23 00 2D       COPYXY R2 -> R13           Up: from the new top line
+; D 4179 11 0F 0A 5E    LOADXI R15 0A5E
+; D 417D B0 01 B2       GAL GOA
+; RSA:
+; D 4180 23 00 2D       COPYXY R2 -> R13
+; D 4183 11 0F 0A 8A    LOADXI R15 0A8A
+; D 4187 B0 01 B2       GAL GOA
+; MLA:
+; D 418A 23 00 1E       COPYXY R1 -> R14           Moving left: the box starts at the new left edge
+; D 418D 87 2C          TESTXY R2 = R12            Level?
+; D 418F A0 01 AB       IFTRUEI LSA
+; D 4192 88 2C          TESTGXY R2 >= R12          Down?
+; D 4194 A1 01 A1       IFFALSEI LUA               No - up
+; D 4197 23 00 CD       COPYXY R12 -> R13          Down: from the old top line
+; D 419A 11 0F 0B 40    LOADXI R15 0B40
+; D 419E B0 01 B2       GAL GOA
+; LUA:
+; D 41A1 23 00 2D       COPYXY R2 -> R13           Up: from the new top line
+; D 41A4 11 0F 0A DF    LOADXI R15 0ADF
+; D 41A8 B0 01 B2       GAL GOA
+; LSA:
+; D 41AB 23 00 2D       COPYXY R2 -> R13
+; D 41AE 11 0F 0B 15    LOADXI R15 0B15
+; GOA:
+; D 41B2 BD 02 E6       CALL POSXY                 One cursor move
+; D 41B5 C1 0F          PRINTSTR R15               The cells it left blanked, the cells it came to lit
 ; NRA:
-; D 419B 23 00 6B       COPYXY R6 -> R11           Remember where this ball is
-; D 419E 23 00 7C       COPYXY R7 -> R12
-; D 41A1 86 08 00 00    TESTXI R8 0000             Heading right?
-; D 41A5 A1 01 BC       IFFALSEI XLB               No - heading left
-; D 41A8 42 06          INCX R6                    x = x + 1
-; D 41AA 86 06 00 4E    TESTXI R6 004E             Would the right edge pass column 79?
-; D 41AE A1 01 CD       IFFALSEI XDB               No - carry on
-; D 41B1 11 06 00 4C    LOADXI R6 004C             Reflect to 76
-; D 41B5 11 08 00 01    LOADXI R8 0001             and bounce - now heading left
-; D 41B9 B0 01 CD       GAL XDB
+; D 41B7 23 00 6B       COPYXY R6 -> R11           Remember where this ball is
+; D 41BA 23 00 7C       COPYXY R7 -> R12
+; D 41BD 86 08 00 00    TESTXI R8 0000             Heading right?
+; D 41C1 A1 01 D8       IFFALSEI XLB               No - heading left
+; D 41C4 42 06          INCX R6                    x = x + 1
+; D 41C6 86 06 00 4E    TESTXI R6 004E             Would the right edge pass column 79?
+; D 41CA A1 01 E9       IFFALSEI XDB               No - carry on
+; D 41CD 11 06 00 4C    LOADXI R6 004C             Reflect to 76
+; D 41D1 11 08 00 01    LOADXI R8 0001             and bounce - now heading left
+; D 41D5 B0 01 E9       GAL XDB
 ; XLB:
-; D 41BC 43 06          DECX R6                    x = x - 1
-; D 41BE 86 06 00 01    TESTXI R6 0001             Reached column 1?
-; D 41C2 A1 01 CD       IFFALSEI XDB               No - carry on
-; D 41C5 11 06 00 03    LOADXI R6 0003             Reflect to 3
-; D 41C9 11 08 00 00    LOADXI R8 0000             and bounce - now heading right
+; D 41D8 43 06          DECX R6                    x = x - 1
+; D 41DA 86 06 00 01    TESTXI R6 0001             Reached column 1?
+; D 41DE A1 01 E9       IFFALSEI XDB               No - carry on
+; D 41E1 11 06 00 03    LOADXI R6 0003             Reflect to 3
+; D 41E5 11 08 00 00    LOADXI R8 0000             and bounce - now heading right
 ; XDB:
-; D 41CD 50 A0 0F       ADDXYZ R10 + R0 -> R15     This ball's row + the frame phase
-; D 41D0 2E 0F 09 60    READIDX R15 0960           Is this a frame for its vertical step?
-; D 41D4 81 00 00       TESTAI 0000
-; D 41D7 A0 02 04       IFTRUEI SYB                No - leave y alone this time
-; D 41DA 86 09 00 00    TESTXI R9 0000             Heading down?
-; D 41DE A1 01 F5       IFFALSEI YUB               No - heading up
-; D 41E1 42 07          INCX R7                    y = y + 1
-; D 41E3 86 07 00 16    TESTXI R7 0016             Would the bottom edge pass line 23?
-; D 41E7 A1 02 04       IFFALSEI SYB               No - carry on
-; D 41EA 11 07 00 14    LOADXI R7 0014             Reflect to 20
-; D 41EE 11 09 00 01    LOADXI R9 0001             and bounce - now heading up
-; D 41F2 B0 02 04       GAL SYB
+; D 41E9 50 A0 0F       ADDXYZ R10 + R0 -> R15     This ball's row + the frame phase
+; D 41EC 2E 0F 09 60    READIDX R15 0960           Is this a frame for its vertical step?
+; D 41F0 81 00 00       TESTAI 0000
+; D 41F3 A0 02 20       IFTRUEI SYB                No - leave y alone this time
+; D 41F6 86 09 00 00    TESTXI R9 0000             Heading down?
+; D 41FA A1 02 11       IFFALSEI YUB               No - heading up
+; D 41FD 42 07          INCX R7                    y = y + 1
+; D 41FF 86 07 00 16    TESTXI R7 0016             Would the bottom edge pass line 23?
+; D 4203 A1 02 20       IFFALSEI SYB               No - carry on
+; D 4206 11 07 00 14    LOADXI R7 0014             Reflect to 20
+; D 420A 11 09 00 01    LOADXI R9 0001             and bounce - now heading up
+; D 420E B0 02 20       GAL SYB
 ; YUB:
-; D 41F5 43 07          DECX R7                    y = y - 1
-; D 41F7 8C 07          TESTXZ R7                  Reached line 0?
-; D 41F9 A1 02 04       IFFALSEI SYB               No - carry on
-; D 41FC 11 07 00 02    LOADXI R7 0002             Reflect to 2
-; D 4200 11 09 00 00    LOADXI R9 0000             and bounce - now heading down
+; D 4211 43 07          DECX R7                    y = y - 1
+; D 4213 8C 07          TESTXZ R7                  Reached line 0?
+; D 4215 A1 02 20       IFFALSEI SYB               No - carry on
+; D 4218 11 07 00 02    LOADXI R7 0002             Reflect to 2
+; D 421C 11 09 00 00    LOADXI R9 0000             and bounce - now heading down
 ; SYB:
-; D 4204 88 6B          TESTGXY R6 >= R11          Did x increase?
-; D 4206 A1 02 0F       IFFALSEI ELB               No - the stale column is on the right
-; D 4209 23 00 BE       COPYXY R11 -> R14          Moving right: the old left edge is stale
-; D 420C B0 02 16       GAL ECB
-; ELB:
-; D 420F 23 00 BE       COPYXY R11 -> R14          Moving left: the old right edge is stale
-; D 4212 52 0E 00 02    ADDXI R14 0002
-; ECB:
-; D 4216 23 00 CD       COPYXY R12 -> R13          From the old top line
-; D 4219 BD 02 96       CALL POSXY
-; D 421C 11 0F 0A 5E    LOADXI R15 0A5E
-; D 4220 C1 0F          PRINTSTR R15               Blank the stale column, top to bottom
-; D 4222 87 7C          TESTXY R7 = R12            Did y stay put this frame?
-; D 4224 A0 02 45       IFTRUEI NRB                Yes - nothing more to erase
-; D 4227 88 7C          TESTGXY R7 >= R12          Did y increase?
-; D 4229 A1 02 32       IFFALSEI EUB               No - the stale row is the old bottom
-; D 422C 23 00 CD       COPYXY R12 -> R13          Moving down: the old top row is stale
-; D 422F B0 02 39       GAL ERB
-; EUB:
-; D 4232 23 00 CD       COPYXY R12 -> R13          Moving up: the old bottom row is stale
-; D 4235 52 0D 00 02    ADDXI R13 0002
-; ERB:
-; D 4239 23 00 BE       COPYXY R11 -> R14          From the old left edge
-; D 423C BD 02 96       CALL POSXY
-; D 423F 11 0F 0A 6A    LOADXI R15 0A6A
-; D 4243 C1 0F          PRINTSTR R15               Three spaces clear the row
+; D 4220 88 6B          TESTGXY R6 >= R11          Did x increase?
+; D 4222 A1 02 50       IFFALSEI MLB               No - it moved left
+; D 4225 23 00 BE       COPYXY R11 -> R14          Moving right: the box starts at the old left edge
+; D 4228 87 7C          TESTXY R7 = R12            Level?
+; D 422A A0 02 46       IFTRUEI RSB
+; D 422D 88 7C          TESTGXY R7 >= R12          Down?
+; D 422F A1 02 3C       IFFALSEI RUB               No - up
+; D 4232 23 00 CD       COPYXY R12 -> R13          Down: from the old top line
+; D 4235 11 0F 0A B1    LOADXI R15 0AB1
+; D 4239 B0 02 78       GAL GOB
+; RUB:
+; D 423C 23 00 7D       COPYXY R7 -> R13           Up: from the new top line
+; D 423F 11 0F 0A 5E    LOADXI R15 0A5E
+; D 4243 B0 02 78       GAL GOB
+; RSB:
+; D 4246 23 00 7D       COPYXY R7 -> R13
+; D 4249 11 0F 0A 8A    LOADXI R15 0A8A
+; D 424D B0 02 78       GAL GOB
+; MLB:
+; D 4250 23 00 6E       COPYXY R6 -> R14           Moving left: the box starts at the new left edge
+; D 4253 87 7C          TESTXY R7 = R12            Level?
+; D 4255 A0 02 71       IFTRUEI LSB
+; D 4258 88 7C          TESTGXY R7 >= R12          Down?
+; D 425A A1 02 67       IFFALSEI LUB               No - up
+; D 425D 23 00 CD       COPYXY R12 -> R13          Down: from the old top line
+; D 4260 11 0F 0B 40    LOADXI R15 0B40
+; D 4264 B0 02 78       GAL GOB
+; LUB:
+; D 4267 23 00 7D       COPYXY R7 -> R13           Up: from the new top line
+; D 426A 11 0F 0A DF    LOADXI R15 0ADF
+; D 426E B0 02 78       GAL GOB
+; LSB:
+; D 4271 23 00 7D       COPYXY R7 -> R13
+; D 4274 11 0F 0B 15    LOADXI R15 0B15
+; GOB:
+; D 4278 BD 02 E6       CALL POSXY                 One cursor move
+; D 427B C1 0F          PRINTSTR R15               The cells it left blanked, the cells it came to lit
 ; NRB:
-; D 4245 23 00 1E       COPYXY R1 -> R14           Both moved and erased: now draw both
-; D 4248 23 00 2D       COPYXY R2 -> R13
-; D 424B BD 02 8B       CALL DRAW
-; D 424E 23 00 6E       COPYXY R6 -> R14
-; D 4251 23 00 7D       COPYXY R7 -> R13
-; D 4254 BD 02 8B       CALL DRAW
-; D 4257 CC             SERST                      A key waiting?
-; D 4258 A1 02 70       IFFALSEI NOKEY             No
-; D 425B CB             SERIN                      Read it
-; D 425C 81 00 1B       TESTAI 001B                Was it ESC?
-; D 425F A1 02 70       IFFALSEI NOKEY
-; D 4262 BD 02 75       CALL KWAIT                 Yes: an arrow following?
-; D 4265 A1 02 B4       IFFALSEI QUIT              No: ESC on its own stops it
-; D 4268 CB             SERIN                      an arrow (ESC [ x): its two bytes are thrown away
-; D 4269 BD 02 75       CALL KWAIT
-; D 426C A1 02 70       IFFALSEI NOKEY
-; D 426F CB             SERIN
+; D 427D 45 16          SUBXY R1 - R6              Close together after the move?
+; D 427F 25             COPYMAA
+; D 4280 21 0B          COPYAX Acc -> R11
+; D 4282 11 0C 00 05    LOADXI R12 0005            Five
+; D 4286 89 BC          TESTLXY R11 < R12
+; D 4288 A1 02 A7       IFFALSEI FAR               No - neither string touched the other ball
+; D 428B 45 27          SUBXY R2 - R7
+; D 428D 25             COPYMAA
+; D 428E 21 0B          COPYAX Acc -> R11
+; D 4290 89 BC          TESTLXY R11 < R12
+; D 4292 A1 02 A7       IFFALSEI FAR
+; D 4295 23 00 1E       COPYXY R1 -> R14           Close: one erase may have touched the other ball - draw both whole
+; D 4298 23 00 2D       COPYXY R2 -> R13
+; D 429B BD 02 DB       CALL DRAW
+; D 429E 23 00 6E       COPYXY R6 -> R14
+; D 42A1 23 00 7D       COPYXY R7 -> R13
+; D 42A4 BD 02 DB       CALL DRAW
+; FAR:
+; D 42A7 CC             SERST                      A key waiting?
+; D 42A8 A1 02 C0       IFFALSEI NOKEY             No
+; D 42AB CB             SERIN                      Read it
+; D 42AC 81 00 1B       TESTAI 001B                Was it ESC?
+; D 42AF A1 02 C0       IFFALSEI NOKEY
+; D 42B2 BD 02 C5       CALL KWAIT                 Yes: an arrow following?
+; D 42B5 A1 03 04       IFFALSEI QUIT              No: ESC on its own stops it
+; D 42B8 CB             SERIN                      an arrow (ESC [ x): its two bytes are thrown away
+; D 42B9 BD 02 C5       CALL KWAIT
+; D 42BC A1 02 C0       IFFALSEI NOKEY
+; D 42BF CB             SERIN
 ; NOKEY:
-; D 4270 C0 04          DLYI 04                    Pace the animation
-; D 4272 B0 00 9B       GAL LOOP                   Round again
+; D 42C0 C0 01          DLYI 01                    Pace the animation
+; D 42C2 B0 00 9B       GAL LOOP                   Round again
 ; KWAIT:
-; D 4275 72 0B          PUSHX R11
-; D 4277 11 0B 00 08    LOADXI R11 0008
+; D 42C5 72 0B          PUSHX R11
+; D 42C7 11 0B 00 08    LOADXI R11 0008
 ; KWAIT1:
-; D 427B CC             SERST
-; D 427C A0 02 86       IFTRUEI KWAIT2
-; D 427F 43 0B          DECX R11
-; D 4281 8C 0B          TESTXZ R11
-; D 4283 A1 02 7B       IFFALSEI KWAIT1
+; D 42CB CC             SERST
+; D 42CC A0 02 D6       IFTRUEI KWAIT2
+; D 42CF 43 0B          DECX R11
+; D 42D1 8C 0B          TESTXZ R11
+; D 42D3 A1 02 CB       IFFALSEI KWAIT1
 ; KWAIT2:
-; D 4286 73 0B          POPX R11
-; D 4288 CC             SERST                      Test: a key is waiting
-; D 4289 BE 00          RETURN
+; D 42D6 73 0B          POPX R11
+; D 42D8 CC             SERST                      Test: a key is waiting
+; D 42D9 BE 00          RETURN
 ; DRAW:
-; D 428B BD 02 96       CALL POSXY
-; D 428E 11 0F 0A 40    LOADXI R15 0A40
-; D 4292 C1 0F          PRINTSTR R15               Reverse video, three rows of three, normal video
-; D 4294 BE 00          RETURN
+; D 42DB BD 02 E6       CALL POSXY
+; D 42DE 11 0F 0A 40    LOADXI R15 0A40
+; D 42E2 C1 0F          PRINTSTR R15               Reverse video, three rows of three, normal video
+; D 42E4 BE 00          RETURN
 ; POSXY:
-; D 4296 CA 1B          SEROUTI 1B                 ESC
-; D 4298 CA 5B          SEROUTI 5B '['             [
-; D 429A 2E 0D 09 80    READIDX R13 0980           Line: tens digit
-; D 429E C9             SEROUT
-; D 429F 2E 0D 09 E0    READIDX R13 09E0           units digit
-; D 42A3 C9             SEROUT
-; D 42A4 CA 3B          SEROUTI 3B ';'             ;
-; D 42A6 2E 0E 09 80    READIDX R14 0980           Column: tens digit
-; D 42AA C9             SEROUT
-; D 42AB 2E 0E 09 E0    READIDX R14 09E0           units digit
-; D 42AF C9             SEROUT
-; D 42B0 CA 48          SEROUTI 48 'H'             H
-; D 42B2 BE 00          RETURN
+; D 42E6 CA 1B          SEROUTI 1B                 ESC
+; D 42E8 CA 5B          SEROUTI 5B '['             [
+; D 42EA 2E 0D 09 80    READIDX R13 0980           Line: tens digit
+; D 42EE C9             SEROUT
+; D 42EF 2E 0D 09 E0    READIDX R13 09E0           units digit
+; D 42F3 C9             SEROUT
+; D 42F4 CA 3B          SEROUTI 3B ';'             ;
+; D 42F6 2E 0E 09 80    READIDX R14 0980           Column: tens digit
+; D 42FA C9             SEROUT
+; D 42FB 2E 0E 09 E0    READIDX R14 09E0           units digit
+; D 42FF C9             SEROUT
+; D 4300 CA 48          SEROUTI 48 'H'             H
+; D 4302 BE 00          RETURN
 ; QUIT:
-; D 42B4 CA 1B          SEROUTI 1B                 ESC
-; D 42B6 CA 5B          SEROUTI 5B '['             [
-; D 42B8 CA 3F          SEROUTI 3F '?'             ?
-; D 42BA CA 32          SEROUTI 32 '2'             2
-; D 42BC CA 35          SEROUTI 35 '5'             5
-; D 42BE CA 68          SEROUTI 68 'h'             h - show the cursor again
-; D 42C0 CA 1B          SEROUTI 1B                 ESC
-; D 42C2 CA 5B          SEROUTI 5B '['             [
-; D 42C4 CA 32          SEROUTI 32 '2'             2
-; D 42C6 CA 4A          SEROUTI 4A 'J'             J
-; D 42C8 CA 1B          SEROUTI 1B                 ESC
-; D 42CA CA 5B          SEROUTI 5B '['             [
-; D 42CC CA 48          SEROUTI 48 'H'             H - cursor home
-; D 42CE F0 00 00       BREAK                      End of program
+; D 4304 CA 1B          SEROUTI 1B                 ESC
+; D 4306 CA 5B          SEROUTI 5B '['             [
+; D 4308 CA 3F          SEROUTI 3F '?'             ?
+; D 430A CA 32          SEROUTI 32 '2'             2
+; D 430C CA 35          SEROUTI 35 '5'             5
+; D 430E CA 68          SEROUTI 68 'h'             h - show the cursor again
+; D 4310 CA 1B          SEROUTI 1B                 ESC
+; D 4312 CA 5B          SEROUTI 5B '['             [
+; D 4314 CA 32          SEROUTI 32 '2'             2
+; D 4316 CA 4A          SEROUTI 4A 'J'             J
+; D 4318 CA 1B          SEROUTI 1B                 ESC
+; D 431A CA 5B          SEROUTI 5B '['             [
+; D 431C CA 48          SEROUTI 48 'H'             H - cursor home
+; D 431E F0 00 00       BREAK                      End of program
 
 ; --------------------------------------------------------------------------
 ; CODE, then DATA  -  download both blocks
@@ -410,10 +440,10 @@ D 4085 CA 35
 D 4087 CA 6C
 D 4089 23 00 1E
 D 408C 23 00 2D
-D 408F BD 02 8B
+D 408F BD 02 DB
 D 4092 23 00 6E
 D 4095 23 00 7D
-D 4098 BD 02 8B
+D 4098 BD 02 DB
 D 409B 42 00
 D 409D 86 00 00 06
 D 40A1 A1 00 A8
@@ -477,141 +507,170 @@ D 414F A1 01 5A
 D 4152 11 02 00 02
 D 4156 11 04 00 00
 D 415A 88 1B
-D 415C A1 01 65
+D 415C A1 01 8A
 D 415F 23 00 BE
-D 4162 B0 01 6C
-D 4165 23 00 BE
-D 4168 52 0E 00 02
+D 4162 87 2C
+D 4164 A0 01 80
+D 4167 88 2C
+D 4169 A1 01 76
 D 416C 23 00 CD
-D 416F BD 02 96
-D 4172 11 0F 0A 5E
-D 4176 C1 0F
-D 4178 87 2C
-D 417A A0 01 9B
-D 417D 88 2C
-D 417F A1 01 88
-D 4182 23 00 CD
-D 4185 B0 01 8F
-D 4188 23 00 CD
-D 418B 52 0D 00 02
-D 418F 23 00 BE
-D 4192 BD 02 96
-D 4195 11 0F 0A 6A
-D 4199 C1 0F
-D 419B 23 00 6B
-D 419E 23 00 7C
-D 41A1 86 08 00 00
-D 41A5 A1 01 BC
-D 41A8 42 06
-D 41AA 86 06 00 4E
-D 41AE A1 01 CD
-D 41B1 11 06 00 4C
-D 41B5 11 08 00 01
-D 41B9 B0 01 CD
-D 41BC 43 06
-D 41BE 86 06 00 01
-D 41C2 A1 01 CD
-D 41C5 11 06 00 03
-D 41C9 11 08 00 00
-D 41CD 50 A0 0F
-D 41D0 2E 0F 09 60
-D 41D4 81 00 00
-D 41D7 A0 02 04
-D 41DA 86 09 00 00
-D 41DE A1 01 F5
-D 41E1 42 07
-D 41E3 86 07 00 16
-D 41E7 A1 02 04
-D 41EA 11 07 00 14
-D 41EE 11 09 00 01
-D 41F2 B0 02 04
-D 41F5 43 07
-D 41F7 8C 07
-D 41F9 A1 02 04
-D 41FC 11 07 00 02
-D 4200 11 09 00 00
-D 4204 88 6B
-D 4206 A1 02 0F
-D 4209 23 00 BE
-D 420C B0 02 16
-D 420F 23 00 BE
-D 4212 52 0E 00 02
-D 4216 23 00 CD
-D 4219 BD 02 96
-D 421C 11 0F 0A 5E
-D 4220 C1 0F
-D 4222 87 7C
-D 4224 A0 02 45
-D 4227 88 7C
-D 4229 A1 02 32
-D 422C 23 00 CD
-D 422F B0 02 39
+D 416F 11 0F 0A B1
+D 4173 B0 01 B2
+D 4176 23 00 2D
+D 4179 11 0F 0A 5E
+D 417D B0 01 B2
+D 4180 23 00 2D
+D 4183 11 0F 0A 8A
+D 4187 B0 01 B2
+D 418A 23 00 1E
+D 418D 87 2C
+D 418F A0 01 AB
+D 4192 88 2C
+D 4194 A1 01 A1
+D 4197 23 00 CD
+D 419A 11 0F 0B 40
+D 419E B0 01 B2
+D 41A1 23 00 2D
+D 41A4 11 0F 0A DF
+D 41A8 B0 01 B2
+D 41AB 23 00 2D
+D 41AE 11 0F 0B 15
+D 41B2 BD 02 E6
+D 41B5 C1 0F
+D 41B7 23 00 6B
+D 41BA 23 00 7C
+D 41BD 86 08 00 00
+D 41C1 A1 01 D8
+D 41C4 42 06
+D 41C6 86 06 00 4E
+D 41CA A1 01 E9
+D 41CD 11 06 00 4C
+D 41D1 11 08 00 01
+D 41D5 B0 01 E9
+D 41D8 43 06
+D 41DA 86 06 00 01
+D 41DE A1 01 E9
+D 41E1 11 06 00 03
+D 41E5 11 08 00 00
+D 41E9 50 A0 0F
+D 41EC 2E 0F 09 60
+D 41F0 81 00 00
+D 41F3 A0 02 20
+D 41F6 86 09 00 00
+D 41FA A1 02 11
+D 41FD 42 07
+D 41FF 86 07 00 16
+D 4203 A1 02 20
+D 4206 11 07 00 14
+D 420A 11 09 00 01
+D 420E B0 02 20
+D 4211 43 07
+D 4213 8C 07
+D 4215 A1 02 20
+D 4218 11 07 00 02
+D 421C 11 09 00 00
+D 4220 88 6B
+D 4222 A1 02 50
+D 4225 23 00 BE
+D 4228 87 7C
+D 422A A0 02 46
+D 422D 88 7C
+D 422F A1 02 3C
 D 4232 23 00 CD
-D 4235 52 0D 00 02
-D 4239 23 00 BE
-D 423C BD 02 96
-D 423F 11 0F 0A 6A
-D 4243 C1 0F
-D 4245 23 00 1E
-D 4248 23 00 2D
-D 424B BD 02 8B
-D 424E 23 00 6E
-D 4251 23 00 7D
-D 4254 BD 02 8B
-D 4257 CC
-D 4258 A1 02 70
-D 425B CB
-D 425C 81 00 1B
-D 425F A1 02 70
-D 4262 BD 02 75
-D 4265 A1 02 B4
-D 4268 CB
-D 4269 BD 02 75
-D 426C A1 02 70
-D 426F CB
-D 4270 C0 04
-D 4272 B0 00 9B
-D 4275 72 0B
-D 4277 11 0B 00 08
-D 427B CC
-D 427C A0 02 86
-D 427F 43 0B
-D 4281 8C 0B
-D 4283 A1 02 7B
-D 4286 73 0B
-D 4288 CC
-D 4289 BE 00
-D 428B BD 02 96
-D 428E 11 0F 0A 40
-D 4292 C1 0F
-D 4294 BE 00
-D 4296 CA 1B
-D 4298 CA 5B
-D 429A 2E 0D 09 80
-D 429E C9
-D 429F 2E 0D 09 E0
-D 42A3 C9
-D 42A4 CA 3B
-D 42A6 2E 0E 09 80
-D 42AA C9
-D 42AB 2E 0E 09 E0
-D 42AF C9
-D 42B0 CA 48
-D 42B2 BE 00
-D 42B4 CA 1B
-D 42B6 CA 5B
-D 42B8 CA 3F
-D 42BA CA 32
-D 42BC CA 35
-D 42BE CA 68
-D 42C0 CA 1B
-D 42C2 CA 5B
-D 42C4 CA 32
-D 42C6 CA 4A
-D 42C8 CA 1B
-D 42CA CA 5B
-D 42CC CA 48
-D 42CE F0 00 00
+D 4235 11 0F 0A B1
+D 4239 B0 02 78
+D 423C 23 00 7D
+D 423F 11 0F 0A 5E
+D 4243 B0 02 78
+D 4246 23 00 7D
+D 4249 11 0F 0A 8A
+D 424D B0 02 78
+D 4250 23 00 6E
+D 4253 87 7C
+D 4255 A0 02 71
+D 4258 88 7C
+D 425A A1 02 67
+D 425D 23 00 CD
+D 4260 11 0F 0B 40
+D 4264 B0 02 78
+D 4267 23 00 7D
+D 426A 11 0F 0A DF
+D 426E B0 02 78
+D 4271 23 00 7D
+D 4274 11 0F 0B 15
+D 4278 BD 02 E6
+D 427B C1 0F
+D 427D 45 16
+D 427F 25
+D 4280 21 0B
+D 4282 11 0C 00 05
+D 4286 89 BC
+D 4288 A1 02 A7
+D 428B 45 27
+D 428D 25
+D 428E 21 0B
+D 4290 89 BC
+D 4292 A1 02 A7
+D 4295 23 00 1E
+D 4298 23 00 2D
+D 429B BD 02 DB
+D 429E 23 00 6E
+D 42A1 23 00 7D
+D 42A4 BD 02 DB
+D 42A7 CC
+D 42A8 A1 02 C0
+D 42AB CB
+D 42AC 81 00 1B
+D 42AF A1 02 C0
+D 42B2 BD 02 C5
+D 42B5 A1 03 04
+D 42B8 CB
+D 42B9 BD 02 C5
+D 42BC A1 02 C0
+D 42BF CB
+D 42C0 C0 01
+D 42C2 B0 00 9B
+D 42C5 72 0B
+D 42C7 11 0B 00 08
+D 42CB CC
+D 42CC A0 02 D6
+D 42CF 43 0B
+D 42D1 8C 0B
+D 42D3 A1 02 CB
+D 42D6 73 0B
+D 42D8 CC
+D 42D9 BE 00
+D 42DB BD 02 E6
+D 42DE 11 0F 0A 40
+D 42E2 C1 0F
+D 42E4 BE 00
+D 42E6 CA 1B
+D 42E8 CA 5B
+D 42EA 2E 0D 09 80
+D 42EE C9
+D 42EF 2E 0D 09 E0
+D 42F3 C9
+D 42F4 CA 3B
+D 42F6 2E 0E 09 80
+D 42FA C9
+D 42FB 2E 0E 09 E0
+D 42FF C9
+D 4300 CA 48
+D 4302 BE 00
+D 4304 CA 1B
+D 4306 CA 5B
+D 4308 CA 3F
+D 430A CA 32
+D 430C CA 35
+D 430E CA 68
+D 4310 CA 1B
+D 4312 CA 5B
+D 4314 CA 32
+D 4316 CA 4A
+D 4318 CA 1B
+D 431A CA 5B
+D 431C CA 48
+D 431E F0 00 00
 
 D 4900 54 77 6F 20 62 6F 75 6E 63 69 6E 67 20 62 61 6C
 D 4910 6C 73 20 2D 2D 20 61 6E 79 20 6B 65 79 20 74 6F
@@ -632,8 +691,24 @@ D 4A10 38 39 30 31 32 33 34 35 36 37 38 39 30 31 32 33
 D 4A20 34 35 36 37 38 39 30 31 32 33 34 35 36 37 38 39
 D 4A30 30
 D 4A40 1B 5B 37 6D 20 20 20 08 08 08 1B 5B 42 20 20 20
-D 4A50 08 08 08 1B 5B 42 20 20 20 1B 5B 30 6D 00 20 08
-D 4A60 1B 5B 42 20 08 1B 5B 42 20 00 20 20 20 00
+D 4A50 08 08 08 1B 5B 42 20 20 20 1B 5B 30 6D 00 1B 5B
+D 4A60 42 20 1B 5B 42 08 20 1B 5B 42 08 20 20 20 1B 5B
+D 4A70 37 6D 1B 5B 33 41 08 08 20 20 20 1B 5B 42 08 20
+D 4A80 1B 5B 42 08 20 1B 5B 30 6D 00 20 1B 5B 42 08 20
+D 4A90 1B 5B 42 08 20 1B 5B 37 6D 1B 5B 32 41 1B 5B 32
+D 4AA0 43 20 1B 5B 42 08 20 1B 5B 42 08 20 1B 5B 30 6D
+D 4AB0 00 20 20 20 1B 5B 42 08 08 08 20 1B 5B 42 08 20
+D 4AC0 1B 5B 37 6D 1B 5B 41 1B 5B 32 43 20 1B 5B 42 08
+D 4AD0 20 1B 5B 42 08 08 08 20 20 20 1B 5B 30 6D 00 1B
+D 4AE0 5B 42 1B 5B 33 43 20 1B 5B 42 08 20 1B 5B 42 08
+D 4AF0 08 08 20 20 20 1B 5B 37 6D 1B 5B 33 41 1B 5B 34
+D 4B00 44 20 20 20 1B 5B 42 08 08 08 20 1B 5B 42 08 20
+D 4B10 1B 5B 30 6D 00 1B 5B 33 43 20 1B 5B 42 08 20 1B
+D 4B20 5B 42 08 20 1B 5B 37 6D 1B 5B 32 41 1B 5B 34 44
+D 4B30 20 1B 5B 42 08 20 1B 5B 42 08 20 1B 5B 30 6D 00
+D 4B40 1B 5B 43 20 20 20 1B 5B 42 08 20 1B 5B 42 08 20
+D 4B50 1B 5B 37 6D 1B 5B 41 1B 5B 34 44 20 1B 5B 42 08
+D 4B60 20 1B 5B 42 08 20 20 20 1B 5B 30 6D 00
 D 5000 00
 D 6000 00
 D 7000 00
