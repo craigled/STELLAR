@@ -135,7 +135,7 @@
     else { t.scrollIntoView({ block: 'center' }); t.focus({ preventScroll: true }); }
   }
 
-  fetch('samples/manifest.json?v=173')
+  fetch('samples/manifest.json?v=174')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       // Most samples are one VM. This one is four, so the VM selector has something to show.
@@ -182,7 +182,7 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=173')
+    fetch('samples/' + s.file + '?v=174')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
@@ -304,7 +304,7 @@
 
   // The full catalogue (web/build/gen_downloads.py): every finished app, grouped.
   var catalog = [];
-  fetch('downloads/catalog.json?v=173')
+  fetch('downloads/catalog.json?v=174')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       catalog = list;
@@ -331,7 +331,7 @@
     var a = catalog[+btn('dlPick').value];
     if (!a) return;
     var fn = a.href.split('/').pop();
-    fetch(a.href + '?v=173')
+    fetch(a.href + '?v=174')
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         saveFile(fn, text);
@@ -387,9 +387,43 @@
     beep.addEventListener('click', function () { qAudio.beep(); });
     btn('soundNote').insertAdjacentElement('afterend', dbg);
     dbg.insertAdjacentElement('afterend', beep);
+    // two more ways to the speakers, to find which one this browser plays:
+    // B: Web Audio fed into an <audio> element (the path YouTube's sound takes),
+    // C: no Web Audio at all - a little WAV file played by an <audio> element
+    var said = document.createElement('p'); said.className = 'arrow-note';
+    function say(t) { said.textContent = t; }
+    function mk(label, fn) {
+      var b2 = document.createElement('button'); b2.type = 'button'; b2.textContent = label;
+      b2.style.marginLeft = '6px'; b2.addEventListener('click', fn); return b2;
+    }
+    var beepB = mk('Beep B', function () {
+      try {
+        var AC = window.AudioContext || window.webkitAudioContext, ctx = new AC();
+        var dest = ctx.createMediaStreamDestination(), o = ctx.createOscillator(), g = ctx.createGain();
+        g.gain.value = 0.2; o.frequency.value = 550; o.connect(g); g.connect(dest);
+        var au = new Audio(); au.srcObject = dest.stream;
+        o.start(); o.stop(ctx.currentTime + 0.6);
+        au.play().then(function () { say('Beep B: playing (' + ctx.state + ')'); },
+                       function (e) { say('Beep B: refused - ' + e.name + ' ' + e.message); });
+        setTimeout(function () { au.pause(); ctx.close(); }, 1500);
+      } catch (e) { say('Beep B: error - ' + e.message); }
+    });
+    var beepC = mk('Beep C', function () {
+      var sr = 22050, n = sr / 2, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+      function str(o, t) { for (var i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); }
+      str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true);
+      v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+      v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n * 2, true);
+      for (var i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * 660 * i / sr) * 6000), true);
+      var au = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+      au.play().then(function () { say('Beep C: playing'); }, function (e) { say('Beep C: refused - ' + e.name + ' ' + e.message); });
+    });
+    beep.insertAdjacentElement('afterend', beepB);
+    beepB.insertAdjacentElement('afterend', beepC);
+    beepC.insertAdjacentElement('afterend', said);
     setInterval(function () {
       var c = qAudio.ctx, t = qAudio.stat, sp = clock && clock.current();
-      dbg.textContent = 'v173 on=' + qAudio.enabled + ' ctx=' + (c ? c.state + ' ' + c.sampleRate + 'Hz t=' + c.currentTime.toFixed(1) : 'none') +
+      dbg.textContent = 'v174 on=' + qAudio.enabled + ' ctx=' + (c ? c.state + ' ' + c.sampleRate + 'Hz t=' + c.currentTime.toFixed(1) : 'none') +
         ' elf2k=' + !!(sp && sp.ips === window.ClockRow.ELF2K) + ' run=' + !!app.running +
         ' ticks=' + t.ticks + ' syncs=' + t.syncs + ' late=' + t.late + ' muted=' + t.muted +
         ' notRunning=' + t.notRunning + ' quiet=' + t.quiet + ' edges=' + t.edges + ' played=' + t.played + ' maxGap=' + t.maxGap;
@@ -427,7 +461,7 @@
     });
     b.textContent = '🎤 Listening…'; b.setAttribute('aria-pressed', 'true');
     note.textContent = 'Allow the microphone, then send a tone (another laptop, Sound on, Morse Sender v18).';
-    listener.start('js/tone-detect.js?v=173').catch(function (e) {
+    listener.start('js/tone-detect.js?v=174').catch(function (e) {
       listener = null; b.textContent = '🎤 Listen'; b.setAttribute('aria-pressed', 'false');
       note.textContent = 'Could not listen: ' + (e && e.message || e);
     });
