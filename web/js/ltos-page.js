@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '172';                                    // the ?v= the card is fetched with
+  var V = '173';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var CPS = 375000;                                 // its machine cycles a second (3 MHz / 8)
@@ -28,7 +28,7 @@
     ['LTWRITER DOCS/BOOK.TXT', 'Lite-Writer 3: a 20 KB file, a part at a time (Ctrl-N, Ctrl-P)'],
     ['NANO DOCS/BOOK.TXT', 'NANO: a small editor in 1802 code - long lines wrapped, Shift+arrow selects (Ctrl-G: every key)'],
     ['LTCALC DOCS/BUDGET', 'LTCALC: a small spreadsheet in 1802 code; change a number and watch the totals'],
-    ['PLAY -s 3 /MUSIC/ODE', 'music on Q: press Sound and choose Elf2K first (-s 3: this Elf2K runs at 3 MHz). Also TWINKLE, GRACE, CHIMES; HELP PLAY'],
+    ['PLAY -s 3 /MUSIC/ODE', 'music on Q: press Sound first - it sets the clock to Elf2K (-s 3: this Elf2K runs at 3 MHz). Also TWINKLE, GRACE, CHIMES; HELP PLAY'],
     ['GALAXIA', 'a game: arrows, SPACE; Esc back to LTOS'],
     ['ORBIT', 'STELLAR ORBIT: Apollo 7 on three VMs (SPACE: the count, ?: help)'],
     ['FREEFALL', 'more games: SNAKE, BOUNCE, INVADERS, BREAKOUT, MAZE'],
@@ -146,7 +146,8 @@
     SPEEDS.forEach(function (x) { x.btn.classList.toggle('active', x === s); x.btn.setAttribute('aria-checked', x === s); });
     document.getElementById('speedLabel').textContent = s.ips ? '≈ ' + Math.round(s.ips / 1000) + 'k 1802 instructions a second' : 'no pacing';
     try { localStorage.setItem('ltos-speed', s.label); } catch (e) {}
-    if (/^Running LTOS/.test(statusEl.textContent)) status('Running LTOS 0.5 at ' + s.label + '.');
+    if (qAudio && qAudio.enabled && s.ips !== ELF2K) status('Sound is muted at ' + s.label + ': it plays at the Elf2K clock only.');
+    else if (/^Running LTOS|^Sound is/.test(statusEl.textContent)) status('Running LTOS 0.5 at ' + s.label + '.');
   }
   var want = null; try { want = localStorage.getItem('ltos-speed'); } catch (e) {}
   pick(SPEEDS.filter(function (s) { return s.label === want; })[0] || SPEEDS[2]);
@@ -170,7 +171,9 @@
     if (!qAudio) soundBtn.disabled = true;
     else soundBtn.addEventListener('click', function () {
       qAudio.setEnabled(!qAudio.enabled); soundLabel();
-      if (qAudio.enabled && speed.ips !== ELF2K) status('Sound is on: it plays at the Elf2K clock only - choose Elf2K.');
+      // sound plays in real time only (other clocks would change the pitch), so turning
+      // it on brings the clock to Elf2K - left at 10x, PLAY was silent with no clue why
+      if (qAudio.enabled && speed.ips !== ELF2K) { pick(SPEEDS[0]); status('Sound is on, and the clock is now Elf2K: sound plays in real time only.'); }
       termEl.focus({ preventScroll: true });
     });
     soundLabel();

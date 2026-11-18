@@ -135,7 +135,7 @@
     else { t.scrollIntoView({ block: 'center' }); t.focus({ preventScroll: true }); }
   }
 
-  fetch('samples/manifest.json?v=172')
+  fetch('samples/manifest.json?v=173')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       // Most samples are one VM. This one is four, so the VM selector has something to show.
@@ -182,7 +182,7 @@
 
   function loadSample(s) {
     btn('status').textContent = 'loading ' + s.name + '…';
-    fetch('samples/' + s.file + '?v=172')
+    fetch('samples/' + s.file + '?v=173')
       .then(function (r) { return r.text(); })
       .then(function (text) {
         var input = btn('input').value.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
@@ -304,7 +304,7 @@
 
   // The full catalogue (web/build/gen_downloads.py): every finished app, grouped.
   var catalog = [];
-  fetch('downloads/catalog.json?v=172')
+  fetch('downloads/catalog.json?v=173')
     .then(function (r) { return r.json(); })
     .then(function (list) {
       catalog = list;
@@ -331,7 +331,7 @@
     var a = catalog[+btn('dlPick').value];
     if (!a) return;
     var fn = a.href.split('/').pop();
-    fetch(a.href + '?v=172')
+    fetch(a.href + '?v=173')
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         saveFile(fn, text);
@@ -371,6 +371,8 @@
   if (qAudio) {
     btn('sound').addEventListener('click', function () {
       var on = qAudio.setEnabled(!qAudio.enabled);
+      var sp = clock && clock.current();             // sound plays in real time only: bring the clock to Elf2K
+      if (on && sp && sp.ips !== window.ClockRow.ELF2K) clock.set('Elf2K');
       this.textContent = on ? '🔊 Sound on' : '🔈 Sound off';
       this.setAttribute('aria-pressed', on ? 'true' : 'false');
       soundNote();
@@ -387,7 +389,7 @@
     dbg.insertAdjacentElement('afterend', beep);
     setInterval(function () {
       var c = qAudio.ctx, t = qAudio.stat, sp = clock && clock.current();
-      dbg.textContent = 'v172 on=' + qAudio.enabled + ' ctx=' + (c ? c.state + ' ' + c.sampleRate + 'Hz t=' + c.currentTime.toFixed(1) : 'none') +
+      dbg.textContent = 'v173 on=' + qAudio.enabled + ' ctx=' + (c ? c.state + ' ' + c.sampleRate + 'Hz t=' + c.currentTime.toFixed(1) : 'none') +
         ' elf2k=' + !!(sp && sp.ips === window.ClockRow.ELF2K) + ' run=' + !!app.running +
         ' ticks=' + t.ticks + ' syncs=' + t.syncs + ' late=' + t.late + ' muted=' + t.muted +
         ' notRunning=' + t.notRunning + ' quiet=' + t.quiet + ' edges=' + t.edges + ' played=' + t.played + ' maxGap=' + t.maxGap;
@@ -425,7 +427,7 @@
     });
     b.textContent = '🎤 Listening…'; b.setAttribute('aria-pressed', 'true');
     note.textContent = 'Allow the microphone, then send a tone (another laptop, Sound on, Morse Sender v18).';
-    listener.start('js/tone-detect.js?v=172').catch(function (e) {
+    listener.start('js/tone-detect.js?v=173').catch(function (e) {
       listener = null; b.textContent = '🎤 Listen'; b.setAttribute('aria-pressed', 'false');
       note.textContent = 'Could not listen: ' + (e && e.message || e);
     });
