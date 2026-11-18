@@ -46,9 +46,22 @@
         this.ctx = new AC();
         this.gain = this.ctx.createGain();
         this.gain.gain.value = 1;
-        this.gain.connect(this.ctx.destination);
+        // Safari on some Macs plays nothing from Web Audio sent straight to the speakers
+        // (Craig's: running, buffers queued, silence - while YouTube plays), yet the same
+        // sound handed to an <audio> element is heard. So in Safari it goes that way.
+        this.route = QAudio.route();
+        if (this.route === 'element' && this.ctx.createMediaStreamDestination) {
+          var dest = this.ctx.createMediaStreamDestination();
+          this.gain.connect(dest);
+          this.el = new Audio();
+          this.el.srcObject = dest.stream;
+        } else {
+          this.route = 'direct';
+          this.gain.connect(this.ctx.destination);
+        }
       }
       if (this.ctx.state !== 'running') this.ctx.resume();
+      if (this.el) { var pr = this.el.play(); if (pr && pr.catch) pr.catch(function () {}); }   // (in the click)
       // Safari keeps Web Audio silent until a sound is STARTED inside the click itself
       // (making and resuming the context is not enough), so start a silent sample now
       try {
@@ -57,8 +70,18 @@
         b.connect(this.gain); b.start(0);
       } catch (e) {}
     }
+    else if (this.el) this.el.pause();
     this.cpu = null;     // re-sync on the next tick
     return this.enabled;
+  };
+
+  // 'element' (through an <audio> element) in Safari, else 'direct'; ?audio=direct or
+  // ?audio=element in the page's address picks one by hand
+  QAudio.route = function () {
+    var m = /[?&#]audio=(direct|element)/.exec(location.search + location.hash);
+    if (m) return m[1];
+    var ua = navigator.userAgent;
+    return /Safari\//.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg|OPR|Android/.test(ua) ? 'element' : 'direct';
   };
 
   QAudio.prototype._sync = function (cpu) {
@@ -135,12 +158,13 @@
   QAudio.prototype.beep = function () {
     var AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    if (!this.ctx) this.setEnabled(this.enabled);
+    if (!this.ctx) { var was = this.enabled; this.setEnabled(true); this.enabled = was; }   // the context, on its route
     var ctx = this.ctx || new AC();
     if (ctx.state !== 'running') ctx.resume();
+    if (this.el && this.el.paused) this.el.play();
     var o = ctx.createOscillator(), g = ctx.createGain();
     g.gain.value = 0.2; o.frequency.value = 440;
-    o.connect(g); g.connect(ctx.destination);
+    o.connect(g); g.connect(this.gain && this.ctx === ctx ? this.gain : ctx.destination);   // the same way as the sound
     o.start(); o.stop(ctx.currentTime + 0.5);
   };
 
