@@ -650,3 +650,8 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .ex-d,.ex-m{font-family:var(--mono); white-space:nowrap}
 .ex-m{color:var(--accent)}
 @media(max-width:680px){ .ex-box{padding-left:10px} }
+
+/* ---- About: the history, in Craig's words ---- */
+.history h3{font-size:17px; margin:24px 0 6px; color:var(--ink)}
+.history p{max-width:72ch}
+.history .hist-sig{margin-top:22px; font-style:italic; color:var(--ink-soft)}

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>What is STELLAR</title>
 <meta name="description" content="STELLAR-1802 in depth: what it is, how a multitasking language layer runs four machines on one RCA 1802, and the Elf 2000 hardware it runs on.">
-<link rel="stylesheet" href="css/site.css?v=178">
+<link rel="stylesheet" href="css/site.css?v=179">
 <style>
 .about{max-width:76ch}
 .about h2{margin-top:2em}
@@ -103,7 +103,55 @@
 
   <h2><span class="hx">4</span>History</h2>
 
-  <p class="muted">Why STELLAR was created, and how it came to be, will be told here.</p>
+  <div class="history">
+  <p class="muted"><em>History of the Stellar Programming Layer.</em></p>
+  <p>This is a summary of the history of the development of the Stellar programming Layer for the 1802 microprocessor.</p>
+  <h3>My wish for a decade.</h3>
+  <p>I had always wanted to create a programming layer on top of my RCA 1802 Elf2K computer system (designed by Spare Time Gizmos) that I picked up way back in the early 2000’s.</p>
+  <p>It already has a very simple Basic, and the Forth language, and some rudimentary editors installed. And I had very rudimentary fun with it and its LED’s and its 1861 Pixie chip.</p>
+  <p>To my shame, in all my years of programming my 1802 systems, I never learned 1802 assembly. I had always programmed in bare-metal machine code and enjoyed it. When I worked for AT&amp;T Bell Labs in the 1990’s, I learned and programmed heavily in Unix and the C programming language, but never assembly. I never had to.</p>
+  <p>When I discovered there was a simple C programming language compiler for the 1802, I found the resulting code was often very bloated and took loads of memory to do simple things. So I started to dream.</p>
+  <p>I filled out notebooks full of design ideas and wishes for my little 1802 to try to strive to do.</p>
+  <p>I imagined making apps that would run on my 1802, on top of a layer that made more math routines and copying routines available. But they were only thoughts on paper. I wished for multitasking, and tried to think of everything it would require to ever become a reality. But I never wrote anything into my elf2k.</p>
+  <p>And then COVID hit.</p>
+  <h3>Time to Make My Dream a Reality.</h3>
+  <p>So, with months of time on my hands, and no desire to waste it watching TV, I started with the goal of a simple set of 20 extra commands kept in any portion of the available RAM memory that an 1802 program could call using the standard call and return sequence. But those 20 instructions that allowed me more advanced math, memory move, et cetera. quickly became its own layer, running as an interpreter. It had become its own language layer on top of the 1802 machine code. This layer was able to run a new set of commands as its own Language, and it was cool to create simple applications with them.</p>
+  <p>Those 20 instructions grew into 50, and then started expanding to well over 150 instructions by the end of year 1.</p>
+  <p>What was unique was the fact I was programming each instruction by hand, in machine code, and tacking it into the programming layer. They were just one byte instructions with added parameters, like memory locations tacked-on. But they were quickly becoming very powerful.</p>
+  <p>I could never settle on a name for the programming layer.</p>
+  <p>Then I had the idea one night... of making the programming layer into 4 machines, and time sharing the 4 virtual machines on top of the 1802. FOUR virtual machines, running simultaneously, not by interrupt, but by time share. More about that on another page.</p>
+  <p>It took a few months to make it work, but in the end, it worked! I could write up to FOUR different Stellar based programs and then run them, and watch as each finished and exited, leaving others to continue until they too finished. I was blown away!</p>
+  <h3>A Multitasking 1802.</h3>
+  <p>I quickly added a series of 16 inter-process commands and communication commands between the virtual machines. And I was totally overwhelmed at how cool this was working.</p>
+  <p>I finally had an initial name, MPL02 (Multitasking Programming Layer for the 1802).</p>
+  <p>I wrote hundreds of simple programs using MPL02, but was limited by only being able to communicate with the outside world via the 2 seven segment LED’s and the Q line for sound. I needed to get the UART and VT100 terminal link up working. That was when Claude.ai entered.</p>
+  <h3>Hello Claude!</h3>
+  <p>Up until 2026, I could never get the UART to work for me to actually communicate with my elf2k via a terminal off my Mac. But Claude figured out what I had missed, and in one hour, I was “talking” with MPL02 on my elf2k through a terminal session on my MacBook pro!</p>
+  <p>From that moment, I began to ask Claude to become an expert in RCA 1802 programming, and to find the flaws in my hand-coded kernel, and it found them! Hundreds of them! And I worked with Claude, training it how I expected MPL02 to work, and Claude made MPL02 sing!</p>
+  <h3>What About a Name?</h3>
+  <p>And then I asked Claude for a proper name, not a technical name like MPL02.</p>
+  <p>And it came up with STELLAR!</p>
+  <p>Claude gave me a couple of interesting ideas, but Stellar was the one. It stood for “System for Time-shared Execution on Low-Level Architecture Resources”</p>
+  <p>One of these days, I will dig up my conversation with Claude about the name because I had to really define what I wanted my elf2k to end up doing, and it was going to be great! I expect to port Stellar to other 8 bit microprocessors someday, so stay tuned!</p>
+  <h3>The First 'Apps'</h3>
+  <p>Lite-writer was the first real app written for the Stellar Programming layer. It was a test of Claude's ability to understand the capabilities of the Stellar code, and the limitations of the 1802 hardware and environment. It ultimately was a proving ground for the functionality of the Stellar opcodes in a real-world application.</p>
+  <p>Lite-Writer2 has a limited set of functions, but it does them all well. I can write text, save it, recall it, edit it like a simple text editor, all written in Stellar code. I was delighted! But I had only begun!</p>
+  <h3>Working with the CF card</h3>
+  <p>Next to experiment with was the CF card interface on the DISK/UART daughter card of the elf2k. Working with the CF card opened up a whole new world! If Stellar could be expanded into an operating system, it could do almost anything!</p>
+  <p>So, I just simply asked Claude how do we adapt Stellar to use the CF Card as a disk, and LTOS was born!</p>
+  <p>Now I could really push the limits of the elf2k and the little 1802 processor!</p>
+  <h3>LTOS</h3>
+  <p>It is an acronym for LighT-Operating System. Okay, so I am not very flashy with my naming, but I like it. I usually pronounce it L-tos, so it sticks.</p>
+  <p>Claude began to work out how to utilise Stellar’s operating environment and expand it into a switching action that can run an app or a game in Stellar code, or quickly change the environment to the LTOS Operating System without any fuss at all. My elf2k could run dozens of unix commands from an actual command line shell, and then run a Stellar app, as if it all was just one happy family. And it just grew and grew!</p>
+  <p>All of this shows what the 1802 could have been back in the 1980’s!</p>
+  <h3>Then Stellar on the Web!</h3>
+  <p>I jokingly asked Claude to come up with a set of web pages that would show off Stellar and what it is capable of doing. And www.stellar-1802.dev was born!</p>
+  <p>The web pages run a full implementation of absolutely every aspect of Stellar and its Apps as well as LTOS, as they run on an actual Elf2K, including sound and VT100 video terminal emulation. And Claude brought the contents of the entire 31k of RAM alive on the main page! It even showed off the four Virtual Machines of Stellar running four different Stellar-based apps at the same time, as they would on a real elf2k. Yes, you can speed it up, but you also can slow it down to a step-by-step through the code, and you can watch every register and memory location in the entire system, blink and change right before your eyes!</p>
+  <p>Enough of a start. This summary of the history behind Stellar is only a start. There is so much more I want to add, but it will be for another time.</p>
+  <p>Stay tuned; enjoy Stellar; and happy dreaming about the 1802!</p>
+  <p class="hist-sig">Craig Ledbetter<br>Ireland</p>
+  <p>There are so many people I have to recognize and thank…</p>
+  </div>
 
   <div class="note" style="margin-top:34px">
     <div class="lbl">See it run</div>
@@ -113,6 +161,6 @@
 </main>
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · built by <button type="button" class="who">Craig Ledbetter</button> · <a href="index.html">home</a> · <a href="license.html">license</a></footer>
-<script src="js/nav.js?v=178"></script>
+<script src="js/nav.js?v=179"></script>
 </body>
 </html>
