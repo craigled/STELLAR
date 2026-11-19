@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '176';                                    // the ?v= the card is fetched with
+  var V = '177';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var CPS = 375000;                                 // its machine cycles a second (3 MHz / 8)
