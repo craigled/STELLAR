@@ -655,3 +655,5 @@ td.hex,.hex{font-family:var(--mono); color:var(--accent)}
 .history h3{font-size:17px; margin:24px 0 6px; color:var(--ink)}
 .history p{max-width:72ch}
 .history .hist-sig{margin-top:22px; font-style:italic; color:var(--ink-soft)}
+.history .thanks ul{margin:.3em 0 .6em; padding-left:1.2em; max-width:72ch}
+.history .thanks li{margin:.45em 0}

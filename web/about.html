@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>What is STELLAR</title>
 <meta name="description" content="STELLAR-1802 in depth: what it is, how a multitasking language layer runs four machines on one RCA 1802, and the Elf 2000 hardware it runs on.">
-<link rel="stylesheet" href="css/site.css?v=179">
+<link rel="stylesheet" href="css/site.css?v=180">
 <style>
 .about{max-width:76ch}
 .about h2{margin-top:2em}
@@ -151,6 +151,26 @@
   <p>Stay tuned; enjoy Stellar; and happy dreaming about the 1802!</p>
   <p class="hist-sig">Craig Ledbetter<br>Ireland</p>
   <p>There are so many people I have to recognize and thank…</p>
+
+  <div class="thanks">
+  <h3>The hardware and the chip</h3>
+  <ul>
+    <li><strong>Bob Armstrong, Spare Time Gizmos:</strong> designed the Elf2K and its ROM monitor. All the background on the Elf2k used to live at <a href="http://www.sparetimegizmos.com/" target="_blank" rel="noopener">sparetimegizmos.com</a> but it no longer is live.</li>
+    <li><strong>Joseph Weisbecker:</strong> designed the RCA 1802 (COSMAC) and the original COSMAC Elf, published in Popular Electronics in 1976. Without him there's no Elf to build on. <a href="https://en.wikipedia.org/wiki/Joseph_Weisbecker" target="_blank" rel="noopener">Wikipedia: Joseph Weisbecker</a></li>
+  </ul>
+  <h3>The software everything stands on</h3>
+  <ul>
+    <li><strong>Mike Riley:</strong> wrote the BIOS in the Elf2K's ROM. LTOS and STELLAR both call its routines to talk to the terminal and the card. Go to <a href="https://github.com/rileym65" target="_blank" rel="noopener">github.com/rileym65</a> (his Elf-BIOS is there)</li>
+    <li><strong>William C. Colley III:</strong> wrote a18, the amazing 1802 assembler LTOS is built with. Herb Johnson keeps it available, along with a large collection of 1802 history. <a href="https://www.retrotechnology.com/memship/a18.html" target="_blank" rel="noopener">a18 is on retrotechnology.com</a> and <a href="https://www.retrotechnology.com/memship/memship.html" target="_blank" rel="noopener">Herb&#8217;s 1802 pages</a></li>
+    <li><strong>Marcel van Tongeren:</strong> wrote the incredible Emma 02 emulator that has several dozen adaptations of so many variations of 1802-based computer systems. Emma02 is available on Mac OS, as well as Linux, and Windows. LTOS runs perfectly in it! See <a href="https://www.emma02.hobby-site.com/" target="_blank" rel="noopener">emma02.hobby-site.com</a></li>
+  </ul>
+  <h3>The 1802 community</h3>
+  <ul>
+    <li><strong>Lee Hart:</strong> created the 1802 Membership Card, which keeps new people building 1802 computers more than 50 years on. See <a href="https://www.sunrise-ev.com/1802.htm" target="_blank" rel="noopener">sunrise-ev.com/1802.htm</a></li>
+    <li>The <strong>COSMAC ELF group</strong> is where Elf2K owners and 1802 people help each other. <a href="https://groups.io/g/cosmacelf" target="_blank" rel="noopener">groups.io/g/cosmacelf</a></li>
+  </ul>
+  <p>And most recently, I am grateful to Anthropic, for Claude: <a href="https://www.anthropic.com/" target="_blank" rel="noopener">anthropic.com</a> and <a href="https://claude.ai/" target="_blank" rel="noopener">claude.ai</a></p>
+  </div>
   </div>
 
   <div class="note" style="margin-top:34px">
@@ -161,6 +181,6 @@
 </main>
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · built by <button type="button" class="who">Craig Ledbetter</button> · <a href="index.html">home</a> · <a href="license.html">license</a></footer>
-<script src="js/nav.js?v=179"></script>
+<script src="js/nav.js?v=180"></script>
 </body>
 </html>
