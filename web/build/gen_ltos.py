@@ -124,6 +124,9 @@ def add_files(m):
     open(os.path.join(m, 'DOCS', 'SALES.TXT'), 'wb').write(SALES)
     open(os.path.join(m, 'DOCS', 'BOOK.TXT'), 'wb').write(BOOK)
     open(os.path.join(m, 'DOCS', 'BUDGET.CLC'), 'wb').write(BUDGET)
+    sys.path.insert(0, os.path.join(WORK, 'tools'))                   # the card layout template (LTOS/layout.txt):
+    import card_layout                                                #  /BIN/GAMES, /BIN/OFFICE, /BIN/SYSTEM ...
+    card_layout.arrange_dir(m, say=lambda *a: None)
     for junk in ('.fseventsd', '.Spotlight-V100', '.Trashes'):        # what the Mac leaves on a volume
         shutil.rmtree(os.path.join(m, junk), ignore_errors=True)
     for d, ds, fs in os.walk(m):
