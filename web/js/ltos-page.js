@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '182';                                    // the ?v= the card is fetched with
+  var V = '183';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var CPS = 375000;                                 // its machine cycles a second (3 MHz / 8)
@@ -29,6 +29,7 @@
     ['NANO DOCS/BOOK.TXT', 'NANO: a small editor in 1802 code - long lines wrapped, Shift+arrow selects (Ctrl-G: every key)'],
     ['LTCALC DOCS/BUDGET', 'LTCALC: a small spreadsheet in 1802 code; change a number and watch the totals'],
     ['PLAY -s 3 /MUSIC/ODE', 'music on Q: press Sound first - it sets the clock to Elf2K (-s 3: this Elf2K runs at 3 MHz). Also TWINKLE, GRACE, CHIMES; HELP PLAY'],
+    ['COSMO', 'COSMO KID: a platform game in 1802 code - arrows move, Up or Space jumps, Esc quits (Sound on: Q\u2019s tunes)'],
     ['GALAXIA', 'a game: arrows, SPACE; Esc back to LTOS'],
     ['ORBIT', 'STELLAR ORBIT: Apollo 7 on three VMs (SPACE: the count, ?: help)'],
     ['FREEFALL', 'more games: SNAKE, BOUNCE, INVADERS, BREAKOUT, MAZE'],
