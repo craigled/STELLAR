@@ -81,6 +81,10 @@ EXAMPLES = [
      'rand() is STELLAR\'s RAND opcode, a number 0 to 65535; rand(n) is 0 to n - 1, so rand(6) + 1 is a die. '
      'It stirs rand() while waiting for a key. Click the terminal, then press any key to roll, S to roll 600 '
      'times and see the spread, or Q to quit.'),
+    ('dotbot', 'DOTBOT (a maze game)', '', 'Elf2K',
+     'The LTOS game DOTBOT written again in Stellar C: the maze, the score and the game in C, its busiest parts - '
+     'the four Glitches\' moves and the screen updates - in native { } 1802 code, and its sounds on Q. Click '
+     'the terminal, press a key, then steer with the arrows or W A S D; a power cell (o) scares the Glitches. Esc quits.'),
     ('nativedemo', 'Native 1802: native { }', '', 'flat out',
      'Raw 1802 machine code run by $F1 RUNMC: sums a 200-byte array (71x faster than the compiled '
      'loop), formats the total as hex, and copies a string kept inside the native block.'),

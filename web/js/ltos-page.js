@@ -31,6 +31,7 @@
     ['PLAY -s 3 /MUSIC/ODE', 'music on Q: press Sound first - it sets the clock to Elf2K (-s 3: this Elf2K runs at 3 MHz). Also TWINKLE, GRACE, CHIMES; HELP PLAY'],
     ['COSMO', 'COSMO KID: a platform game in 1802 code - arrows move, Up or Space jumps, Esc quits (Sound on: Q\u2019s tunes)'],
     ['DOTBOT', 'DOTBOT: a maze game in 1802 code - eat the dots, dodge the Glitches; arrows or W A S D, Esc quits (Sound on: its ticks)'],
+    ['DOTBOTC', 'DOTBOT again, written in Stellar C and run by STELLAR (its busy parts in native { } 1802 code)'],
     ['GALAXIA', 'a game: arrows, SPACE; Esc back to LTOS'],
     ['ORBIT', 'STELLAR ORBIT: Apollo 7 on three VMs (SPACE: the count, ?: help)'],
     ['FREEFALL', 'more games: SNAKE, BOUNCE, INVADERS, BREAKOUT, MAZE'],

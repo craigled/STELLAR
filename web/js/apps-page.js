@@ -55,7 +55,7 @@
     try { history.replaceState(null, '', g === 'All' ? location.pathname : '#' + g.toLowerCase()); } catch (e) {}
   }
 
-  fetch('apps/apps.json?v=184')
+  fetch('apps/apps.json?v=185')
     .then(function (r) { return r.json(); })
     .then(function (apps) {
       apps.sort(function (x, y) { return ORDER.indexOf(x.group) - ORDER.indexOf(y.group); });
