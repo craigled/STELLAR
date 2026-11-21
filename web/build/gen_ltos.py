@@ -120,6 +120,11 @@ def add_files(m):
         if n.upper().endswith('.MUS'): os.remove(os.path.join(m, n))
     for f in sorted(os.listdir(os.path.join(LTOS, 'music'))):
         if f.upper().endswith('.MUS'): shutil.copyfile(os.path.join(LTOS, 'music', f), os.path.join(m, 'MUSIC', f.upper()))
+    os.makedirs(os.path.join(m, 'SRC'), exist_ok=True)                # the Tiny Stellar C examples, in /SRC as SYSRX puts them
+    for name, d in build.srcfiles():
+        f = name[:8].decode().strip() + '.SC'
+        if os.path.exists(os.path.join(m, f)): os.remove(os.path.join(m, f))
+        open(os.path.join(m, 'SRC', f), 'wb').write(d)
     open(os.path.join(m, 'DOCS', 'LETTER.TXT'), 'wb').write(LETTER)
     open(os.path.join(m, 'DOCS', 'SALES.TXT'), 'wb').write(SALES)
     open(os.path.join(m, 'DOCS', 'BOOK.TXT'), 'wb').write(BOOK)
