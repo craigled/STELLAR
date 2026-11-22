@@ -86,14 +86,94 @@
 ; D 4336 B0 01 90       GAL QUIT               ESC on its own quits
 ; GO:
 ; D 4339 11 01 00 26    LOADXI R1 0026         Gun starts at column 38 (moved here from $4011)
-; D 433D B0 00 15       GAL 4015               back to the game
+; D 433D B0 04 20      GAL PINIT              the sound on, then the game
+;
+;
+;
+;
+;
+;
+; ---- SOUND (build_invaders_sound.py) ----
+; SOUND (2026-11-22, build_invaders_sound.py): Q, a speaker or buzzer on it (the web Simulator's
+; Sound button). A zap when you fire, a pop for a hit, a low thump each march step (two pitches
+; in turn), a rising tune for a win and three falling notes for a landing. S turns it off and
+; on (line 24 says which). Patches past the program, each reached by a GAL in place of one
+; instruction it then does itself - no address moved:
+;   $4005 LOADXI R14 0800 (the new title)   $40A7 GAL PKEY    $4109 GAL PFIRE   $416E GAL PMARCH
+;   $41B8 GAL PEND   $42BC GAL PHIT   $433D GAL PINIT
+; Patches $4380-$442D; the player (qsound.py, raw 1802, $F1 RUNMC) $4480-$4568; the title $4800;
+; the sound flag $49F8 (1 = on).
+; PFIRE:
+; D 4380 11 03 00 16   LOADXI R3 0016         the rocket leaves (as at $4109)
+; D 4384 F1 44 80      RUNMC 4480             a zap
+; D 4387 B0 01 0D      GAL 010D
+; PHIT:
+; D 438A 11 03 00 00   LOADXI R3 0000         the rocket is spent (as at $42BC)
+; D 438E F1 44 89      RUNMC 4489             a pop
+; D 4391 B0 02 C0      GAL 02C0
+; PMARCH:
+; D 4394 BD 02 02      CALL 0202              redraw both rows (as at $416E)
+; D 4397 11 09 00 00   LOADXI R9 0000
+; D 439B 2E 09 09 F8   READIDX R9 09F8
+; D 439F 81 00 00      TESTAI 0000
+; D 43A2 A0 01 71      IFTRUEI 0171           the sound off: on as before
+; D 43A5 F1 44 92      RUNMC 4492             a thump, two pitches in turn
+; D 43A8 8C 08         TESTXZ R8              all twelve shot down? (as at $4171)
+; D 43AA A0 01 82      IFTRUEI 0182           WIN
+; D 43AD 86 05 00 15   TESTXI R5 0015         landed? (as at $4176)
+; D 43B1 A0 01 89      IFTRUEI 0189           LOSE
+; D 43B4 B0 01 7F      GAL 017F               the loop - the thump stands in for this frame's DLYI 02
+; PEND:
+; D 43B7 86 0C 09 A0   TESTXI R12 09A0
+; D 43BB A1 03 C4      IFFALSEI PE2
+; D 43BE F1 44 B1      RUNMC 44B1
+; D 43C1 B0 03 CE      GAL PE9
+; PE2:
+; D 43C4 86 0C 09 C0   TESTXI R12 09C0
+; D 43C8 A1 03 CE      IFFALSEI PE9
+; D 43CB F1 44 BA      RUNMC 44BA
+; PE9:
+; D 43CE F0 00 00      BREAK                  End of program (as at $41B8)
+; PKEY:
+; D 43D1 86 0C 00 73   TESTXI R12 0073
+; D 43D5 A0 03 E9      IFTRUEI PSND
+; D 43D8 86 0C 00 53   TESTXI R12 0053
+; D 43DC A0 03 E9      IFTRUEI PSND
+; D 43DF 86 0C 00 61   TESTXI R12 0061        a moves left (as at $40A7)
+; D 43E3 A0 00 DF      IFTRUEI 00DF           GOLEFT
+; D 43E6 B0 00 AE      GAL 00AE
+; PSND:
+; D 43E9 11 09 00 00   LOADXI R9 0000
+; D 43ED 2E 09 09 F8   READIDX R9 09F8
+; D 43F1 81 00 00      TESTAI 0000
+; D 43F4 A0 04 05      IFTRUEI PSON
+; D 43F7 10 00 00      LOADAI 0000
+; D 43FA 2F 09 09 F8   WRITEIDX R9 09F8
+; D 43FE 11 0C 08 67   LOADXI R12 0867
+; D 4402 B0 04 10      GAL PSSAY
+; PSON:
+; D 4405 10 00 01      LOADAI 0001
+; D 4408 2F 09 09 F8   WRITEIDX R9 09F8
+; D 440C 11 0C 08 71   LOADXI R12 0871
+; PSSAY:
+; D 4410 11 0D 00 18   LOADXI R13 0018        line 24 says which
+; D 4414 11 0E 00 01   LOADXI R14 0001
+; D 4418 BD 02 C6      CALL 02C6
+; D 441B C1 0C         PRINTSTR R12
+; D 441D B0 01 0D      GAL 010D
+; PINIT:
+; D 4420 11 09 00 00   LOADXI R9 0000
+; D 4424 10 00 01      LOADAI 0001
+; D 4427 2F 09 09 F8   WRITEIDX R9 09F8
+; D 442B B0 00 15      GAL 0015               the game
+; ---- END OF SOUND ----
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
 ; --------------------------------------------------------------------------
 ; D 4000 CD             START                  Start of program, and run the label pre-pass
 ; D 4001 11 0F 00 0A    LOADXI R15 000A        Ten, for splitting numbers into digits
-; D 4005 11 0E 09 00    LOADXI R14 0900        Point at the title text
+; D 4005 11 0E 08 00   LOADXI R14 0800        Point at the title text (with S sound: the sound patch)
 ; D 4009 C1 0E          PRINTSTR R14           Print it
 ; D 400B C3             RAND                   Stir the generator while we wait
 ; D 400C CC             SERST                  A key yet?
@@ -149,7 +229,7 @@
 ; D 409D A0 01 90       IFTRUEI QUIT
 ; D 40A0 86 0C 00 51    TESTXI R12 0051        and so does Q
 ; D 40A4 A0 01 90       IFTRUEI QUIT
-; D 40A7 86 0C 00 61    TESTXI R12 0061        a moves left, for terminals that send no arrows
+; D 40A7 B0 03 D1 C4   GAL PKEY  NOP          S, a, ... (the sound patch)
 ; D 40AB A0 00 DF       IFTRUEI GOLEFT
 ; D 40AE 86 0C 00 64    TESTXI R12 0064        d moves right
 ; D 40B2 A0 00 EE       IFTRUEI GORIGHT
@@ -179,7 +259,7 @@
 ; D 40FF A1 01 0D       IFFALSEI NOKEY         Yes - only one at a time
 ; D 4102 23 00 12       COPYXY R1 R2           It leaves from the gun
 ; D 4105 52 02 00 01    ADDXI R2 0001          from the middle of the barrel
-; D 4109 11 03 00 16    LOADXI R3 0016         starting one line above the gun
+; D 4109 B0 03 80 C4   GAL PFIRE  NOP         the rocket leaves, with a zap
 ; D 410D 8C 03          TESTXZ R3              Anything in flight?
 ; D 410F A0 01 37       IFTRUEI NOSHOT         No
 ; D 4112 23 00 3D       COPYXY R3 R13          Erase it from where it was
@@ -214,7 +294,7 @@
 ; D 4164 A1 01 6E       IFFALSEI MARCHED
 ; D 4167 11 06 00 00    LOADXI R6 0000         Turn around
 ; D 416B BD 01 D5       CALL DROP              and drop a line
-; D 416E BD 02 02       CALL DRAWALL           Redraw both rows - only on a marching frame
+; D 416E B0 03 94      GAL PMARCH             redraw both rows, and a thump
 ; D 4171 8C 08          TESTXZ R8              All twelve shot down?
 ; D 4173 A0 01 82       IFTRUEI WIN
 ; D 4176 86 05 00 15    TESTXI R5 0015         Has the formation reached line 21?
@@ -239,7 +319,7 @@
 ; D 41AD 11 0D 00 17    LOADXI R13 0017
 ; D 41B1 11 0E 00 01    LOADXI R14 0001
 ; D 41B5 BD 02 C6       CALL POSXY
-; D 41B8 F0 00 00       BREAK                  End of program
+; D 41B8 B0 03 B7      GAL PEND               the end tune, then BREAK
 ; D 41BB 11 0D 00 17    LOADXI R13 0017        Line 23
 ; D 41BF 23 00 1E       COPYXY R1 R14
 ; D 41C2 52 0E FF FF    ADDXI R14 FFFF         one column to the left
@@ -333,7 +413,7 @@
 ; D 42B6 CA 20          SEROUTI 20             ' '
 ; D 42B8 CA 20          SEROUTI 20             ' '
 ; D 42BA CA 20          SEROUTI 20             ' '
-; D 42BC 11 03 00 00    LOADXI R3 0000         The rocket is spent
+; D 42BC B0 03 8A C4   GAL PHIT  NOP          the rocket is spent, with a pop
 ; D 42C0 11 02 00 00    LOADXI R2 0000
 ; D 42C4 BE 00          RETURN
 ; D 42C6 CA 1B          SEROUTI 1B             ''
@@ -361,7 +441,7 @@
 
 D 4000 CD
 D 4001 11 0F 00 0A
-D 4005 11 0E 09 00
+D 4005 11 0E 08 00
 D 4009 C1 0E
 D 400B C3
 D 400C CC
@@ -416,7 +496,7 @@ D 4099 86 0C 00 71
 D 409D A0 01 90
 D 40A0 86 0C 00 51
 D 40A4 A0 01 90
-D 40A7 86 0C 00 61
+D 40A7 B0 03 D1 C4
 D 40AB A0 00 DF
 D 40AE 86 0C 00 64
 D 40B2 A0 00 EE
@@ -446,7 +526,7 @@ D 40FD 8C 03
 D 40FF A1 01 0D
 D 4102 23 00 12
 D 4105 52 02 00 01
-D 4109 11 03 00 16
+D 4109 B0 03 80 C4
 D 410D 8C 03
 D 410F A0 01 37
 D 4112 23 00 3D
@@ -481,7 +561,7 @@ D 4160 86 04 00 02
 D 4164 A1 01 6E
 D 4167 11 06 00 00
 D 416B BD 01 D5
-D 416E BD 02 02
+D 416E B0 03 94
 D 4171 8C 08
 D 4173 A0 01 82
 D 4176 86 05 00 15
@@ -506,7 +586,7 @@ D 41AB CA 68
 D 41AD 11 0D 00 17
 D 41B1 11 0E 00 01
 D 41B5 BD 02 C6
-D 41B8 F0 00 00
+D 41B8 B0 03 B7
 D 41BB 11 0D 00 17
 D 41BF 23 00 1E
 D 41C2 52 0E FF FF
@@ -600,7 +680,7 @@ D 42B3 BD 02 C6
 D 42B6 CA 20
 D 42B8 CA 20
 D 42BA CA 20
-D 42BC 11 03 00 00
+D 42BC B0 03 8A C4
 D 42C0 11 02 00 00
 D 42C4 BE 00
 D 42C6 CA 1B
@@ -626,7 +706,7 @@ D 42E6 BE 00
 D 4300 11 09 00 08 CC A0 01 0D 43 09 8C 09 A1 03 04 B0
 D 4310 01 90
 D 4320 CB 81 00 1B A1 03 39 11 09 00 08 CC A0 03 39 43
-D 4330 09 8C 09 A1 03 2B B0 01 90 11 01 00 26 B0 00 15
+D 4330 09 8C 09 A1 03 2B B0 01 90 11 01 00 26 B0 04 20
 D 4900 53 54 45 4C 4C 41 52 20 49 4E 56 41 44 45 52 53
 D 4910 20 2D 2D 20 61 72 72 6F 77 73 20 6F 72 20 61 2F
 D 4920 64 20 74 6F 20 6D 6F 76 65 2C 20 53 50 41 43 45
@@ -644,3 +724,85 @@ D 49E0 47 41 4D 45 20 41 42 41 4E 44 4F 4E 45 44 00
 D 5000 00
 D 6000 00
 D 7000 00
+
+; ---- SOUND (build_invaders_sound.py) ----
+D 4380 11 03 00 16
+D 4384 F1 44 80
+D 4387 B0 01 0D
+D 438A 11 03 00 00
+D 438E F1 44 89
+D 4391 B0 02 C0
+D 4394 BD 02 02
+D 4397 11 09 00 00
+D 439B 2E 09 09 F8
+D 439F 81 00 00
+D 43A2 A0 01 71
+D 43A5 F1 44 92
+D 43A8 8C 08
+D 43AA A0 01 82
+D 43AD 86 05 00 15
+D 43B1 A0 01 89
+D 43B4 B0 01 7F
+D 43B7 86 0C 09 A0
+D 43BB A1 03 C4
+D 43BE F1 44 B1
+D 43C1 B0 03 CE
+D 43C4 86 0C 09 C0
+D 43C8 A1 03 CE
+D 43CB F1 44 BA
+D 43CE F0 00 00
+D 43D1 86 0C 00 73
+D 43D5 A0 03 E9
+D 43D8 86 0C 00 53
+D 43DC A0 03 E9
+D 43DF 86 0C 00 61
+D 43E3 A0 00 DF
+D 43E6 B0 00 AE
+D 43E9 11 09 00 00
+D 43ED 2E 09 09 F8
+D 43F1 81 00 00
+D 43F4 A0 04 05
+D 43F7 10 00 00
+D 43FA 2F 09 09 F8
+D 43FE 11 0C 08 67
+D 4402 B0 04 10
+D 4405 10 00 01
+D 4408 2F 09 09 F8
+D 440C 11 0C 08 71
+D 4410 11 0D 00 18
+D 4414 11 0E 00 01
+D 4418 BD 02 C6
+D 441B C1 0C
+D 441D B0 01 0D
+D 4420 11 09 00 00
+D 4424 10 00 01
+D 4427 2F 09 09 F8
+D 442B B0 00 15
+
+D 4480 F8 45 B8 F8 02 A8 C0 44 C3 F8 45 B8 F8 13 A8 C0
+D 4490 44 C3 F8 45 B8 F8 24 A8 08 FB 01 58 C2 44 A8 F8
+D 44A0 45 B8 F8 2A A8 C0 44 C3 F8 45 B8 F8 25 A8 C0 44
+D 44B0 C3 F8 45 B8 F8 2F A8 C0 44 C3 F8 45 B8 F8 54 A8
+D 44C0 C0 44 C3 E2 F8 49 B7 F8 F8 A7 07 C2 44 FF 48 C2
+D 44D0 44 FF BB 48 B7 48 A7 48 AB 8B C2 44 E8 C1 44 E4
+D 44E0 7B C0 44 EB 7A C0 44 EB 7A C4 C4 9B A9 29 89 CA
+D 44F0 44 ED 27 87 CA 44 D9 97 CA 44 D9 7A C0 44 CE 7A
+D 4500 E2 D5 0E 00 0F 01 13 00 0C 01 17 00 0A 01 1E 00
+D 4510 08 01 00 13 00 13 01 23 00 0B 01 40 00 06 01 76
+D 4520 00 04 01 00 00 91 00 06 01 00 AF 00 05 01 00 30
+D 4530 00 68 01 32 00 14 00 25 00 85 01 32 00 14 00 1F
+D 4540 00 9C 01 32 00 14 00 16 00 D3 01 32 00 14 00 11
+D 4550 02 90 01 00 85 00 4F 01 32 00 28 00 9F 00 42 01
+D 4560 32 00 28 00 C9 00 83 01 00
+
+D 4800 53 54 45 4C 4C 41 52 20 49 4E 56 41 44 45 52 53
+D 4810 20 2D 2D 20 61 72 72 6F 77 73 20 6F 72 20 61 2F
+D 4820 64 20 74 6F 20 6D 6F 76 65 2C 20 53 50 41 43 45
+D 4830 20 74 6F 20 66 69 72 65 2C 20 53 20 73 6F 75 6E
+D 4840 64 2C 20 45 73 63 20 71 75 69 74 73 0D 0A 50 72
+D 4850 65 73 73 20 61 6E 79 20 6B 65 79 20 74 6F 20 62
+D 4860 65 67 69 6E 0D 0A 00 73 6F 75 6E 64 20 6F 66 66
+D 4870 00 73 6F 75 6E 64 20 6F 6E 20 00
+
+D 49F8 01
+; ---- END OF SOUND ----

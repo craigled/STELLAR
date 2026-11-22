@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '184';                                    // the ?v= the card is fetched with
+  var V = '189';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var CPS = 375000;                                 // its machine cycles a second (3 MHz / 8)
@@ -31,7 +31,7 @@
     ['PLAY -s 3 /MUSIC/ODE', 'music on Q: press Sound first - it sets the clock to Elf2K (-s 3: this Elf2K runs at 3 MHz). Also TWINKLE, GRACE, CHIMES; HELP PLAY'],
     ['COSMO', 'COSMO KID: a platform game in 1802 code - arrows move, Up or Space jumps, Esc quits (Sound on: Q\u2019s tunes)'],
     ['DOTBOT', 'DOTBOT: a maze game in 1802 code - eat the dots, dodge the Glitches; arrows or W A S D, Esc quits (Sound on: its ticks)'],
-    ['DELVE', 'DELVE: a dungeon crawl in 1802 code - find the Star Crystal on depth 10; arrows or W A S D move and fight, P a potion, > the stairs (Sound on)'],
+    ['DESCEND', 'DESCEND: a dungeon crawl in 1802 code - find the Star Crystal on depth 10; arrows or W A S D move and fight, P a potion, > the stairs (Sound on)'],
     ['GALAXIA', 'a game: arrows, SPACE; Esc back to LTOS'],
     ['ORBIT', 'STELLAR ORBIT: Apollo 7 on three VMs (SPACE: the count, ?: help)'],
     ['FREEFALL', 'more games: SNAKE, BOUNCE, INVADERS, BREAKOUT, MAZE'],

@@ -10,12 +10,12 @@
 ;
 ; VT100: cursor addressing and reverse video (the walls) only.
 ;
-; VERIFICATION (Firmware-Math/maze_verify.py, V0061.33, two-VM cold boot): three mazes, the first booted into DIRTY grid RAM and the second a RERUN from the memory the first left (no reload, as on the Elf2K) - it draws a NEW maze; each reads back off the screen as a PERFECT 25 x 10 maze equal to VM1's grid; VM2's copy has identical walls ($DC); the 'o' left on screen is exactly the start-to-exit path, '.' only off it, and the step and path counts match a Python right-hand walk. About 12-16 million 1802 instructions (~1.5 min at 3 MHz) + ~12 KB of output.
+; VERIFICATION (Firmware-Math/maze_verify.py, V0061.33, two-VM cold boot): PASS 2026-11-22 with the solved chime (run on V0061.34)
 ; The first build was HW-VERIFIED on the Elf2K (V0061.33), 2026-09-24. This build
 ; also rebuilds the grid at the start of every run (FILLMEM), so a rerun without
 ; reloading makes a new maze - that change is not yet run on hardware.
 ;
-; VM1: 167 STELLAR commands.   VM2: 137 STELLAR commands.
+; VM1: 167 STELLAR commands.   VM2: 138 STELLAR commands.
 
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  VM1 ($4000): builds the maze, hands it over  -  commented out; the loader skips it
@@ -224,7 +224,7 @@
 ; D 502B 2F 02 08 00    WRITEIDX R2 0800
 ; D 502F 11 0A 00 6F    LOADXI R10 006F
 ; D 5033 23 00 2B       COPYXY R2 -> R11
-; D 5036 BD 01 21       CALL DRAW
+; D 5036 BD 01 24       CALL DRAW
 ; D 5039 11 08 00 01    LOADXI R8 0001                     R8 = path length (cells)
 ; D 503D 11 09 00 00    LOADXI R9 0000                     R9 = steps
 ; STEP:
@@ -236,7 +236,7 @@
 ; D 504F A1 00 56       IFFALSEI TRY                       R4 = heading + 1: try RIGHT first
 ; D 5052 11 04 00 00    LOADXI R4 0000
 ; TRY:
-; D 5056 BD 00 E8       CALL OFF                           R6 = the wall that way, R7 = the cell beyond
+; D 5056 BD 00 EB       CALL OFF                           R6 = the wall that way, R7 = the cell beyond
 ; D 5059 2E 06 08 00    READIDX R6 0800
 ; D 505D 81 00 23       TESTAI 0023
 ; D 5060 A1 00 71       IFFALSEI FOUND                     Open
@@ -256,9 +256,9 @@
 ; D 5084 2F 07 08 00    WRITEIDX R7 0800
 ; D 5088 11 0A 00 6F    LOADXI R10 006F
 ; D 508C 23 00 6B       COPYXY R6 -> R11
-; D 508F BD 01 21       CALL DRAW
+; D 508F BD 01 24       CALL DRAW
 ; D 5092 23 00 7B       COPYXY R7 -> R11
-; D 5095 BD 01 21       CALL DRAW
+; D 5095 BD 01 24       CALL DRAW
 ; D 5098 42 08          INCX R8
 ; D 509A B0 00 BA       GAL MOVED
 ; BACK:
@@ -267,9 +267,9 @@
 ; D 50A4 2F 06 08 00    WRITEIDX R6 0800
 ; D 50A8 11 0A 00 2E    LOADXI R10 002E
 ; D 50AC 23 00 2B       COPYXY R2 -> R11
-; D 50AF BD 01 21       CALL DRAW
+; D 50AF BD 01 24       CALL DRAW
 ; D 50B2 23 00 6B       COPYXY R6 -> R11
-; D 50B5 BD 01 21       CALL DRAW
+; D 50B5 BD 01 24       CALL DRAW
 ; D 50B8 43 08          DECX R8
 ; MOVED:
 ; D 50BA 23 00 72       COPYXY R7 -> R2
@@ -280,88 +280,89 @@
 ; D 50C6 11 0E 06 39    LOADXI R14 0639
 ; D 50CA C1 0E          PRINTSTR R14
 ; D 50CC 23 00 94       COPYXY R9 -> R4
-; D 50CF BD 01 5B       CALL PRNUM
+; D 50CF BD 01 5E       CALL PRNUM
 ; D 50D2 11 0E 06 51    LOADXI R14 0651
 ; D 50D6 C1 0E          PRINTSTR R14
 ; D 50D8 23 00 74       COPYXY R7 -> R4
-; D 50DB BD 01 5B       CALL PRNUM
+; D 50DB BD 01 5E       CALL PRNUM
 ; D 50DE 11 0E 06 67    LOADXI R14 0667
 ; D 50E2 C1 0E          PRINTSTR R14
-; D 50E4 00             HALT
-; D 50E5 F0 00 00       BREAK
+; D 50E4 F1 52 00       RUNMC 5200                         a rising chime
+; D 50E7 00             HALT
+; D 50E8 F0 00 00       BREAK
 ; OFF:
-; D 50E8 23 00 26       COPYXY R2 -> R6
-; D 50EB 86 04 00 00    TESTXI R4 0000
-; D 50EF A0 01 07       IFTRUEI OU
-; D 50F2 86 04 00 01    TESTXI R4 0001
-; D 50F6 A0 01 0E       IFTRUEI OR
-; D 50F9 86 04 00 02    TESTXI R4 0002
-; D 50FD A0 01 15       IFTRUEI OD
-; D 5100 53 06 00 01    SUBXI R6 0001                      left
-; D 5104 B0 01 19       GAL ON
+; D 50EB 23 00 26       COPYXY R2 -> R6
+; D 50EE 86 04 00 00    TESTXI R4 0000
+; D 50F2 A0 01 0A       IFTRUEI OU
+; D 50F5 86 04 00 01    TESTXI R4 0001
+; D 50F9 A0 01 11       IFTRUEI OR
+; D 50FC 86 04 00 02    TESTXI R4 0002
+; D 5100 A0 01 18       IFTRUEI OD
+; D 5103 53 06 00 01    SUBXI R6 0001                      left
+; D 5107 B0 01 1C       GAL ON
 ; OU:
-; D 5107 53 06 00 34    SUBXI R6 0034
-; D 510B B0 01 19       GAL ON
+; D 510A 53 06 00 34    SUBXI R6 0034
+; D 510E B0 01 1C       GAL ON
 ; OR:
-; D 510E 52 06 00 01    ADDXI R6 0001
-; D 5112 B0 01 19       GAL ON
+; D 5111 52 06 00 01    ADDXI R6 0001
+; D 5115 B0 01 1C       GAL ON
 ; OD:
-; D 5115 52 06 00 34    ADDXI R6 0034
+; D 5118 52 06 00 34    ADDXI R6 0034
 ; ON:
-; D 5119 50 66 07       ADDXYZ R6 + R6 -> R7
-; D 511C 51 72 07       SUBXYZ R7 - R2 -> R7               next = 2 x wall - here
-; D 511F BE 00          RETURN
+; D 511C 50 66 07       ADDXYZ R6 + R6 -> R7
+; D 511F 51 72 07       SUBXYZ R7 - R2 -> R7               next = 2 x wall - here
+; D 5122 BE 00          RETURN
 ; DRAW:
-; D 5121 4D BC          DIVXY R11 / R12                    row + 1, column
-; D 5123 25             COPYMAA
-; D 5124 21 0D          COPYAX Acc -> R13
-; D 5126 52 0D 00 02    ADDXI R13 0002
-; D 512A 27             COPYREMA
-; D 512B 21 0E          COPYAX Acc -> R14
-; D 512D 52 0E 00 0F    ADDXI R14 000F
-; D 5131 BD 01 39       CALL POSXY
-; D 5134 22 0A          COPYXA R10 -> Acc
-; D 5136 C9             SEROUT
-; D 5137 BE 00          RETURN
+; D 5124 4D BC          DIVXY R11 / R12                    row + 1, column
+; D 5126 25             COPYMAA
+; D 5127 21 0D          COPYAX Acc -> R13
+; D 5129 52 0D 00 02    ADDXI R13 0002
+; D 512D 27             COPYREMA
+; D 512E 21 0E          COPYAX Acc -> R14
+; D 5130 52 0E 00 0F    ADDXI R14 000F
+; D 5134 BD 01 3C       CALL POSXY
+; D 5137 22 0A          COPYXA R10 -> Acc
+; D 5139 C9             SEROUT
+; D 513A BE 00          RETURN
 ; POSXY:
-; D 5139 CA 1B          SEROUTI 1B
-; D 513B CA 5B          SEROUTI 5B '['
-; D 513D 4D DF          DIVXY R13 / R15
-; D 513F 25             COPYMAA
-; D 5140 4E 00 30       ADDAI 0030
-; D 5143 C9             SEROUT
-; D 5144 27             COPYREMA
-; D 5145 4E 00 30       ADDAI 0030
-; D 5148 C9             SEROUT
-; D 5149 CA 3B          SEROUTI 3B ';'
-; D 514B 4D EF          DIVXY R14 / R15
-; D 514D 25             COPYMAA
-; D 514E 4E 00 30       ADDAI 0030
-; D 5151 C9             SEROUT
-; D 5152 27             COPYREMA
-; D 5153 4E 00 30       ADDAI 0030
-; D 5156 C9             SEROUT
-; D 5157 CA 48          SEROUTI 48 'H'
-; D 5159 BE 00          RETURN
+; D 513C CA 1B          SEROUTI 1B
+; D 513E CA 5B          SEROUTI 5B '['
+; D 5140 4D DF          DIVXY R13 / R15
+; D 5142 25             COPYMAA
+; D 5143 4E 00 30       ADDAI 0030
+; D 5146 C9             SEROUT
+; D 5147 27             COPYREMA
+; D 5148 4E 00 30       ADDAI 0030
+; D 514B C9             SEROUT
+; D 514C CA 3B          SEROUTI 3B ';'
+; D 514E 4D EF          DIVXY R14 / R15
+; D 5150 25             COPYMAA
+; D 5151 4E 00 30       ADDAI 0030
+; D 5154 C9             SEROUT
+; D 5155 27             COPYREMA
+; D 5156 4E 00 30       ADDAI 0030
+; D 5159 C9             SEROUT
+; D 515A CA 48          SEROUTI 48 'H'
+; D 515C BE 00          RETURN
 ; PRNUM:
-; D 515B 11 08 00 00    LOADXI R8 0000
+; D 515E 11 08 00 00    LOADXI R8 0000
 ; PN1:
-; D 515F 4D 4F          DIVXY R4 / R15
-; D 5161 27             COPYREMA
-; D 5162 70 00          PUSHA Acc                          digits onto the stack
-; D 5164 42 08          INCX R8
-; D 5166 25             COPYMAA
-; D 5167 21 04          COPYAX Acc -> R4
-; D 5169 8C 04          TESTXZ R4
-; D 516B A1 01 5F       IFFALSEI PN1
+; D 5162 4D 4F          DIVXY R4 / R15
+; D 5164 27             COPYREMA
+; D 5165 70 00          PUSHA Acc                          digits onto the stack
+; D 5167 42 08          INCX R8
+; D 5169 25             COPYMAA
+; D 516A 21 04          COPYAX Acc -> R4
+; D 516C 8C 04          TESTXZ R4
+; D 516E A1 01 62       IFFALSEI PN1
 ; PN2:
-; D 516E 71 00          POPA Acc
-; D 5170 4E 00 30       ADDAI 0030
-; D 5173 C9             SEROUT
-; D 5174 43 08          DECX R8
-; D 5176 8C 08          TESTXZ R8
-; D 5178 A1 01 6E       IFFALSEI PN2
-; D 517B BE 00          RETURN
+; D 5171 71 00          POPA Acc
+; D 5173 4E 00 30       ADDAI 0030
+; D 5176 C9             SEROUT
+; D 5177 43 08          DECX R8
+; D 5179 8C 08          TESTXZ R8
+; D 517B A1 01 71       IFFALSEI PN2
+; D 517E BE 00          RETURN
 
 ; --------------------------------------------------------------------------
 ; CODE  -  download this block (VM1 then VM2)
@@ -574,7 +575,7 @@ D 5028 10 00 6F
 D 502B 2F 02 08 00
 D 502F 11 0A 00 6F
 D 5033 23 00 2B
-D 5036 BD 01 21
+D 5036 BD 01 24
 D 5039 11 08 00 01
 D 503D 11 09 00 00
 D 5041 87 25
@@ -584,7 +585,7 @@ D 5049 42 04
 D 504B 86 04 00 04
 D 504F A1 00 56
 D 5052 11 04 00 00
-D 5056 BD 00 E8
+D 5056 BD 00 EB
 D 5059 2E 06 08 00
 D 505D 81 00 23
 D 5060 A1 00 71
@@ -602,9 +603,9 @@ D 5080 2F 06 08 00
 D 5084 2F 07 08 00
 D 5088 11 0A 00 6F
 D 508C 23 00 6B
-D 508F BD 01 21
+D 508F BD 01 24
 D 5092 23 00 7B
-D 5095 BD 01 21
+D 5095 BD 01 24
 D 5098 42 08
 D 509A B0 00 BA
 D 509D 10 00 2E
@@ -612,9 +613,9 @@ D 50A0 2F 02 08 00
 D 50A4 2F 06 08 00
 D 50A8 11 0A 00 2E
 D 50AC 23 00 2B
-D 50AF BD 01 21
+D 50AF BD 01 24
 D 50B2 23 00 6B
-D 50B5 BD 01 21
+D 50B5 BD 01 24
 D 50B8 43 08
 D 50BA 23 00 72
 D 50BD 23 00 43
@@ -623,78 +624,89 @@ D 50C3 23 00 87
 D 50C6 11 0E 06 39
 D 50CA C1 0E
 D 50CC 23 00 94
-D 50CF BD 01 5B
+D 50CF BD 01 5E
 D 50D2 11 0E 06 51
 D 50D6 C1 0E
 D 50D8 23 00 74
-D 50DB BD 01 5B
+D 50DB BD 01 5E
 D 50DE 11 0E 06 67
 D 50E2 C1 0E
-D 50E4 00
-D 50E5 F0 00 00
-D 50E8 23 00 26
-D 50EB 86 04 00 00
-D 50EF A0 01 07
-D 50F2 86 04 00 01
-D 50F6 A0 01 0E
-D 50F9 86 04 00 02
-D 50FD A0 01 15
-D 5100 53 06 00 01
-D 5104 B0 01 19
-D 5107 53 06 00 34
-D 510B B0 01 19
-D 510E 52 06 00 01
-D 5112 B0 01 19
-D 5115 52 06 00 34
-D 5119 50 66 07
-D 511C 51 72 07
-D 511F BE 00
-D 5121 4D BC
-D 5123 25
-D 5124 21 0D
-D 5126 52 0D 00 02
-D 512A 27
-D 512B 21 0E
-D 512D 52 0E 00 0F
-D 5131 BD 01 39
-D 5134 22 0A
-D 5136 C9
-D 5137 BE 00
-D 5139 CA 1B
-D 513B CA 5B
-D 513D 4D DF
-D 513F 25
-D 5140 4E 00 30
-D 5143 C9
-D 5144 27
-D 5145 4E 00 30
-D 5148 C9
-D 5149 CA 3B
-D 514B 4D EF
-D 514D 25
-D 514E 4E 00 30
-D 5151 C9
-D 5152 27
-D 5153 4E 00 30
-D 5156 C9
-D 5157 CA 48
-D 5159 BE 00
-D 515B 11 08 00 00
-D 515F 4D 4F
-D 5161 27
-D 5162 70 00
-D 5164 42 08
-D 5166 25
-D 5167 21 04
-D 5169 8C 04
-D 516B A1 01 5F
-D 516E 71 00
-D 5170 4E 00 30
-D 5173 C9
-D 5174 43 08
-D 5176 8C 08
-D 5178 A1 01 6E
-D 517B BE 00
+D 50E4 F1 52 00
+D 50E7 00
+D 50E8 F0 00 00
+D 50EB 23 00 26
+D 50EE 86 04 00 00
+D 50F2 A0 01 0A
+D 50F5 86 04 00 01
+D 50F9 A0 01 11
+D 50FC 86 04 00 02
+D 5100 A0 01 18
+D 5103 53 06 00 01
+D 5107 B0 01 1C
+D 510A 53 06 00 34
+D 510E B0 01 1C
+D 5111 52 06 00 01
+D 5115 B0 01 1C
+D 5118 52 06 00 34
+D 511C 50 66 07
+D 511F 51 72 07
+D 5122 BE 00
+D 5124 4D BC
+D 5126 25
+D 5127 21 0D
+D 5129 52 0D 00 02
+D 512D 27
+D 512E 21 0E
+D 5130 52 0E 00 0F
+D 5134 BD 01 3C
+D 5137 22 0A
+D 5139 C9
+D 513A BE 00
+D 513C CA 1B
+D 513E CA 5B
+D 5140 4D DF
+D 5142 25
+D 5143 4E 00 30
+D 5146 C9
+D 5147 27
+D 5148 4E 00 30
+D 514B C9
+D 514C CA 3B
+D 514E 4D EF
+D 5150 25
+D 5151 4E 00 30
+D 5154 C9
+D 5155 27
+D 5156 4E 00 30
+D 5159 C9
+D 515A CA 48
+D 515C BE 00
+D 515E 11 08 00 00
+D 5162 4D 4F
+D 5164 27
+D 5165 70 00
+D 5167 42 08
+D 5169 25
+D 516A 21 04
+D 516C 8C 04
+D 516E A1 01 62
+D 5171 71 00
+D 5173 4E 00 30
+D 5176 C9
+D 5177 43 08
+D 5179 8C 08
+D 517B A1 01 71
+D 517E BE 00
+
+D 51F0 01
+
+D 5200 F8 52 B8 F8 48 A8 C0 52 09 E2 F8 51 B7 F8 F0 A7
+D 5210 07 C2 52 45 48 C2 52 45 BB 48 B7 48 A7 48 AB 8B
+D 5220 C2 52 2E C1 52 2A 7B C0 52 31 7A C0 52 31 7A C4
+D 5230 C4 9B A9 29 89 CA 52 33 27 87 CA 52 1F 97 CA 52
+D 5240 1F 7A C0 52 14 7A E2 D5 30 00 49 01 32 00 0F 00
+D 5250 25 00 5D 01 32 00 0F 00 1F 00 6D 01 32 00 0F 00
+D 5260 16 02 0F 01 00
 
 D 5600 1B 5B 30 32 3B 31 35 48 56 4D 32 3A 20 67 6F 74
 D 5610 20 74 68 65 20 6D 61 7A 65 20 2D 20 72 69 67 68

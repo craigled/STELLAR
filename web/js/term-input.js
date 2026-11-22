@@ -125,12 +125,14 @@
         btn.type = 'button'; btn.textContent = k[0];
         btn.setAttribute('aria-label', k[2] || k[1]);
         // pointerdown + preventDefault: the tap must not take focus from the textarea,
-        // or the keyboard would close every time an arrow is pressed
-        btn.addEventListener('pointerdown', function (e) {
+        // or the keyboard would close every time an arrow is pressed. Safari before iOS 13
+        // has no pointer events at all (the keys did nothing on an older iPad), so there the
+        // same is done on touchstart.
+        btn.addEventListener(window.PointerEvent ? 'pointerdown' : 'touchstart', function (e) {
           e.preventDefault();
           if (!k[1]) { openKeyboard(); return; }
           send(keyBytes({ key: k[1] }));
-        });
+        }, { passive: false });
         btn.addEventListener('click', function (e) { e.preventDefault(); });
         bar.appendChild(btn);
       });

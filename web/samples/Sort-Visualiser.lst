@@ -21,10 +21,10 @@
 ;
 ; VERIFICATION (Firmware-Math/sortvis_verify.py, V0061.33 image): the output is
 ; replayed into a VT100 screen and, after EVERY pass, the twenty bars must show
-; exactly a Python bubble sort's state after that pass - up, down (D) and new numbers (N) sorts all match, pass for pass.
+; exactly a Python bubble sort's state after that pass - PASS 2026-11-22 with the sorted chime (run on V0061.34).
 ; NOT YET RUN ON HARDWARE.
 ;
-; 224 STELLAR commands, $4000-$423E (575 bytes).  Arrays at $4900/$4940, the bar's
+; 225 STELLAR commands, $4000-$4241 (578 bytes).  Arrays at $4900/$4940, the bar's
 ; run of spaces at $4A00, strings at $4B00.
 ;
 ; --------------------------------------------------------------------------
@@ -50,12 +50,12 @@
 ; D 4023 CA 6C          SEROUTI 6C 'l'
 ; D 4025 11 0D 00 01    LOADXI R13 0001
 ; D 4029 11 0E 00 01    LOADXI R14 0001
-; D 402D BD 02 1D       CALL POSXY
+; D 402D BD 02 20       CALL POSXY
 ; D 4030 11 0E 0B 00    LOADXI R14 0B00
 ; D 4034 C1 0E          PRINTSTR R14                       The title on line 1
 ; D 4036 11 0D 00 18    LOADXI R13 0018
 ; D 403A 11 0E 00 01    LOADXI R14 0001
-; D 403E BD 02 1D       CALL POSXY
+; D 403E BD 02 20       CALL POSXY
 ; D 4041 11 0E 0B 41    LOADXI R14 0B41
 ; D 4045 C1 0E          PRINTSTR R14
 ; SEED:
@@ -65,10 +65,10 @@
 ; D 404C CB             SERIN                              and throw the key away -
 ; D 404D 81 00 1B       TESTAI 001B
 ; D 4050 A1 00 61       IFFALSEI NEW                       unless it is a lone ESC
-; D 4053 BD 01 92       CALL KWAIT
-; D 4056 A1 01 6F       IFFALSEI QUIT
+; D 4053 BD 01 95       CALL KWAIT
+; D 4056 A1 01 72       IFFALSEI QUIT
 ; D 4059 CB             SERIN                              an arrow (ESC [ x): its two bytes are thrown away
-; D 405A BD 01 92       CALL KWAIT
+; D 405A BD 01 95       CALL KWAIT
 ; D 405D A1 00 61       IFFALSEI NEW
 ; D 4060 CB             SERIN
 ; NEW:
@@ -89,11 +89,11 @@
 ; D 4081 11 01 00 00    LOADXI R1 0000                     No passes yet
 ; D 4085 11 03 00 00    LOADXI R3 0000
 ; ALL:
-; D 4089 BD 01 A7       CALL DRAWROW
+; D 4089 BD 01 AA       CALL DRAWROW
 ; D 408C 42 03          INCX R3
 ; D 408E 87 32          TESTXY R3 = R2
 ; D 4090 A1 00 89       IFFALSEI ALL
-; D 4093 BD 01 F5       CALL STATUS
+; D 4093 BD 01 F8       CALL STATUS
 ; PASS:
 ; D 4096 11 0D 09 00    LOADXI R13 0900
 ; D 409A 11 0E 09 40    LOADXI R14 0940
@@ -122,163 +122,164 @@
 ; D 40D6 21 07          COPYAX Acc -> R7
 ; D 40D8 87 67          TESTXY R6 = R7
 ; D 40DA A0 00 E0       IFTRUEI SAME
-; D 40DD BD 01 A7       CALL DRAWROW
+; D 40DD BD 01 AA       CALL DRAWROW
 ; SAME:
 ; D 40E0 42 03          INCX R3
 ; D 40E2 87 32          TESTXY R3 = R2
 ; D 40E4 A1 00 CC       IFFALSEI CHG
-; D 40E7 BD 01 F5       CALL STATUS
+; D 40E7 BD 01 F8       CALL STATUS
 ; D 40EA 8C 08          TESTXZ R8
 ; D 40EC A0 00 96       IFTRUEI PASS                       Something moved: another pass
 ; DONE:
 ; D 40EF 11 0E 0B 96    LOADXI R14 0B96
 ; D 40F3 C1 0E          PRINTSTR R14                       Sorted
-; D 40F5 11 0D 00 18    LOADXI R13 0018
-; D 40F9 11 0E 00 01    LOADXI R14 0001
-; D 40FD BD 02 1D       CALL POSXY
-; D 4100 CA 1B          SEROUTI 1B                         Clear the old prompt
-; D 4102 CA 5B          SEROUTI 5B '['
-; D 4104 CA 4B          SEROUTI 4B 'K'
-; D 4106 11 0E 0B 59    LOADXI R14 0B59
-; D 410A C1 0E          PRINTSTR R14
+; D 40F5 F1 4C 00       RUNMC 4C00                         a rising chime
+; D 40F8 11 0D 00 18    LOADXI R13 0018
+; D 40FC 11 0E 00 01    LOADXI R14 0001
+; D 4100 BD 02 20       CALL POSXY
+; D 4103 CA 1B          SEROUTI 1B                         Clear the old prompt
+; D 4105 CA 5B          SEROUTI 5B '['
+; D 4107 CA 4B          SEROUTI 4B 'K'
+; D 4109 11 0E 0B 59    LOADXI R14 0B59
+; D 410D C1 0E          PRINTSTR R14
 ; KEY:
-; D 410C CB             SERIN                              Wait for a key (other VMs keep running)
-; D 410D 21 06          COPYAX Acc -> R6
-; D 410F 86 06 00 1B    TESTXI R6 001B
-; D 4113 A1 01 26       IFFALSEI KEYL
-; D 4116 BD 01 92       CALL KWAIT                         ESC: an arrow following?
-; D 4119 A1 01 6F       IFFALSEI QUIT                      no: ESC on its own quits
+; D 410F CB             SERIN                              Wait for a key (other VMs keep running)
+; D 4110 21 06          COPYAX Acc -> R6
+; D 4112 86 06 00 1B    TESTXI R6 001B
+; D 4116 A1 01 29       IFFALSEI KEYL
+; D 4119 BD 01 95       CALL KWAIT                         ESC: an arrow following?
+; D 411C A1 01 72       IFFALSEI QUIT                      no: ESC on its own quits
 ; KESC:
-; D 411C CB             SERIN                              yes: the rest of it is thrown away
-; D 411D BD 01 92       CALL KWAIT
-; D 4120 A0 01 1C       IFTRUEI KESC
-; D 4123 B0 01 0C       GAL KEY
+; D 411F CB             SERIN                              yes: the rest of it is thrown away
+; D 4120 BD 01 95       CALL KWAIT
+; D 4123 A0 01 1F       IFTRUEI KESC
+; D 4126 B0 01 0F       GAL KEY
 ; KEYL:
-; D 4126 86 06 00 71    TESTXI R6 0071
-; D 412A A0 01 6F       IFTRUEI QUIT
-; D 412D 86 06 00 51    TESTXI R6 0051
-; D 4131 A0 01 6F       IFTRUEI QUIT
-; D 4134 86 06 00 61    TESTXI R6 0061
-; D 4138 A0 01 61       IFTRUEI UP
-; D 413B 86 06 00 41    TESTXI R6 0041
-; D 413F A0 01 61       IFTRUEI UP
-; D 4142 86 06 00 64    TESTXI R6 0064
-; D 4146 A0 01 68       IFTRUEI DN
-; D 4149 86 06 00 44    TESTXI R6 0044
-; D 414D A0 01 68       IFTRUEI DN
-; D 4150 86 06 00 6E    TESTXI R6 006E
-; D 4154 A0 00 61       IFTRUEI NEW
-; D 4157 86 06 00 4E    TESTXI R6 004E
-; D 415B A0 00 61       IFTRUEI NEW
-; D 415E B0 01 0C       GAL KEY
+; D 4129 86 06 00 71    TESTXI R6 0071
+; D 412D A0 01 72       IFTRUEI QUIT
+; D 4130 86 06 00 51    TESTXI R6 0051
+; D 4134 A0 01 72       IFTRUEI QUIT
+; D 4137 86 06 00 61    TESTXI R6 0061
+; D 413B A0 01 64       IFTRUEI UP
+; D 413E 86 06 00 41    TESTXI R6 0041
+; D 4142 A0 01 64       IFTRUEI UP
+; D 4145 86 06 00 64    TESTXI R6 0064
+; D 4149 A0 01 6B       IFTRUEI DN
+; D 414C 86 06 00 44    TESTXI R6 0044
+; D 4150 A0 01 6B       IFTRUEI DN
+; D 4153 86 06 00 6E    TESTXI R6 006E
+; D 4157 A0 00 61       IFTRUEI NEW
+; D 415A 86 06 00 4E    TESTXI R6 004E
+; D 415E A0 00 61       IFTRUEI NEW
+; D 4161 B0 01 0F       GAL KEY
 ; UP:
-; D 4161 11 05 00 00    LOADXI R5 0000
-; D 4165 B0 00 81       GAL SORT
+; D 4164 11 05 00 00    LOADXI R5 0000
+; D 4168 B0 00 81       GAL SORT
 ; DN:
-; D 4168 11 05 00 01    LOADXI R5 0001
-; D 416C B0 00 81       GAL SORT
+; D 416B 11 05 00 01    LOADXI R5 0001
+; D 416F B0 00 81       GAL SORT
 ; QUIT:
-; D 416F CA 1B          SEROUTI 1B                         Normal video, cursor back, clear, home
-; D 4171 CA 5B          SEROUTI 5B '['
-; D 4173 CA 30          SEROUTI 30 '0'
-; D 4175 CA 6D          SEROUTI 6D 'm'
-; D 4177 CA 1B          SEROUTI 1B
-; D 4179 CA 5B          SEROUTI 5B '['
-; D 417B CA 3F          SEROUTI 3F '?'
-; D 417D CA 32          SEROUTI 32 '2'
-; D 417F CA 35          SEROUTI 35 '5'
-; D 4181 CA 68          SEROUTI 68 'h'
-; D 4183 CA 1B          SEROUTI 1B
-; D 4185 CA 5B          SEROUTI 5B '['
-; D 4187 CA 32          SEROUTI 32 '2'
-; D 4189 CA 4A          SEROUTI 4A 'J'
-; D 418B CA 1B          SEROUTI 1B
-; D 418D CA 5B          SEROUTI 5B '['
-; D 418F CA 48          SEROUTI 48 'H'
-; D 4191 00             HALT
+; D 4172 CA 1B          SEROUTI 1B                         Normal video, cursor back, clear, home
+; D 4174 CA 5B          SEROUTI 5B '['
+; D 4176 CA 30          SEROUTI 30 '0'
+; D 4178 CA 6D          SEROUTI 6D 'm'
+; D 417A CA 1B          SEROUTI 1B
+; D 417C CA 5B          SEROUTI 5B '['
+; D 417E CA 3F          SEROUTI 3F '?'
+; D 4180 CA 32          SEROUTI 32 '2'
+; D 4182 CA 35          SEROUTI 35 '5'
+; D 4184 CA 68          SEROUTI 68 'h'
+; D 4186 CA 1B          SEROUTI 1B
+; D 4188 CA 5B          SEROUTI 5B '['
+; D 418A CA 32          SEROUTI 32 '2'
+; D 418C CA 4A          SEROUTI 4A 'J'
+; D 418E CA 1B          SEROUTI 1B
+; D 4190 CA 5B          SEROUTI 5B '['
+; D 4192 CA 48          SEROUTI 48 'H'
+; D 4194 00             HALT
 ; KWAIT:
-; D 4192 11 07 00 08    LOADXI R7 0008
+; D 4195 11 07 00 08    LOADXI R7 0008
 ; KWAIT1:
-; D 4196 CC             SERST
-; D 4197 A0 01 A2       IFTRUEI KWAIT2
-; D 419A 43 07          DECX R7
-; D 419C 8C 07          TESTXZ R7
-; D 419E A1 01 96       IFFALSEI KWAIT1
-; D 41A1 CC             SERST                              Test false: nothing came
+; D 4199 CC             SERST
+; D 419A A0 01 A5       IFTRUEI KWAIT2
+; D 419D 43 07          DECX R7
+; D 419F 8C 07          TESTXZ R7
+; D 41A1 A1 01 99       IFFALSEI KWAIT1
+; D 41A4 CC             SERST                              Test false: nothing came
 ; KWAIT2:
-; D 41A2 BE 00          RETURN
-; D 41A4 F0 00 00       BREAK                              End of program
+; D 41A5 BE 00          RETURN
+; D 41A7 F0 00 00       BREAK                              End of program
 ; DRAWROW:
-; D 41A7 23 00 3D       COPYXY R3 -> R13
-; D 41AA 52 0D 00 03    ADDXI R13 0003                     screen line
-; D 41AE 11 0E 00 01    LOADXI R14 0001
-; D 41B2 BD 02 1D       CALL POSXY
-; D 41B5 2E 03 09 00    READIDX R3 0900
-; D 41B9 21 04          COPYAX Acc -> R4                   R4 = the value
-; D 41BB 4D 4F          DIVXY R4 / R15
-; D 41BD 25             COPYMAA
-; D 41BE 4E 00 30       ADDAI 0030
-; D 41C1 C9             SEROUT                             tens
-; D 41C2 27             COPYREMA
-; D 41C3 4E 00 30       ADDAI 0030
-; D 41C6 C9             SEROUT                             units
-; D 41C7 CA 20          SEROUTI 20
-; D 41C9 CA 1B          SEROUTI 1B                         Reverse video: a space is a block
-; D 41CB CA 5B          SEROUTI 5B '['
-; D 41CD CA 37          SEROUTI 37 '7'
-; D 41CF CA 6D          SEROUTI 6D 'm'
-; D 41D1 10 00 00       LOADAI 0000
-; D 41D4 2F 04 0A 00    WRITEIDX R4 0A00                   Cut the run of spaces to the value
-; D 41D8 11 0E 0A 00    LOADXI R14 0A00
-; D 41DC C1 0E          PRINTSTR R14                       the bar
-; D 41DE 10 00 20       LOADAI 0020
-; D 41E1 2F 04 0A 00    WRITEIDX R4 0A00                   and mend it
-; D 41E5 CA 1B          SEROUTI 1B                         Normal video; erase what the old bar left
-; D 41E7 CA 5B          SEROUTI 5B '['
-; D 41E9 CA 30          SEROUTI 30 '0'
-; D 41EB CA 6D          SEROUTI 6D 'm'
-; D 41ED CA 1B          SEROUTI 1B
-; D 41EF CA 5B          SEROUTI 5B '['
-; D 41F1 CA 4B          SEROUTI 4B 'K'
-; D 41F3 BE 00          RETURN
+; D 41AA 23 00 3D       COPYXY R3 -> R13
+; D 41AD 52 0D 00 03    ADDXI R13 0003                     screen line
+; D 41B1 11 0E 00 01    LOADXI R14 0001
+; D 41B5 BD 02 20       CALL POSXY
+; D 41B8 2E 03 09 00    READIDX R3 0900
+; D 41BC 21 04          COPYAX Acc -> R4                   R4 = the value
+; D 41BE 4D 4F          DIVXY R4 / R15
+; D 41C0 25             COPYMAA
+; D 41C1 4E 00 30       ADDAI 0030
+; D 41C4 C9             SEROUT                             tens
+; D 41C5 27             COPYREMA
+; D 41C6 4E 00 30       ADDAI 0030
+; D 41C9 C9             SEROUT                             units
+; D 41CA CA 20          SEROUTI 20
+; D 41CC CA 1B          SEROUTI 1B                         Reverse video: a space is a block
+; D 41CE CA 5B          SEROUTI 5B '['
+; D 41D0 CA 37          SEROUTI 37 '7'
+; D 41D2 CA 6D          SEROUTI 6D 'm'
+; D 41D4 10 00 00       LOADAI 0000
+; D 41D7 2F 04 0A 00    WRITEIDX R4 0A00                   Cut the run of spaces to the value
+; D 41DB 11 0E 0A 00    LOADXI R14 0A00
+; D 41DF C1 0E          PRINTSTR R14                       the bar
+; D 41E1 10 00 20       LOADAI 0020
+; D 41E4 2F 04 0A 00    WRITEIDX R4 0A00                   and mend it
+; D 41E8 CA 1B          SEROUTI 1B                         Normal video; erase what the old bar left
+; D 41EA CA 5B          SEROUTI 5B '['
+; D 41EC CA 30          SEROUTI 30 '0'
+; D 41EE CA 6D          SEROUTI 6D 'm'
+; D 41F0 CA 1B          SEROUTI 1B
+; D 41F2 CA 5B          SEROUTI 5B '['
+; D 41F4 CA 4B          SEROUTI 4B 'K'
+; D 41F6 BE 00          RETURN
 ; STATUS:
-; D 41F5 11 0D 00 17    LOADXI R13 0017
-; D 41F9 11 0E 00 01    LOADXI R14 0001
-; D 41FD BD 02 1D       CALL POSXY
-; D 4200 11 0E 0B 90    LOADXI R14 0B90
-; D 4204 C1 0E          PRINTSTR R14
-; D 4206 23 00 14       COPYXY R1 -> R4
-; D 4209 4D 4F          DIVXY R4 / R15
-; D 420B 25             COPYMAA
-; D 420C 4E 00 30       ADDAI 0030
-; D 420F C9             SEROUT
-; D 4210 27             COPYREMA
-; D 4211 4E 00 30       ADDAI 0030
-; D 4214 C9             SEROUT
-; D 4215 CA 1B          SEROUTI 1B
-; D 4217 CA 5B          SEROUTI 5B '['
-; D 4219 CA 4B          SEROUTI 4B 'K'
-; D 421B BE 00          RETURN
+; D 41F8 11 0D 00 17    LOADXI R13 0017
+; D 41FC 11 0E 00 01    LOADXI R14 0001
+; D 4200 BD 02 20       CALL POSXY
+; D 4203 11 0E 0B 90    LOADXI R14 0B90
+; D 4207 C1 0E          PRINTSTR R14
+; D 4209 23 00 14       COPYXY R1 -> R4
+; D 420C 4D 4F          DIVXY R4 / R15
+; D 420E 25             COPYMAA
+; D 420F 4E 00 30       ADDAI 0030
+; D 4212 C9             SEROUT
+; D 4213 27             COPYREMA
+; D 4214 4E 00 30       ADDAI 0030
+; D 4217 C9             SEROUT
+; D 4218 CA 1B          SEROUTI 1B
+; D 421A CA 5B          SEROUTI 5B '['
+; D 421C CA 4B          SEROUTI 4B 'K'
+; D 421E BE 00          RETURN
 ; POSXY:
-; D 421D CA 1B          SEROUTI 1B
-; D 421F CA 5B          SEROUTI 5B '['
-; D 4221 4D DF          DIVXY R13 / R15
-; D 4223 25             COPYMAA
-; D 4224 4E 00 30       ADDAI 0030
-; D 4227 C9             SEROUT
-; D 4228 27             COPYREMA
-; D 4229 4E 00 30       ADDAI 0030
-; D 422C C9             SEROUT
-; D 422D CA 3B          SEROUTI 3B ';'
-; D 422F 4D EF          DIVXY R14 / R15
-; D 4231 25             COPYMAA
-; D 4232 4E 00 30       ADDAI 0030
-; D 4235 C9             SEROUT
-; D 4236 27             COPYREMA
-; D 4237 4E 00 30       ADDAI 0030
-; D 423A C9             SEROUT
-; D 423B CA 48          SEROUTI 48 'H'
-; D 423D BE 00          RETURN
+; D 4220 CA 1B          SEROUTI 1B
+; D 4222 CA 5B          SEROUTI 5B '['
+; D 4224 4D DF          DIVXY R13 / R15
+; D 4226 25             COPYMAA
+; D 4227 4E 00 30       ADDAI 0030
+; D 422A C9             SEROUT
+; D 422B 27             COPYREMA
+; D 422C 4E 00 30       ADDAI 0030
+; D 422F C9             SEROUT
+; D 4230 CA 3B          SEROUTI 3B ';'
+; D 4232 4D EF          DIVXY R14 / R15
+; D 4234 25             COPYMAA
+; D 4235 4E 00 30       ADDAI 0030
+; D 4238 C9             SEROUT
+; D 4239 27             COPYREMA
+; D 423A 4E 00 30       ADDAI 0030
+; D 423D C9             SEROUT
+; D 423E CA 48          SEROUTI 48 'H'
+; D 4240 BE 00          RETURN
 
 ; --------------------------------------------------------------------------
 ; CODE  -  download this block
@@ -303,12 +304,12 @@ D 4021 CA 35
 D 4023 CA 6C
 D 4025 11 0D 00 01
 D 4029 11 0E 00 01
-D 402D BD 02 1D
+D 402D BD 02 20
 D 4030 11 0E 0B 00
 D 4034 C1 0E
 D 4036 11 0D 00 18
 D 403A 11 0E 00 01
-D 403E BD 02 1D
+D 403E BD 02 20
 D 4041 11 0E 0B 41
 D 4045 C1 0E
 D 4047 C3
@@ -317,10 +318,10 @@ D 4049 A1 00 47
 D 404C CB
 D 404D 81 00 1B
 D 4050 A1 00 61
-D 4053 BD 01 92
-D 4056 A1 01 6F
+D 4053 BD 01 95
+D 4056 A1 01 72
 D 4059 CB
-D 405A BD 01 92
+D 405A BD 01 95
 D 405D A1 00 61
 D 4060 CB
 D 4061 11 03 00 00
@@ -337,11 +338,11 @@ D 407A A1 00 69
 D 407D 11 05 00 00
 D 4081 11 01 00 00
 D 4085 11 03 00 00
-D 4089 BD 01 A7
+D 4089 BD 01 AA
 D 408C 42 03
 D 408E 87 32
 D 4090 A1 00 89
-D 4093 BD 01 F5
+D 4093 BD 01 F8
 D 4096 11 0D 09 00
 D 409A 11 0E 09 40
 D 409E 3B DE 14
@@ -365,149 +366,150 @@ D 40D2 2E 03 09 40
 D 40D6 21 07
 D 40D8 87 67
 D 40DA A0 00 E0
-D 40DD BD 01 A7
+D 40DD BD 01 AA
 D 40E0 42 03
 D 40E2 87 32
 D 40E4 A1 00 CC
-D 40E7 BD 01 F5
+D 40E7 BD 01 F8
 D 40EA 8C 08
 D 40EC A0 00 96
 D 40EF 11 0E 0B 96
 D 40F3 C1 0E
-D 40F5 11 0D 00 18
-D 40F9 11 0E 00 01
-D 40FD BD 02 1D
-D 4100 CA 1B
-D 4102 CA 5B
-D 4104 CA 4B
-D 4106 11 0E 0B 59
-D 410A C1 0E
-D 410C CB
-D 410D 21 06
-D 410F 86 06 00 1B
-D 4113 A1 01 26
-D 4116 BD 01 92
-D 4119 A1 01 6F
-D 411C CB
-D 411D BD 01 92
-D 4120 A0 01 1C
-D 4123 B0 01 0C
-D 4126 86 06 00 71
-D 412A A0 01 6F
-D 412D 86 06 00 51
-D 4131 A0 01 6F
-D 4134 86 06 00 61
-D 4138 A0 01 61
-D 413B 86 06 00 41
-D 413F A0 01 61
-D 4142 86 06 00 64
-D 4146 A0 01 68
-D 4149 86 06 00 44
-D 414D A0 01 68
-D 4150 86 06 00 6E
-D 4154 A0 00 61
-D 4157 86 06 00 4E
-D 415B A0 00 61
-D 415E B0 01 0C
-D 4161 11 05 00 00
-D 4165 B0 00 81
-D 4168 11 05 00 01
-D 416C B0 00 81
-D 416F CA 1B
-D 4171 CA 5B
-D 4173 CA 30
-D 4175 CA 6D
-D 4177 CA 1B
-D 4179 CA 5B
-D 417B CA 3F
-D 417D CA 32
-D 417F CA 35
-D 4181 CA 68
-D 4183 CA 1B
-D 4185 CA 5B
-D 4187 CA 32
-D 4189 CA 4A
-D 418B CA 1B
-D 418D CA 5B
-D 418F CA 48
-D 4191 00
-D 4192 11 07 00 08
-D 4196 CC
-D 4197 A0 01 A2
-D 419A 43 07
-D 419C 8C 07
-D 419E A1 01 96
-D 41A1 CC
-D 41A2 BE 00
-D 41A4 F0 00 00
-D 41A7 23 00 3D
-D 41AA 52 0D 00 03
-D 41AE 11 0E 00 01
-D 41B2 BD 02 1D
-D 41B5 2E 03 09 00
-D 41B9 21 04
-D 41BB 4D 4F
-D 41BD 25
-D 41BE 4E 00 30
-D 41C1 C9
-D 41C2 27
-D 41C3 4E 00 30
-D 41C6 C9
-D 41C7 CA 20
-D 41C9 CA 1B
-D 41CB CA 5B
-D 41CD CA 37
-D 41CF CA 6D
-D 41D1 10 00 00
-D 41D4 2F 04 0A 00
-D 41D8 11 0E 0A 00
-D 41DC C1 0E
-D 41DE 10 00 20
-D 41E1 2F 04 0A 00
-D 41E5 CA 1B
-D 41E7 CA 5B
-D 41E9 CA 30
-D 41EB CA 6D
-D 41ED CA 1B
-D 41EF CA 5B
-D 41F1 CA 4B
-D 41F3 BE 00
-D 41F5 11 0D 00 17
-D 41F9 11 0E 00 01
-D 41FD BD 02 1D
-D 4200 11 0E 0B 90
-D 4204 C1 0E
-D 4206 23 00 14
-D 4209 4D 4F
-D 420B 25
-D 420C 4E 00 30
-D 420F C9
-D 4210 27
-D 4211 4E 00 30
-D 4214 C9
-D 4215 CA 1B
-D 4217 CA 5B
-D 4219 CA 4B
-D 421B BE 00
-D 421D CA 1B
-D 421F CA 5B
-D 4221 4D DF
-D 4223 25
-D 4224 4E 00 30
-D 4227 C9
-D 4228 27
-D 4229 4E 00 30
-D 422C C9
-D 422D CA 3B
-D 422F 4D EF
-D 4231 25
-D 4232 4E 00 30
-D 4235 C9
-D 4236 27
-D 4237 4E 00 30
-D 423A C9
-D 423B CA 48
-D 423D BE 00
+D 40F5 F1 4C 00
+D 40F8 11 0D 00 18
+D 40FC 11 0E 00 01
+D 4100 BD 02 20
+D 4103 CA 1B
+D 4105 CA 5B
+D 4107 CA 4B
+D 4109 11 0E 0B 59
+D 410D C1 0E
+D 410F CB
+D 4110 21 06
+D 4112 86 06 00 1B
+D 4116 A1 01 29
+D 4119 BD 01 95
+D 411C A1 01 72
+D 411F CB
+D 4120 BD 01 95
+D 4123 A0 01 1F
+D 4126 B0 01 0F
+D 4129 86 06 00 71
+D 412D A0 01 72
+D 4130 86 06 00 51
+D 4134 A0 01 72
+D 4137 86 06 00 61
+D 413B A0 01 64
+D 413E 86 06 00 41
+D 4142 A0 01 64
+D 4145 86 06 00 64
+D 4149 A0 01 6B
+D 414C 86 06 00 44
+D 4150 A0 01 6B
+D 4153 86 06 00 6E
+D 4157 A0 00 61
+D 415A 86 06 00 4E
+D 415E A0 00 61
+D 4161 B0 01 0F
+D 4164 11 05 00 00
+D 4168 B0 00 81
+D 416B 11 05 00 01
+D 416F B0 00 81
+D 4172 CA 1B
+D 4174 CA 5B
+D 4176 CA 30
+D 4178 CA 6D
+D 417A CA 1B
+D 417C CA 5B
+D 417E CA 3F
+D 4180 CA 32
+D 4182 CA 35
+D 4184 CA 68
+D 4186 CA 1B
+D 4188 CA 5B
+D 418A CA 32
+D 418C CA 4A
+D 418E CA 1B
+D 4190 CA 5B
+D 4192 CA 48
+D 4194 00
+D 4195 11 07 00 08
+D 4199 CC
+D 419A A0 01 A5
+D 419D 43 07
+D 419F 8C 07
+D 41A1 A1 01 99
+D 41A4 CC
+D 41A5 BE 00
+D 41A7 F0 00 00
+D 41AA 23 00 3D
+D 41AD 52 0D 00 03
+D 41B1 11 0E 00 01
+D 41B5 BD 02 20
+D 41B8 2E 03 09 00
+D 41BC 21 04
+D 41BE 4D 4F
+D 41C0 25
+D 41C1 4E 00 30
+D 41C4 C9
+D 41C5 27
+D 41C6 4E 00 30
+D 41C9 C9
+D 41CA CA 20
+D 41CC CA 1B
+D 41CE CA 5B
+D 41D0 CA 37
+D 41D2 CA 6D
+D 41D4 10 00 00
+D 41D7 2F 04 0A 00
+D 41DB 11 0E 0A 00
+D 41DF C1 0E
+D 41E1 10 00 20
+D 41E4 2F 04 0A 00
+D 41E8 CA 1B
+D 41EA CA 5B
+D 41EC CA 30
+D 41EE CA 6D
+D 41F0 CA 1B
+D 41F2 CA 5B
+D 41F4 CA 4B
+D 41F6 BE 00
+D 41F8 11 0D 00 17
+D 41FC 11 0E 00 01
+D 4200 BD 02 20
+D 4203 11 0E 0B 90
+D 4207 C1 0E
+D 4209 23 00 14
+D 420C 4D 4F
+D 420E 25
+D 420F 4E 00 30
+D 4212 C9
+D 4213 27
+D 4214 4E 00 30
+D 4217 C9
+D 4218 CA 1B
+D 421A CA 5B
+D 421C CA 4B
+D 421E BE 00
+D 4220 CA 1B
+D 4222 CA 5B
+D 4224 4D DF
+D 4226 25
+D 4227 4E 00 30
+D 422A C9
+D 422B 27
+D 422C 4E 00 30
+D 422F C9
+D 4230 CA 3B
+D 4232 4D EF
+D 4234 25
+D 4235 4E 00 30
+D 4238 C9
+D 4239 27
+D 423A 4E 00 30
+D 423D C9
+D 423E CA 48
+D 4240 BE 00
 
 D 4A00 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
 D 4A10 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
@@ -527,6 +529,16 @@ D 4B90 50 61 73 73 20 00 20 20 73 6F 72 74 65 64 20 2D
 D 4BA0 20 74 68 65 20 6C 61 73 74 20 70 61 73 73 20 66
 D 4BB0 6F 75 6E 64 20 6E 6F 74 68 69 6E 67 20 74 6F 20
 D 4BC0 73 77 61 70 2E 20 20 00
+
+D 4BF0 01
+
+D 4C00 F8 4C B8 F8 48 A8 C0 4C 09 E2 F8 4B B7 F8 F0 A7
+D 4C10 07 C2 4C 45 48 C2 4C 45 BB 48 B7 48 A7 48 AB 8B
+D 4C20 C2 4C 2E C1 4C 2A 7B C0 4C 31 7A C0 4C 31 7A C4
+D 4C30 C4 9B A9 29 89 CA 4C 33 27 87 CA 4C 1F 97 CA 4C
+D 4C40 1F 7A C0 4C 14 7A E2 D5 30 00 3E 01 32 00 0A 00
+D 4C50 25 00 50 01 32 00 0A 00 1F 00 5D 01 32 00 0A 00
+D 4C60 16 01 A5 01 00
 D 5000 00
 D 6000 00
 D 7000 00
