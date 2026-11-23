@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '189';                                    // the ?v= the card is fetched with
+  var V = '190';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var CPS = 375000;                                 // its machine cycles a second (3 MHz / 8)
@@ -24,7 +24,7 @@
     ['TEST', 'a script: a name alone finds TEST.SH'],
     ['DEMO you', 'DEMO.SH: functions, loops, case, $( )'],
     ['SH -x TEST', 'each line shown as it runs'],
-    ['LW2 DOCS/LETTER.TXT', 'Lite-Writer 2 (Ctrl-X: the menu)'],
+    ['CAL', 'a calendar, as Unix cal lays it out: this month, today reversed; CAL 2026 a year; CAL 9 1752 the month with 11 days gone'],
     ['LTWRITER DOCS/BOOK.TXT', 'Lite-Writer 3: a 20 KB file, a part at a time (Ctrl-N, Ctrl-P)'],
     ['NANO DOCS/BOOK.TXT', 'NANO: a small editor in 1802 code - long lines wrapped, Shift+arrow selects (Ctrl-G: every key)'],
     ['LTCALC DOCS/BUDGET', 'LTCALC: a small spreadsheet in 1802 code; change a number and watch the totals'],
