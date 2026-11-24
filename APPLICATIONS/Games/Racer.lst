@@ -11,11 +11,11 @@
 ; it (Scroll-Check: only test A, a plain ESC M, works) - v1 needed one and its road
 ; never moved down on the Elf2K.
 ;
-; VERIFICATION (Firmware-Math/racer_verify.py): V0061.37, 2026-11-18 - the autopilot drives 300 frames round 38 rocks, speed 1-9, edge and rock crashes, restart, rerun: PASS
-; HW-VERIFIED on the Elf2K (V0061.33), 2026-09-24 - v2 works. v3 (rocks, 2026-11-18): not yet on hardware.
-; VERSION:  3
+; VERIFICATION (Firmware-Math/racer_verify.py): racer_verify.py PASS 2026-11-23 on V0061.37 (1-5, 2b: arrows through a one-byte UART)
+; HW-VERIFIED on the Elf2K (V0061.33), 2026-09-24 - v2 works. v3 (rocks, 2026-11-18). v4 (2026-11-23): a lone A-D is an arrow (the UART keeps only an arrow's last byte).
+; VERSION:  4
 ;
-; 331 STELLAR commands.
+; 361 STELLAR commands.
 ;
 ; --------------------------------------------------------------------------
 ; DISASSEMBLY  -  commented out; the loader skips it
@@ -24,370 +24,404 @@
 ; D 4000 CD             START
 ; D 4001 11 0F 00 0A    LOADXI R15 000A
 ; D 4005 11 0B 00 00    LOADXI R11 0000                    RB = 0: the index for patching strings
-; D 4009 11 0E 07 8E    LOADXI R14 078E
-; D 400D C1 0E          PRINTSTR R14
+; D 4009 10 00 01       LOADAI 0001
+; D 400C 2F 0B 0F 80    WRITEIDX R11 0F80                  the sound on
+; D 4010 11 0E 07 8E    LOADXI R14 078E
+; D 4014 C1 0E          PRINTSTR R14
 ; SEED:
-; D 400F C3             RAND                               Spin the generator until a key comes: every road differs
-; D 4010 CC             SERST
-; D 4011 A1 00 0F       IFFALSEI SEED
-; D 4014 BD 03 6A       CALL ANYKEY                        Take it (an ESC on its own quits)
+; D 4016 C3             RAND                               Spin the generator until a key comes: every road differs
+; D 4017 CC             SERST
+; D 4018 A1 00 16       IFFALSEI SEED
+; D 401B BD 03 C7       CALL ANYKEY                        Take it (an ESC on its own quits)
 ; NEW:
-; D 4017 11 0E 07 7F    LOADXI R14 077F
-; D 401B C1 0E          PRINTSTR R14                       Clear, hide the cursor
-; D 401D 11 02 00 20    LOADXI R2 0020
-; D 4021 11 03 00 01    LOADXI R3 0001                     straight
-; D 4025 11 04 00 17    LOADXI R4 0017                     a straight start
-; D 4029 11 05 00 27    LOADXI R5 0027                     the car in the middle
-; D 402D 11 06 00 05    LOADXI R6 0005
-; D 4031 11 07 00 01    LOADXI R7 0001
-; D 4035 11 08 00 00    LOADXI R8 0000
-; D 4039 11 01 00 00    LOADXI R1 0000
-; D 403D 11 0D 00 01    LOADXI R13 0001
-; D 4041 11 09 0F 00    LOADXI R9 0F00
-; D 4045 11 0A 0F 3F    LOADXI R10 0F3F
-; D 4049 FB 9A 20       FILLMEMXY R9..RA 20                The ring: the road was straight
-; D 404C 11 09 0F 40    LOADXI R9 0F40
-; D 4050 11 0A 0F 7F    LOADXI R10 0F7F
-; D 4054 FB 9A 00       FILLMEMXY R9..RA 00                and had no rocks
-; D 4057 11 0C 00 18    LOADXI R12 0018
+; D 401E 11 0E 07 7F    LOADXI R14 077F
+; D 4022 C1 0E          PRINTSTR R14                       Clear, hide the cursor
+; D 4024 11 02 00 20    LOADXI R2 0020
+; D 4028 11 03 00 01    LOADXI R3 0001                     straight
+; D 402C 11 04 00 17    LOADXI R4 0017                     a straight start
+; D 4030 11 05 00 27    LOADXI R5 0027                     the car in the middle
+; D 4034 11 06 00 05    LOADXI R6 0005
+; D 4038 11 07 00 01    LOADXI R7 0001
+; D 403C 11 08 00 00    LOADXI R8 0000
+; D 4040 11 01 00 00    LOADXI R1 0000
+; D 4044 11 0D 00 01    LOADXI R13 0001
+; D 4048 11 09 0F 00    LOADXI R9 0F00
+; D 404C 11 0A 0F 3F    LOADXI R10 0F3F
+; D 4050 FB 9A 20       FILLMEMXY R9..RA 20                The ring: the road was straight
+; D 4053 11 09 0F 40    LOADXI R9 0F40
+; D 4057 11 0A 0F 7F    LOADXI R10 0F7F
+; D 405B FB 9A 00       FILLMEMXY R9..RA 00                and had no rocks
+; D 405E 11 0C 00 18    LOADXI R12 0018
 ; PRE:
-; D 405B BD 01 D2       CALL ROADROW                       Draw a straight road down the screen
-; D 405E 43 0C          DECX R12
-; D 4060 8C 0C          TESTXZ R12
-; D 4062 A1 00 5B       IFFALSEI PRE
-; D 4065 BD 02 96       CALL STATUS
+; D 4062 BD 01 FA       CALL ROADROW                       Draw a straight road down the screen
+; D 4065 43 0C          DECX R12
+; D 4067 8C 0C          TESTXZ R12
+; D 4069 A1 00 62       IFFALSEI PRE
+; D 406C BD 02 BE       CALL STATUS
 ; FRAME:
-; D 4068 BD 02 FD       CALL KEYS
-; D 406B 43 04          DECX R4
-; D 406D 8C 04          TESTXZ R4
-; D 406F A1 00 75       IFFALSEI SAME                      This stretch goes on
-; D 4072 BD 02 79       CALL NEWSEG
+; D 406F BD 03 25       CALL KEYS
+; D 4072 43 04          DECX R4
+; D 4074 8C 04          TESTXZ R4
+; D 4076 A1 00 7C       IFFALSEI SAME                      This stretch goes on
+; D 4079 BD 02 A1       CALL NEWSEG
 ; SAME:
-; D 4075 50 23 02       ADDXYZ R2 + R3 -> R2
-; D 4078 53 02 00 01    SUBXI R2 0001                      L += direction - 1
-; D 407C 86 02 00 0E    TESTXI R2 000E
-; D 4080 A1 00 8B       IFFALSEI C1
-; D 4083 11 02 00 0F    LOADXI R2 000F
-; D 4087 11 03 00 02    LOADXI R3 0002                     hit the left side: turn right
+; D 407C 50 23 02       ADDXYZ R2 + R3 -> R2
+; D 407F 53 02 00 01    SUBXI R2 0001                      L += direction - 1
+; D 4083 86 02 00 0E    TESTXI R2 000E
+; D 4087 A1 00 92       IFFALSEI C1
+; D 408A 11 02 00 0F    LOADXI R2 000F
+; D 408E 11 03 00 02    LOADXI R3 0002                     hit the left side: turn right
 ; C1:
-; D 408B 86 02 00 3F    TESTXI R2 003F
-; D 408F A1 00 9A       IFFALSEI C2
-; D 4092 11 02 00 3E    LOADXI R2 003E
-; D 4096 11 03 00 00    LOADXI R3 0000                     hit the right side: turn left
+; D 4092 86 02 00 3F    TESTXI R2 003F
+; D 4096 A1 00 A1       IFFALSEI C2
+; D 4099 11 02 00 3E    LOADXI R2 003E
+; D 409D 11 03 00 00    LOADXI R3 0000                     hit the right side: turn left
 ; C2:
-; D 409A BD 01 D2       CALL ROADROW
-; D 409D 50 57 05       ADDXYZ R5 + R7 -> R5
-; D 40A0 53 05 00 01    SUBXI R5 0001                      x += steer - 1
-; D 40A4 11 07 00 01    LOADXI R7 0001                     steer used up
-; D 40A8 86 05 00 01    TESTXI R5 0001
-; D 40AC A1 00 B3       IFFALSEI C3
-; D 40AF 11 05 00 02    LOADXI R5 0002
+; D 40A1 BD 01 FA       CALL ROADROW
+; D 40A4 50 57 05       ADDXYZ R5 + R7 -> R5
+; D 40A7 53 05 00 01    SUBXI R5 0001                      x += steer - 1
+; D 40AB 50 57 05       ADDXYZ R5 + R7 -> R5
+; D 40AE 53 05 00 01    SUBXI R5 0001                      x += steer - 1
+; D 40B2 11 07 00 01    LOADXI R7 0001                     steer used up
+; D 40B6 11 0A 00 02    LOADXI R10 0002
+; D 40BA 89 5A          TESTLXY R5 < R10
+; D 40BC A1 00 C3       IFFALSEI C3                        left of column 2?
+; D 40BF 11 05 00 02    LOADXI R5 0002
 ; C3:
-; D 40B3 86 05 00 4D    TESTXI R5 004D
-; D 40B7 A1 00 BE       IFFALSEI C4
-; D 40BA 11 05 00 4C    LOADXI R5 004C                     never near column 80: no wrap
+; D 40C3 11 0A 00 4C    LOADXI R10 004C
+; D 40C7 89 A5          TESTLXY R10 < R5
+; D 40C9 A1 00 D0       IFFALSEI C4                        right of 76?
+; D 40CC 11 05 00 4C    LOADXI R5 004C                     never near column 80: no wrap
 ; C4:
-; D 40BE 23 00 59       COPYXY R5 -> R9
-; D 40C1 53 09 00 01    SUBXI R9 0001                      the padding column
-; D 40C5 4D 9F          DIVXY R9 / R15
-; D 40C7 25             COPYMAA
-; D 40C8 4E 00 30       ADDAI 0030
-; D 40CB 2F 0B 07 26    WRITEIDX R11 0726
-; D 40CF 27             COPYREMA
-; D 40D0 4E 00 30       ADDAI 0030
-; D 40D3 2F 0B 07 27    WRITEIDX R11 0727
+; D 40D0 23 00 59       COPYXY R5 -> R9
+; D 40D3 53 09 00 01    SUBXI R9 0001                      the padding column
 ; D 40D7 4D 9F          DIVXY R9 / R15
 ; D 40D9 25             COPYMAA
 ; D 40DA 4E 00 30       ADDAI 0030
-; D 40DD 2F 0B 07 47    WRITEIDX R11 0747
+; D 40DD 2F 0B 07 26    WRITEIDX R11 0726
 ; D 40E1 27             COPYREMA
 ; D 40E2 4E 00 30       ADDAI 0030
-; D 40E5 2F 0B 07 48    WRITEIDX R11 0748
-; D 40E9 11 0E 07 21    LOADXI R14 0721
-; D 40ED C1 0E          PRINTSTR R14                       The car, with a space either side
-; D 40EF 2E 08 0F 0A    READIDX R8 0F0A                    the road's left edge on line 23
-; D 40F3 21 09          COPYAX Acc -> R9
-; D 40F5 23 00 9A       COPYXY R9 -> R10
-; D 40F8 52 09 00 01    ADDXI R9 0001
-; D 40FC 88 95          TESTGXY R9 >= R5
-; D 40FE A0 01 71       IFTRUEI CRASH                      car against the left edge
-; D 4101 52 0A 00 0E    ADDXI R10 000E
-; D 4105 88 5A          TESTGXY R5 >= R10
-; D 4107 A0 01 71       IFTRUEI CRASH                      car against the right edge
-; D 410A 2E 08 0F 4A    READIDX R8 0F4A                    a rock on line 23?
-; D 410E 21 09          COPYAX Acc -> R9
-; D 4110 8C 09          TESTXZ R9
-; D 4112 A0 01 26       IFTRUEI NR
-; D 4115 88 95          TESTGXY R9 >= R5
-; D 4117 A1 01 26       IFFALSEI NR                        left of the car
-; D 411A 23 00 5A       COPYXY R5 -> R10
-; D 411D 52 0A 00 02    ADDXI R10 0002
-; D 4121 88 A9          TESTGXY R10 >= R9
-; D 4123 A0 01 71       IFTRUEI CRASH                      a rock under the car
+; D 40E5 2F 0B 07 27    WRITEIDX R11 0727
+; D 40E9 4D 9F          DIVXY R9 / R15
+; D 40EB 25             COPYMAA
+; D 40EC 4E 00 30       ADDAI 0030
+; D 40EF 2F 0B 07 47    WRITEIDX R11 0747
+; D 40F3 27             COPYREMA
+; D 40F4 4E 00 30       ADDAI 0030
+; D 40F7 2F 0B 07 48    WRITEIDX R11 0748
+; D 40FB 11 0E 07 21    LOADXI R14 0721
+; D 40FF C1 0E          PRINTSTR R14                       The car, with a space either side
+; D 4101 2E 08 0F 0A    READIDX R8 0F0A                    the road's left edge on line 23
+; D 4105 21 09          COPYAX Acc -> R9
+; D 4107 23 00 9A       COPYXY R9 -> R10
+; D 410A 52 09 00 01    ADDXI R9 0001
+; D 410E 88 95          TESTGXY R9 >= R5
+; D 4110 A0 01 96       IFTRUEI CRASH                      car against the left edge
+; D 4113 52 0A 00 0E    ADDXI R10 000E
+; D 4117 88 5A          TESTGXY R5 >= R10
+; D 4119 A0 01 96       IFTRUEI CRASH                      car against the right edge
+; D 411C 2E 08 0F 4A    READIDX R8 0F4A                    a rock on line 23?
+; D 4120 21 09          COPYAX Acc -> R9
+; D 4122 8C 09          TESTXZ R9
+; D 4124 A0 01 38       IFTRUEI NR
+; D 4127 88 95          TESTGXY R9 >= R5
+; D 4129 A1 01 38       IFFALSEI NR                        left of the car
+; D 412C 23 00 5A       COPYXY R5 -> R10
+; D 412F 52 0A 00 02    ADDXI R10 0002
+; D 4133 88 A9          TESTGXY R10 >= R9
+; D 4135 A0 01 96       IFTRUEI CRASH                      a rock under the car
 ; NR:
-; D 4126 2E 08 0F 09    READIDX R8 0F09                    the road's left edge on line 24
-; D 412A 21 09          COPYAX Acc -> R9
-; D 412C 23 00 9A       COPYXY R9 -> R10
-; D 412F 52 09 00 01    ADDXI R9 0001
-; D 4133 88 95          TESTGXY R9 >= R5
-; D 4135 A0 01 71       IFTRUEI CRASH                      car against the left edge
-; D 4138 52 0A 00 0E    ADDXI R10 000E
-; D 413C 88 5A          TESTGXY R5 >= R10
-; D 413E A0 01 71       IFTRUEI CRASH                      car against the right edge
-; D 4141 42 08          INCX R8
-; D 4143 86 08 00 20    TESTXI R8 0020
-; D 4147 A1 01 4E       IFFALSEI I1
-; D 414A 11 08 00 00    LOADXI R8 0000
+; D 4138 2E 08 0F 09    READIDX R8 0F09                    the road's left edge on line 24
+; D 413C 21 09          COPYAX Acc -> R9
+; D 413E 23 00 9A       COPYXY R9 -> R10
+; D 4141 52 09 00 01    ADDXI R9 0001
+; D 4145 88 95          TESTGXY R9 >= R5
+; D 4147 A0 01 96       IFTRUEI CRASH                      car against the left edge
+; D 414A 52 0A 00 0E    ADDXI R10 000E
+; D 414E 88 5A          TESTGXY R5 >= R10
+; D 4150 A0 01 96       IFTRUEI CRASH                      car against the right edge
+; D 4153 42 08          INCX R8
+; D 4155 86 08 00 20    TESTXI R8 0020
+; D 4159 A1 01 60       IFFALSEI I1
+; D 415C 11 08 00 00    LOADXI R8 0000
 ; I1:
-; D 414E 42 01          INCX R1                            distance
-; D 4150 43 0D          DECX R13
-; D 4152 8C 0D          TESTXZ R13
-; D 4154 A1 01 5E       IFFALSEI NOST
-; D 4157 BD 02 96       CALL STATUS
-; D 415A 11 0D 00 08    LOADXI R13 0008
+; D 4160 42 01          INCX R1                            distance
+; D 4162 23 00 1A       COPYXY R1 -> R10
+; D 4165 11 0C 00 64    LOADXI R12 0064
+; D 4169 4D AC          DIVXY R10 / R12
+; D 416B 27             COPYREMA
+; D 416C 81 00 00       TESTAI 0000
+; D 416F A1 01 75       IFFALSEI NM                        every 100: a blip
+; D 4172 F1 49 12       RUNMC 4912
+; NM:
+; D 4175 43 0D          DECX R13
+; D 4177 8C 0D          TESTXZ R13
+; D 4179 A1 01 83       IFFALSEI NOST
+; D 417C BD 02 BE       CALL STATUS
+; D 417F 11 0D 00 08    LOADXI R13 0008
 ; NOST:
-; D 415E 11 09 00 09    LOADXI R9 0009
-; D 4162 51 96 09       SUBXYZ R9 - R6 -> R9               9 - speed delay steps
+; D 4183 11 09 00 09    LOADXI R9 0009
+; D 4187 51 96 09       SUBXYZ R9 - R6 -> R9               9 - speed delay steps
 ; DL:
-; D 4165 8C 09          TESTXZ R9
-; D 4167 A0 00 68       IFTRUEI FRAME
-; D 416A C0 0C          DLYI 0C                            one speed step
-; D 416C 43 09          DECX R9
-; D 416E B0 01 65       GAL DL
+; D 418A 8C 09          TESTXZ R9
+; D 418C A0 00 6F       IFTRUEI FRAME
+; D 418F C0 0C          DLYI 0C                            one speed step
+; D 4191 43 09          DECX R9
+; D 4193 B0 01 8A       GAL DL
 ; CRASH:
-; D 4171 23 00 59       COPYXY R5 -> R9
-; D 4174 53 09 00 01    SUBXI R9 0001
-; D 4178 4D 9F          DIVXY R9 / R15
-; D 417A 25             COPYMAA
-; D 417B 4E 00 30       ADDAI 0030
-; D 417E 2F 0B 07 55    WRITEIDX R11 0755
-; D 4182 27             COPYREMA
-; D 4183 4E 00 30       ADDAI 0030
-; D 4186 2F 0B 07 56    WRITEIDX R11 0756
-; D 418A 4D 9F          DIVXY R9 / R15
-; D 418C 25             COPYMAA
-; D 418D 4E 00 30       ADDAI 0030
-; D 4190 2F 0B 07 76    WRITEIDX R11 0776
-; D 4194 27             COPYREMA
-; D 4195 4E 00 30       ADDAI 0030
-; D 4198 2F 0B 07 77    WRITEIDX R11 0777
-; D 419C BD 02 96       CALL STATUS
-; D 419F 11 0E 07 50    LOADXI R14 0750
-; D 41A3 C1 0E          PRINTSTR R14
-; D 41A5 11 0E 08 49    LOADXI R14 0849
-; D 41A9 C1 0E          PRINTSTR R14
-; D 41AB 11 0C 00 28    LOADXI R12 0028                    Swallow keys still coming for ~1 s: no accidental restart
+; D 4196 23 00 59       COPYXY R5 -> R9
+; D 4199 53 09 00 01    SUBXI R9 0001
+; D 419D 4D 9F          DIVXY R9 / R15
+; D 419F 25             COPYMAA
+; D 41A0 4E 00 30       ADDAI 0030
+; D 41A3 2F 0B 07 55    WRITEIDX R11 0755
+; D 41A7 27             COPYREMA
+; D 41A8 4E 00 30       ADDAI 0030
+; D 41AB 2F 0B 07 56    WRITEIDX R11 0756
+; D 41AF 4D 9F          DIVXY R9 / R15
+; D 41B1 25             COPYMAA
+; D 41B2 4E 00 30       ADDAI 0030
+; D 41B5 2F 0B 07 76    WRITEIDX R11 0776
+; D 41B9 27             COPYREMA
+; D 41BA 4E 00 30       ADDAI 0030
+; D 41BD 2F 0B 07 77    WRITEIDX R11 0777
+; D 41C1 BD 02 BE       CALL STATUS
+; D 41C4 11 0E 07 50    LOADXI R14 0750
+; D 41C8 C1 0E          PRINTSTR R14
+; D 41CA 11 0E 08 62    LOADXI R14 0862
+; D 41CE C1 0E          PRINTSTR R14
+; D 41D0 F1 49 1B       RUNMC 491B                         a falling crunch, after the words
+; D 41D3 11 0C 00 28    LOADXI R12 0028                    Swallow keys still coming for ~1 s: no accidental restart
 ; FL:
-; D 41AF CC             SERST
-; D 41B0 A1 01 B4       IFFALSEI FL2
-; D 41B3 CB             SERIN
+; D 41D7 CC             SERST
+; D 41D8 A1 01 DC       IFFALSEI FL2
+; D 41DB CB             SERIN
 ; FL2:
-; D 41B4 C0 0C          DLYI 0C
-; D 41B6 43 0C          DECX R12
-; D 41B8 8C 0C          TESTXZ R12
-; D 41BA A1 01 AF       IFFALSEI FL
+; D 41DC C0 0C          DLYI 0C
+; D 41DE 43 0C          DECX R12
+; D 41E0 8C 0C          TESTXZ R12
+; D 41E2 A1 01 D7       IFFALSEI FL
 ; AGAIN:
-; D 41BD C3             RAND
-; D 41BE CC             SERST
-; D 41BF A1 01 BD       IFFALSEI AGAIN
-; D 41C2 BD 03 6A       CALL ANYKEY                        ESC on its own quits
-; D 41C5 B0 00 17       GAL NEW                            Anything else (arrows too): drive again
+; D 41E5 C3             RAND
+; D 41E6 CC             SERST
+; D 41E7 A1 01 E5       IFFALSEI AGAIN
+; D 41EA BD 03 C7       CALL ANYKEY                        ESC on its own quits
+; D 41ED B0 00 1E       GAL NEW                            Anything else (arrows too): drive again
 ; QUIT:
-; D 41C8 11 0E 08 95    LOADXI R14 0895
-; D 41CC C1 0E          PRINTSTR R14
-; D 41CE 00             HALT
-; D 41CF F0 00 00       BREAK
+; D 41F0 11 0E 08 AE    LOADXI R14 08AE
+; D 41F4 C1 0E          PRINTSTR R14
+; D 41F6 00             HALT
+; D 41F7 F0 00 00       BREAK
 ; ROADROW:
-; D 41D2 22 02          COPYXA R2 -> Acc
-; D 41D4 2F 08 0F 00    WRITEIDX R8 0F00                   this line into the ring
-; D 41D8 2F 08 0F 20    WRITEIDX R8 0F20                   ... twice
-; D 41DC 4D 2F          DIVXY R2 / R15                     left edge column
-; D 41DE 25             COPYMAA
-; D 41DF 4E 00 30       ADDAI 0030
-; D 41E2 2F 0B 07 0A    WRITEIDX R11 070A
-; D 41E6 27             COPYREMA
-; D 41E7 4E 00 30       ADDAI 0030
-; D 41EA 2F 0B 07 0B    WRITEIDX R11 070B
-; D 41EE 23 00 29       COPYXY R2 -> R9
-; D 41F1 52 09 00 11    ADDXI R9 0011
-; D 41F5 4D 9F          DIVXY R9 / R15                     right edge column
-; D 41F7 25             COPYMAA
-; D 41F8 4E 00 30       ADDAI 0030
-; D 41FB 2F 0B 07 13    WRITEIDX R11 0713
-; D 41FF 27             COPYREMA
-; D 4200 4E 00 30       ADDAI 0030
-; D 4203 2F 0B 07 14    WRITEIDX R11 0714
-; D 4207 11 09 00 00    LOADXI R9 0000                     no rock
-; D 420B 11 0A 00 28    LOADXI R10 0028
-; D 420F 88 1A          TESTGXY R1 >= R10
-; D 4211 A1 02 3F       IFFALSEI OBN                       not in the first lines
-; D 4214 C3             RAND
-; D 4215 21 09          COPYAX Acc -> R9
-; D 4217 11 0A 00 06    LOADXI R10 0006
-; D 421B 4D 9A          DIVXY R9 / R10
-; D 421D 27             COPYREMA
-; D 421E 21 09          COPYAX Acc -> R9
-; D 4220 8C 09          TESTXZ R9
-; D 4222 A1 02 3B       IFFALSEI OB0                       one line in 6
-; D 4225 C3             RAND
-; D 4226 21 09          COPYAX Acc -> R9
-; D 4228 11 0A 00 0D    LOADXI R10 000D
-; D 422C 4D 9A          DIVXY R9 / R10
-; D 422E 27             COPYREMA
-; D 422F 21 09          COPYAX Acc -> R9
-; D 4231 50 92 09       ADDXYZ R9 + R2 -> R9
-; D 4234 52 09 00 02    ADDXI R9 0002                      the rock: 2-14 right of the left edge
-; D 4238 B0 02 3F       GAL OBN
+; D 41FA 22 02          COPYXA R2 -> Acc
+; D 41FC 2F 08 0F 00    WRITEIDX R8 0F00                   this line into the ring
+; D 4200 2F 08 0F 20    WRITEIDX R8 0F20                   ... twice
+; D 4204 4D 2F          DIVXY R2 / R15                     left edge column
+; D 4206 25             COPYMAA
+; D 4207 4E 00 30       ADDAI 0030
+; D 420A 2F 0B 07 0A    WRITEIDX R11 070A
+; D 420E 27             COPYREMA
+; D 420F 4E 00 30       ADDAI 0030
+; D 4212 2F 0B 07 0B    WRITEIDX R11 070B
+; D 4216 23 00 29       COPYXY R2 -> R9
+; D 4219 52 09 00 11    ADDXI R9 0011
+; D 421D 4D 9F          DIVXY R9 / R15                     right edge column
+; D 421F 25             COPYMAA
+; D 4220 4E 00 30       ADDAI 0030
+; D 4223 2F 0B 07 13    WRITEIDX R11 0713
+; D 4227 27             COPYREMA
+; D 4228 4E 00 30       ADDAI 0030
+; D 422B 2F 0B 07 14    WRITEIDX R11 0714
+; D 422F 11 09 00 00    LOADXI R9 0000                     no rock
+; D 4233 11 0A 00 28    LOADXI R10 0028
+; D 4237 88 1A          TESTGXY R1 >= R10
+; D 4239 A1 02 67       IFFALSEI OBN                       not in the first lines
+; D 423C C3             RAND
+; D 423D 21 09          COPYAX Acc -> R9
+; D 423F 11 0A 00 06    LOADXI R10 0006
+; D 4243 4D 9A          DIVXY R9 / R10
+; D 4245 27             COPYREMA
+; D 4246 21 09          COPYAX Acc -> R9
+; D 4248 8C 09          TESTXZ R9
+; D 424A A1 02 63       IFFALSEI OB0                       one line in 6
+; D 424D C3             RAND
+; D 424E 21 09          COPYAX Acc -> R9
+; D 4250 11 0A 00 0D    LOADXI R10 000D
+; D 4254 4D 9A          DIVXY R9 / R10
+; D 4256 27             COPYREMA
+; D 4257 21 09          COPYAX Acc -> R9
+; D 4259 50 92 09       ADDXYZ R9 + R2 -> R9
+; D 425C 52 09 00 02    ADDXI R9 0002                      the rock: 2-14 right of the left edge
+; D 4260 B0 02 67       GAL OBN
 ; OB0:
-; D 423B 11 09 00 00    LOADXI R9 0000
+; D 4263 11 09 00 00    LOADXI R9 0000
 ; OBN:
-; D 423F 22 09          COPYXA R9 -> Acc
-; D 4241 2F 08 0F 40    WRITEIDX R8 0F40                   into the rocks ring
-; D 4245 2F 08 0F 60    WRITEIDX R8 0F60                   ... twice
-; D 4249 11 0A 00 40    LOADXI R10 0040
-; D 424D 8C 09          TESTXZ R9
-; D 424F A1 02 59       IFFALSEI OBD
-; D 4252 23 00 29       COPYXY R2 -> R9
-; D 4255 11 0A 00 7C    LOADXI R10 007C                    no rock: the left edge again
+; D 4267 22 09          COPYXA R9 -> Acc
+; D 4269 2F 08 0F 40    WRITEIDX R8 0F40                   into the rocks ring
+; D 426D 2F 08 0F 60    WRITEIDX R8 0F60                   ... twice
+; D 4271 11 0A 00 40    LOADXI R10 0040
+; D 4275 8C 09          TESTXZ R9
+; D 4277 A1 02 81       IFFALSEI OBD
+; D 427A 23 00 29       COPYXY R2 -> R9
+; D 427D 11 0A 00 7C    LOADXI R10 007C                    no rock: the left edge again
 ; OBD:
-; D 4259 22 0A          COPYXA R10 -> Acc
-; D 425B 2F 0B 07 1F    WRITEIDX R11 071F
-; D 425F 4D 9F          DIVXY R9 / R15                     its column
-; D 4261 25             COPYMAA
-; D 4262 4E 00 30       ADDAI 0030
-; D 4265 2F 0B 07 1C    WRITEIDX R11 071C
-; D 4269 27             COPYREMA
-; D 426A 4E 00 30       ADDAI 0030
-; D 426D 2F 0B 07 1D    WRITEIDX R11 071D
-; D 4271 11 0E 07 00    LOADXI R14 0700
-; D 4275 C1 0E          PRINTSTR R14
-; D 4277 BE 00          RETURN
+; D 4281 22 0A          COPYXA R10 -> Acc
+; D 4283 2F 0B 07 1F    WRITEIDX R11 071F
+; D 4287 4D 9F          DIVXY R9 / R15                     its column
+; D 4289 25             COPYMAA
+; D 428A 4E 00 30       ADDAI 0030
+; D 428D 2F 0B 07 1C    WRITEIDX R11 071C
+; D 4291 27             COPYREMA
+; D 4292 4E 00 30       ADDAI 0030
+; D 4295 2F 0B 07 1D    WRITEIDX R11 071D
+; D 4299 11 0E 07 00    LOADXI R14 0700
+; D 429D C1 0E          PRINTSTR R14
+; D 429F BE 00          RETURN
 ; NEWSEG:
-; D 4279 C3             RAND
-; D 427A 21 09          COPYAX Acc -> R9
-; D 427C 11 0C 00 03    LOADXI R12 0003
-; D 4280 4D 9C          DIVXY R9 / R12
-; D 4282 27             COPYREMA
-; D 4283 21 03          COPYAX Acc -> R3
-; D 4285 25             COPYMAA
-; D 4286 21 09          COPYAX Acc -> R9
-; D 4288 11 0C 00 08    LOADXI R12 0008
-; D 428C 4D 9C          DIVXY R9 / R12
-; D 428E 27             COPYREMA
-; D 428F 4E 00 03       ADDAI 0003
-; D 4292 21 04          COPYAX Acc -> R4
-; D 4294 BE 00          RETURN
+; D 42A1 C3             RAND
+; D 42A2 21 09          COPYAX Acc -> R9
+; D 42A4 11 0C 00 03    LOADXI R12 0003
+; D 42A8 4D 9C          DIVXY R9 / R12
+; D 42AA 27             COPYREMA
+; D 42AB 21 03          COPYAX Acc -> R3
+; D 42AD 25             COPYMAA
+; D 42AE 21 09          COPYAX Acc -> R9
+; D 42B0 11 0C 00 08    LOADXI R12 0008
+; D 42B4 4D 9C          DIVXY R9 / R12
+; D 42B6 27             COPYREMA
+; D 42B7 4E 00 03       ADDAI 0003
+; D 42BA 21 04          COPYAX Acc -> R4
+; D 42BC BE 00          RETURN
 ; STATUS:
-; D 4296 22 06          COPYXA R6 -> Acc
-; D 4298 4E 00 30       ADDAI 0030
-; D 429B 2F 0B 07 3A    WRITEIDX R11 073A
-; D 429F 2F 0B 07 69    WRITEIDX R11 0769
-; D 42A3 23 00 1A       COPYXY R1 -> R10
-; D 42A6 4D AF          DIVXY R10 / R15
-; D 42A8 27             COPYREMA
-; D 42A9 4E 00 30       ADDAI 0030
-; D 42AC 2F 0B 07 41    WRITEIDX R11 0741
-; D 42B0 2F 0B 07 70    WRITEIDX R11 0770
-; D 42B4 25             COPYMAA
-; D 42B5 21 0A          COPYAX Acc -> R10
-; D 42B7 4D AF          DIVXY R10 / R15
-; D 42B9 27             COPYREMA
-; D 42BA 4E 00 30       ADDAI 0030
-; D 42BD 2F 0B 07 40    WRITEIDX R11 0740
-; D 42C1 2F 0B 07 6F    WRITEIDX R11 076F
-; D 42C5 25             COPYMAA
-; D 42C6 21 0A          COPYAX Acc -> R10
-; D 42C8 4D AF          DIVXY R10 / R15
-; D 42CA 27             COPYREMA
-; D 42CB 4E 00 30       ADDAI 0030
-; D 42CE 2F 0B 07 3F    WRITEIDX R11 073F
-; D 42D2 2F 0B 07 6E    WRITEIDX R11 076E
-; D 42D6 25             COPYMAA
-; D 42D7 21 0A          COPYAX Acc -> R10
-; D 42D9 4D AF          DIVXY R10 / R15
-; D 42DB 27             COPYREMA
-; D 42DC 4E 00 30       ADDAI 0030
-; D 42DF 2F 0B 07 3E    WRITEIDX R11 073E
-; D 42E3 2F 0B 07 6D    WRITEIDX R11 076D
-; D 42E7 25             COPYMAA
-; D 42E8 21 0A          COPYAX Acc -> R10
-; D 42EA 4D AF          DIVXY R10 / R15
-; D 42EC 27             COPYREMA
-; D 42ED 4E 00 30       ADDAI 0030
-; D 42F0 2F 0B 07 3D    WRITEIDX R11 073D
-; D 42F4 2F 0B 07 6C    WRITEIDX R11 076C
-; D 42F8 25             COPYMAA
-; D 42F9 21 0A          COPYAX Acc -> R10
-; D 42FB BE 00          RETURN
+; D 42BE 22 06          COPYXA R6 -> Acc
+; D 42C0 4E 00 30       ADDAI 0030
+; D 42C3 2F 0B 07 3A    WRITEIDX R11 073A
+; D 42C7 2F 0B 07 69    WRITEIDX R11 0769
+; D 42CB 23 00 1A       COPYXY R1 -> R10
+; D 42CE 4D AF          DIVXY R10 / R15
+; D 42D0 27             COPYREMA
+; D 42D1 4E 00 30       ADDAI 0030
+; D 42D4 2F 0B 07 41    WRITEIDX R11 0741
+; D 42D8 2F 0B 07 70    WRITEIDX R11 0770
+; D 42DC 25             COPYMAA
+; D 42DD 21 0A          COPYAX Acc -> R10
+; D 42DF 4D AF          DIVXY R10 / R15
+; D 42E1 27             COPYREMA
+; D 42E2 4E 00 30       ADDAI 0030
+; D 42E5 2F 0B 07 40    WRITEIDX R11 0740
+; D 42E9 2F 0B 07 6F    WRITEIDX R11 076F
+; D 42ED 25             COPYMAA
+; D 42EE 21 0A          COPYAX Acc -> R10
+; D 42F0 4D AF          DIVXY R10 / R15
+; D 42F2 27             COPYREMA
+; D 42F3 4E 00 30       ADDAI 0030
+; D 42F6 2F 0B 07 3F    WRITEIDX R11 073F
+; D 42FA 2F 0B 07 6E    WRITEIDX R11 076E
+; D 42FE 25             COPYMAA
+; D 42FF 21 0A          COPYAX Acc -> R10
+; D 4301 4D AF          DIVXY R10 / R15
+; D 4303 27             COPYREMA
+; D 4304 4E 00 30       ADDAI 0030
+; D 4307 2F 0B 07 3E    WRITEIDX R11 073E
+; D 430B 2F 0B 07 6D    WRITEIDX R11 076D
+; D 430F 25             COPYMAA
+; D 4310 21 0A          COPYAX Acc -> R10
+; D 4312 4D AF          DIVXY R10 / R15
+; D 4314 27             COPYREMA
+; D 4315 4E 00 30       ADDAI 0030
+; D 4318 2F 0B 07 3D    WRITEIDX R11 073D
+; D 431C 2F 0B 07 6C    WRITEIDX R11 076C
+; D 4320 25             COPYMAA
+; D 4321 21 0A          COPYAX Acc -> R10
+; D 4323 BE 00          RETURN
 ; KEYS:
-; D 42FD CC             SERST
-; D 42FE A1 03 65       IFFALSEI KX
-; D 4301 BD 03 81       CALL KEY1
-; D 4304 86 09 00 1B    TESTXI R9 001B
-; D 4308 A1 02 FD       IFFALSEI KEYS                      Only ESC sequences mean anything
-; D 430B BD 03 86       CALL KWAIT                         ESC: is an arrow following?
-; D 430E 8C 09          TESTXZ R9
-; D 4310 A0 03 67       IFTRUEI QUITK                      nothing: ESC on its own
-; D 4313 86 09 00 5B    TESTXI R9 005B
-; D 4317 A1 02 FD       IFFALSEI KEYS
-; D 431A BD 03 86       CALL KWAIT
-; D 431D 86 09 00 43    TESTXI R9 0043
-; D 4321 A1 03 2B       IFFALSEI K1
-; D 4324 11 07 00 02    LOADXI R7 0002                     right
-; D 4328 B0 02 FD       GAL KEYS
+; D 4325 CC             SERST
+; D 4326 A1 03 C2       IFFALSEI KX
+; D 4329 BD 03 DE       CALL KEY1
+; D 432C 86 09 00 6D    TESTXI R9 006D
+; D 4330 A0 03 A1       IFTRUEI MUTE
+; D 4333 86 09 00 4D    TESTXI R9 004D
+; D 4337 A0 03 A1       IFTRUEI MUTE
+; D 433A 86 09 00 1B    TESTXI R9 001B
+; D 433E A1 03 53       IFFALSEI KL                        a lone A-D: an arrow whose ESC [ the UART lost while a frame was drawn
+; D 4341 BD 03 E3       CALL KWAIT                         ESC: is an arrow following?
+; D 4344 8C 09          TESTXZ R9
+; D 4346 A0 03 C4       IFTRUEI QUITK                      nothing: ESC on its own
+; D 4349 86 09 00 5B    TESTXI R9 005B
+; D 434D A1 03 53       IFFALSEI KL
+; D 4350 BD 03 E3       CALL KWAIT
+; KL:
+; D 4353 86 09 00 43    TESTXI R9 0043
+; D 4357 A1 03 61       IFFALSEI K1
+; D 435A 11 07 00 02    LOADXI R7 0002                     right
+; D 435E B0 03 25       GAL KEYS
 ; K1:
-; D 432B 86 09 00 44    TESTXI R9 0044
-; D 432F A1 03 39       IFFALSEI K2
-; D 4332 11 07 00 00    LOADXI R7 0000                     left
-; D 4336 B0 02 FD       GAL KEYS
+; D 4361 86 09 00 44    TESTXI R9 0044
+; D 4365 A1 03 6F       IFFALSEI K2
+; D 4368 11 07 00 00    LOADXI R7 0000                     left
+; D 436C B0 03 25       GAL KEYS
 ; K2:
-; D 4339 86 09 00 41    TESTXI R9 0041
-; D 433D A1 03 4F       IFFALSEI K3
-; D 4340 86 06 00 09    TESTXI R6 0009
-; D 4344 A0 02 FD       IFTRUEI KEYS
-; D 4347 42 06          INCX R6                            faster
-; D 4349 BD 02 96       CALL STATUS
-; D 434C B0 02 FD       GAL KEYS
+; D 436F 86 09 00 41    TESTXI R9 0041
+; D 4373 A1 03 88       IFFALSEI K3
+; D 4376 86 06 00 09    TESTXI R6 0009
+; D 437A A0 03 25       IFTRUEI KEYS
+; D 437D 42 06          INCX R6                            faster
+; D 437F F1 49 00       RUNMC 4900                         a click
+; D 4382 BD 02 BE       CALL STATUS
+; D 4385 B0 03 25       GAL KEYS
 ; K3:
-; D 434F 86 09 00 42    TESTXI R9 0042
-; D 4353 A1 02 FD       IFFALSEI KEYS
-; D 4356 86 06 00 01    TESTXI R6 0001
-; D 435A A0 02 FD       IFTRUEI KEYS
-; D 435D 43 06          DECX R6                            slower
-; D 435F BD 02 96       CALL STATUS
-; D 4362 B0 02 FD       GAL KEYS
+; D 4388 86 09 00 42    TESTXI R9 0042
+; D 438C A1 03 25       IFFALSEI KEYS
+; D 438F 86 06 00 01    TESTXI R6 0001
+; D 4393 A0 03 25       IFTRUEI KEYS
+; D 4396 43 06          DECX R6                            slower
+; D 4398 F1 49 09       RUNMC 4909                         a lower click
+; D 439B BD 02 BE       CALL STATUS
+; D 439E B0 03 25       GAL KEYS
+; MUTE:
+; D 43A1 2E 0B 0F 80    READIDX R11 0F80
+; D 43A5 81 00 00       TESTAI 0000
+; D 43A8 A0 03 B5       IFTRUEI MON
+; D 43AB 10 00 00       LOADAI 0000
+; D 43AE 2F 0B 0F 80    WRITEIDX R11 0F80
+; D 43B2 B0 03 25       GAL KEYS
+; MON:
+; D 43B5 10 00 01       LOADAI 0001
+; D 43B8 2F 0B 0F 80    WRITEIDX R11 0F80
+; D 43BC F1 49 24       RUNMC 4924
+; D 43BF B0 03 25       GAL KEYS
 ; KX:
-; D 4365 BE 00          RETURN
+; D 43C2 BE 00          RETURN
 ; QUITK:
-; D 4367 B0 01 C8       GAL QUIT
+; D 43C4 B0 01 F0       GAL QUIT
 ; ANYKEY:
-; D 436A BD 03 81       CALL KEY1
-; D 436D 86 09 00 1B    TESTXI R9 001B
-; D 4371 A1 03 7F       IFFALSEI AKR
-; D 4374 BD 03 86       CALL KWAIT                         ESC: part of an arrow?
-; D 4377 8C 09          TESTXZ R9
-; D 4379 A0 03 67       IFTRUEI QUITK
-; D 437C BD 03 86       CALL KWAIT                         yes - eat its last byte
+; D 43C7 BD 03 DE       CALL KEY1
+; D 43CA 86 09 00 1B    TESTXI R9 001B
+; D 43CE A1 03 DC       IFFALSEI AKR
+; D 43D1 BD 03 E3       CALL KWAIT                         ESC: part of an arrow?
+; D 43D4 8C 09          TESTXZ R9
+; D 43D6 A0 03 C4       IFTRUEI QUITK
+; D 43D9 BD 03 E3       CALL KWAIT                         yes - eat its last byte
 ; AKR:
-; D 437F BE 00          RETURN
+; D 43DC BE 00          RETURN
 ; KEY1:
-; D 4381 CB             SERIN
-; D 4382 21 09          COPYAX Acc -> R9
-; D 4384 BE 00          RETURN
+; D 43DE CB             SERIN
+; D 43DF 21 09          COPYAX Acc -> R9
+; D 43E1 BE 00          RETURN
 ; KWAIT:
-; D 4386 11 0C 00 08    LOADXI R12 0008
+; D 43E3 11 0C 00 08    LOADXI R12 0008
 ; KW:
-; D 438A CC             SERST
-; D 438B A0 03 9B       IFTRUEI KW1
-; D 438E 43 0C          DECX R12
-; D 4390 8C 0C          TESTXZ R12
-; D 4392 A1 03 8A       IFFALSEI KW
-; D 4395 11 09 00 00    LOADXI R9 0000
-; D 4399 BE 00          RETURN
+; D 43E7 CC             SERST
+; D 43E8 A0 03 F8       IFTRUEI KW1
+; D 43EB 43 0C          DECX R12
+; D 43ED 8C 0C          TESTXZ R12
+; D 43EF A1 03 E7       IFFALSEI KW
+; D 43F2 11 09 00 00    LOADXI R9 0000
+; D 43F6 BE 00          RETURN
 ; KW1:
-; D 439B CB             SERIN
-; D 439C 21 09          COPYAX Acc -> R9
-; D 439E BE 00          RETURN
+; D 43F8 CB             SERIN
+; D 43F9 21 09          COPYAX Acc -> R9
+; D 43FB BE 00          RETURN
 
 ; --------------------------------------------------------------------------
 ; CODE  -  download this block
@@ -396,334 +430,364 @@
 D 4000 CD
 D 4001 11 0F 00 0A
 D 4005 11 0B 00 00
-D 4009 11 0E 07 8E
-D 400D C1 0E
-D 400F C3
-D 4010 CC
-D 4011 A1 00 0F
-D 4014 BD 03 6A
-D 4017 11 0E 07 7F
-D 401B C1 0E
-D 401D 11 02 00 20
-D 4021 11 03 00 01
-D 4025 11 04 00 17
-D 4029 11 05 00 27
-D 402D 11 06 00 05
-D 4031 11 07 00 01
-D 4035 11 08 00 00
-D 4039 11 01 00 00
-D 403D 11 0D 00 01
-D 4041 11 09 0F 00
-D 4045 11 0A 0F 3F
-D 4049 FB 9A 20
-D 404C 11 09 0F 40
-D 4050 11 0A 0F 7F
-D 4054 FB 9A 00
-D 4057 11 0C 00 18
-D 405B BD 01 D2
-D 405E 43 0C
-D 4060 8C 0C
-D 4062 A1 00 5B
-D 4065 BD 02 96
-D 4068 BD 02 FD
-D 406B 43 04
-D 406D 8C 04
-D 406F A1 00 75
-D 4072 BD 02 79
-D 4075 50 23 02
-D 4078 53 02 00 01
-D 407C 86 02 00 0E
-D 4080 A1 00 8B
-D 4083 11 02 00 0F
-D 4087 11 03 00 02
-D 408B 86 02 00 3F
-D 408F A1 00 9A
-D 4092 11 02 00 3E
-D 4096 11 03 00 00
-D 409A BD 01 D2
-D 409D 50 57 05
-D 40A0 53 05 00 01
-D 40A4 11 07 00 01
-D 40A8 86 05 00 01
-D 40AC A1 00 B3
-D 40AF 11 05 00 02
-D 40B3 86 05 00 4D
-D 40B7 A1 00 BE
-D 40BA 11 05 00 4C
-D 40BE 23 00 59
-D 40C1 53 09 00 01
-D 40C5 4D 9F
-D 40C7 25
-D 40C8 4E 00 30
-D 40CB 2F 0B 07 26
-D 40CF 27
-D 40D0 4E 00 30
-D 40D3 2F 0B 07 27
+D 4009 10 00 01
+D 400C 2F 0B 0F 80
+D 4010 11 0E 07 8E
+D 4014 C1 0E
+D 4016 C3
+D 4017 CC
+D 4018 A1 00 16
+D 401B BD 03 C7
+D 401E 11 0E 07 7F
+D 4022 C1 0E
+D 4024 11 02 00 20
+D 4028 11 03 00 01
+D 402C 11 04 00 17
+D 4030 11 05 00 27
+D 4034 11 06 00 05
+D 4038 11 07 00 01
+D 403C 11 08 00 00
+D 4040 11 01 00 00
+D 4044 11 0D 00 01
+D 4048 11 09 0F 00
+D 404C 11 0A 0F 3F
+D 4050 FB 9A 20
+D 4053 11 09 0F 40
+D 4057 11 0A 0F 7F
+D 405B FB 9A 00
+D 405E 11 0C 00 18
+D 4062 BD 01 FA
+D 4065 43 0C
+D 4067 8C 0C
+D 4069 A1 00 62
+D 406C BD 02 BE
+D 406F BD 03 25
+D 4072 43 04
+D 4074 8C 04
+D 4076 A1 00 7C
+D 4079 BD 02 A1
+D 407C 50 23 02
+D 407F 53 02 00 01
+D 4083 86 02 00 0E
+D 4087 A1 00 92
+D 408A 11 02 00 0F
+D 408E 11 03 00 02
+D 4092 86 02 00 3F
+D 4096 A1 00 A1
+D 4099 11 02 00 3E
+D 409D 11 03 00 00
+D 40A1 BD 01 FA
+D 40A4 50 57 05
+D 40A7 53 05 00 01
+D 40AB 50 57 05
+D 40AE 53 05 00 01
+D 40B2 11 07 00 01
+D 40B6 11 0A 00 02
+D 40BA 89 5A
+D 40BC A1 00 C3
+D 40BF 11 05 00 02
+D 40C3 11 0A 00 4C
+D 40C7 89 A5
+D 40C9 A1 00 D0
+D 40CC 11 05 00 4C
+D 40D0 23 00 59
+D 40D3 53 09 00 01
 D 40D7 4D 9F
 D 40D9 25
 D 40DA 4E 00 30
-D 40DD 2F 0B 07 47
+D 40DD 2F 0B 07 26
 D 40E1 27
 D 40E2 4E 00 30
-D 40E5 2F 0B 07 48
-D 40E9 11 0E 07 21
-D 40ED C1 0E
-D 40EF 2E 08 0F 0A
-D 40F3 21 09
-D 40F5 23 00 9A
-D 40F8 52 09 00 01
-D 40FC 88 95
-D 40FE A0 01 71
-D 4101 52 0A 00 0E
-D 4105 88 5A
-D 4107 A0 01 71
-D 410A 2E 08 0F 4A
-D 410E 21 09
-D 4110 8C 09
-D 4112 A0 01 26
-D 4115 88 95
-D 4117 A1 01 26
-D 411A 23 00 5A
-D 411D 52 0A 00 02
-D 4121 88 A9
-D 4123 A0 01 71
-D 4126 2E 08 0F 09
-D 412A 21 09
-D 412C 23 00 9A
-D 412F 52 09 00 01
-D 4133 88 95
-D 4135 A0 01 71
-D 4138 52 0A 00 0E
-D 413C 88 5A
-D 413E A0 01 71
-D 4141 42 08
-D 4143 86 08 00 20
-D 4147 A1 01 4E
-D 414A 11 08 00 00
-D 414E 42 01
-D 4150 43 0D
-D 4152 8C 0D
-D 4154 A1 01 5E
-D 4157 BD 02 96
-D 415A 11 0D 00 08
-D 415E 11 09 00 09
-D 4162 51 96 09
-D 4165 8C 09
-D 4167 A0 00 68
-D 416A C0 0C
-D 416C 43 09
-D 416E B0 01 65
-D 4171 23 00 59
-D 4174 53 09 00 01
-D 4178 4D 9F
-D 417A 25
-D 417B 4E 00 30
-D 417E 2F 0B 07 55
-D 4182 27
-D 4183 4E 00 30
-D 4186 2F 0B 07 56
-D 418A 4D 9F
-D 418C 25
-D 418D 4E 00 30
-D 4190 2F 0B 07 76
-D 4194 27
-D 4195 4E 00 30
-D 4198 2F 0B 07 77
-D 419C BD 02 96
-D 419F 11 0E 07 50
-D 41A3 C1 0E
-D 41A5 11 0E 08 49
-D 41A9 C1 0E
-D 41AB 11 0C 00 28
-D 41AF CC
-D 41B0 A1 01 B4
-D 41B3 CB
-D 41B4 C0 0C
-D 41B6 43 0C
-D 41B8 8C 0C
-D 41BA A1 01 AF
-D 41BD C3
-D 41BE CC
-D 41BF A1 01 BD
-D 41C2 BD 03 6A
-D 41C5 B0 00 17
-D 41C8 11 0E 08 95
-D 41CC C1 0E
-D 41CE 00
-D 41CF F0 00 00
-D 41D2 22 02
-D 41D4 2F 08 0F 00
-D 41D8 2F 08 0F 20
-D 41DC 4D 2F
-D 41DE 25
-D 41DF 4E 00 30
-D 41E2 2F 0B 07 0A
-D 41E6 27
-D 41E7 4E 00 30
-D 41EA 2F 0B 07 0B
-D 41EE 23 00 29
-D 41F1 52 09 00 11
-D 41F5 4D 9F
-D 41F7 25
-D 41F8 4E 00 30
-D 41FB 2F 0B 07 13
-D 41FF 27
-D 4200 4E 00 30
-D 4203 2F 0B 07 14
-D 4207 11 09 00 00
-D 420B 11 0A 00 28
-D 420F 88 1A
-D 4211 A1 02 3F
-D 4214 C3
-D 4215 21 09
-D 4217 11 0A 00 06
-D 421B 4D 9A
-D 421D 27
-D 421E 21 09
-D 4220 8C 09
-D 4222 A1 02 3B
-D 4225 C3
-D 4226 21 09
-D 4228 11 0A 00 0D
-D 422C 4D 9A
-D 422E 27
-D 422F 21 09
-D 4231 50 92 09
-D 4234 52 09 00 02
-D 4238 B0 02 3F
-D 423B 11 09 00 00
-D 423F 22 09
-D 4241 2F 08 0F 40
-D 4245 2F 08 0F 60
-D 4249 11 0A 00 40
-D 424D 8C 09
-D 424F A1 02 59
-D 4252 23 00 29
-D 4255 11 0A 00 7C
-D 4259 22 0A
-D 425B 2F 0B 07 1F
-D 425F 4D 9F
-D 4261 25
-D 4262 4E 00 30
-D 4265 2F 0B 07 1C
-D 4269 27
-D 426A 4E 00 30
-D 426D 2F 0B 07 1D
-D 4271 11 0E 07 00
-D 4275 C1 0E
-D 4277 BE 00
-D 4279 C3
-D 427A 21 09
-D 427C 11 0C 00 03
-D 4280 4D 9C
-D 4282 27
-D 4283 21 03
-D 4285 25
-D 4286 21 09
-D 4288 11 0C 00 08
-D 428C 4D 9C
-D 428E 27
-D 428F 4E 00 03
-D 4292 21 04
-D 4294 BE 00
-D 4296 22 06
-D 4298 4E 00 30
-D 429B 2F 0B 07 3A
-D 429F 2F 0B 07 69
-D 42A3 23 00 1A
-D 42A6 4D AF
-D 42A8 27
-D 42A9 4E 00 30
-D 42AC 2F 0B 07 41
-D 42B0 2F 0B 07 70
-D 42B4 25
-D 42B5 21 0A
-D 42B7 4D AF
-D 42B9 27
-D 42BA 4E 00 30
-D 42BD 2F 0B 07 40
-D 42C1 2F 0B 07 6F
-D 42C5 25
-D 42C6 21 0A
-D 42C8 4D AF
-D 42CA 27
-D 42CB 4E 00 30
-D 42CE 2F 0B 07 3F
-D 42D2 2F 0B 07 6E
-D 42D6 25
-D 42D7 21 0A
-D 42D9 4D AF
-D 42DB 27
-D 42DC 4E 00 30
-D 42DF 2F 0B 07 3E
-D 42E3 2F 0B 07 6D
-D 42E7 25
-D 42E8 21 0A
-D 42EA 4D AF
-D 42EC 27
-D 42ED 4E 00 30
-D 42F0 2F 0B 07 3D
-D 42F4 2F 0B 07 6C
-D 42F8 25
-D 42F9 21 0A
-D 42FB BE 00
-D 42FD CC
-D 42FE A1 03 65
-D 4301 BD 03 81
-D 4304 86 09 00 1B
-D 4308 A1 02 FD
-D 430B BD 03 86
-D 430E 8C 09
-D 4310 A0 03 67
-D 4313 86 09 00 5B
-D 4317 A1 02 FD
-D 431A BD 03 86
-D 431D 86 09 00 43
-D 4321 A1 03 2B
-D 4324 11 07 00 02
-D 4328 B0 02 FD
-D 432B 86 09 00 44
-D 432F A1 03 39
-D 4332 11 07 00 00
-D 4336 B0 02 FD
-D 4339 86 09 00 41
-D 433D A1 03 4F
-D 4340 86 06 00 09
-D 4344 A0 02 FD
-D 4347 42 06
-D 4349 BD 02 96
-D 434C B0 02 FD
-D 434F 86 09 00 42
-D 4353 A1 02 FD
-D 4356 86 06 00 01
-D 435A A0 02 FD
-D 435D 43 06
-D 435F BD 02 96
-D 4362 B0 02 FD
-D 4365 BE 00
-D 4367 B0 01 C8
-D 436A BD 03 81
-D 436D 86 09 00 1B
-D 4371 A1 03 7F
-D 4374 BD 03 86
-D 4377 8C 09
-D 4379 A0 03 67
-D 437C BD 03 86
-D 437F BE 00
-D 4381 CB
-D 4382 21 09
-D 4384 BE 00
-D 4386 11 0C 00 08
-D 438A CC
-D 438B A0 03 9B
-D 438E 43 0C
-D 4390 8C 0C
-D 4392 A1 03 8A
-D 4395 11 09 00 00
-D 4399 BE 00
-D 439B CB
-D 439C 21 09
-D 439E BE 00
+D 40E5 2F 0B 07 27
+D 40E9 4D 9F
+D 40EB 25
+D 40EC 4E 00 30
+D 40EF 2F 0B 07 47
+D 40F3 27
+D 40F4 4E 00 30
+D 40F7 2F 0B 07 48
+D 40FB 11 0E 07 21
+D 40FF C1 0E
+D 4101 2E 08 0F 0A
+D 4105 21 09
+D 4107 23 00 9A
+D 410A 52 09 00 01
+D 410E 88 95
+D 4110 A0 01 96
+D 4113 52 0A 00 0E
+D 4117 88 5A
+D 4119 A0 01 96
+D 411C 2E 08 0F 4A
+D 4120 21 09
+D 4122 8C 09
+D 4124 A0 01 38
+D 4127 88 95
+D 4129 A1 01 38
+D 412C 23 00 5A
+D 412F 52 0A 00 02
+D 4133 88 A9
+D 4135 A0 01 96
+D 4138 2E 08 0F 09
+D 413C 21 09
+D 413E 23 00 9A
+D 4141 52 09 00 01
+D 4145 88 95
+D 4147 A0 01 96
+D 414A 52 0A 00 0E
+D 414E 88 5A
+D 4150 A0 01 96
+D 4153 42 08
+D 4155 86 08 00 20
+D 4159 A1 01 60
+D 415C 11 08 00 00
+D 4160 42 01
+D 4162 23 00 1A
+D 4165 11 0C 00 64
+D 4169 4D AC
+D 416B 27
+D 416C 81 00 00
+D 416F A1 01 75
+D 4172 F1 49 12
+D 4175 43 0D
+D 4177 8C 0D
+D 4179 A1 01 83
+D 417C BD 02 BE
+D 417F 11 0D 00 08
+D 4183 11 09 00 09
+D 4187 51 96 09
+D 418A 8C 09
+D 418C A0 00 6F
+D 418F C0 0C
+D 4191 43 09
+D 4193 B0 01 8A
+D 4196 23 00 59
+D 4199 53 09 00 01
+D 419D 4D 9F
+D 419F 25
+D 41A0 4E 00 30
+D 41A3 2F 0B 07 55
+D 41A7 27
+D 41A8 4E 00 30
+D 41AB 2F 0B 07 56
+D 41AF 4D 9F
+D 41B1 25
+D 41B2 4E 00 30
+D 41B5 2F 0B 07 76
+D 41B9 27
+D 41BA 4E 00 30
+D 41BD 2F 0B 07 77
+D 41C1 BD 02 BE
+D 41C4 11 0E 07 50
+D 41C8 C1 0E
+D 41CA 11 0E 08 62
+D 41CE C1 0E
+D 41D0 F1 49 1B
+D 41D3 11 0C 00 28
+D 41D7 CC
+D 41D8 A1 01 DC
+D 41DB CB
+D 41DC C0 0C
+D 41DE 43 0C
+D 41E0 8C 0C
+D 41E2 A1 01 D7
+D 41E5 C3
+D 41E6 CC
+D 41E7 A1 01 E5
+D 41EA BD 03 C7
+D 41ED B0 00 1E
+D 41F0 11 0E 08 AE
+D 41F4 C1 0E
+D 41F6 00
+D 41F7 F0 00 00
+D 41FA 22 02
+D 41FC 2F 08 0F 00
+D 4200 2F 08 0F 20
+D 4204 4D 2F
+D 4206 25
+D 4207 4E 00 30
+D 420A 2F 0B 07 0A
+D 420E 27
+D 420F 4E 00 30
+D 4212 2F 0B 07 0B
+D 4216 23 00 29
+D 4219 52 09 00 11
+D 421D 4D 9F
+D 421F 25
+D 4220 4E 00 30
+D 4223 2F 0B 07 13
+D 4227 27
+D 4228 4E 00 30
+D 422B 2F 0B 07 14
+D 422F 11 09 00 00
+D 4233 11 0A 00 28
+D 4237 88 1A
+D 4239 A1 02 67
+D 423C C3
+D 423D 21 09
+D 423F 11 0A 00 06
+D 4243 4D 9A
+D 4245 27
+D 4246 21 09
+D 4248 8C 09
+D 424A A1 02 63
+D 424D C3
+D 424E 21 09
+D 4250 11 0A 00 0D
+D 4254 4D 9A
+D 4256 27
+D 4257 21 09
+D 4259 50 92 09
+D 425C 52 09 00 02
+D 4260 B0 02 67
+D 4263 11 09 00 00
+D 4267 22 09
+D 4269 2F 08 0F 40
+D 426D 2F 08 0F 60
+D 4271 11 0A 00 40
+D 4275 8C 09
+D 4277 A1 02 81
+D 427A 23 00 29
+D 427D 11 0A 00 7C
+D 4281 22 0A
+D 4283 2F 0B 07 1F
+D 4287 4D 9F
+D 4289 25
+D 428A 4E 00 30
+D 428D 2F 0B 07 1C
+D 4291 27
+D 4292 4E 00 30
+D 4295 2F 0B 07 1D
+D 4299 11 0E 07 00
+D 429D C1 0E
+D 429F BE 00
+D 42A1 C3
+D 42A2 21 09
+D 42A4 11 0C 00 03
+D 42A8 4D 9C
+D 42AA 27
+D 42AB 21 03
+D 42AD 25
+D 42AE 21 09
+D 42B0 11 0C 00 08
+D 42B4 4D 9C
+D 42B6 27
+D 42B7 4E 00 03
+D 42BA 21 04
+D 42BC BE 00
+D 42BE 22 06
+D 42C0 4E 00 30
+D 42C3 2F 0B 07 3A
+D 42C7 2F 0B 07 69
+D 42CB 23 00 1A
+D 42CE 4D AF
+D 42D0 27
+D 42D1 4E 00 30
+D 42D4 2F 0B 07 41
+D 42D8 2F 0B 07 70
+D 42DC 25
+D 42DD 21 0A
+D 42DF 4D AF
+D 42E1 27
+D 42E2 4E 00 30
+D 42E5 2F 0B 07 40
+D 42E9 2F 0B 07 6F
+D 42ED 25
+D 42EE 21 0A
+D 42F0 4D AF
+D 42F2 27
+D 42F3 4E 00 30
+D 42F6 2F 0B 07 3F
+D 42FA 2F 0B 07 6E
+D 42FE 25
+D 42FF 21 0A
+D 4301 4D AF
+D 4303 27
+D 4304 4E 00 30
+D 4307 2F 0B 07 3E
+D 430B 2F 0B 07 6D
+D 430F 25
+D 4310 21 0A
+D 4312 4D AF
+D 4314 27
+D 4315 4E 00 30
+D 4318 2F 0B 07 3D
+D 431C 2F 0B 07 6C
+D 4320 25
+D 4321 21 0A
+D 4323 BE 00
+D 4325 CC
+D 4326 A1 03 C2
+D 4329 BD 03 DE
+D 432C 86 09 00 6D
+D 4330 A0 03 A1
+D 4333 86 09 00 4D
+D 4337 A0 03 A1
+D 433A 86 09 00 1B
+D 433E A1 03 53
+D 4341 BD 03 E3
+D 4344 8C 09
+D 4346 A0 03 C4
+D 4349 86 09 00 5B
+D 434D A1 03 53
+D 4350 BD 03 E3
+D 4353 86 09 00 43
+D 4357 A1 03 61
+D 435A 11 07 00 02
+D 435E B0 03 25
+D 4361 86 09 00 44
+D 4365 A1 03 6F
+D 4368 11 07 00 00
+D 436C B0 03 25
+D 436F 86 09 00 41
+D 4373 A1 03 88
+D 4376 86 06 00 09
+D 437A A0 03 25
+D 437D 42 06
+D 437F F1 49 00
+D 4382 BD 02 BE
+D 4385 B0 03 25
+D 4388 86 09 00 42
+D 438C A1 03 25
+D 438F 86 06 00 01
+D 4393 A0 03 25
+D 4396 43 06
+D 4398 F1 49 09
+D 439B BD 02 BE
+D 439E B0 03 25
+D 43A1 2E 0B 0F 80
+D 43A5 81 00 00
+D 43A8 A0 03 B5
+D 43AB 10 00 00
+D 43AE 2F 0B 0F 80
+D 43B2 B0 03 25
+D 43B5 10 00 01
+D 43B8 2F 0B 0F 80
+D 43BC F1 49 24
+D 43BF B0 03 25
+D 43C2 BE 00
+D 43C4 B0 01 F0
+D 43C7 BD 03 DE
+D 43CA 86 09 00 1B
+D 43CE A1 03 DC
+D 43D1 BD 03 E3
+D 43D4 8C 09
+D 43D6 A0 03 C4
+D 43D9 BD 03 E3
+D 43DC BE 00
+D 43DE CB
+D 43DF 21 09
+D 43E1 BE 00
+D 43E3 11 0C 00 08
+D 43E7 CC
+D 43E8 A0 03 F8
+D 43EB 43 0C
+D 43ED 8C 0C
+D 43EF A1 03 E7
+D 43F2 11 09 00 00
+D 43F6 BE 00
+D 43F8 CB
+D 43F9 21 09
+D 43FB BE 00
 
 D 4700 1B 5B 48 1B 4D 1B 5B 30 31 3B 4C 4C 48 7C 1B 5B
 D 4710 30 31 3B 52 52 48 7C 1B 5B 30 31 3B 4F 4F 48 4B
@@ -743,17 +807,31 @@ D 47E0 20 66 61 73 74 65 72 20 2F 20 73 6C 6F 77 65 72
 D 47F0 1B 5B 31 31 3B 32 31 48 53 74 61 79 20 6F 6E 20
 D 4800 74 68 65 20 72 6F 61 64 20 61 6E 64 20 6D 69 73
 D 4810 73 20 74 68 65 20 72 6F 63 6B 73 20 40 20 20 20
-D 4820 20 45 53 43 20 71 75 69 74 73 1B 5B 31 34 3B 32
-D 4830 39 48 50 72 65 73 73 20 61 6E 79 20 6B 65 79 20
-D 4840 74 6F 20 73 74 61 72 74 00 1B 5B 31 30 3B 33 32
-D 4850 48 1B 5B 37 6D 20 20 43 20 52 20 41 20 53 20 48
-D 4860 20 21 20 20 1B 5B 30 6D 1B 5B 31 32 3B 32 32 48
-D 4870 41 6E 79 20 6B 65 79 3A 20 64 72 69 76 65 20 61
-D 4880 67 61 69 6E 20 20 20 20 20 20 20 45 53 43 3A 20
-D 4890 71 75 69 74 00 1B 5B 30 6D 1B 5B 32 4A 1B 5B 48
-D 48A0 1B 5B 3F 32 35 68 54 68 61 6E 6B 73 20 66 6F 72
-D 48B0 20 64 72 69 76 69 6E 67 20 53 54 45 4C 4C 41 52
-D 48C0 20 52 41 43 45 52 2E 0D 0A 00
+D 4820 20 45 53 43 20 71 75 69 74 73 1B 5B 31 32 3B 33
+D 4830 30 48 4D 3A 20 73 6F 75 6E 64 20 6F 6E 20 2F 20
+D 4840 6F 66 66 1B 5B 31 34 3B 32 39 48 50 72 65 73 73
+D 4850 20 61 6E 79 20 6B 65 79 20 74 6F 20 73 74 61 72
+D 4860 74 00 1B 5B 31 30 3B 33 32 48 1B 5B 37 6D 20 20
+D 4870 43 20 52 20 41 20 53 20 48 20 21 20 20 1B 5B 30
+D 4880 6D 1B 5B 31 32 3B 32 32 48 41 6E 79 20 6B 65 79
+D 4890 3A 20 64 72 69 76 65 20 61 67 61 69 6E 20 20 20
+D 48A0 20 20 20 20 45 53 43 3A 20 71 75 69 74 00 1B 5B
+D 48B0 30 6D 1B 5B 32 4A 1B 5B 48 1B 5B 3F 32 35 68 54
+D 48C0 68 61 6E 6B 73 20 66 6F 72 20 64 72 69 76 69 6E
+D 48D0 67 20 53 54 45 4C 4C 41 52 20 52 41 43 45 52 2E
+D 48E0 0D 0A 00
+
+D 4900 F8 49 B8 F8 6C A8 C0 49 2D F8 49 B8 F8 71 A8 C0
+D 4910 49 2D F8 49 B8 F8 76 A8 C0 49 2D F8 49 B8 F8 7F
+D 4920 A8 C0 49 2D F8 49 B8 F8 A8 A8 C0 49 2D E2 F8 4F
+D 4930 B7 F8 80 A7 07 C2 49 69 48 C2 49 69 BB 48 B7 48
+D 4940 A7 48 AB 8B C2 49 52 C1 49 4E 7B C0 49 55 7A C0
+D 4950 49 55 7A C4 C4 9B A9 29 89 CA 49 57 27 87 CA 49
+D 4960 43 97 CA 49 43 7A C0 49 38 7A E2 D5 18 00 14 01
+D 4970 00 33 00 0A 01 00 11 00 1A 01 0C 00 2A 01 00 40
+D 4980 00 18 01 76 00 0D 01 4E 00 14 01 91 00 0B 01 64
+D 4990 00 10 01 AF 00 09 01 82 00 0C 01 D3 00 07 01 A4
+D 49A0 00 0A 01 F0 00 07 01 00 1B 00 35 01 00
 D 5000 00
 D 6000 00
 D 7000 00
