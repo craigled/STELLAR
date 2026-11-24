@@ -72,7 +72,7 @@ What it can do:
 - **Time:** CAL shows a calendar as Unix cal does, today marked; SLEEP waits a number of seconds, timed by the clock card.
 - **awk:** RAWK is an awk written in 1802 code.
 - **Editors:** NANO, a small editor in the style of GNU nano, written from scratch in 1802 code and not part of the GNU project; Lite-Writer 2 (LW2) and Lite-Writer 3 (LTWRITER) on STELLAR, for files up to 60 KB.
-- **Spreadsheet:** LTCALC, in 1802 code: one page of 8 columns by 20 rows, two decimals, formulas with SUM, AVG, MIN, MAX and COUNT, saved as plain text.
+- **Spreadsheet:** LTCALC, in 1802 code: 256 cells (8 columns by 32 rows, the screen scrolling), two decimals, formulas with SUM, AVG, MIN, MAX and COUNT, saved as plain text.
 - **Music:** PLAY plays tunes on the Q output, from text files of notes (C D E, sharps, lengths, rests, octaves, tempo); `-s 1.79` sets it for a slower Elf2K's clock. Songs are in /MUSIC, and `LTOS/tomus.py` makes more from ABC, MIDI, RTTTL or BASIC music found on the internet.
 - **Morse code:** MORSE sends a file or typed lines as Morse on the Q output, and receives Morse from a key or a sound detector on an EF line, learning the sender's speed. EARTEST checks a sound detector: how soon it hears a tone, how much of it, and at which pitch it hears best.
 - **A shell:** line editing with the last command recalled, `>` and `>>` on any command, scripts with variables, `if`, loops, functions, `case` and `$(command)`.
