@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '191';                                    // the ?v= the card is fetched with
+  var V = '192';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var CPS = 375000;                                 // its machine cycles a second (3 MHz / 8)
@@ -21,7 +21,7 @@
     ['HELP', 'every command'],
     ['TYPE README.TXT', 'what is on this card'],
     ['DIR /BIN', 'the programs, and the STELLAR apps (.STL)'],
-    ['LC', 'LTOS Commander: two folders side by side - Tab the other pane, 3 View, 5 Copy, 9 or Enter Run (it comes back after); 1 every key, Esc quits'],
+    ['LC', 'LTOS Commander: two folders side by side - Tab the other pane, 3 View, 5 Copy, 9 or Enter Run, E Edit with NANO (it comes back after); 1 every key, Esc quits'],
     ['TEST', 'a script: a name alone finds TEST.SH'],
     ['DEMO you', 'DEMO.SH: functions, loops, case, $( )'],
     ['SH -x TEST', 'each line shown as it runs'],
