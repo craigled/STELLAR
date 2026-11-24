@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '194';                                    // the ?v= the card is fetched with
+  var V = '195';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var CPS = 375000;                                 // its machine cycles a second (3 MHz / 8)
@@ -114,7 +114,9 @@
   var last = performance.now(), shown = 0;
   function frame(now) {
     requestAnimationFrame(frame);                   // first: an error below must not stop the machine for good
-    var dt = Math.min(now - last, 100); last = now;
+    // a late frame (up to 250 ms - Q's sound starts over after that) is caught up, not lost: at the Elf2K clock
+    // a lost slice of time was a gap in the sound (2026-11-24; was 100 ms for every speed)
+    var dt = Math.min(now - last, speed.ips === ELF2K ? 250 : 100); last = now;
     if (m && !halted) try {
       var t0 = performance.now();
       if (speed.ips === ELF2K) {                    // real time: by the Elf2K's machine cycles, so Q's sound is right

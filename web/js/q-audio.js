@@ -22,7 +22,9 @@
   'use strict';
 
   var CPS = 375000;      // Elf2K machine cycles a second (3 MHz / 8)
-  var LEAD = 0.08;       // seconds queued ahead of the audio clock when sound (re)starts
+  var LEAD = 0.12;       // seconds queued ahead of the audio clock when sound (re)starts; 0.25 on Safari's
+  var LEAD_EL = 0.25;    //  <audio> route, which buffers more of its own: a frame later than the lead let
+                         //  the queue run dry - a gap and a click (Craig, DOTBOT in Safari, 2026-11-24; was 0.08)
   var AMP = 0.25;
   var R = 0.995;         // DC blocker pole: a steady Q fades in a few ms
 
@@ -142,8 +144,9 @@
         out[i] = y * AMP;
       }
       this.level = level; this.x = x; this.y = y;
-      if (!this.cursor) this.cursor = now + LEAD;
-      if (this.cursor > now + 3) this.cursor = now + LEAD;          // never queue seconds of lag
+      var lead = this.route === 'element' ? LEAD_EL : LEAD;
+      if (!this.cursor) this.cursor = now + lead;
+      if (this.cursor > now + 3) this.cursor = now + lead;          // never queue seconds of lag
       var src = this.ctx.createBufferSource();
       src.buffer = buf; src.connect(this.gain); src.start(this.cursor); st.played++;
       this.cursor += n / sr;
