@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '192';                                    // the ?v= the card is fetched with
+  var V = '193';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var CPS = 375000;                                 // its machine cycles a second (3 MHz / 8)
@@ -45,7 +45,7 @@
     ['RUNNING', 'the same man in 1802 code (a blur at 10x: choose Elf2K first)'],
     ['MEMVERSE', 'a verse picked at random, wrapped at the words'],
     ['CONTACTS', 'an address book: it asks NAME, ADDRESS ... NOTE; then CONTACTS london finds it (-e edits, -d deletes)'],
-    ['CD /SRC', 'the Tiny Stellar C examples: DIR to see them, then SC FIRST and FIRST (each .SC compiled on the 1802; HELP SCLANG: the language)'],
+    ['CD /SRC', 'the Tiny Stellar C examples: DIR to see them, then SC FIRST and FIRST; try SC OXO and OXO (noughts and crosses), GLIDER, BUBBLE, PIDIGITS, MOONLAND (each .SC compiled on the 1802; HELP SCLANG: the language)'],
     ['SC PRIMES', 'Tiny Stellar C, compiled on the 1802: PRIMES.SC made into PRIMES.STL; then type PRIMES (TYPE PRIMES.SC: the program)'],
     ['ECHO hello > HI.TXT', 'a file written to the card'],
     ['DELETE HI.TXT', 'moved to /TRASH; EMPTY deletes it for good'],

@@ -369,7 +369,7 @@ ZERO = 0xC                        # holds 0 when the program needs it: a[k], u8 
 BUILTINS = {'turns', 'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'delay', 'halt', 'fill', 'copy',
             'out', 'outmem', 'outport', 'inport', 'getin', 'scanin', 'ef', 'efsource', 'waitef', 'q',
             'cls', 'eol', 'rev', 'cursor', 'at', 'printz', 'printw', 'printh', 'getline',
-            'rtcget', 'rtcset', 'peek', 'poke', 'peekw', 'pokew', 'printi'}
+            'rtcget', 'rtcset', 'peek', 'poke', 'peekw', 'pokew', 'printi', 'rtc'}
 #   printi(e)       e as a SIGNED number: a '-' and its size if negative
 # Terminal, number formatting, line input, the RTC and absolute memory (2026-10-04):
 #   cls() eol() rev(on) cursor(on)   VT100: clear + home, erase to end of line, reverse video,
@@ -384,6 +384,9 @@ BUILTINS = {'turns', 'putc', 'print', 'printu', 'getc', 'keyready', 'rand', 'del
 #   rtcget(t) / rtcset(t)  $07 RTCGET / RTCSET with the 8-byte u8 array t: sec min hour weekday(0=Sun)
 #                   day month year-hi year-lo. rtcset returns 1 if the firmware wrote it, 0 if refused.
 #                   Needs firmware V0061.35 or later (the $07 RTC opcode).
+#   rtc(n)          one field of the clock as a number, n a constant: 0 second, 1 minute, 2 hour, 3 weekday
+#                   (0 = Sunday), 4 day, 5 month, 6 the year; 7: 1 if there is a clock chip (register B is
+#                   not $FF), else 0. RTCGET into a hidden 8-byte array; Tiny Stellar C has it too (2026-11-24)
 #   peek(a) poke(a, v) peekw(a) pokew(a, v)   a byte / 16-bit word at the ABSOLUTE address a
 #                   (MEMMODE 00 for those few opcodes, no branch while absolute)
 LIBS = {}   # library routines a program uses: emitted once, after its functions
@@ -432,13 +435,18 @@ class Compiler:
             elif it[0] == 'shared': s.shared.update(it[2])
         if not hasattr(s, 'signed'): s.signed = set()
         if entry not in s.funcs: raise Error('no main()')
+        used = []
+        for fn in s.funcs.values():
+            Compiler.walk(s, fn[5], lambda x: used.append(1) if x[0] == 'call' and x[1] == 'rtc' else None)
+        if used:                                                # rtc(n): RTCGET's 8 bytes land here
+            s.arrays['.rtc'] = ('array', 0, '.rtc', ('num', 8), None, 'u8')
         for n, fn in list(s.funcs.items()):                     # u8 variable x  ->  x[0]
             s.funcs[n] = fn[:5] + (s.desugar(fn[5]),)
         s.written = set()
         s.scan_writes()
         if mt and mt['role'] == 'main': s.written |= {a for a in s.shared if a in s.arrays}   # set up every run
         s.patched = {n for n, it in s.arrays.items() if it[-1] == 'patched'}
-        s.need_zero = bool(s.bytevars) or s.uses_const_index()
+        s.need_zero = bool(s.bytevars) or s.uses_const_index() or '.rtc' in s.arrays
         s.setsize = 1
         s.allocate()
 
@@ -585,7 +593,9 @@ class Compiler:
                 if e is None: return out - {st[2]}
                 kill = {tgt[1]} if tgt[0] == 'var' else set()
                 use = s.vars_in(e) | (s.vars_in(tgt[2]) if tgt[0] == 'idx' else set())
-                if has_call(e):
+                if tgt[0] == 'idx' and has_call(tgt[2]):   # b[f()] = v: what is live must survive f() too
+                    mark((out - kill) | use, [e, tgt[2]])  #  (2026-11-24: it was not looked for there)
+                elif has_call(e):
                     rest = s.vars_in(e[2]) if e[0] == 'call' and e[1] in s.funcs else set()
                     # the call's own arguments are used up before it runs - unless they are
                     # still live after it (then they must survive it like anything else)
@@ -920,7 +930,7 @@ class Compiler:
         """Does evaluating e do something (a call to a function, rand(), getc(), an input)?"""
         found = []
         s.walk(e, lambda x: found.append(x) if x[0] == 'call' and (x[1] in s.funcs or
-               x[1] in ('rand', 'getc', 'getin', 'scanin', 'getline', 'peek', 'peekw', 'rtcset')) else None)
+               x[1] in ('rand', 'getc', 'getin', 'scanin', 'getline', 'peek', 'peekw', 'rtcset', 'rtc')) else None)
         return bool(found)
 
     def wptr(s, name, ie, t=None):
@@ -1056,7 +1066,7 @@ class Compiler:
             s.emit(('3B %X%X %02X' % (x, y, n), 'COPYMXMY R%d -> R%d %d' % (x, y, n), ''))
             s.untemp(x); s.untemp(y); return
         if name in ('cls', 'eol', 'rev', 'cursor', 'at', 'printz', 'printw', 'printh', 'getline',
-                    'rtcget', 'rtcset', 'peek', 'poke', 'peekw', 'pokew'):
+                    'rtcget', 'rtcset', 'peek', 'poke', 'peekw', 'pokew', 'rtc'):
             return s.builtin2(name, args, d)
         raise Error(name)
 
@@ -1136,6 +1146,24 @@ class Compiler:
             s.emit(serouti(8)); s.emit(serouti(' ')); s.emit(serouti(8)); s.emit(gal(loop))
             s.label(end); s.emit(ldai(0)); s.emit(wridx(cnt, base, 'NUL')); s.emit(serouti(13)); s.emit(serouti(10))
             if d is not None and d != cnt: s.emit(cpxy(cnt, d))
+            return
+        if name == 'rtc':
+            s.nargs(name, args, 1)
+            if not s.isconst(args[0]) or s.const(args[0], s.ln) > 7:
+                raise Error('line %d: rtc(n): n is a constant, 0-7' % s.ln)
+            n = s.const(args[0], s.ln)
+            if n == 7:                                          # a clock chip there? register B $FF: none
+                s.emit(('07 2B', 'RTCRD B', 'the clock chip: $FF if there is none')); s.acc = None
+                if d is not None:
+                    no = s.new(); s.emit(testai(0xFF)); s.emit(ldx(d, 0)); s.emit(ift(no, 'none')); s.emit(ldx(d, 1))
+                    s.label(no)
+                return
+            t = s.temp(); s.emit(ldx(t, s.addr('.rtc')))
+            s.emit(('07 0%X' % t, 'RTCGET R%d' % t, 'sec min hour wday day month yearhi yearlo'))
+            if d is not None:
+                if n == 6: s.emit(ldx(t, s.addr('.rtc') + 6)); s.emit(mxy2(t, d))
+                else: s.emit(rdidx(ZERO, s.addr('.rtc') + n)); s.emit(acc2x(d))
+            s.untemp(t); s.acc = None
             return
         if name in ('rtcget', 'rtcset'):
             s.nargs(name, args, 1)
@@ -1702,7 +1730,16 @@ class Compiler:
         s.ma = None; s.kreg = {}; s.acc = None                  # it may have changed anything
 
     def assign(s, target, e):
-        e = s.hoist(e)
+        once = (target[0] == 'idx' and s.side_effects(target[2]) and e[0] == 'bin' and len(e) > 2
+                and e[2] == target)
+        if once:                                    # a[f()] += k: only the right side hoisted - hoisting the
+            e = ('bin', e[1], e[2], s.hoist(e[3], False))   #  whole of e made f() twice (2026-11-24)
+        else:
+            if target[0] == 'idx' and s.side_effects(target[2]):
+                # b[f()] = v: the call made first, into a hidden variable - else working out the index
+                # (calling f) clobbered the register already holding v (2026-11-24, TICTAC's b[pick()] = 2)
+                target = ('idx', target[1], s.hoist(target[2], False))
+            e = s.hoist(e)
         if target[0] == 'var':
             loc = s.where(target[1])
             if loc[0] == 'r':
