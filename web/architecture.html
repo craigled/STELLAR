@@ -59,6 +59,9 @@
   points at the CALL routine (<span class="hex">$0340</span>), <span class="mono">R5</span> at RETURN
   (<span class="hex">$0360</span>), and <span class="mono">R6</span> carries the link address. Every
   STELLAR <span class="mono">CALL</span>/<span class="mono">RETURN</span> opcode rides on this.</p>
+  <p>SCRT does have a stack: <span class="mono">R2</span> points to it in memory. CALL pushes the
+  caller's <span class="mono">R6</span> onto that stack before <span class="mono">R6</span> takes the new
+  link, and RETURN pops it back, so calls can nest as deep as the stack allows.</p>
 
   <h2><span class="hx">■</span>The VM core ($3000, $3400, $3800, and $3C00 blocks)</h2>
   <p>Each VM's entire live state is a 256-byte block. This is exactly what the
