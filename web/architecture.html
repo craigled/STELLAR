@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STELLAR Architecture</title>
 <meta name="description" content="STELLAR's memory map, 1802 register roles, SCRT, the VM core layout, and the CIDP multitasking page.">
-<link rel="stylesheet" href="css/site.css?v=200">
+<link rel="stylesheet" href="css/site.css?v=201">
 </head>
 <body>
 <main class="wrap">
@@ -52,7 +52,7 @@
   the monitor's exit vector. Servicing interrupts would mean moving the exit vector to another register
   first.</p>
 
-  <h2><span class="hx">→</span>SCRT — calls without a stack</h2>
+  <h2><span class="hx">→</span>SCRT — an old-fashioned way</h2>
   <p>The 1802 has no call instruction. STELLAR uses RCA's <strong>Standard Call and Return
   Technique</strong>: <span class="mono">R3</span> is the program counter, and switching it with
   another register (via <span class="mono">SEP</span>) transfers control. <span class="mono">R4</span>
@@ -167,6 +167,6 @@
 </main>
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a> · <a href="license.html">license</a></footer>
-<script src="js/nav.js?v=200"></script>
+<script src="js/nav.js?v=201"></script>
 </body>
 </html>
