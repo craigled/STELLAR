@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LTOS on the Elf2K</title>
 <meta name="description" content="LTOS 0.5, the disk operating system for the Elf2K, running in your browser: the real kernel, shell and programs on an emulated RCA 1802 with a CF card.">
-<link rel="stylesheet" href="css/site.css?v=199">
+<link rel="stylesheet" href="css/site.css?v=200">
 <style>
   .ltos-body{display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:18px; align-items:start}
   @media (max-width:900px){ .ltos-body{grid-template-columns:minmax(0,1fr)} }
@@ -57,7 +57,7 @@
     <h2>Run LTOS in Emma 02</h2>
     <p>LTOS also runs in <a href="https://www.emma02.hobby-site.com">Emma 02</a>, Marcel van Tongeren's 1802 emulator, on its
       COSMAC Elf 2000. This kit has a card image, with STELLAR and its apps on it, and the set-up files.</p>
-    <p><a href="downloads/LTOS-for-Emma02.zip?v=199" download style="display:inline-block; padding:7px 14px; border:1px solid var(--line); border-radius:8px; text-decoration:none">⤓ LTOS-for-Emma02.zip</a></p>
+    <p><a href="downloads/LTOS-for-Emma02.zip?v=200" download style="display:inline-block; padding:7px 14px; border:1px solid var(--line); border-radius:8px; text-decoration:none">⤓ LTOS-for-Emma02.zip</a></p>
     <ol>
       <li>Copy <span class="mono">ltos-card.ide</span> and <span class="mono">rtcdump.bin</span> into your Emma 02 data folder's <span class="mono">Elf2K</span> folder, and <span class="mono">ltos.xml</span> into <span class="mono">Xml/Elf2K</span>. If your Elf 2000 already starts and shows its banner, keep your own <span class="mono">rtcdump.bin</span>.</li>
       <li>In Emma 02 choose COSMAC Elf 2000, set XML to <span class="mono">ltos.xml</span>, and press Start.</li>
@@ -67,6 +67,22 @@
       <span class="mono">LTOS: loading the kernel ?? FAILED (read/sum)</span>: update Emma 02 and it boots.</p>
     <p>The kit uses the Elf 2000 ROM that comes with Emma 02, and turns on the Q sound. <span class="mono">README.TXT</span> on the card
       explains the rest, including how to move files on and off the card.</p>
+  </section>
+
+  <section style="margin-top:22px; max-width:80ch" id="cardtool">
+    <h2>Put LTOS on your own Elf2K's card</h2>
+    <p>The Elf2K card tool looks after the CompactFlash card in a real Elf 2000 over its serial port, from a Mac, a Windows PC
+      or Linux: it formats a card and installs LTOS and STELLAR, updates them (only what differs), backs the card up and
+      restores it, checks it, lists it, and gets and puts files.</p>
+    <p><a href="downloads/Elf2K-Card-Tool.zip?v=200" download style="display:inline-block; padding:7px 14px; border:1px solid var(--line); border-radius:8px; text-decoration:none">⤓ Elf2K-Card-Tool.zip</a></p>
+    <ol>
+      <li>Install Python 3 (python.org; on Windows tick <i>Add python.exe to PATH</i>).</li>
+      <li>Unzip, plug in the Elf2K's USB serial cable (19200 baud) and close any terminal program using it.</li>
+      <li>Double-click <span class="mono">Elf2K Card.command</span> on a Mac or <span class="mono">Elf2K Card.bat</span> on Windows
+        (it installs pyserial the first time); on Linux run <span class="mono">./elf2k-card.sh</span>.</li>
+    </ol>
+    <p>The Elf2K needs the STELLAR ROM. A card that already holds LTOS is never formatted without asking, and a backup is
+      offered first. <span class="mono">README.txt</span> in the zip says more.</p>
   </section>
 
   <section style="margin-top:22px; max-width:80ch">
@@ -86,14 +102,14 @@
 
 <footer class="foot">STELLAR for the RCA COSMAC 1802 · <a href="index.html">home</a> · <a href="license.html">license</a></footer>
 
-<script src="js/firmware-0061-37.js?v=199"></script>
-<script src="js/stellar-vm.js?v=199"></script>
-<script src="js/webbios.js?v=199"></script>
-<script src="js/elf2k.js?v=199"></script>
-<script src="js/vt100.js?v=199"></script>
-<script src="js/term-input.js?v=199"></script>
-<script src="js/q-audio.js?v=199"></script>
-<script src="js/ltos-page.js?v=199"></script>
-<script src="js/nav.js?v=199"></script>
+<script src="js/firmware-0061-37.js?v=200"></script>
+<script src="js/stellar-vm.js?v=200"></script>
+<script src="js/webbios.js?v=200"></script>
+<script src="js/elf2k.js?v=200"></script>
+<script src="js/vt100.js?v=200"></script>
+<script src="js/term-input.js?v=200"></script>
+<script src="js/q-audio.js?v=200"></script>
+<script src="js/ltos-page.js?v=200"></script>
+<script src="js/nav.js?v=200"></script>
 </body>
 </html>
