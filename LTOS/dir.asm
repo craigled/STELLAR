@@ -687,14 +687,14 @@ PDATE:  SEP     R4              ; the date and time: yyyy-mm-dd hh:mm
         SHR
         ANI     0FH
         SEP     R4
-        DW      KS_P2D
+        DW      P2D
         LDI     '-'
         SEP     R4
         DW      F_TYPE
         GLO     RC              ; day = date & 31
         ANI     1FH
         SEP     R4
-        DW      KS_P2D
+        DW      P2D
         LDI     ' '
         SEP     R4
         DW      F_TYPE
@@ -708,7 +708,7 @@ PDATE:  SEP     R4              ; the date and time: yyyy-mm-dd hh:mm
         SHR
         SHR
         SEP     R4
-        DW      KS_P2D
+        DW      P2D
         LDI     ':'
         SEP     R4
         DW      F_TYPE
@@ -726,7 +726,7 @@ PDATE:  SEP     R4              ; the date and time: yyyy-mm-dd hh:mm
         SHL
         OR
         SEP     R4
-        DW      KS_P2D
+        DW      P2D
         SEP     R5
 
 ; GETE: RC -> the entry DNEXT gave.  CPY / CPYN: D bytes from RC to RA (CPYN: complemented); both move on.
@@ -764,6 +764,7 @@ INC16:  INC     RD
         STR     RD
         SEP     R5
 
+        INCL    "p2d.inc"
 USAGE:  SEP     R4
         DW      K_PIN
         DB      'DIR [-a -e -s -t -r -w -p -h] [path]   (folders first when sorted)',0DH,0AH

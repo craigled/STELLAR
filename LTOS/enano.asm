@@ -222,7 +222,7 @@ ST3:    LOAD    RD, KS_WDIR     ; MYDIR = WDIR
         INC     RC
         LDN     RD
         STR     RC
-        LOAD    RD, ATTN        ; ATTACH.PRG: in /BIN, else here, else in the root
+        LOAD    RD, ATTN        ; ATTACH.PRG: in /BIN or a folder in it, else here, else in the root
         SEP     R4
         DW      FINDP
         LBDF    NOATT
@@ -615,17 +615,14 @@ CFAIL:  SEP     R4
         LBR     K_MAIN
 ATTN:   DB      'ATTACH  PRG'
 OVLN:   DB      'NANO    OVL'
-; FINDP: the file named at RD (11 bytes) in /BIN, else here, else in the root - KS_FINDN'd (DF = 1: nowhere)
+; FINDP: the file named at RD (11 bytes) in /BIN or a folder in it, else here, else in the root - KS_FINDN'd (DF = 1: nowhere)
 FINDP:  SEP     R4
         DW      PWD_
         SEP     R4
-        DW      KS_TOBIN
-        BDF     FDP1
-        SEP     R4
         DW      GWD_
-        SEP     R4
-        DW      KS_FINDN
-        BNF     FDP9
+        SEP     R4              ; (BINFN: /BIN, then its folders)
+        DW      BINFN
+        LBNF    FDP9
 FDP1:    LOAD    RD, KS_CWD
         LOAD    RC, KS_WDIR
         LDA     RD
@@ -3737,10 +3734,10 @@ CVCR:   LDI     1
         LBR     CV1
 CVO:    LDI     0
         PHI     RC
-        GLO     RC
-        STR     R9
-        INC     R9
+        SEP     R4              ; (CVMAP, in NANO.OVL: it stores the byte - curly quotes, dashes: ASCII)
+        DW      CVMAP
         LBR     CV1
+        INCL    "binfn.inc"
 ; CNTLF: LOFF = the line ends (LF) in the file before WOFF. DF = 1: failed.
 CNTLF:  LOAD    R7, 0
         SEP     R4

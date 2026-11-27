@@ -124,7 +124,7 @@ K4:     SEP     R4
         SEP     R4
         DW      KS_ST32
         SEP     R4
-        DW      KS_PMB
+        DW      PMB
         SEP     R4
         DW      KS_PIN
         DB      ' = ',0
@@ -264,7 +264,7 @@ P5:     SEP     R4
         DW      WALK
         LBDF    RDERR
         SEP     R4
-        DW      DOTEND
+        DW      SPINEND         ; (the turning character rubbed out: Volume is written where it was)
 ; ---- the volume
 VOL:    SEP     R4
         DW      KS_PIN
@@ -316,7 +316,9 @@ V4:     LDI     11
 V5:     SEP     R4
         DW      KS_PIN
         DB      '(none)',0
-V6:     LOAD    RF, VBUF+26H
+V6:     SEP     R4              ; when it was formatted (LTOS's installer keeps it in the boot record)
+        DW      PFMTD
+        LOAD    RF, VBUF+26H
         LDN     RF
         XRI     29H
         LBNZ    V7
@@ -541,10 +543,10 @@ C1:     SEP     R4
         DB      '  (DISKINFO -S reads every sector of the card to look for more)',0DH,0AH,0
         LBR     DONE
 
-; ---- -S: every sector read (0 .. NSEC - 1); a dot each 2,048 (1 MB); any key stops it
+; ---- -S: every sector read (0 .. NSEC - 1); the character turns each 16; any key stops it
 SCANS:  SEP     R4
         DW      KS_PIN
-        DB      '  Reading every sector (a dot a MB; a key stops it) ',0
+        DB      '  Reading every sector (a key stops it) ',0
 SC1:    LOAD    RD, SLBA        ; done? SLBA = NSEC
         SEP     R4
         DW      KS_LD32
@@ -563,8 +565,8 @@ SC1:    LOAD    RD, SLBA        ; done? SLBA = NSEC
         SMB
         SEX     R2
         LBDF    SC8
-        GLO     R7              ; each 64 sectors: a key in? (the UART's line status)
-        ANI     3FH
+        GLO     R7              ; each 16 sectors: a key in? (the UART's line status)
+        ANI     0FH
         LBNZ    SC2
         LDI     15H
         STR     R2
@@ -579,6 +581,8 @@ SC1:    LOAD    RD, SLBA        ; done? SLBA = NSEC
         DEC     R2
         INP     DATPORT
         SEP     R4
+        DW      SPINEND
+        SEP     R4
         DW      KS_PIN
         DB      0DH,0AH,'  Stopped at sector ',0
         LOAD    RD, SLBA
@@ -590,18 +594,8 @@ SC1:    LOAD    RD, SLBA        ; done? SLBA = NSEC
         SEP     R4
         DW      KS_PCRLF
         LBR     SC9
-SC1A:   LOAD    RD, SLBA        ; a dot each 2,048 sectors
-        SEP     R4
-        DW      KS_LD32
-        GHI     R7
-        ANI     07H
-        STR     R2
-        GLO     R7
-        OR
-        LBNZ    SC2
-        LDI     '.'
-        SEP     R4
-        DW      F_TYPE
+SC1A:   SEP     R4              ; each 16 sectors: the character turns
+        DW      SPIN
 SC2:    LOAD    RD, SLBA
         SEP     R4
         DW      KS_LD32
@@ -612,6 +606,8 @@ SC2:    LOAD    RD, SLBA
         LOAD    RD, NSBAD       ; a bad one: counted and named
         SEP     R4
         DW      INC16
+        SEP     R4
+        DW      SPINEND
         SEP     R4
         DW      KS_PIN
         DB      0DH,0AH,'  Bad: sector ',0
@@ -634,6 +630,8 @@ SC3:    LOAD    RD, SLBA
         DW      KS_ST32
         LBR     SC1
 SC8:    SEP     R4
+        DW      SPINEND
+        SEP     R4
         DW      KS_PCRLF
 SC9:    SEP     R4
         DW      KS_PIN
@@ -656,6 +654,8 @@ NOCARD: SEP     R4
         DB      'the card did not answer',0DH,0AH,0
         SEP     R5
 RDERR:  SEP     R4
+        DW      SPINEND
+        SEP     R4
         DW      KS_PIN
         DB      0DH,0AH,'The card could not be read.',0DH,0AH,0
         LBR     DONE
@@ -679,11 +679,11 @@ FATCNT: LOAD    RD, KS_NCLUS    ; RB = the last entry + 1 = NCLUS + 2
         PLO     R9
 FC0:    GLO     RA              ; a new FAT sector every 256 entries
         LBNZ    FC4
-        GHI     RA              ; a dot every 4 sectors
+        GHI     RA              ; the character turns every 4 sectors
         ANI     3
         LBNZ    FC1
         SEP     R4
-        DW      DOT
+        DW      SPIN
 FC1:
         GHI     RA
         PLO     RC
@@ -801,8 +801,8 @@ W0A:    LOAD    RD, KS_WDIR     ; WDIR = the next folder; QH on
         STR     RD
         INC     RD
         STR     RD
-W1:     SEP     R4              ; a dot for each sector of a folder
-        DW      DOT
+W1:     SEP     R4              ; the character turns for each sector of a folder
+        DW      SPIN
         LOAD    RD, DSI
         LDA     RD
         PHI     RC
@@ -981,6 +981,121 @@ PI3:    GHI     RC
         XOR
         LBNZ    PI1
         SEP     R5
+; PFMTD: "  Formatted:  yyyy-mm-dd hh:mm" - from the boot record (VBUF) at $1F0: 'FD', then the DS12887's registers
+;   B year month day hour minute second as LTOS's installer found them (B says how: bit 2 binary, else BCD; bit 1
+;   24-hour, else the hour's bit 7 = PM; the year: binary = 1972 + it, as the Elf2K BIOS keeps it, BCD = 2000 + it).
+;   Not there (another formatter, or LTOS's before 2026-11-16) or no clock then (B $FF, or month 0): "not recorded".
+PFMTD:  SEP     R4
+        DW      KS_PIN
+        DB      0DH,0AH,'  Formatted:     ',0
+        LOAD    RF, VBUF+1F0H
+        LDA     RF
+        XRI     'F'
+        LBNZ    FDNO
+        LDA     RF
+        XRI     'D'
+        LBNZ    FDNO
+        LDA     RF              ; RB.0 = B
+        PLO     RB
+        XRI     0FFH
+        LBZ     FDNO
+        LOAD    RD, VBUF+1F4H   ; month 0: no clock either (nothing answered)
+        LDN     RD
+        LBZ     FDNO
+        LDA     RF              ; the year
+        SEP     R4
+        DW      FDBIN
+        STR     R2
+        GLO     RB
+        ANI     04H
+        LBZ     FDY1
+        LDI     LOW(1972)
+        LBR     FDY2
+FDY1:   LDI     LOW(2000)
+FDY2:   ADD
+        PLO     RD
+        LDI     HIGH(2000)      ; (1972 and 2000: the same high byte)
+        ADCI    0
+        PHI     RD
+        SEP     R4
+        DW      KS_PDEC
+        LDI     '-'
+        SEP     R4
+        DW      F_TYPE
+        LDA     RF              ; the month
+        SEP     R4
+        DW      FDBIN
+        SEP     R4
+        DW      P2D
+        LDI     '-'
+        SEP     R4
+        DW      F_TYPE
+        LDA     RF              ; the day
+        SEP     R4
+        DW      FDBIN
+        SEP     R4
+        DW      P2D
+        LDI     ' '
+        SEP     R4
+        DW      F_TYPE
+        LDA     RF              ; the hour (12-hour: bit 7 = PM, 12 = 0)
+        PHI     R8
+        ANI     7FH
+        SEP     R4
+        DW      FDBIN
+        PLO     R8
+        GLO     RB
+        ANI     02H
+        LBNZ    FDH2
+        GLO     R8
+        XRI     12
+        LBNZ    FDH1
+        PLO     R8
+FDH1:   GHI     R8
+        SHL
+        LBNF    FDH2
+        GLO     R8
+        ADI     12
+        PLO     R8
+FDH2:   GLO     R8
+        SEP     R4
+        DW      P2D
+        LDI     ':'
+        SEP     R4
+        DW      F_TYPE
+        LDA     RF              ; the minute
+        SEP     R4
+        DW      FDBIN
+        SEP     R4
+        DW      P2D
+        SEP     R5
+FDNO:   SEP     R4
+        DW      KS_PIN
+        DB      'not recorded',0
+        SEP     R5
+; FDBIN: D, as the clock keeps it -> binary (BCD unless RB.0, register B, has bit 2)
+FDBIN:  PLO     R8
+        GLO     RB
+        ANI     04H
+        LBNZ    FDB9
+        GLO     R8
+        SHR
+        SHR
+        SHR
+        SHR
+        STR     R2              ; tens x 10 = (tens x 4 + tens) x 2
+        SHL
+        SHL
+        ADD
+        SHL
+        STR     R2
+        GLO     R8
+        ANI     0FH
+        ADD
+        SEP     R5
+FDB9:   GLO     R8
+        SEP     R5
+
 ; PSTRN: D characters at RF, its trailing spaces left out
 PSTRN:  PLO     RC
         STR     R2              ; RB = RF + D - 1: the last; back while it is a space
@@ -1073,6 +1188,10 @@ CB1:    SEP     R4
         LBNZ    CB1
         SEP     R5
 
+PMBDEC  EQU     K_PDEC
+PMBPIN  EQU     K_PIN
+        INCL    "pmb.inc"
+        INCL    "p2d.inc"
 OLD:    SEP     R4
         DW      K_PIN
         DB      'Not for this kernel - install LTOS again.',0DH,0AH,0
@@ -1091,7 +1210,7 @@ SLBA:   DS      4
 HASLBL: DS      1
 LABEL:  DS      11              ; (just after HASLBL)
 NVARS   EQU     $ - VARS
-        INCL    "dots.inc"
+        INCL    "spin.inc"
 PEND:
 NSEC    EQU     PEND            ; (past the file: not in DISKINFO.PRG)
 QH      EQU     PEND + 4

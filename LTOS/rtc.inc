@@ -117,40 +117,40 @@ PD3:    SEP     R4
         LOAD    RD, YY
         LDN     RD
         SEP     R4
-        DW      KS_P2D
+        DW      P2D
         LDI     '-'
         SEP     R4
         DW      F_TYPE
         LOAD    RD, MON
         LDN     RD
         SEP     R4
-        DW      KS_P2D
+        DW      P2D
         LDI     '-'
         SEP     R4
         DW      F_TYPE
         LOAD    RD, DAY
         LDN     RD
         SEP     R4
-        DW      KS_P2D
+        DW      P2D
         LBR     K_PCRLF
 PTIME:  LOAD    RD, HOUR
         LDN     RD
         SEP     R4
-        DW      KS_P2D
+        DW      P2D
         LDI     ':'
         SEP     R4
         DW      F_TYPE
         LOAD    RD, MIN
         LDN     RD
         SEP     R4
-        DW      KS_P2D
+        DW      P2D
         LDI     ':'
         SEP     R4
         DW      F_TYPE
         LOAD    RD, SEC
         LDN     RD
         SEP     R4
-        DW      KS_P2D
+        DW      P2D
         LBR     K_PCRLF
 WDNAME: DB      'Sunday',0,'Monday',0,'Tuesday',0,'Wednesday',0,'Thursday',0,'Friday',0,'Saturday',0
 
@@ -329,6 +329,7 @@ TF2:    GLO     RA
 TF9:    GLO     RE
         SEP     R5
 
+        INCL    "p2d.inc"
 SEC:    DS      1               ; SEC MIN HOUR DAY MON YY: in this order
 MIN:    DS      1
 HOUR:   DS      1

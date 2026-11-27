@@ -784,9 +784,48 @@ CLI2:    LDA     R9
         BR      CLI1
 CLI9:    SEP     R5
 
+; CVMAP (for CONV): RC.0 = a byte of the file (R8 after it, RB the bytes left) -> stored at R9, R9 + 1. E2 80 90-9F,
+;   the dashes and curly quotes the Mac and Word write, become ONE ASCII byte (R8 and RB past all three): the
+;   screen shows a byte over 7EH as ?, so an apostrophe was ??? (Craig, 2026-11-23). Saved so after an edit.
+CVMAP:  GLO     RC
+        XRI     0E2H
+        BNZ     CM9
+        GHI     RB              ; two more bytes?
+        BNZ     CM1
+        GLO     RB
+        SMI     2
+        BNF     CM9
+CM1:    LDN     R8
+        XRI     80H
+        BNZ     CM9
+        INC     R8
+        LDN     R8
+        DEC     R8
+        SMI     90H
+        BNF     CM9
+        SMI     10H
+        BDF     CM9
+        ADI     LOW(CVTAB) + 10H
+        PLO     RD
+        LDI     HIGH(CVTAB)
+        PHI     RD
+        LDN     RD
+        BZ      CM9             ; (E2 80 96, 97: kept as they are)
+        PLO     RC
+        INC     R8
+        INC     R8
+        DEC     RB
+        DEC     RB
+CM9:    GLO     RC
+        STR     R9
+        INC     R9
+        SEP     R5
+CVTAB:  DB      '------',0,0,27H,27H,27H,27H,22H,22H,22H,22H   ; E2 80 90 .. 9F
+
 ; ---- the overlay's own variables (not in the file: set before use)
 PGL:    DS      2               ; GL as the last FIXUP left it
 SELA:   DS      2               ; the mark's ends, the smaller first (SELA, SELB: in this order)
 SELB:   DS      2
 LROWS:  DS      NROWS           ; the rows each line on the screen takes (NLV of them valid, from the top)
 OVLEND:
+

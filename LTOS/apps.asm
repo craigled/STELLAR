@@ -204,28 +204,42 @@ BLE:    LOAD    RD, VMS
 AV3:    SEP     R4
         DW      K_PIN
         DB      '  ',0
+        LDI     0               ; the columns line up: " 9 blocks  4.5 KB  VM 1 2    "
+        PHI     R8
+        PLO     R8
+        PHI     R7
         GLO     RC
-        PLO     RD
-        LDI     0
-        PHI     RD
+        PLO     R7
+        LDI     2
         SEP     R4
-        DW      K_PDEC
+        DW      KS_PDEC32
+        SEP     R4
+        DW      RELOAD          ; (PDEC32 used RC and R9)
         SEP     R4
         DW      K_PIN
-        DB      ' blocks  ',0
-        GLO     RC              ; and the size: 512 bytes a block -> blocks / 2 KB, .5 for an odd count
-        SHR
-        PLO     RD
-        LDI     0
-        PHI     RD
-        SEP     R4
-        DW      K_PDEC
+        DB      ' blocks ',0
+        LDI     0               ; and the size: 512 bytes a block -> blocks / 2 KB, .5 for an odd count
+        PHI     R8
+        PLO     R8
+        PHI     R7
         GLO     RC
+        SHR
+        PLO     R7
+        GLO     RC              ; " 4.5" / "   4": the KB line up (as APPS -P)
         ANI     1
-        LBZ     AV3K
+        LBZ     AV3W
+        LDI     2
+        SEP     R4
+        DW      KS_PDEC32
         SEP     R4
         DW      K_PIN
         DB      '.5',0
+        LBR     AV3R
+AV3W:   LDI     4
+        SEP     R4
+        DW      KS_PDEC32
+AV3R:   SEP     R4
+        DW      RELOAD          ; (PDEC32 used RC and R9)
 AV3K:   SEP     R4
         DW      K_PIN
         DB      ' KB  VM',0
@@ -236,8 +250,12 @@ AV4:    GHI     RB
         STR     R2
         GLO     R9
         AND
-        LBZ     AV5
-        LDI     ' '
+        LBNZ    AV4N
+        SEP     R4              ; not in this VM: a blank in its place
+        DW      K_PIN
+        DB      '  ',0
+        LBR     AV5
+AV4N:   LDI     ' '
         SEP     R4
         DW      F_TYPE
         GLO     RB
@@ -401,6 +419,14 @@ PGEND:  LOAD    RD, NAPP
         DW      K_PIN
         DB      'No programs in /BIN.',0DH,0AH,0
 PGE1:   SEP     R5
+; RELOAD: RC.0 = the blocks (NBLK), R9.0 = the VMs (VMS) again
+RELOAD: LOAD    RD, NBLK
+        LDN     RD
+        PLO     RC
+        LOAD    RD, VMS
+        LDN     RD
+        PLO     R9
+        SEP     R5
 ; SETPAT: KS_PAT = ????????EXT, the extension's 3 letters at RF
 SETPAT: LOAD    RD, KS_PAT
         LDI     8

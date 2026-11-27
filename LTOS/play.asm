@@ -3,6 +3,7 @@
 ; play.asm - PLAY.PRG: PLAY name - a tune file played on Q (the Elf2K's speaker), a square wave.
 ;            PLAY -n notes - the notes on the command line (O there: > < are the shell's). No extension: .MUS.
 ;            PLAY -s MHz ... - for an Elf2K clocked at MHz (1.00-9.99; 3.58 if not given): the table worked out again.
+;            PLAY -r ...     - again and again, until a key stops it.
 ; The notes (upper or lower case; spaces, new lines, | and , between them are ignored):
 ;   C D E F G A B   a note; then # or + sharp, - flat; then a length (1 whole, 2, 4 quarter, 8, 16, 32, 3 6 12 ...
 ;                   triplets - any 1-64; none: L's); then . dotted, .. double dotted.     C#8  E-4.  G
@@ -76,7 +77,10 @@ TKEY:   REQ
 
 START:  SEX     R2
         REQ
-OPT:    SEP     R4              ; the options: -s MHz, -n
+        LOAD    RD, REPT        ; (-r: not yet)
+        LDI     0
+        STR     RD
+OPT:    SEP     R4              ; the options: -s MHz, -n, -r
         DW      K_SKIPSP
         LDN     RF
         LBZ     USAGE
@@ -85,9 +89,14 @@ OPT:    SEP     R4              ; the options: -s MHz, -n
         INC     RF
         LDA     RF
         ANI     0DFH
+        STR     R2
+        XRI     'R'
+        LBZ     OPTR
+        LDN     R2
         XRI     'N'
         LBZ     OPTN
-        XRI     1DH             ; 'N' xor 'S'
+        LDN     R2
+        XRI     'S'
         LBNZ    USAGE
         SEP     R4
         DW      K_SKIPSP
@@ -190,6 +199,10 @@ MZBAD:  SEP     R4
 OPTN:   SEP     R4
         DW      K_SKIPSP
         LBR     GO
+OPTR:   LOAD    RD, REPT        ; -r: again and again
+        LDI     1
+        STR     RD
+        LBR     OPT
 ; ---- the name, with .MUS if it has no extension
 FNAME:  LOAD    RD, NAMEB
         LDI     0
@@ -246,8 +259,14 @@ FN5:    LDI     0
         LDI     0
         STR     RD
         LOAD    RF, BUF
-; ---- the notes at RF, to a 0
-GO:     LOAD    RD, OCT
+; ---- the notes at RF, to a 0 (kept in TUNE: -r starts them again)
+GO:     LOAD    RD, TUNE
+        GHI     RF
+        STR     RD
+        INC     RD
+        GLO     RF
+        STR     RD
+GO1:    LOAD    RD, OCT
         LDI     3               ; O4
         STR     RD
         INC     RD
@@ -266,7 +285,7 @@ GO:     LOAD    RD, OCT
         STR     RD
 NEXT:   LDA     RF
         PHI     RB              ; RB.1 = the character
-        LBZ     DONE
+        LBZ     ENDT
         XRI     0AH
         LBZ     NEWLN
         GHI     RB
@@ -349,6 +368,7 @@ USAGE:  SEP     R4
         DB      'PLAY -n notes  the notes here:  PLAY -n T180 C E G O5 C',0DH,0AH
         DB      '               (use O, not > <: those send the output to a file)',0DH,0AH
         DB      'PLAY -s MHz .. the Elf2K',27H,'s clock (3.58 if not given):  PLAY -s 1.79 ODE',0DH,0AH
+        DB      'PLAY -r ...    again and again until a key:  PLAY -r /MUSIC/CHIMES',0DH,0AH
         DB      'HELP PLAY for the notes. Any key stops it.',0DH,0AH,0
         SEP     R5
 
@@ -815,6 +835,25 @@ STOP:   SEP     R4
         DW      K_PIN
         DB      'Stopped.',0DH,0AH,0
         LBR     DONE
+; ENDT: the end of the tune - with -r, from the start again (O4 L4 T120 MN), after a look for a key: a tune with
+;       no notes would otherwise never look
+ENDT:   LOAD    RD, REPT
+        LDN     RD
+        LBZ     DONE
+        LOAD    R7, 0100H       ; one quiet half-period (TONE looks for a key)
+        LOAD    R8, 00FFH
+        LDI     0
+        PLO     RA
+        PLO     RB
+        SEP     R4
+        DW      TONE
+        LBDF    STOP
+        LOAD    RD, TUNE
+        LDA     RD
+        PHI     RF
+        LDN     RD
+        PLO     RF
+        LBR     GO1
 
 ; ---- NUM: RF -> digits -> RD (at most 255 kept: more is 256+), R7.1 = 1 if there were any. RF past them.
 NUM:    LDI     0
@@ -1455,6 +1494,8 @@ KC:     DS      2               ; (FC follows it)
 FC:     DS      1
 OVX:    DS      3
 SAVRF:  DS      2
+REPT:   DS      1               ; -r
+TUNE:   DS      2               ; the tune's first character
 NAMEB:  DS      64
 BUF:
         END

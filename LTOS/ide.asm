@@ -344,28 +344,28 @@ IW1:    DEC     RC
         GLO     RC
         LBNZ     IW2
         GHI     RC
-        LBNZ     IW2
+        BNZ     IW2
         LDI     0FFH            ; no answer
-        LBR     IWFAIL
+        BR      IWFAIL
 IW2:    INP     DATPORT         ; the status, also at M(R2)
         ANI     80H
-        LBNZ     IW1             ; busy: the other bits mean nothing yet
+        BNZ     IW1             ; busy: the other bits mean nothing yet
         GLO     RD
         ANI     01H
-        LBZ      IW3
+        BZ      IW3
         LDN     R2
         ANI     01H
-        LBZ      IW3
+        BZ      IW3
         LDI     IDE_ERR         ; an error: its error register
         STR     R2
         OUT     SELPORT
         DEC     R2
         INP     DATPORT
-        LBR     IWFAIL
+        BR      IWFAIL
 IW3:    GLO     RD
         ANI     0FEH            ; the bit wanted (RDY or DRQ) ...
         AND                     ; ... of the status still at M(R2)
-        LBZ      IW1
+        BZ      IW1
         LDI     0
         SHR                     ; DF = 0
         LSKP

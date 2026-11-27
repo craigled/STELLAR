@@ -45,12 +45,23 @@ def main():
         img[a:a + 2] = b'\xf7\xff'
     P1.load_image(cf, bytes(img))
     later = [('LTOS> ', b'DISKINFO\r'), ('LTOS> ', b'FSCK\r'), ('LTOS> ', b'FREE\r'), ('LTOS> ', b'DISKINFO -Q\r'),
-             ('LTOS> ', b'DISKINFO -S\r'), ('a key stops it) ', b'x'), ('LTOS> ', b'DISKINFO -X\r'), ('LTOS> ', b'MON\r')]
+             ('LTOS> ', b'DISKINFO -S\r'), ('a key stops it) \\\x08|\x08/', b'x'), ('LTOS> ', b'DISKINFO -X\r'), ('LTOS> ', b'MON\r')]
     b = V.Elf2K(cf, keys=b'', later=later); b.rtc = P3.clock()
     st = b.boot_rom(3_000_000_000)
-    t = b.text().replace('\r', '')
-    dots = re.findall(r'\n\.{5,}\n', t)                                # the progress dots: seen, then out of the way
-    t = re.sub(r'(?<=\n)\.+\n', '', t)
+    raw = b.text().replace('\r', '')
+    rd = raw[raw.find('LTOS> DISKINFO\n'):raw.find('LTOS> FSCK')]
+    turns = re.findall(r'\x08([\\|/-])', rd)                        # DISKINFO's turning \|/- : each over the last,
+    spun = '\\\x08|\x08/\x08-\x08\\' in rd                                # in that order,
+    rubbed = re.search(r'[\\|/-]\x08 \x08Volume\n', rd)                # then rubbed out and Volume written there
+    def term(x):                                                     # as the terminal shows it: a backspace steps back
+        out = []
+        for c in x:
+            if c == '\x08':
+                if out and out[-1] != '\n': out.pop()
+            else: out.append(c)
+        return ''.join(out)
+    t = term(raw)
+    t = re.sub(r'(?<=\n)\.+\n', '', t)                                  # (FSCK's dots)
     if '-v' in sys.argv: print(t[t.find('DISKINFO'):])
     d = t[t.find('LTOS> DISKINFO\n'):t.find('LTOS> FSCK')]
     def num(label):
@@ -103,9 +114,15 @@ def main():
     q = t[t.find('LTOS> DISKINFO -Q'):t.find('LTOS> DISKINFO -S')]
     full = d[d.find('Card'):d.find('Space\n')]
     if q[q.find('Card'):].replace('LTOS> ', '') != full: e.append('-Q is not the full report up to Space: %r' % q[-300:])
-    if not dots: e.append('no progress dots')
+    if len(turns) < 8 or not spun: e.append('the character did not turn \\|/- in place (%d turns)' % len(turns))
+    if not rubbed: e.append('the turning character was not rubbed out with Volume written where it was')
+    if '\nVolume\n' not in d: e.append('Volume is not on a line of its own once the terminal has drawn it')
+    sx = raw[raw.find('LTOS> DISKINFO -S'):raw.find('LTOS> DISKINFO -X')]
+    if not re.search(r'a key stops it\) [\\|/-](\x08[\\|/-])*\x08 \x08\n  Stopped at sector', sx):
+        e.append('-S: the character did not turn after the heading and was not rubbed out before Stopped: %r' % sx[sx.find('Reading'):][:200])
     report('DISKINFO -Q: the card, partition and volume exactly as in the full report, nothing after; '
-           'DISKINFO -S reads every sector until a key; -X: the usage', e)
+           'DISKINFO -S reads every sector until a key; -X: the usage; '
+           'the progress is a \\|/- turning in place, rubbed out when done', e)
     print('\nDISKINFO: %s' % ('ALL PASS' if ok else 'FAIL'))
     return ok
 

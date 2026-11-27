@@ -315,7 +315,7 @@ RO2E:   LDA     RD
         INC     RF
         DEC     RB
         GLO     RB
-        LBNZ    RO2E
+        BNZ     RO2E
         LDI     20H
         STR     RF
         SEP     R4
@@ -336,7 +336,7 @@ RO3A:   LDI     0
         INC     RD
         DEC     RB
         GLO     RB
-        LBNZ    RO3A
+        BNZ     RO3A
         SEP     R4
         DW      RVAR
         DB      RPTR - RVARS
@@ -349,7 +349,7 @@ RO3A:   LDI     0
         DW      RVAR
         DB      RAPP - RVARS
         LDN     RD
-        LBZ     RO4             ; '>': from nothing
+        BZ      RO4             ; '>': from nothing
         SEP     R4
         DW      RVAR
         DB      ROLDCL - RVARS
@@ -358,9 +358,9 @@ RO3A:   LDI     0
         LDN     RD
         PLO     RC
         GHI     RC
-        LBNZ    RO5
+        BNZ     RO5
         GLO     RC
-        LBNZ    RO5
+        BNZ     RO5
 RO4:    SEP     R4              ; (an empty old file: as a new one)
         DW      RVAR
         DB      RSIZE - RVARS
@@ -394,7 +394,7 @@ RO5A:   SEP     R4
         LBDF    ROCF
         SEP     R4
         DW      CLVALID
-        LBDF    RO5A
+        BDF     RO5A
         SEP     R4              ; ... is where the new part links on
         DW      RVAR
         DB      RLAST - RVARS
@@ -449,11 +449,11 @@ RO5A:   SEP     R4
         DW      RVAR
         DB      RTMP - RVARS
         LDN     RD
-        LBNZ    RO6
+        BNZ     RO6
         GHI     RA
-        LBNZ    RO6
+        BNZ     RO6
         GLO     RA
-        LBZ     RWCWD
+        BZ      RWCWD
 RO6:    SEP     R4              ; RLBA = its sector, RSLEFT = the sectors from there to the cluster's end
         DW      CL2LBA
         SEP     R4
@@ -487,7 +487,7 @@ RO6:    SEP     R4              ; RLBA = its sector, RSLEFT = the sectors from t
         STR     R2
         LDN     RD
         OR
-        LBZ     RWCWD
+        BZ      RWCWD
         SEP     R4
         DW      RVAR
         DB      RLBA - RVARS
@@ -496,7 +496,7 @@ RO6:    SEP     R4              ; RLBA = its sector, RSLEFT = the sectors from t
         LOAD    RF, OBUF
         SEP     R4
         DW      IDERD
-        LBDF    ROCF
+        BDF     ROCF
         SEP     R4              ; RPTR = OBUF + it
         DW      RVAR
         DB      ROFF - RVARS
@@ -516,11 +516,11 @@ RO6:    SEP     R4              ; RLBA = its sector, RSLEFT = the sectors from t
         INC     RD
         LDI     0
         STR     RD
-        LBR     RWCWD
+        BR      RWCWD
 ROFD:   SEP     R4
         DW      PIN
         DB      'That is a folder.',0DH,0AH,0
-        LBR     ROERR
+        BR      ROERR
 ROCF:   SEP     R4
         DW      PIN
         DB      'The card did not answer.',0DH,0AH,0
@@ -588,17 +588,17 @@ KOUT:   STXD                    ; the character (for the end)
         STXD
         LOAD    RD, KRDIR
         LDN     RD
-        LBZ     KOS             ; the screen
+        BZ      KOS             ; the screen
         LOAD    RD, TTYF
         LDN     RD
-        LBNZ    KOS
+        BNZ     KOS
         LOAD    RD, KRDIR
         LDN     RD
         XRI     1
-        LBNZ    KOX             ; nowhere
+        BNZ     KOX             ; nowhere
         GLO     RE
         XRI     0DH
-        LBZ     KOX             ; CR LF -> LF
+        BZ      KOX             ; CR LF -> LF
         LOAD    RD, RPTR
         LDA     RD
         PHI     RF
@@ -613,7 +613,7 @@ KOUT:   STXD                    ; the character (for the end)
         GHI     RF
         STR     RD
         XRI     HIGH(OBUF + 512)
-        LBNZ    KOX
+        BNZ     KOX
         SEP     R4              ; a full OBUF: the file's next sector
         DW      RFLUSH
 KOX:    IRX
@@ -700,7 +700,7 @@ RFLUSH: GHI     R7
         STXD
         SEP     R4
         DW      RWRBLK
-        LBNF    RFL2
+        BNF     RFL2
         STXD
         SEP     R4
         DW      RVAR
@@ -777,7 +777,7 @@ RWRBLK: SEP     R4
         LBNZ    RW4
         SEP     R4              ; a cluster for the next part
         DW      FREECL
-        LBDF    RWFULL
+        BDF     RWFULL
         SEP     R4
         DW      RVAR
         DB      RNEWC - RVARS
@@ -802,7 +802,7 @@ RWRBLK: SEP     R4
 RW1:    LOAD    R9, 0FFFFH      ; it ends the chain ...
         SEP     R4
         DW      FATPUT
-        LBDF    RWERR
+        BDF     RWERR
         SEP     R4              ; ... and the last one points at it (or it is the first)
         DW      RVAR
         DB      RPREV - RVARS
@@ -832,7 +832,7 @@ RW1:    LOAD    R9, 0FFFFH      ; it ends the chain ...
         BR      RW3
 RW2:    SEP     R4
         DW      FATPUT
-        LBDF    RWERR
+        BDF     RWERR
 RW3:    SEP     R4              ; RPREV = it; RLBA = its first sector, RSLEFT = its sectors
         DW      RVAR
         DB      RNEWC - RVARS
@@ -871,7 +871,7 @@ RW4:    SEP     R4              ; the sector
         LOAD    RF, OBUF
         SEP     R4
         DW      IDEWR
-        LBDF    RWERR
+        BDF     RWERR
         SEP     R4
         DW      RVAR
         DB      RLBA - RVARS
@@ -956,7 +956,7 @@ RCLOSE: SEP     R4
         ADCI    0
         STR     RD
         GHI     RC              ; any? then 0s to the sector's end, and it is written
-        BNZ     RC1
+        LBNZ    RC1
         GLO     RC
         BZ      RC3
 RC1:    SEP     R4
@@ -974,15 +974,15 @@ RC2:    LDI     0
         BNZ     RC2
         SEP     R4
         DW      RWRBLK
-        LBDF    RCF0
+        BDF     RCF0
 RC3:    SEP     R4
         DW      FATFLUSH
-        LBDF    RCF3
+        BDF     RCF3
         SEP     R4
         DW      STAMP
         SEP     R4
         DW      RENTRY
-        LBDF    RCF3
+        BDF     RCF3
         GLO     RF              ; 11: archive
         ADI     11
         PLO     RF
@@ -1046,7 +1046,7 @@ RC5:    LDN     RD
         BNZ     RC5
         SEP     R4
         DW      RENTWR
-        LBDF    RCF3
+        BDF     RCF3
         SEP     R4              ; '>': the old file's clusters
         DW      RVAR
         DB      RAPP - RVARS
@@ -1060,7 +1060,7 @@ RC5:    LDN     RD
         LDN     RD
         PLO     RC
         GHI     RC
-        LBNZ    RC6
+        BNZ     RC6
         GLO     RC
         LBZ     RWCWD
 RC6:    SEP     R4
@@ -1114,7 +1114,7 @@ RCF5:   SEP     R4
         SEP     R4
         DW      PIN
         DB      'The card is full - ',0
-        BR      RCF7
+        LBR     RCF7
 RCF6:   SEP     R4
         DW      PIN
         DB      'The card did not answer - ',0

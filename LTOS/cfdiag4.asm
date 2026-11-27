@@ -704,6 +704,9 @@ WAYTAB: DB      18H,00H, 00H, 0, 0      ; source (hi, lo), select value, twice, 
         INCL    "ide.asm"
         INCL    "cons.asm"
         INCL    "nums.asm"
+PMBDEC  EQU     PDEC
+PMBPIN  EQU     PIN
+        INCL    "pmb.inc"
 
 TSEC:   DS      4
 SRC:    DS      2

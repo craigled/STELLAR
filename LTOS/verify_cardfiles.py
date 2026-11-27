@@ -167,7 +167,10 @@ def main():
     if st != 'stop' or u.result: e.append('%s %r' % (st, u.result))
     for p, d in datas.items():
         k = p.strip('/').replace('/', os.sep)
-        if on_b2.get(k) != d: e.append('%s: %s' % (p, 'missing' if k not in on_b2 else 'not the same'))
+        if on_b2.get(k) != d:
+            g = on_b2.get(k)
+            at = None if g is None else next((i for i in range(min(len(g), len(d))) if g[i] != d[i]), min(len(g), len(d)))
+            e.append('%s: %s' % (p, 'missing' if g is None else 'not the same: %d bytes (want %d), first difference at %d' % (len(g), len(d), at)))
     rc, _ = P2.fsck_free(imgb2)
     if rc: e.append('fsck_msdos: %d' % rc)
     report('restore --all over it again: every file replaced (Y to "replace it?"), the card\'s LTOS files as the backup\'s, '

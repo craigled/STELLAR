@@ -115,8 +115,9 @@ With several files, each line starts with its file's name.
 @SYSRX Every LTOS program from the PC/Mac/Linux, in one go
 Usage:  (on the PC/Mac/Linux, with LTOS at its prompt)  elfser.py system
 
-Makes /BIN if it is not there, runs SYSRX and sends LTOS-ALL.PAK: every
-program added or replaced, checked block by block. It does RECV SYSTEM's
+Makes /BIN and /MUSIC if they are not there, sends the new SYSRX first,
+runs it and sends LTOS-ALL.PAK: every program added or replaced, and
+PLAY's songs in /MUSIC, checked block by block. It does RECV SYSTEM's
 job in one step, in about half the bytes.
 @SQUEEZE Take the deleted entries out of the root folder
 Usage:  SQUEEZE
@@ -346,7 +347,7 @@ The space in clusters and bytes: in all, free, used, marked bad. The files
 (and the bytes in them) and folders in every folder.
   -Q   quick: the card, partition and volume only, nothing counted
   -S   also read every sector of the card and count the ones that fail
-       (a dot a MB, about a minute each on the Elf2K; any key stops it)
+       (about a minute a MB on the Elf2K, \|/- turning; any key stops it)
 # Folders
 @PWD Show the current folder
 Usage:  PWD
@@ -380,7 +381,8 @@ words. Put one verse on each line; blank lines are skipped.
 @LTCALC A small spreadsheet
 Usage:  LTCALC [name]
 
-One page of 8 columns (A-H) by 20 rows. A name with no extension gets .CLC.
+8 columns (A-H) by 32 rows: 256 cells. The screen shows 20 rows at a time
+and moves as the cursor goes past them. A name with no extension gets .CLC.
 Type in a cell: a number, text, or a formula that starts with =
 
     =A1+B1*2     =(A1-B2)/3     =SUM(A1:A10)     =AVG(A1:A3,C1:C3)
@@ -393,9 +395,25 @@ too big, dividing by 0, or a cell that needs itself.
 Arrows, Tab and Enter move, and finish what you typed. Esc drops what you
 typed, or leaves. Backspace empties a cell. ^E edits it. ^S saves, ^A saves
 under a new name, ^O opens another sheet.
+^R then I inserts a row above the cursor's, D deletes its row; ^L then I
+inserts a column left of the cursor's, D deletes its column. Formulas follow
+(=SUM(A1:A3) becomes A1:A4); one naming a deleted cell shows ERR. Not if
+row 32 or column H would be pushed off (it says so).
 
 The file is plain text, one line for each cell, such as A3 =A1+A2, so TYPE,
 GREP, RAWK and NANO can all read it.
+
+CSV (from a spreadsheet on a PC or Mac): open NAME.CSV (LTCALC DATA.CSV, or
+^O): CSV2CLC reads it in, row by row, its fields in A-H, 1,234.50 a number;
+save it with ^A as a sheet. ^A with a name ending .CSV writes the values
+(two decimals, a formula's result) - the sheet keeps its formulas and name.
+@CSV2CLC Make a CSV file into an LTCALC sheet
+Usage:  CSV2CLC NAME.CSV
+
+Makes NAME.CLC beside it (never over a NAME.CLC already there): row n of
+the CSV is row n of the sheet, its fields A-H. Quotes, "" and CR LF as Excel
+and Numbers write them; 1,234.50 comes in as a number; past H, row 32 or 60
+characters is left out. 6,000 bytes at most. LTCALC NAME.CSV uses it too.
 @CONTACTS An address book
 Usage:  CONTACTS [-b file] [-d | -e | -l] [-f FIELD] [word ...]
 
@@ -448,10 +466,32 @@ Wildcards work; no dot means any extension. Folders end with a /.
   FIND NOTE.TXT     /DOCS/NOTE.TXT
   FIND *.STL        every STELLAR app on the card
 @TREE The folders as a tree
-Usage:  TREE
+Usage:  TREE [-f] [-h] [folder]
 
-The folders below this one, indented, each with its files and their
-size - and the totals at the end. (CD / first for the whole card.)
+The folders below this one (or below the folder given), indented, each
+with its files and their size - and the totals at the end.
+  -f   every folder and file: in each folder its folders, then its
+       files, by name, each file with its size, date and time
+  -h   hidden files too (marked: hidden)
+  TREE -f /            the whole card, file by file
+  TREE -fh /BIN        /BIN and its folders, hidden files too
+@LC LTOS Commander: two folders side by side, a file manager
+Usage:  LC
+
+Two panes, each a folder; the keys work on the tagged files, or on the one
+under the cursor. Esc goes back to LTOS.
+
+  Up Down PgUp PgDn Home End   move       Tab (Left, Right)   the other pane
+  Enter      into a folder (.. up); on a file: Run it, or View it
+  Backspace  up a folder        Space or Ins  tag    * +  tag all   - none
+  1 Help   2 Info   3 View   4 Rename   5 Copy   6 Move   7 MkDir
+  8 Delete (or Del)   9 Run   E Edit   F1-F9 as 1-9;  Ctrl-R reads again
+
+Copy and Move go to the other pane's folder, folders with all inside.
+Delete puts files in /TRASH (EMPTY empties it); an empty folder goes.
+Run: a .PRG, a .SH (SH), a .STL (STELLAR), a .MUS (PLAY) or a .SC (SC
+compiles it); then a key (after a STELLAR app, Esc) brings LC back as it was.
+Edit: NANO on a .SC .TXT .SH .RF .LOG or .TAB file; ^X brings LC back.
 @PATHS How to name files in other folders
 Paths use / (never \):
   GAMES/SNAKE.STL   in GAMES, below this folder
@@ -460,15 +500,80 @@ Paths use / (never \):
 Names are 8.3: up to 8 letters, a dot, up to 3 (NOTE.TXT).
 Wildcards: * and ? (DIR S*, RM *.BAK, COPY *.DAT D).
 # Programs
-@RUN Load a program and start it
-Usage:  RUN name [arguments]
+@RUN Run one exact program file (built in)
+Usage:  RUN name [arguments]      (built into LTOS, so not in /BIN)
 
-Loads an LTOS program (a file with the 6-byte LTOS header) and starts it;
-the rest of the line is its arguments. Give the full name, with a path if
-it is elsewhere: RUN HELLO.PRG hi.
+You seldom need RUN: just type a program's name. HELLO hi runs HELLO.PRG,
+looked for here, then in the root, then in /BIN and its folders (HELP BIN).
 
-Usually you just type the program's name: HELLO hi runs HELLO.PRG, looked
-for here, then in the root, then in /BIN. RUN looks only where you say.
+RUN is for one exact file. Give its full name, with a path if it is
+elsewhere; RUN loads that file and no other. The rest of the line is its
+arguments.
+  RUN HELLO.PRG hi          HELLO.PRG in this folder
+  RUN /BIN/HELLO.PRG hi     that one, even if another HELLO is nearer
+The file needs the 6-byte LTOS header. A raw program with no header
+(NAME.BIN): see HELP 1802.
+@1802 Run a raw 1802 program on the bare machine
+Usage:  1802 [-Z] name [load [start]]   (hex; no extension: .BIN)
+        (1802.PRG, in /BIN)
+
+Runs a raw 1802 program - bytes only, no LTOS header - as if it were the
+only thing in the Elf2K: R0 is the PC, X = P = 0, IE = 1, Q off. It may
+use every register, port and byte of RAM, so LTOS stops: RESET, then BOOT
+at the monitor, starts LTOS again from the card. (The card is still in
+the program's reach, through ports 2 and 3.)
+
+The name is looked for where you say, as PLAY does: a name alone, in the
+folder you are in. The examples are in /BIN/RAW - 1802 /BIN/RAW/COUNTUP,
+1802 /BIN/RAW/UPDOWN, 1802 /BIN/RAW/SINE (a tone on Q).
+
+load goes in $0000-$2FFF (12 KB) or $3400-$7EFF ($0000 if not given). A
+start other than $0000 gets an LBR there, so load at $0003 or above.
+-Z sets $0000-$2FFF and $3400-$7EFF to 00 first (about 2 seconds), so the
+program finds a clean machine, not LTOS's leftovers.
+
+  1802 GAME             GAME.BIN at $0000, started there
+  1802 DEMO.BIN 100 100 at $0100, started there
+  1802 -Z GAME          GAME.BIN in RAM cleared to 00
+@COSMO COSMO KID, a platform game
+Usage:  COSMO          (COSMO.PRG, in /BIN/GAMES)
+
+Cosmo, a little space kid, runs across two worlds of three screens each.
+Collect the coins ($), stomp the Blorbs (&) by landing on them from
+above, and reach the portal ( ) at the end of each world. Touching a
+Blorb from the side, falling in a pit or onto spikes (^) costs a life;
+you have three. Sounds play on Q (a speaker on Q to hear them).
+
+  Arrows or A / D     move left and right
+  Up, W or Space      jump
+  Esc                 quit
+@DESCEND DESCEND, a dungeon crawl
+Usage:  DESCEND        (DESCEND.PRG, in /BIN/GAMES)
+
+Down into the dungeon to find the Star Crystal (*) on depth 10. Each
+level is new: nine rooms joined by corridors (#), doors (+). A room is
+shown when you step into it; in a corridor, only the cells next to you.
+Walk into a monster to fight it - rats and bats first, dragons by the
+end. Gold ($), potions (!), weapons ()) and armour ([) are picked up as
+you go; experience brings levels: more HP, a harder blow. Turn-based:
+nothing moves until you do.
+
+  Arrows or W A S D   move, fight
+  P                   drink a potion (10 HP)
+  > or Enter          go down the stairs (>)
+  Space               rest a turn
+  Esc                 quit
+@AT-MAN AT-MAN, a maze game
+Usage:  AT-MAN         (AT-MAN.PRG, in /BIN/GAMES)
+
+AT-MAN (@), a little robot, eats every dot (.) to clear the maze while
+four Glitches (X) hunt him - each in its own way. A power cell (o) scares
+them (x) for a while: catch one then for 200 points. Caught by one that
+is not scared, a life is lost; you have three. The tunnel at the sides
+takes you across. Each maze cleared, the next is faster. Sounds on Q.
+
+  Arrows or W A S D   steer (a turn asked early is taken where it can be)
+  Esc                 quit
 @LOAD Load a file into memory
 Usage:  LOAD name [a]
 
@@ -480,6 +585,7 @@ Usage:  PLAY name         a tune file (no extension: .MUS)
                           (there, use O: > and < send output to a file)
         PLAY -s MHz ...   for an Elf2K clocked at MHz (1.00-9.99; 3.58 if
                           not given):  PLAY -s 1.79 ODE
+        PLAY -r ...       again and again, until a key: PLAY -r ODE
 
   C D E F G A B  a note: # or + sharp, - flat; a length 1 2 4 8 16 32
                  (3 6 12: triplets; none: L's); . dotted   C#8 E-4. G
@@ -533,12 +639,16 @@ length in ms. Keys:
   EARTEST -c 1.79
 @BIN Where programs are found
 Typing NAME runs, the first one found of:
-  NAME.SH    a script (here, else the root, else /BIN): SH NAME
-  NAME.PRG   a program (here, else the root, else /BIN)
+  NAME.SH    a script: SH NAME
+  NAME.PRG   a program
   NAME.STL   a STELLAR app: LW2 DOC.TXT is STELLAR LW2 DOC.TXT
-A program found elsewhere still works in this folder, so the files you
-give it are found here. STELLAR finds its firmware and apps the same
-way. A name with a / is looked for only where it says.
+Each is looked for here, then in the root, then in /BIN, then in each
+folder in /BIN (/BIN/SYS, /BIN/GAMES: one level down, in the order
+DIR /BIN lists them; hidden ones not). Two of one name: the first found
+runs. A program found elsewhere still works in this folder, so the
+files you give it are found here. STELLAR finds its apps the same way
+(its firmware: here, the root, /BIN). A name with a / is looked for
+only where it says.
 # STELLAR
 @STELLAR Start STELLAR, with apps from the card
 Usage:  STELLAR [-M] [firmware.BIN] [app ...] [document]
@@ -631,7 +741,8 @@ Type BOOT there to come back to LTOS.
 Usage:  SH [-x] name [words]      or just:  name [words]
 (name alone: a script wins over a NAME.PRG or NAME.STL of the same name)
 
-Runs name.SH, a line at a time: from this folder, else the root, else /BIN.
+Runs name.SH, a line at a time: from this folder, else the root, else /BIN
+or a folder in it (HELP BIN).
 The words are $1 .. $9 inside it. -x shows each command before it runs.
 Ctrl-C (or Esc) between lines stops it. HELP SCRIPTS: what can go in one.
 
@@ -746,6 +857,12 @@ Stellar C (a program also compiles with scc.py on a PC). A mistake:
 shown with its line, and nothing saved ($? 1). HELP SCLANG: the language.
 
   SC HELLO               HELLO.SC -> HELLO.STL; then HELLO runs it
+
+Examples in /SRC: CD /SRC, then SC FIRST and FIRST. Also COUNT,
+FIZZBUZZ, FUNCS, SIEVE, TEMPS, GUESS, PRIMEGEN, BOXES, OXO (noughts
+and crosses), GLIDER (Life), BUBBLE (a sort), PIDIGITS, MOONLAND (a
+lander) and TIMENOW (the clock, Q, INPUT). An LTOS update puts them
+back as they were: copy one to change it.
 @SCLANG What Tiny Stellar C holds
   const N = 10;  u16 a, b = 5, t[N];   16-bit unsigned (0-65535) only
   u16 f(u16 x) { ... }  void main() { ... }   defined before a call;
@@ -755,6 +872,10 @@ shown with its line, and nothing saved ($? 1). HELP SCLANG: the language.
   x++ x--  t[i] = e   || && == != < <= > >= | ^ & << >> (by a constant)
   + - * / % - ~ ! ( )  123 0x1F 'c'  \n \r \t \b \e \0 \\ \' \"
   print("text")  printu(e)  putc(e)  getc()  halt()   // and /* */
+  q(n) Q: 0 off 1 on 2/3 blink   ef(n) EF line n (1-4) on: 1, else 0
+  waitef(n) waits for a press of EF n (4: INPUT)   n: a constant
+  rtc(n) the clock: 0 sec 1 min 2 hour 3 weekday 4 day 5 month 6 year,
+      7: 1 if there is a clock chip
 
   void main() { u16 i; for (i = 1; i <= 5; i++) { printu(i * i);
       putc(32); } print("\r\n"); }
@@ -870,6 +991,27 @@ Unix cal: September 1752 goes from the 2nd to the 14th). Years 1-9999.
   CAL               this month, from the clock
   CAL 12 2026       December 2026
   CAL 2027          the whole year
+@CRON Run jobs at set times (cron mode)
+Usage:  CRON                  the table and its jobs, numbered
+        CRON START / PAUSE    the whole table on or off (STOP = PAUSE)
+        CRON ON n / OFF n     job n on or off
+        CRON RUN              cron mode: each job at its time; Esc stops
+
+The table is /CRON.TAB (CRON START makes one; edit it with NANO):
+  CRON y                       y: the table runs, n: it is paused
+  # run min  hour day month weekday  command
+  y    0     *    *   *     *        PLAY /MUSIC/CHIMES
+  y    30    7    *   *     1-5      MEMVERSE
+  n    */15  *    *   *     *        ECHO tick >> /TICK.TXT
+run: y or n, for that job alone (PAUSE and START leave these alone).
+A field: * n n-m lists (1,15,30), and /s (every s-th: */15).
+min 0-59 hour 0-23 day 1-31 month 1-12 weekday 0-7 (0, 7 = Sunday).
+Day and weekday both given: either one will do (as Unix cron).
+
+Jobs run only in cron mode (CRON RUN), each as if typed, then cron
+waits again; minutes that pass while a job runs are not caught up.
+Jobs should not wait for keys, and not be STELLAR apps (.STL): those
+replace LTOS and end cron mode. Needs the clock card's DS12887.
 @DUMP Show memory in hex
 Usage:  DUMP [a [n]]
 

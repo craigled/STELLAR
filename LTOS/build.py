@@ -19,14 +19,19 @@ def assemble(name):
     os.makedirs(OUT, exist_ok=True)
     src = os.path.join(HERE, name + '.asm')
     lst, hexf = os.path.join(OUT, name + '.lst'), os.path.join(OUT, name + '.a18.hex')
-    r = subprocess.run([A18, src, '-l', lst, '-o', hexf], capture_output=True, text=True, cwd=HERE)
+    # each run to its own files, moved into place at the end: tests run side by side (run_tests.py) and two of
+    # them assembling the same program at once read each other's half-written listing (phase4's KeyError BACKN)
+    tag = '.%d' % os.getpid()
+    r = subprocess.run([A18, src, '-l', lst + tag, '-o', hexf + tag], capture_output=True, text=True, cwd=HERE)
     errs = re.findall(r'^.*Error.*$|^\S.*\b[A-Z] Error\b.*$', r.stdout, re.M)
-    listing = open(lst).read()
+    listing = open(lst + tag).read()
+    hexlines = open(hexf + tag).read().split('\n')
+    os.replace(lst + tag, lst); os.replace(hexf + tag, hexf)
     bad = [l for l in listing.split('\n') if re.match(r'^[A-Z]  ', l) or re.match(r'^[A-Z] \d', l)]
     if r.returncode or bad or 'Errors' in r.stdout and not re.search(r'\b0 Errors?\b|No Errors', r.stdout, re.I):
         print(r.stdout); print('\n'.join(bad[:20])); raise SystemExit('%s: a18 reported errors' % name)
     mem = {}
-    for ln in open(hexf):
+    for ln in hexlines:
         ln = ln.strip()
         if not ln.startswith(':') or ln[7:9] != '00': continue
         n, a = int(ln[1:3], 16), int(ln[3:7], 16)
@@ -105,9 +110,11 @@ def help_list():
     return t
 
 
-def help_dats(most=12000):
+def help_dats(most=12500):
     """HELP.HLP, HELP2.HLP, HELP3.HLP (and HELP4.HLP): the records split where one starts, each ending with a 0 - so each fits in
-    one part of LTOS-SYSTEM, and in memory: HELP.PRG holds one at a time (the next once it reaches one's end)."""
+    one part of LTOS-SYSTEM, and in memory: HELP.PRG holds one at a time (the next once it reaches one's end).
+    most: RECV takes 13,312 bytes a file ($3800-$6BFF), HELP.PRG 14,216 ($3478-$6BFF); 12,500 since HELP LC
+    (2026-11-23: at 12,000 the records' cuts needed a fifth part)."""
     b = help_dat()[:-1]
     starts = [i for i in range(len(b)) if b[i] in (1, 2) and (i == 0 or b[i - 1] == 0)] + [len(b)]
     parts, at = [], 0
@@ -151,11 +158,38 @@ def shstub():
             f.write('        DB      ' + ', '.join('0%02XH' % b for b in body[i:i + 16]) + '\n')
 
 
+def lc_ovl():
+    """LC's parts: LC0.OVL View and Info (lcov0.asm), LC1.OVL Rename Move MkDir Delete (lcov1.asm), LC2.OVL Help
+    (lcov2.asm), LC3.OVL Copy (lcov3.asm), LC4.OVL Run (lcov4.asm) - each assembled at OVLA with LC.PRG's names (out/lcsyms.inc, from
+    lc.asm's listing), each its own file (one is up to OVSECS sectors; RECV SYSTEM takes ~13 KB a file). -> [bytes]"""
+    mem, syms = assemble('lc')
+    assert syms['VEND'] <= syms['CORETOP'], 'LC.PRG runs to $%04X, past $%04X' % (syms['VEND'], syms['CORETOP'])
+    skip = set()
+    for f in ('ltos.inc', 'kapi.inc', 'lc.inc'):
+        skip |= set(re.findall(r'^([A-Z_][A-Z0-9_]*)\s+EQU\b', open(os.path.join(HERE, f)).read(), re.M))
+    lines = ['%-10s EQU     0%04XH' % (n, v) for n, v in sorted(syms.items())
+             if 0x3000 <= v <= syms['VEND'] and n not in skip and not n.startswith('KS_')]
+    open(os.path.join(OUT, 'lcsyms.inc'), 'w').write('; out/lcsyms.inc - LC.PRG\'s names for its parts (build.py lc_ovl)\n' + '\n'.join(lines) + '\n')
+    parts = []
+    for nm in ('lcov0', 'lcov1', 'lcov2', 'lcov3', 'lcov4'):
+        m, sy = assemble(nm)
+        room = syms['OVLA'] + syms['OVSECS'] * 512
+        assert sy['OVEND'] <= room, '%s runs to $%04X, past $%04X' % (nm, sy['OVEND'], room)
+        parts.append(bytes(m.get(a, 0) for a in range(syms['OVLA'], sy['OVEND'])))
+    return parts
+
+
 def prg(name):
     """A program (its 6-byte header just before its load address: $3000, $4000 for STELLAR, $6800 for SAVE, DUMP and MON) -> the
     .PRG file's bytes."""
     if name == 'sh': shstub()
+    if name == 'cosmo':                                         # COSMO KID's screens, packed from cosmo_gen.py
+        import cosmo_gen; cosmo_gen.write()
+    if name == 'atman':                                        # AT-MAN's maze, checked, from atman_gen.py
+        import atman_gen; atman_gen.write()
     mem, syms = assemble(name)
+    if name == 'cosmo':                                         # its map (a screen) below LTOS's buffers
+        assert syms['MAP'] + 22 * 79 <= 0x6C00, 'COSMO.PRG: its map runs past $6BFF'
     if name == 'sh':                                            # SH: its code $4000-$6BFF, its buffers $7700-$79FF
         assert syms['START'] == 0x4000 and syms['PEND'] <= 0x6C00, 'SH.PRG runs to $%04X - past $6BFF' % syms['PEND']
         assert syms['RAWL'] >= 0x7700 and syms['VEND2'] <= 0x7C00, 'SH.PRG: its buffers not in $7700-$7BFF'
@@ -186,6 +220,8 @@ def prg(name):
         assert lo == 0x3000 and syms['ENDA'] <= 0x3300, 'NANO.PRG: its first part runs into the note ($%04X)' % syms['ENDA']
         assert syms['CODEB'] == 0x3400 and syms['PEND'] <= syms['ATTORG'], 'NANO.PRG runs into ATTACH.PRG ($%04X)' % syms['PEND']
         assert syms['NOTE'] + syms['V_VEND'] <= syms['NAMEZ'], 'NANO.PRG: its variables run into NAMEZ'
+    if name == 'cron':                                          # its code below its table (TAB, $5000)
+        assert syms['PEND'] <= syms['TAB'], 'CRON.PRG runs into its table ($%04X)' % syms['PEND']
     if name == 'stlrx':                                         # its code in $7700-$7BFF, its variables $7C00 up
         assert lo == 0x7700 and syms['PEND'] <= 0x7C00, 'STLRX.PRG is not in $7700-$7BFF'
         assert 0x7C00 <= syms['NTXT'] and syms['STLVEND'] <= 0x7D00, 'STLRX.PRG\'s variables must sit at $7C00-$7CFF'
@@ -206,13 +242,32 @@ def sysparts():
     return [n for n in ['LTOS-SYSTEM.HEX'] + ['LTOS-SYSTEM%d.HEX' % k for k in range(2, SYSMAX + 1)] if os.path.exists(os.path.join(OUT, n))]
 
 
+def songs():
+    """PLAY's songs (music/*.MUS) for /MUSIC: in the system bundle only (SYSRX and RECV put a .MUS in /MUSIC)."""
+    d = os.path.join(HERE, 'music')
+    return [((f.upper().split('.')[0].ljust(8) + 'MUS').encode(), open(os.path.join(d, f), 'rb').read()) for f in sorted(os.listdir(d)) if f.upper().endswith('.MUS')]
+
+
+def srcfiles():
+    """The Tiny Stellar C examples (src/*.SC) for /SRC: in the system bundle only (SYSRX puts a .SC in /SRC)."""
+    d = os.path.join(HERE, 'src')
+    if not os.path.isdir(d): return []                         # (an older LTOS, built by verify_update: none)
+    return [((f.upper().split('.')[0].ljust(8) + 'SC ').encode(), open(os.path.join(d, f), 'rb').read().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
+            for f in sorted(os.listdir(d)) if f.upper().endswith('.SC')]
+
+
+def system_files():
+    """Everything the system bundle carries: samples(), PLAY's songs and the Stellar C examples."""
+    return samples() + songs() + srcfiles()
+
+
 def samples():
     """[(11-byte name, bytes)] - every file LTOS puts on the card besides STELLAR.BIN, most needed first: the
     installer takes as many as fit; LTOS-SYSTEM.HEX (RECV SYSTEM) carries them all."""
-    return [(b'RECV    PRG', prg('recv')), (b'MON     PRG', prg('mon')), (b'STLRX   PRG', prg('stlrx')), (b'TYPE    PRG', prg('type')), (b'HELP    TXT', help_list().encode('ascii')),
+    return [(b'RECV    PRG', prg('recv')), (b'MON     PRG', prg('mon')), (b'STLRX   PRG', prg('stlrx')), (b'TYPE    PRG', prg('type')), (b'HELP    TXT', help_list().encode('ascii')), (b'ABOUT   TXT', open(os.path.join(HERE, 'ABOUT.TXT'), 'rb').read().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')),
             (b'DIR     PRG', prg('dir')), (b'SAVE    PRG', prg('save')), (b'LOAD    PRG', prg('load')), (b'DUMP    PRG', prg('dump')), (b'VER     PRG', prg('ver')),
             (b'FREE    PRG', prg('free')), (b'DISKINFOPRG', prg('diskinfo')), (b'COPY    PRG', prg('copy')), (b'HEX     PRG', prg('hexd')),
-            (b'HELLO   PRG', prg('hello')), (b'STELLAR PRG', prg('stellar')), (b'APPS    PRG', prg('apps')), (b'FW      PRG', prg('fw')),
+            (b'HELLO   PRG', prg('hello')), (b'1802    PRG', prg('1802')), (b'STELLAR PRG', prg('stellar')), (b'APPS    PRG', prg('apps')), (b'FW      PRG', prg('fw')),
             (b'DATE    PRG', prg('date')), (b'TIME    PRG', prg('time')), (b'MKDIR   PRG', prg('mkdir')),
             (b'RMDIR   PRG', prg('rmdir')), (b'MV      PRG', prg('mv')),
             (b'RM      PRG', prg('rm')), (b'DEL     PRG', prg('rm')), (b'REN     PRG', prg('ren')), (b'CLS     PRG', prg('cls')), (b'CD      PRG', prg('cd')),
@@ -220,7 +275,7 @@ def samples():
             (b'ECHO    PRG', prg('echo')), (b'CAT     PRG', prg('cat')), (b'HEAD    PRG', prg('head')), (b'TAIL    PRG', prg('tail')), (b'TOUCH   PRG', prg('touch')), (b'SH      PRG', prg('sh')), (b'EROFF   PRG', prg('eroff')), (b'PWD     PRG', prg('pwd')), (b'SORT    PRG', prg('sort')), (b'UNIQ    PRG', prg('uniq')),
             (b'ATTACH  PRG', prg('attach')), (b'HELP    PRG', prg('help')), (b'NANO    PRG', prg('enano')), (b'NANO    OVL', enano_ovl()),
             (b'GETSTR  PRG', prg('getstr')), (b'FETCH   PRG', prg('fetch')), (b'POS     PRG', prg('pos')),
-            (b'DELETE  PRG', prg('delete')), (b'EMPTY   PRG', prg('empty')), (b'RUNNING PRG', prg('running')), (b'MEMVERSEPRG', prg('memverse')), (b'LTCALC  PRG', prg('ltcalc')), (b'SED     PRG', prg('sed')), (b'SYSRX   PRG', prg('sysrx')), (b'SQUEEZE PRG', prg('squeeze')), (b'HIDE    PRG', prg('hide')), (b'PLAY    PRG', prg('play')), (b'NL      PRG', prg('nl')), (b'MORSE   PRG', prg('morse')), (b'EARTEST PRG', prg('eartest')), (b'CAL     PRG', prg('cal')), (b'SLEEP   PRG', prg('sleep')), (b'DEROFF  PRG', prg('deroff')), (b'FILE    PRG', prg('file')), (b'MAKE    PRG', prg('make')), (b'ASM     PRG', prg('asm')), (b'SC      PRG', prg('sc')), (b'CONTACTSPRG', prg('contacts'))] + help_dats()
+            (b'DELETE  PRG', prg('delete')), (b'EMPTY   PRG', prg('empty')), (b'RUNNING PRG', prg('running')), (b'MEMVERSEPRG', prg('memverse')), (b'LTCALC  PRG', prg('ltcalc')), (b'CSV2CLC PRG', prg('csv2clc')), (b'SED     PRG', prg('sed')), (b'SYSRX   PRG', prg('sysrx')), (b'SQUEEZE PRG', prg('squeeze')), (b'HIDE    PRG', prg('hide')), (b'PLAY    PRG', prg('play')), (b'NL      PRG', prg('nl')), (b'MORSE   PRG', prg('morse')), (b'EARTEST PRG', prg('eartest')), (b'CAL     PRG', prg('cal')), (b'SLEEP   PRG', prg('sleep')), (b'DEROFF  PRG', prg('deroff')), (b'FILE    PRG', prg('file')), (b'MAKE    PRG', prg('make')), (b'ASM     PRG', prg('asm')), (b'SC      PRG', prg('sc')), (b'CONTACTSPRG', prg('contacts')), (b'CRON    PRG', prg('cron')), (b'COSMO   PRG', prg('cosmo')), (b'AT-MAN  PRG', prg('atman')), (b'DESCEND PRG', prg('descend')), (b'LC      PRG', prg('lc'))] + [(b'LC%d     OVL' % k, p) for k, p in enumerate(lc_ovl())] + help_dats()
 
 
 def stl_of(lst):
@@ -266,7 +321,7 @@ def pak(files):
 
 
 SYSPARTS = []
-SYSMAX = 16                                                   # LTOS-SYSTEM's parts at most (each one RECV SYSTEM)
+SYSMAX = 24                                                   # LTOS-SYSTEM's parts at most (each one RECV SYSTEM)
 
 
 def build(kernel=b''):
@@ -291,7 +346,7 @@ def build(kernel=b''):
             else: t += len(d)
         return t <= syms['SBUF']
     while not fits(files): files = files[:-1]                  # as many as fit, in the order of samples()
-    sysall = samples()                                         # LTOS-SYSTEM.HEX (+ 2.HEX .. 4.HEX): all of them
+    sysall = system_files()                                    # LTOS-SYSTEM.HEX (+ 2.HEX ..): all of them, and PLAY's songs
     rbuf = assemble('recv')[1]['BUF']                          # RECV keeps a HEX file from BUF up to PTOP:
     room = 0x6C00 - rbuf - 1                                   #  as many as fit in the first, the rest in a second
                                                                #  (its last byte below $6BFF: RECV's end check)
@@ -371,6 +426,9 @@ def build(kernel=b''):
     s2 = sum(m2[a] for a in range(a2, at2)) & 0xFFFF
     for i, v in enumerate((s2 >> 8, s2 & 0xFF, n2 >> 8, n2 & 0xFF)): m2[syms['I2AT'] + i] = v
     open(os.path.join(OUT, 'INSTALL2.HEX'), 'w').write(intel_hex(m2))
+    mc, sc = assemble('cardchk')                               # CARDCHK.HEX: the card tool asks what is on a card from the
+    assert sc['CEND'] <= 0x3400, 'CARDCHK runs into its sector buffer'   #  monitor (no BOOT: a blank card would hang it)
+    open(os.path.join(OUT, 'CARDCHK.HEX'), 'w').write(intel_hex(mc))
     build.install2_files = [n for n, d in files2]
     print('boot sector: code to $%04X (the table starts at $02BE), checksum byte $%02X -> the BIOS check gives $%02X'
           % (bend, ck, btcheck(boot)))

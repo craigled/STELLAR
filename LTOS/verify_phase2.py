@@ -125,7 +125,7 @@ def main():
     ok = True
     kimg, ksyms = build.kernel()
     mem, syms, boot = build.build(kimg)
-    files = dict((n[:8].decode().strip() + '.' + n[8:].decode().strip(), d) for n, d in build.samples())
+    files = dict((n[:8].decode().strip() + '.' + n[8:].decode().strip(), d) for n, d in build.system_files())
     def report(label, e):
         nonlocal ok
         print('%s: %s' % (label, 'OK' if not e else 'FAIL')); [print('    ' + x) for x in e]; ok &= not e
@@ -204,8 +204,8 @@ def main():
     img = fragment(img, b'FRAG    TXT')
     P1.load_image(cf, img)
     rc, fr = fsck_free(img)
-    shorts = root_names(img)
-    lname = ([x for x in shorts if x.startswith('ALONG')] or [print('short names:', shorts, listing)])[0]
+    shorts = root_names(img)                   # (the Mac's short form: ALONGF~1.TXT, or ALON~105.TXT in a full root)
+    lname = ([x for x in shorts if x.startswith('ALON') and '~' in x] or [print('short names:', shorts, listing)])[0]
     # is FRAG.TXT really in pieces?  follow its chain in the image
     import struct
     vbr = img[64 * 512:65 * 512]; spc = vbr[13]; res = struct.unpack('<H', vbr[14:16])[0]; fsz = struct.unpack('<H', vbr[22:24])[0]
@@ -258,7 +258,7 @@ def main():
         inst = sorted(n[:8].decode().strip() + '.' + n[8:].decode().strip() for n in build.build.installed_files + build.build.install2_files)
         if out != inst or fsck_free(img)[0] != 0: e.append('%s: the Mac sees %s' % (how, out))
         P1.add_system(cf, ram=lambda M: M.__setitem__(slice(0, 0x2F00), bytes(0x2F00)))
-        inst = sorted(n[:8].decode().strip() + '.' + n[8:].decode().strip() for n, d in build.samples())
+        inst = sorted(n[:8].decode().strip() + '.' + n[8:].decode().strip() for n, d in build.system_files())
         b = V.Elf2K(cf, keys=b'VER\rDIR\rMON\r')
         b.c.M[0:0x2F00] = bytes(0x2F00)
         st = b.boot_rom(cap=200_000_000); t = b.text()

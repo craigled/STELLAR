@@ -76,12 +76,12 @@ def main():
            'characters at most, near misses ignored', e)
 
     e = []
-    want = ('LONG      8 blocks  4 KB  VM 1 2 3  1234567890ABCDE\n'
-            'TGV       4 blocks  2 KB  VM 1  2.1\n'
-            'TIMEGRAB  4 blocks  2 KB  VM 1\n')
+    want = ('LONG       8 blocks    4 KB  VM 1 2 3    1234567890ABCDE\n'      # (each column in its place: the
+            'TGV        4 blocks    2 KB  VM 1        2.1\n'                  #  versions line up)
+            'TIMEGRAB   4 blocks    2 KB  VM 1      \n')
     ao = parts.get('APPS', '')
     if sorted(ao.splitlines()) != sorted(want.splitlines()): e.append('APPS: %r' % ao)
-    report('APPS: blocks, KB, the VMs, the version when there is one', e)
+    report('APPS: blocks, KB, the VMs, the version when there is one - in columns that line up', e)
 
     e = []
     want = sorted('%-8s%s%s' % (k, kb(len(d)), ('  ' + prg_ver(d)) if prg_ver(d) else '') for k, d in progs.items())

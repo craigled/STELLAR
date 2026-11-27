@@ -110,40 +110,6 @@ PDU:    GLO     RD              ; the units, always printed
         SEP     R5
 DECTAB: DW      10000, 1000, 100, 10, 0
 
-; ---- PMB: R8:R7 sectors, printed as MB (sectors / 2048); keeps R7, R8
-PMB:    GHI     R8
-        PHI     RA
-        GLO     R8
-        PLO     RA
-        GHI     R7
-        PHI     RD
-        GLO     R7
-        PLO     RD
-        LDI     11
-        PLO     RC
-PM1:    GHI     RA
-        SHR
-        PHI     RA
-        GLO     RA
-        SHRC
-        PLO     RA
-        GHI     RD
-        SHRC
-        PHI     RD
-        GLO     RD
-        SHRC
-        PLO     RD
-        DEC     RC
-        GLO     RC
-        LBNZ    PM1
-        SEP     R4
-        DW      PDEC
-        SEP     R4
-        DW      PIN
-        DB      ' MB',0
-        SEP     R5
-
-
 ; ---- PDEC32: R8:R7 in decimal, right-aligned in D columns (0: no padding). Keeps R7, R8.
 ;      Uses RA RB RC RD RF R9. Repeated subtraction of 10^9 ... 10 (no BIOS maths).
 PDEC32: PLO     RA              ; RA.0 = the width
@@ -249,23 +215,3 @@ P10TAB: DB      3BH,9AH,0CAH,00H, 05H,0F5H,0E1H,00H, 00H,98H,96H,80H, 00H,0FH,42
         DB      00H,01H,86H,0A0H, 00H,00H,27H,10H, 00H,00H,03H,0E8H, 00H,00H,00H,64H
         DB      00H,00H,00H,0AH
 
-; ---- P2D: D (0-99) as two digits
-P2D:    PLO     RA
-        LDI     '0'
-        PHI     RA
-P2D1:   GLO     RA
-        SMI     10
-        LBNF    P2D2
-        PLO     RA
-        GHI     RA
-        ADI     1
-        PHI     RA
-        LBR     P2D1
-P2D2:   GHI     RA
-        SEP     R4
-        DW      F_TYPE
-        GLO     RA
-        ADI     '0'
-        SEP     R4
-        DW      F_TYPE
-        SEP     R5

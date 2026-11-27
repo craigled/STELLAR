@@ -201,6 +201,32 @@ def main():
         if "clock, 1.00 to 9.99" not in r.out or r.notes(): e.append('%r: %r' % (bad, r.out))
     report('-s MHz: in tune (2 cents) and in time at 1.79, 2, 3.58, 4.92, 8, 1 MHz; a rest; = the default at 3.58; bad values said', e)
 
+    # -r: again and again until a key; each time from the start (O4 L4 T120 MN again)
+    e = []
+    r = Run(prg, '-r -n T240 L8 C E O5 G', key_at=1.6)
+    ns = r.notes()
+    want = [261.63, 329.63, 783.99] * 3
+    if 'Stopped.' not in r.out or r.qend or r.end != 'returned' or len(ns) < 6:
+        e.append('-r -n: %r Q %d %d notes %s' % (r.out, r.qend, len(ns), r.end))
+    elif any(abs(1200 * math.log2(hz / f)) > 3 for (_, _, hz), f in zip(ns, want)):
+        e.append('-r: not from the start each time (O5 kept?): %r' % [round(hz) for _, _, hz in ns])
+    else:
+        st = [t for t, _, _ in ns]
+        if any(abs((b - a) - 0.125) > 0.006 for a, b in zip(st, st[1:])): e.append('-r: the timing %r' % [round(b - a, 3) for a, b in zip(st, st[1:])])
+    r = Run(prg, '-r ODE', {'ODE.MUS': b'; Ode\nT240 L8 C D'}, key_at=1.2)
+    if r.loaded != 'ODE.MUS' or len(r.notes()) < 4 or r.out.count('Ode') < 2 or 'Stopped.' not in r.out:
+        e.append('-r a file: %r %d notes %r' % (r.loaded, len(r.notes()), r.out[:80]))
+    r = Run(prg, '-r -n ; no notes', key_at=0.5, max_s=3)
+    if 'Stopped.' not in r.out or r.end != 'returned': e.append('-r with no notes: %s %r' % (r.end, r.out[-60:]))
+    r = Run(prg, '-s 3.58 -r -n T240 C', key_at=1.0)
+    if len(r.notes()) < 3 or 'Stopped.' not in r.out: e.append('-s then -r: %d notes %r' % (len(r.notes()), r.out[-40:]))
+    r = Run(prg, '-n T240 C E', key_at=None, max_s=3)
+    if len(r.notes()) != 2 or r.end != 'returned': e.append('without -r: once (%d notes, %s)' % (len(r.notes()), r.end))
+    r = Run(prg, '-x C')
+    if 'PLAY name' not in r.out: e.append('-x: %r' % r.out)
+    report('-r: the tune again and again from its start (O4 L4 T120 again), until a key - a file, -s too, a tune with '
+           'no notes still stops; without -r once; -x: usage', e)
+
     print('\nPLAY: %s (%d bytes)' % ('ALL PASS' if ok else 'FAIL', len(prg)))
     return ok
 

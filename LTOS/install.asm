@@ -733,6 +733,32 @@ FL2:    SEP     R4
         PLO     RC
         SEP     R4
         DW      COPYN
+        LOAD    RD, CLKREG      ; when: the clock's own registers, as they are (DISKINFO reads them: "Formatted:")
+        LOAD    RF, SBUF+FMTCLK
+        LDI     'F'
+        STR     RF
+        INC     RF
+        LDI     'D'
+        STR     RF
+        INC     RF
+        LDI     0               ; wait while it updates: at most 256 looks (~2 ms)
+        PLO     RC
+FC0:    LDI     8AH
+        SEP     R4
+        DW      RTCRD
+        SHL
+        LBNF    FC1
+        DEC     RC
+        GLO     RC
+        LBNZ    FC0
+FC1:    LDA     RD              ; B (no clock: $FF), then year, month, day, hour, minute, second
+        LBZ     FC2
+        SEP     R4
+        DW      RTCRD
+        STR     RF
+        INC     RF
+        LBR     FC1
+FC2:
         LOAD    RD, KERNIMG+7   ; the formatter's name: LTOS and the kernel's version (its $0307: major, minor)
         LOAD    RF, SBUF+7
         LDA     RD
@@ -1745,9 +1771,20 @@ COPYN:  LDA     RD
         LBNZ    COPYN
         SEP     R5
 
+
+; RTCRD: D = $80 + a DS12887 register -> D = its value
+RTCRD:  STR     R2
+        OUT     SELPORT
+        DEC     R2
+        INP     DATPORT
+        SEP     R5
+
         INCL    "ide.asm"
         INCL    "cons.asm"
         INCL    "nums.asm"
+PMBDEC  EQU     PDEC
+PMBPIN  EQU     PIN
+        INCL    "pmb.inc"
 
 ; ---- the partition's boot record: jump, OEM, BPB (fields filled in above), the FAT16 extension
 VBRTPL: DB      0EBH, 3CH, 90H, 'LTOS?.? ' ; (the version's digits put in from the kernel image)
@@ -1769,6 +1806,8 @@ VBRTPL: DB      0EBH, 3CH, 90H, 'LTOS?.? ' ; (the version's digits put in from t
         DB      'FAT16   '      ; 54 file system type
         DB      'LTOS data partition - boot from the card, not from here.',0
 VBRLEN  EQU     $ - VBRTPL
+FMTCLK  EQU     1F0H            ; in the boot record: 'FD', then the clock's B year month day hour minute second
+CLKREG: DB      8BH, 89H, 88H, 87H, 84H, 82H, 80H, 0    ;  at format time (as the clock keeps them: B says how)
 
 ; ---- the partition table entry (the size is added after)
 PTTPL:  DB      80H             ; bootable

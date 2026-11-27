@@ -48,11 +48,23 @@ class Screen:
                 s.c[s.r][s.k] = chr(b); s.rev[s.r][s.k] = s.inv; s.k += 1
 
     def row(s, n): return ''.join(s.c[n - 1]).rstrip()
+    def label(s, y):
+        """The sheet's row number shown on screen row y (0-based), or None."""
+        t = ''.join(s.c[y][:3]).strip()
+        return int(t) if t.isdigit() else None
+    def srow(s, r):
+        """The screen row (0-based) showing sheet row r (1-based) - the view scrolls - or None."""
+        return next((y for y in range(3, 23) if s.label(y) == r), None)
     def cell(s, name):
-        c, r = ord(name[0]) - 65, int(name[1:]) - 1
-        return ''.join(s.c[3 + r][4 + 9 * c:13 + 9 * c])
+        """A cell's 8 characters, given back as the 9 they used to be (2026-11-24: the 9th is now always a gap):
+        a number, ERR or ######## with a space before it, text with one after. A 9th that is not blank: GAPS."""
+        c, y = ord(name[0]) - 65, s.srow(int(name[1:]))
+        if y is None: return None
+        t = ''.join(s.c[y][4 + 9 * c:12 + 9 * c])
+        if s.c[y][12 + 9 * c] != ' ': GAPS.append('%s: %r' % (name, ''.join(s.c[y][4 + 9 * c:13 + 9 * c])))
+        return ' ' + t if re.fullmatch(r'[ 0-9.#-]*|\s*ERR', t) else t + ' '
     def mark(s):
-        return [(chr(65 + c) + str(r + 1)) for r in range(20) for c in range(8) if s.rev[3 + r][4 + 9 * c]]
+        return [(chr(65 + c) + str(s.label(y))) for y in range(3, 23) for c in range(8) if s.rev[y][4 + 9 * c]]
 
 
 def show(v):
@@ -60,11 +72,14 @@ def show(v):
     a = abs(v); return '%s%d.%02d' % ('-' if v < 0 else '', a // 100, a % 100)
 
 
+GAPS = []          # cells whose 9th character (the gap between columns) was not blank
+
+
 def cellshow(v):
     if v is None: return ' ' * 9
     if v == 'ERR': return '      ERR'
     t = show(v)
-    return t.rjust(9) if len(t) <= 9 else '#' * 9
+    return t.rjust(9) if len(t) <= 8 else ' ' + '#' * 8
 
 
 class Err(Exception): pass
@@ -179,7 +194,7 @@ class Sheet:
         t = sum(vals); q = (2 * abs(t) + len(vals)) // (2 * len(vals))
         return -q if t < 0 else q
 
-    def valid(s, n): return 1 <= int(n[1:]) <= 20
+    def valid(s, n): return 1 <= int(n[1:]) <= 32
     def ref(s):
         s.ws(); m = re.compile(r'[A-H]\d+').match(s.t, s.p)
         if not m or not s.valid(m.group()): raise Err()
@@ -199,7 +214,7 @@ def typed(cells):
         c2, r2 = ord(n[0]) - 65, int(n[1:]) - 1
         k += (DOWN * (r2 - r) if r2 > r else UP * (r - r2)) + (RIGHT * (c2 - c) if c2 > c else LEFT * (c - c2))
         k += t.encode() + b'\r'; r, c = r2 + 1, c2
-        if r > 19: r = 19
+        if r > 31: r = 31
     return k
 
 
@@ -209,7 +224,7 @@ def chunks(cells):
     for n, t in (cells.items() if isinstance(cells, dict) else cells):
         c2, r2 = ord(n[0]) - 65, int(n[1:]) - 1
         k = (DOWN * (r2 - r) if r2 > r else UP * (r - r2)) + (RIGHT * (c2 - c) if c2 > c else LEFT * (c - c2)) + t.encode() + b'\r'
-        r, c = min(r2 + 1, 19), c2
+        r, c = min(r2 + 1, 31), c2
         out.append((BAR if not out else IDLE, k))
     return out
 
@@ -260,7 +275,7 @@ def main():
     def sheet_session(cells, tag, e, then=()):
         """Type a sheet in and compare every cell with the model."""
         fresh()
-        st, d, b = run(cf, b'', chunks(list(cells.items()) + list(then)) + [(IDLE, b'\x13'), ('Save as: ', b'T\r'), ('Saved.', ESC)])
+        st, d, b = run(cf, b'', chunks(list(cells.items()) + list(then)) + [(IDLE, UP * 32 + b'\x13'), ('Save as: ', b'T\r'), ('Saved.', ESC)])   # (up to row 1: Enter past row 20 scrolls the view)
         if st != 'stop': e.append('%s: %s %r' % (tag, st, d[-200:])); return None
         s = Screen(d[d.find(b'\x1b[2J'):d.rfind(b'\x1b[2J')])
         cells = {**cells, **dict(then)}
@@ -268,7 +283,7 @@ def main():
         for r in range(1, 21):
             for c in 'ABCDEFGH':
                 nm = '%s%d' % (c, r); v = want.get(nm)
-                w = (v + ' ' * 9)[:9] if isinstance(v, str) and v != 'ERR' else cellshow(v)
+                w = (v[:8] + ' ' * 9)[:9] if isinstance(v, str) and v != 'ERR' else cellshow(v)
                 if s.cell(nm) != w: e.append('%s %s %r: shows %r, should be %r' % (tag, nm, cells.get(nm), s.cell(nm), w))
         return s, want, b
 
@@ -302,12 +317,11 @@ def main():
                 ('=1+2*3', '7.00'), ('=(1+2)*3', '9.00'), ('=10/4', '2.50'), ('=1/3', '0.33'), ('=2/3', '0.67'), ('=-2*3', '-6.00'),
                 ('=2*-3', '-6.00'), ('=-2*-3', '6.00'), ('=1.5*1.5', '2.25'), ('=0.05*0.1', '0.01'), ('=0.01*0.01', '0.00'), ('=-0.05*0.1', '-0.01'),
                 ('=7-10', '-3.00'), ('=100-0.01', '99.99'), ('=1000/3', '333.33'), ('= 1 + 2 ', '3.00'), ('=2*(3+(4-1))', '12.00'), ('=-(1+2)', '-3.00'),
-                ('=99999.99', '#########'), ('=999999.99', '999999.99'), ('=-99999.99', '-99999.99'), ('=-999999.99', '#########'), ('=1000000', '#########'),
+                ('=99999.99', '99999.99'), ('=999999.99', '########'), ('=-99999.99', '########'), ('=-999999.99', '########'), ('=1000000', '########'),
                 ('=100000*100000', 'ERR'), ('=1/0', 'ERR'), ('=21474836.47+0.01', 'ERR'), ('=-21474836.47-0.01', 'ERR'), ('=21474836.48', 'ERR'), ('21474836.48', 'ERR'),
-                ('=1+', 'ERR'), ('=(1', 'ERR'), ('=1)', 'ERR'), ('=Z1', 'ERR'), ('=A21', 'ERR'), ('=A0', 'ERR'), ('=', 'ERR'), ('=FOO(A1)', 'ERR'), ('=SUM(A1', 'ERR'), ('=1 2', 'ERR'),
-                ('=4634.17*4634.17', 'ERR'), ('=4634*4634', 'ERR'), ('=46.34*46.34', '2147.40'), ('=123456.78/1.5', '82304.52'), ('=1000000/3.33', '300300.30')]
-        HAND = [(t, ('#########' if w == '=99999.99' else w)) for t, w in HAND]
-        fix = {'=99999.99': '99999.99', '=4634*4634': '21473956.00'.replace('21473956.00', '#########')}
+                ('=1+', 'ERR'), ('=(1', 'ERR'), ('=1)', 'ERR'), ('=Z1', 'ERR'), ('=A33', 'ERR'), ('=A0', 'ERR'), ('=', 'ERR'), ('=FOO(A1)', 'ERR'), ('=SUM(A1', 'ERR'), ('=1 2', 'ERR'),
+                ('=4634.17*4634.17', 'ERR'), ('=4634*4634', 'ERR'), ('=46.34*46.34', '2147.40'), ('=123456.78/1.5', '82304.52'), ('=1000000/3.33', '########')]
+        fix = {'=4634*4634': '########'}
         cols = 'ABCDEFGH'
         for part in range(0, len(HAND), 40):
             cells = {}
@@ -377,7 +391,7 @@ def main():
         fresh()
         st, d, b = run(cf, b'', [(BAR, b'11\r22'), ('\x1b[K2', ESC), ('A2 ', b'33' + UP), ('A1 11', RIGHT + b'44\t55' + LEFT),
                                  ('B1 44', LEFT + LEFT + UP + b'\x05'), ('> 11', b'\x7f1\x7f7\r'), ('17.00', UP + b'\x08'),
-                                 ('A1 ', DOWN * 30), ('A20 ', RIGHT * 12), ('H20 ', UP * 25), ('H1 ', LEFT * 12),
+                                 ('A1 ', DOWN * 40), ('A32 ', RIGHT * 12), ('H32 ', UP * 40), ('H1 ', LEFT * 12),
                                  ('A1 ', b'\t' + b'x' * 70 + b'\r'), ('xxxxxxxxx', UP), ('B1 xxx', b'\x1b[3~'), (IDLE, b'\x1b[5~\x1b[H\x1bx\x03' + ESC), ('Quit without', b'N'),
                                  ('B1 ', ESC), ('Quit without', b'Y')])
         if b'B1 ' + b'x' * 60 + b'\x1b' not in d: e.append('not 60 characters')
@@ -432,6 +446,117 @@ def main():
         if code and code[0]: e.append('fsck: %r' % (code,))
         report('A file made by hand (any order, CR LF, no last LF, bad lines); folders; too big; every question; an empty sheet; fsck', e)
 
+    # 8. 256 cells: 32 rows, the view scrolling (2026-11-24)
+    if not only or '8' in only:
+        e = []
+        fresh()
+        cells = {'B1': '=A32*2'}                  # (B1 first: the sheet typed ends at H32, the view at the bottom)
+        cells.update({'A%d' % r: str(r) for r in range(1, 33)})
+        cells.update({'B32': '=SUM(A1:A32)', 'H32': '=AVG(A1:A32)'})
+        st, d, b = run(cf, b'', chunks(cells) + [(IDLE, b'\x13'), ('Save as: ', b'BIG\r'), ('Saved.', b'x' + UP * 31)],
+                       cap=4_000_000_000)
+        s = Screen(d[d.find(b'\x1b[2J'):])
+        s32 = Screen(d[d.find(b'\x1b[2J'):d.rfind(b'Saved.')])
+        if '-v' in sys.argv: print('\n'.join(s32.row(r) for r in range(1, 25)))
+        if [s32.label(y) for y in (3, 22)] != [13, 32]: e.append('at the bottom, rows %r' % [s32.label(y) for y in (3, 22)])
+        if s.label(3) != 1 or s.cell('B1') != '    64.00' or s.mark() != ['H1']: e.append('back up: row %r, B1 %r, %s' % (s.label(3), s.cell('B1'), s.mark()))
+        for k, w in (('B32', '   528.00'), ('H32', '    16.50'), ('A21', '    21.00')):
+            if s32.cell(k) != w: e.append('at the bottom %s: %r' % (k, s32.cell(k)))
+        st2, d2, b2 = run(cf, b'BIG', [(BAR, DOWN * 31 + RIGHT), ('B32 =SUM', ESC)], cap=4_000_000_000)
+        s2 = Screen(d2[d2.find(b'\x1b[2J'):d2.rfind(b'\x1b[2J')])
+        if st2 != 'stop': e.append('opened again: %s %r' % (st2, d2[-200:]))
+        if s2.cell('B32') != '   528.00' or s2.mark() != ['B32']: e.append('opened again, B32: %r %s' % (s2.cell('B32'), s2.mark()))
+        f = later_file('BIG.CLC') or b''
+        if b'A32 32\n' not in f or b'B32 =SUM(A1:A32)\n' not in f: e.append('the file: %r' % f[-80:])
+        # every one of the 256 cells: 1 .. 255, and H32 adds them all
+        full = b''.join(b'%s%d %d\n' % (bytes([65 + i % 8]), i // 8 + 1, i + 1) for i in range(255)) + b'H32 =SUM(A1:G32)+SUM(H1:H31)\n'
+        fresh({'ALL.CLC': full})
+        st3, d3, b3 = run(cf, b'ALL', [(BAR, DOWN * 31 + RIGHT * 7), ('H32 =SUM', UP * 31 + LEFT * 7), ('A1 1', ESC)], cap=4_000_000_000)
+        s3 = Screen(d3[d3.find(b'\x1b[2J'):d3.find(b'H32 =SUM') + 40])      # (when the cursor reached H32)
+        if s3.cell('H32') != ' 32640.00' or s3.cell('G32') != '   255.00': e.append('all 256: H32 %r G32 %r' % (s3.cell('H32'), s3.cell('G32')))
+        s4 = Screen(d3[d3.find(b'\x1b[2J'):d3.rfind(b'\x1b[2J')])
+        if s4.cell('A1') != '     1.00' or s4.label(3) != 1: e.append('back at A1: %r, row %r' % (s4.cell('A1'), s4.label(3)))
+        if st3 != 'stop': e.append('all 256: %s %r' % (st3, d3[-200:]))
+        report('256 cells: A21-A32 typed, the view scrolls down and back; B32 =SUM(A1:A32) 528, saved and opened again; '
+               'a file with all 256 cells: H32 adds the other 255 (32640)', e)
+
+    # 9. CSV: read in, and the values written out (2026-11-24)
+    if not only or '9' in only:
+        e = []
+        CSV = (b'\xef\xbb\xbfItem,Cost,Note\r\n'              # Excel's mark, CR LF
+               b'Rent,500,"monthly, due 1st"\r\n'
+               b'Food,  120.5,"say ""cheap"""\r\n'           # spaces before a field; a "" in quotes
+               b',,\r\n'                                     # an empty row: a row all the same
+               b'Total,=B2+B3,,,,,,,I is past H\r\n'
+               b'Last,7\r\n'
+               b'Big,"1,234.50","-12,000","3,4x",","\r\n')      # numbers with commas: numbers; others text
+        fresh({'DATA.CSV': CSV})
+        st, d, b = run(cf, b'DATA.CSV', [(BAR, b'\x01'), ('Save as: ', b'COPY\r'), ('Saved.', ESC)])
+        s = Screen(d[d.find(b'\x1b[2J'):d.rfind(b'Save as')])
+        for k, w in (('A1', 'Item     '), ('B1', 'Cost     '), ('A2', 'Rent     '), ('B2', '   500.00'), ('C2', 'monthly, '),
+                     ('B3', '   120.50'), ('C3', 'say "che '), ('A4', '         '), ('B5', '   620.50'), ('A6', 'Last     '), ('B6', '     7.00'),
+                     ('B7', '  1234.50'), ('C7', ' ########'), ('D7', '3,4x     '), ('E7', ',        ')):
+            if s.cell(k) != w: e.append('read %s: %r, want %r' % (k, s.cell(k), w))
+        if '(no name)*' not in s.row(24): e.append('a CSV read has no name yet: %r' % s.row(24))
+        f = later_file('COPY.CLC') or b''
+        for ln in (b'C2 monthly, due 1st\n', b'C3 say "cheap"\n', b'B5 =B2+B3\n', b'B6 7\n', b'B7 1234.50\n', b'C7 -12000\n'):
+            if ln not in f: e.append('COPY.CLC: no %r in %r' % (ln, f[:200]))
+        if b'I is past H' in f: e.append('a field past H kept')
+        if later_file('DATA.CSV') != CSV: e.append('the CSV was changed')
+        # the values out
+        fresh()
+        cells = {'A1': 'Name', 'B1': 'Sum', 'A2': 'a, b', 'B2': '1.5', 'A3': 'say "hi"', 'B3': '=B2*2', 'C3': '=1/0', 'D4': '-0.25'}
+        st, d, b = run(cf, b'', chunks(cells) + [(IDLE, b'\x01'), ('Save as: ', b'OUT.CSV\r'), ('as CSV', b'\x01'), ('Save as: ', b'OUT\r'),
+                                                 ('Saved.', ESC)])
+        want = (b'Name,Sum,,\r\n"a, b",1.50,,\r\n"say ""hi""",3.00,ERR,\r\n,,,-0.25\r\n')
+        if later_file('OUT.CSV') != want: e.append('OUT.CSV %r, want %r' % (later_file('OUT.CSV'), want))
+        if b'B3 =B2*2\n' not in (later_file('OUT.CLC') or b''): e.append('after the CSV the sheet still has its formulas: %r' % later_file('OUT.CLC'))
+        if st != 'stop': e.append('%s %r' % (st, d[-200:]))
+        # ^O of a CSV says so
+        fresh({'DATA.CSV': CSV})
+        st, d, b = run(cf, b'', [(BAR, b'\x0f'), ('Open: ', b'DATA.CSV\r'), ('From a CSV', ESC), ('Quit', b'Y')])
+        if b'From a CSV' not in d or st != 'stop': e.append('^O of a CSV: %s %r' % (st, d[-200:]))
+        st, d, b = run(cf, b'', [(BAR, b'\x0f'), ('Open: ', b'NOPE.CSV\r'), ('no such file', ESC), ('LTOS> ', b'')])
+        if b'There is no such file' not in d: e.append('^O of a CSV not there: %r' % d[-200:])
+        # CSV2CLC alone: NAME.CLC beside it, never over one there
+        fresh({'DATA.CSV': CSV})
+        b = V.Elf2K(cf, keys=b'', later=[('LTOS> ', b'CSV2CLC DATA.CSV\r'), ('LTOS> ', b'CSV2CLC DATA.CSV\r'),
+                                         ('LTOS> ', b'CSV2CLC NOPE.CSV\r'), ('LTOS> ', b'MON\r')])
+        b.boot_rom(2_500_000_000); t = bytes(b.u.out).decode('latin1')
+        f = later_file('DATA.CLC') or b''
+        if b'B7 1234.50\n' not in f or b'C2 monthly, due 1st\n' not in f: e.append('CSV2CLC DATA.CSV: %r' % f[:120])
+        if 'Saved the sheet' not in t or 'there already' not in t or 'no such file' not in t: e.append('CSV2CLC said: %r' % t[-300:])
+        report('CSV (CSV2CLC, from LTCALC and alone): Excel\'s (a mark, CR LF, quotes, "", spaces, past H, 1,234.50 a number) '
+               'read in, no name yet, ^A keeps it as a sheet; CSV2CLC alone makes NAME.CLC, never over one; the values written out (two decimals, ERR, quotes when needed, CR LF), the formulas kept', e)
+
+    # 10. ^R / ^L: rows and columns inserted and deleted, the formulas following (2026-11-24)
+    if not only or '10' in only:
+        e = []
+        BASE = b'A1 1\nB1 =A3*2\nA2 2\nC2 =A2\nA3 3\nA4 =SUM(A1:A3)\nD5 =A2+1\n'
+        def go(tag, sheet, keys, want, shows=()):
+            fresh({'T.CLC': sheet})
+            st, d, b = run(cf, b'T', [(BAR, keys[0])] + keys[1:] + [(BAR, b'\x13'), ('Saved.', ESC)])
+            f = later_file('T.CLC')
+            if f != want: e.append('%s: %r, want %r' % (tag, f, want))
+            s9 = Screen(d[d.find(b'\x1b[2J'):d.rfind(b'Saved.')])
+            for k, w in shows:
+                if (s9.cell(k) or '').strip() != w: e.append('%s: %s shows %r, want %r' % (tag, k, s9.cell(k), w))
+            if st != 'stop': e.append('%s: %s %r' % (tag, st, d[-200:]))
+        go('a row inserted at 2', BASE, [DOWN + b'\x12', ('Row:', b'I')],
+           b'A1 1\nB1 =A4*2\nA3 2\nC3 =A3\nA4 3\nA5 =SUM(A1:A4)\nD6 =A3+1\n', [('A5', '6.00'), ('B1', '6.00'), ('C3', '2.00'), ('A2', '')])
+        go('row 2 deleted', BASE, [DOWN + b'\x12', ('Row:', b'd')],
+           b'A1 1\nB1 =A2*2\nA2 3\nA3 =SUM(A1:A2)\nD4 =A0+1\n', [('A3', '4.00'), ('B1', '6.00'), ('D4', 'ERR')])
+        go('a column inserted at B', BASE + b'E1 =B1+1\n', [RIGHT + b'\x0c', ('Column:', b'I')],
+           b'A1 1\nC1 =A3*2\nF1 =C1+1\nA2 2\nD2 =A2\nA3 3\nA4 =SUM(A1:A3)\nE5 =A2+1\n', [('C1', '6.00'), ('F1', '7.00'), ('B1', '')])
+        go('column C deleted', BASE + b'E1 =B1+1\nF2 =SUM(A1:E1)\n', [RIGHT + RIGHT + b'\x0c', ('Column:', b'D')],
+           b'A1 1\nB1 =A3*2\nD1 =B1+1\nA2 2\nE2 =SUM(A1:D1)\nA3 3\nA4 =SUM(A1:A3)\nC5 =A2+1\n', [('D1', '7.00'), ('E2', '14.00')])
+        fresh({'T.CLC': BASE + b'H1 x\n'})
+        st, d, b = run(cf, b'T', [(BAR, b'\x0c'), ('Column:', b'I'), ('Column H is not empty', b'\x12'), ('Row:', ESC), (IDLE, ESC)])
+        if b'Column H is not empty' not in d or st != 'stop' or later_file('T.CLC') != BASE + b'H1 x\n':
+            e.append('column H not empty: %s %r' % (st, d[-200:]))
+        report('^R / ^L: a row inserted (formulas follow: =SUM(A1:A3) -> A1:A4), a row deleted (a range shrinks, a reference '
+               'to it =A0: ERR), a column inserted and deleted; refused when column H holds something; Esc: nothing', e)
+
     # 7. the sheet full, and how much is sent
     if not only or '7' in only:
         e = []
@@ -458,11 +583,13 @@ def main():
         gap = max(o.at[x + 1] - o.at[x] for x in range(i, j - 1))
         tot = o.at[j - 1] - o.at[i]
         print('    one cell changed, 3 cells follow: %d bytes sent, %.2f s on the Elf2K (the longest quiet %.2f s)' % (len(sent), (tot + 0) / 110000, gap / 110000))
-        if gap > 0.6 * 110000: e.append('too slow')
+        if gap > 0.65 * 110000: e.append('too slow')     # (0.57 s with 160 cells, 0.61 s with 256: the passes look at 96 more)
         if len(sent) > 260: e.append('%d bytes sent: %r' % (len(sent), sent))
         s = Screen(dd[dd.find(b'\x1b[2J'):j])
         if s.cell('A1').strip() != '7.00' or s.cell('B1').strip() != '10.50' or s.cell('C1').strip() != '324.00': e.append('after: %r %r %r' % (s.cell('A1'), s.cell('B1'), s.cell('C1')))
         report('A full sheet says so and keeps working; changing one cell sends only what changed', e)
+    if GAPS: print('A cell ran into the next column (the 9th not blank): FAIL'); [print('    ' + g) for g in GAPS[:8]]; ok = False
+    else: print('Every cell shown left the 9th character blank (the gap between columns): OK')
     print('ok' if ok else 'FAILED')
     return ok
 

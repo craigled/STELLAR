@@ -62,8 +62,10 @@ Paths use `/` (never `\`): `GAMES/SNAKE.PRG`, `/HELP.TXT` (from the root), `..` 
 
 * The prompt shows the folder: `LTOS /GAMES/OLD> ` (rebuilt from the `..` entries each time; deeper than 5:
   `/...` in front). Every other command takes paths too (TYPE, RUN, LOAD, SAVE, COPY, RM, RECV, HEX).
-* Typing `NAME` runs `NAME.PRG` from this folder, else from the root, else from `/BIN` (if there is one);
-  `STELLAR` looks for its firmware, apps and ATTACH.PRG the same way (a name with a `/` is looked for only
+* Typing `NAME` runs `NAME.PRG` from this folder, else from the root, else from `/BIN` (if there is one), else
+  from a folder in /BIN (`/BIN/SYS`, `/BIN/GAMES`: one level down, in the order `DIR /BIN` lists them, hidden
+  ones not; the first found wins - the kernel's BINWALK, 2026-11-16: one pass over /BIN keeps its folders' clusters,
+  24 at most; PMB and P2D moved out to pmb.inc / p2d.inc for the room); `STELLAR` looks for its apps and ATTACH.PRG the same way, its firmware in the root and /BIN only (a name with a `/` is looked for only
   where it says). A program found in the root or /BIN still starts in the current folder, so the files it is
   given are found here. A document named to STELLAR is looked for here, else in the root - never in /BIN.
   `MON` and the boot use STELLAR.BIN from the root, else from /BIN.
@@ -72,7 +74,8 @@ Paths use `/` (never `\`): `GAMES/SNAKE.PRG`, `/HELP.TXT` (from the root), `..` 
   an install puts them on the card (the installer itself carries RECV and TYPE).
 * `RECV SYSTEM` puts each .PRG and .STL into /BIN (HELP.TXT into the root) through the kernel's fixed calls only
   (K_PARSE of "/BIN/" or "/", then K_SAVER - `kapi.inc`), never its KS_ addresses, so the RECV.PRG already on the
-  card still does it right after U has put a different kernel there. (Before 2026-10-19 it used KS_WDIR / KS_TOBIN;
+  card still does it right after U has put a different kernel there. With this kernel's stamp, a program already
+  in a folder in /BIN is replaced there instead (BINWALK), so a sorted /BIN stays sorted; SYSRX does the same. (Before 2026-10-19 it used KS_WDIR / KS_TOBIN;
   with a new kernel's stamp it gave up on /BIN and saved them all in the current folder.)
 * `verify_phase5.py`: folders LTOS made and the Mac made, 40 files in one folder, MV, RMDIR refusals,
   STELLAR from a folder - every card checked by `fsck_msdos` and read back by the Mac.
@@ -293,3 +296,46 @@ Elf2K: a 32 MB card with folders in folders, a hidden file, an empty file, a bin
 and restored onto a fresh 8 MB card (the Mac reads it: the same files, the hidden one hidden, LTOS left alone, fsck
 clean), and again with --all. It found that XFER -S could not send hidden files (it used NAMEARG, which skips them):
 now it looks names up with FINDN, as TYPE does.
+
+## A mirror of the card on the Mac: tools/cardsync.py (2026-11-16)
+
+A folder on the Mac kept as a copy of every file and folder on the card, brought up to date whenever it is run. Step-by-step
+instructions, Mac and PC: `tools/CARDSYNC.md`. Only
+what changed is copied, so a rerun is quick. The same tool works with the Elf2K over the serial port, or with the card
+image Emma 02 uses (close Emma 02 first):
+
+    python3 tools/cardsync.py                        Elf2K card -> ~/Elf2K-mirror
+    python3 tools/cardsync.py status                 what a pull and a push would do (nothing copied)
+    python3 tools/cardsync.py push                   files new or edited in the mirror -> the card (asks first)
+    python3 tools/cardsync.py --emma                 the LTOS-Emma02 launcher's card -> ~/Elf2K-mirror-emma
+    python3 tools/cardsync.py --emma home            ~/Emma 02/Elf2K/ltos-card.ide -> ~/Elf2K-mirror-emma-home
+    options: a mirror folder of your own, -n (say, do nothing), --full (copy all again), --yes, --force
+
+- The card is the master. A pull copies a file when its size or date on the card is not what the last sync saw.
+- A file gone from the card is not deleted on the Mac: it is moved to MIRROR/.cardsync/set-aside/<when>/.
+- A file edited in the mirror is kept until the card's copy changes; then the card's copy wins and the Mac's goes to
+  set-aside. `push` sends such files (and new ones, in new folders too) to the card. A file changed on both sides is
+  not sent. Names must be 8.3; a lower-case name is sent in capitals and renamed on the Mac to match.
+- Deleting in the mirror deletes nothing on the card (the next pull brings the file back): DELETE it on the Elf2K.
+- LTOS cannot set a file's date, so a pushed file gets the Elf2K's date; push reads it back so the next pull leaves
+  the file alone.
+- Hidden files are mirrored as plain files; MIRROR/.cardsync/state.json records which are hidden, and every file's
+  size and date. A mirror remembers its card (DISKINFO) and source: syncing it with another card needs --force.
+- Card dates are to the minute: a file rewritten within the same minute at the same size is not seen (--full).
+
+On a Windows PC it runs the same way (and on Linux), in a mirror folder under the user's own folder:
+
+    py -m pip install pyserial                       once: the serial port on a PC needs it (the Mac needs nothing)
+    py tools\cardsync.py --port COM3                 the Elf2K -> C:\Users\<you>\Elf2K-mirror
+    py tools\cardsync.py --emma C:\path\to\ltos-card.ide
+
+Without --port it takes the one USB serial port there is. On a PC give --emma the card image's path (Emma 02 keeps it
+in its own folder there). The Mac goes on using termios as elfser.py does; pyserial is used only where there is no
+termios (Windows), or with --port COMn.
+
+Over serial a run lists every folder (DIR -h and DIR, a few seconds each) and then pulls only the changed files with
+XFER (about 1.5 KB a second). The first pull of a full card takes as long as a `cardfiles.py backup`. With --emma the
+image is read and written directly (its FAT16 in Python, no mount: so on a PC too), and a pull takes well under a
+second. `tools/verify_cardsync.py` runs it against the simulated Elf2K (pull, a quiet rerun, changes on both sides,
+push, a pull after it), against the same card as an image file (a push written in Python, then checked by the Mac's
+fsck and by LTOS itself: TYPE, DIR, FSCK), and the serial layer on a pseudo-terminal both ways (termios, pyserial).

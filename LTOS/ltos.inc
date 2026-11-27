@@ -59,4 +59,7 @@ ATTFND  EQU     4644H           ; STELLAR.PRG -> ATTACH.PRG in RC: its FINDN of 
 CFDLY   EQU     10              ; (cfdiag* only now) a pause after every byte (~130 us) - LTOS 0.2 needed it while a failing 74HC245; some CF cards give
                                 ; wrong bytes when read faster (the Elf2K cannot honour IORDY) - CFDIAG's
                                 ; slow read, reliable on all of Craig's cards
+LCMARK  EQU     07EF8H          ; LC ran a STELLAR app: 'L','C', then the line to run when LTOS starts again
+                                ;  ("LC -r",0 - to $7EFF; the kernel's WARM runs it, once). STELLAR's own RAM:
+                                ;  only an app in VM4 or ATTACH's note ($7EA0-$7EFF) reaches it
 STACK   EQU     07DFFH          ; LTOS's stack top (grows down; $7F00-$7FFF is the monitor's)

@@ -1463,6 +1463,10 @@ FPEND:
         INCL    "ide.asm"
         INCL    "cons.asm"
         INCL    "nums.asm"
+PMBDEC  EQU     PDEC
+PMBPIN  EQU     PIN
+        INCL    "pmb.inc"
+        INCL    "p2d.inc"
 
 MODE:   DS      1               ; 0 read scan, 1 write test
 SFIRST: DS      4               ; the first sector (little-endian, like CUR and SEND)

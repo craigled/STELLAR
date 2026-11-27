@@ -34,7 +34,12 @@ START:  LOAD    RD, 032DH       ; built for this kernel? (it uses the kernel's r
         SEP     R4
         DW      KS_PIN
         DB      ' bytes)',0DH,0AH
-        DB      'Programs:   $3000-$6BFF',0DH,0AH
+        DB      'Built:      ',0
+        SEP     R4
+        DW      PBUILT
+        SEP     R4
+        DW      KS_PIN
+        DB      0DH,0AH,'Programs:   $3000-$6BFF',0DH,0AH
         DB      'Booted:     the boot sector started with R',0
         LOAD    RD, KS_BOOTR
         LDN     RD
@@ -78,7 +83,7 @@ V1:     GLO     RC
         DW      KS_PIN
         DB      'Size:       ',0
         SEP     R4
-        DW      KS_PMB
+        DW      PMB
         LBR     V2
 VNOC:   SEP     R4
         DW      KS_PIN
@@ -117,6 +122,78 @@ V4:     SEP     R4
         DB      ' - not in RAM at boot: MON just leaves',0DH,0AH,0
         SEP     R5     
 
+; PBUILT: when this LTOS was built - the kernel's DATEV (build.py: time lo, hi, date lo, hi, FAT's form) - as
+;   yyyy-mm-dd hh:mm
+PBUILT: LOAD    RD, KS_DATEV+2  ; the date
+        LDA     RD
+        PLO     RC
+        LDN     RD
+        PHI     RC
+        SHR                     ; year = 1980 + date >> 9
+        ADI     LOW(1980)
+        PLO     RD
+        LDI     HIGH(1980)
+        ADCI    0
+        PHI     RD
+        SEP     R4
+        DW      KS_PDEC
+        LDI     '-'
+        SEP     R4
+        DW      F_TYPE
+        GHI     RC              ; month = date >> 5 & 15
+        SHR
+        GLO     RC
+        SHRC
+        SHR
+        SHR
+        SHR
+        SHR
+        ANI     0FH
+        SEP     R4
+        DW      P2D
+        LDI     '-'
+        SEP     R4
+        DW      F_TYPE
+        GLO     RC              ; day = date & 31
+        ANI     1FH
+        SEP     R4
+        DW      P2D
+        LDI     ' '
+        SEP     R4
+        DW      F_TYPE
+        LOAD    RD, KS_DATEV    ; the time
+        LDA     RD
+        PLO     RC
+        LDN     RD
+        PHI     RC
+        SHR                     ; hour = time >> 11
+        SHR
+        SHR
+        SEP     R4
+        DW      P2D
+        LDI     ':'
+        SEP     R4
+        DW      F_TYPE
+        GLO     RC              ; minute = time >> 5 & 63 = (hi & 7) << 3 | lo >> 5
+        SHR
+        SHR
+        SHR
+        SHR
+        SHR
+        STR     R2
+        GHI     RC
+        ANI     07H
+        SHL
+        SHL
+        SHL
+        OR
+        SEP     R4
+        DW      P2D
+        SEP     R5
+        INCL    "p2d.inc"
+PMBDEC  EQU     K_PDEC
+PMBPIN  EQU     K_PIN
+        INCL    "pmb.inc"
 OLD:    SEP     R4
         DW      K_PIN
         DB      'Not for this kernel - install LTOS again.',0DH,0AH,0

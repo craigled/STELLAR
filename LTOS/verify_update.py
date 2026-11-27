@@ -31,6 +31,7 @@ def copy_of_ltos(edit=None):
     for f in glob.glob(os.path.join(HERE, '*.asm')) + glob.glob(os.path.join(HERE, '*.inc')) + [os.path.join(HERE, 'help.txt')]:
         shutil.copy(f, d)
     shutil.copytree(os.path.join(HERE, 'out'), os.path.join(d, 'out'))
+    shutil.copytree(os.path.join(HERE, 'music'), os.path.join(d, 'music'))
     if edit: edit(d)
     return d
 
@@ -40,7 +41,7 @@ def built(d):
     build.HERE, build.OUT = d, os.path.join(d, 'out')
     kimg, ksyms = build.kernel()
     mem, syms, boot = build.build(kimg)
-    files = {n[:8].decode().strip() + '.' + n[8:].decode().strip(): data for n, data in build.samples()}
+    files = {n[:8].decode().strip() + '.' + n[8:].decode().strip(): data for n, data in build.system_files()}
     return mem, ksyms, files
 
 

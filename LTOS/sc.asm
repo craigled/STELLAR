@@ -80,9 +80,9 @@ ST0:    LDI     0
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    ST0
+        BNZ     ST0
         GHI     RC
-        LBNZ    ST0
+        BNZ     ST0
         LOAD    RD, HDR         ; the .STL: 0s
         LOAD    RC, STLEND - HDR
 ST1:    LDI     0
@@ -90,9 +90,9 @@ ST1:    LDI     0
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    ST1
+        BNZ     ST1
         GHI     RC
-        LBNZ    ST1
+        BNZ     ST1
         LOAD    RD, JMPV
         LDI     0C0H
         STR     RD
@@ -104,16 +104,16 @@ ST1:    LDI     0
         LDI     63
         PLO     RC
 AR1:    LDN     RF
-        LBZ     AR2
+        BZ      AR2
         XRI     ' '
-        LBZ     AR2
+        BZ      AR2
         LDA     RF
         STR     RD
         INC     RD
         DEC     RC
         GLO     RC
         LBZ     USE
-        LBR     AR1
+        BR      AR1
 AR2:    LDI     0
         STR     RD
         SEP     R4
@@ -123,7 +123,7 @@ AR2:    LDI     0
         LOAD    RF, SRCT        ; no extension: .SC; the output: .STL
         SEP     R4
         DW      HASEXT
-        LBNF    AR3
+        BNF     AR3
         LOAD    RA, SSC
         SEP     R4
         DW      APPEND
@@ -132,7 +132,7 @@ AR3:    LOAD    RF, SRCT
 AR4:    LDA     RF
         STR     RD
         INC     RD
-        LBNZ    AR4
+        BNZ     AR4
         LOAD    RF, OUTT
         SEP     R4
         DW      HASEXT
@@ -191,7 +191,7 @@ AR4:    LDA     RF
         LOAD    RC, STLEND - HDR
         SEP     R4
         DW      K_SAVER
-        LBDF    NOSAVE
+        BDF     NOSAVE
         SEP     R4
         DW      K_PIN
         DB      'Saved ',0
@@ -251,7 +251,7 @@ BADOUT: SEP     R4
         DW      PSTR
         SEP     R4
         DW      K_PCRLF
-        LBR     FAILST
+        BR      FAILST
 USE:    SEP     R4
         DW      K_PIN
         DB      'Usage: SC name     (name.SC -> name.STL: HELP SC)',0DH,0AH,0
@@ -267,22 +267,22 @@ OLD:    SEP     R4
 HASEXT: LDI     0
         PHI     RA
 HX1:    LDN     RF
-        LBZ     HX9
+        BZ      HX9
         XRI     '/'
-        LBNZ    HX2
+        BNZ     HX2
         LDI     0
         PHI     RA
 HX2:    LDN     RF
         XRI     '.'
-        LBNZ    HX3
+        BNZ     HX3
         GHI     RF
         PHI     RA
         GLO     RF
         PLO     RA
 HX3:    INC     RF
-        LBR     HX1
+        BR      HX1
 HX9:    GHI     RA
-        LBZ     HX8
+        BZ      HX8
         LDI     0
         SHR
         SEP     R5
@@ -291,20 +291,20 @@ HX8:    LDI     1
         SEP     R5
 ; APPEND: the text at RA after the one at RF
 APPEND: LDN     RF
-        LBZ     AP1
+        BZ      AP1
         INC     RF
-        LBR     APPEND
+        BR      APPEND
 AP1:    LDA     RA
         STR     RF
         INC     RF
-        LBNZ    AP1
+        BNZ     AP1
         SEP     R5
 ; PSTR: RF -> 0-ended text, out
 PSTR:   LDA     RF
-        LBZ     PS9
+        BZ      PS9
         SEP     R4
         DW      K_OUT
-        LBR     PSTR
+        BR      PSTR
 PS9:    SEP     R5
 
 ; ==== mistakes: "NAME.SC line n: what", $? 1, nothing saved
@@ -314,7 +314,7 @@ ERRN:   SEP     R4
         LOAD    RF, NBUF
         SEP     R4
         DW      PSTR
-        LBR     ERRT1
+        BR      ERRT1
 ERRT:   SEP     R4
         DW      ERRHD
 ERRT1:  GHI     R6              ; the text after the call (R6 -> it)
@@ -325,7 +325,7 @@ ERRT1:  GHI     R6              ; the text after the call (R6 -> it)
         DW      PSTR
         SEP     R4
         DW      K_PCRLF
-        LBR     FAILST
+        BR      FAILST
 ERRX:   GHI     RF              ; (keep it while the header goes out)
         PHI     R6
         GLO     RF
@@ -379,24 +379,24 @@ NEXTCH: LOAD    RD, NXT
         STR     RD
 NC1:    SEP     R4
         DW      GETB
-        LBDF    NCEOF
+        BDF     NCEOF
         PLO     RE
         XRI     0DH
-        LBNZ    NC2
+        BNZ     NC2
         LOAD    RD, CRF         ; CR: LF, and an LF after it left out
         LDI     1
         STR     RD
         LDI     0AH
-        LBR     NC4
+        BR      NC4
 NC2:    GLO     RE
         XRI     0AH
-        LBNZ    NC3
+        BNZ     NC3
         LOAD    RD, CRF
         LDN     RD
-        LBZ     NC3
+        BZ      NC3
         LDI     0
         STR     RD
-        LBR     NC1
+        BR      NC1
 NC3:    LOAD    RD, CRF
         LDI     0
         STR     RD
@@ -407,7 +407,7 @@ NC4:    PLO     RE
         STR     RD
         SEP     R5
 NCEOF:  LDI     0
-        LBR     NC4
+        BR      NC4
 ; GETB: the file's next byte -> D, DF = 0; DF = 1 at its end
 GETB:   LOAD    RD, SREM
         LDA     RD
@@ -415,9 +415,9 @@ GETB:   LOAD    RD, SREM
         LDN     RD
         PLO     RC
 GB1:    GHI     RC
-        LBNZ    GB2
+        BNZ     GB2
         GLO     RC
-        LBNZ    GB2
+        BNZ     GB2
         GLO     R7              ; (the kernel's read uses R7-RB: kept)
         STXD
         GHI     R7
@@ -461,14 +461,14 @@ GB1:    GHI     RC
         PHI     R7
         LDX
         PLO     R7
-        LBDF    GB9
+        BDF     GB9
         LOAD    RD, SPTR
         LDI     HIGH(KS_DATBUF)
         STR     RD
         INC     RD
         LDI     LOW(KS_DATBUF)
         STR     RD
-        LBR     GB1
+        BR      GB1
 GB9:    LDI     1
         SHR
         SEP     R5
@@ -511,7 +511,7 @@ CURIS:  PLO     RE
         STR     R2
         GLO     RE
         XOR
-        LBZ     CI9
+        BZ      CI9
         LDI     1
         SHR
         SEP     R5
@@ -521,77 +521,77 @@ CI9:    SHR
 ; ==== the tokens: NEXT -> TKIND, TVAL, TOPC (an operator), KW (a name's keyword), NBUF, SBUF/SLEN
 NEXT:   LOAD    RD, CUR         ; spaces, new lines, comments
         LDN     RD
-        LBZ     NXEOF
+        BZ      NXEOF
         XRI     0AH
-        LBNZ    NX1
+        BNZ     NX1
         SEP     R4
         DW      INCLINE
-        LBR     NXSKIP
+        BR      NXSKIP
 NX1:    LDN     RD
         XRI     ' '
-        LBZ     NXSKIP
+        BZ      NXSKIP
         LDN     RD
         XRI     09H
-        LBNZ    NX2
+        BNZ     NX2
 NXSKIP: SEP     R4
         DW      NEXTCH
-        LBR     NEXT
+        BR      NEXT
 NX2:    LDN     RD
         XRI     '/'
-        LBNZ    NX4
+        BNZ     NX4
         LOAD    RD, NXT
         LDN     RD
         XRI     '/'
-        LBNZ    NX3
+        BNZ     NX3
 NX2A:   SEP     R4              ; // to the line's end
         DW      NEXTCH
         LOAD    RD, CUR
         LDN     RD
-        LBZ     NEXT
+        BZ      NEXT
         XRI     0AH
-        LBNZ    NX2A
-        LBR     NEXT
+        BNZ     NX2A
+        BR      NEXT
 NX3:    LDN     RD
         XRI     '*'
-        LBNZ    NX4
+        BNZ     NX4
         SEP     R4              ; /* to */
         DW      NEXTCH
         SEP     R4
         DW      NEXTCH
 NX3A:   LOAD    RD, CUR
         LDN     RD
-        LBNZ    NX3B
+        BNZ     NX3B
         SEP     R4
         DW      ERRT
         DB      'a /* with no */',0
 NX3B:   XRI     '*'
-        LBNZ    NX3C
+        BNZ     NX3C
         LOAD    RD, NXT
         LDN     RD
         XRI     '/'
-        LBNZ    NX3C
+        BNZ     NX3C
         SEP     R4
         DW      NEXTCH
         SEP     R4
         DW      NEXTCH
-        LBR     NEXT
+        BR      NEXT
 NX3C:   LOAD    RD, CUR
         LDN     RD
         XRI     0AH
-        LBNZ    NX3D
+        BNZ     NX3D
         SEP     R4
         DW      INCLINE
 NX3D:   SEP     R4
         DW      NEXTCH
-        LBR     NX3A
+        BR      NX3A
 NXEOF:  LDI     TEOF
         LBR     SETK
 NX4:    LOAD    RD, CUR         ; a number?
         LDN     RD
         SMI     '0'
-        LBNF    NX5
+        BNF     NX5
         SMI     10
-        LBDF    NX5
+        BDF     NX5
         LBR     LXNUM
 NX5:    LDN     RD
         XRI     27H
@@ -613,30 +613,30 @@ NX6:    LDN     RA
         STR     R2
         LDN     RD
         XOR
-        LBNZ    NX6A
+        BNZ     NX6A
         LOAD    RD, NXT
         LDN     RA
         STR     R2
         LDN     RD
         XOR
-        LBNZ    NX6A
+        BNZ     NX6A
         SEP     R4
         DW      NEXTCH
         SEP     R4
         DW      NEXTCH
         GLO     RB
-        LBR     SETOP
+        BR      SETOP
 NX6A:   INC     RA
         INC     RB
         LBR     NX6
 NX7:    LOAD    RA, OPS1        ; one
 NX7A:   LDA     RA
-        LBZ     NXBAD
+        BZ      NXBAD
         STR     R2
         LOAD    RD, CUR
         LDN     RD
         XOR
-        LBNZ    NX7A
+        BNZ     NX7A
         LDN     RD
         PLO     RB
         SEP     R4
@@ -660,13 +660,13 @@ OPS1:   DB      '+-*/%&|^~!<>=(){}[];,',0
 ; ISLET: D a letter or _ ? DF = 0
 ISLET:  PLO     RE
         XRI     '_'
-        LBZ     IL9
+        BZ      IL9
         GLO     RE
         ANI     0DFH
         SMI     'A'
-        LBNF    IL8
+        BNF     IL8
         SMI     26
-        LBNF    IL9
+        BNF     IL9
 IL8:    LDI     1
         SHR
         SEP     R5
@@ -680,7 +680,7 @@ LXNUM:  LDI     0
         PLO     R9              ; R9.0: over 16 bits
         LDN     RD
         XRI     '0'
-        LBNZ    LN1
+        BNZ     LN1
         LOAD    RD, NXT
         LDN     RD
         ANI     0DFH
@@ -701,7 +701,7 @@ LN1:    LOAD    RD, CUR         ; decimal: x 10 + the digit
         GHI     R8
         SHLC
         PHI     R7
-        LBNF    LN2
+        BNF     LN2
         INC     R9
 LN2:    GLO     R7              ; x 8 -> R8
         SHL
@@ -709,7 +709,7 @@ LN2:    GLO     R7              ; x 8 -> R8
         GHI     R7
         SHLC
         PHI     R8
-        LBNF    LN3
+        BNF     LN3
         INC     R9
 LN3:    GLO     R8
         SHL
@@ -717,7 +717,7 @@ LN3:    GLO     R8
         GHI     R8
         SHLC
         PHI     R8
-        LBNF    LN4
+        BNF     LN4
         INC     R9
 LN4:    GLO     R7              ; x 8 + x 2
         STR     R2
@@ -729,7 +729,7 @@ LN4:    GLO     R7              ; x 8 + x 2
         GHI     R8
         ADC
         PHI     R8
-        LBNF    LN5
+        BNF     LN5
         INC     R9
 LN5:    GLO     RE
         STR     R2
@@ -739,13 +739,13 @@ LN5:    GLO     RE
         GHI     R8
         ADCI    0
         PHI     R8
-        LBNF    LN6
+        BNF     LN6
         INC     R9
 LN6:    SEP     R4
         DW      NEXTCH
         LBR     LN1
 LN9:    GLO     R9
-        LBZ     LNOK
+        BZ      LNOK
 LNBIG:  SEP     R4
         DW      ERRT
         DB      'a number over 65535',0
@@ -767,11 +767,11 @@ LH1:    LOAD    RD, CUR
         LDN     RD
         SEP     R4
         DW      HEXD
-        LBDF    LH9
+        BDF     LH9
         PLO     RE
         GHI     R8              ; a digit would push one out of 16 bits?
         ANI     0F0H
-        LBZ     LH2
+        BZ      LH2
         INC     R9
 LH2:    LDI     4
         PLO     RB
@@ -783,7 +783,7 @@ LH3:    GLO     R8
         PHI     R8
         DEC     RB
         GLO     RB
-        LBNZ    LH3
+        BNZ     LH3
         GLO     RE
         STR     R2
         GLO     R8
@@ -792,24 +792,24 @@ LH3:    GLO     R8
         INC     R7
         SEP     R4
         DW      NEXTCH
-        LBR     LH1
+        BR      LH1
 LH9:    GLO     R7
-        LBNZ    LN9
+        BNZ     LN9
         SEP     R4
         DW      ERRT
         DB      '0x with no digits',0
 ; HEXD: D a hex digit -> its value, DF = 0
 HEXD:   PLO     RE
         SMI     '0'
-        LBNF    HDN
+        BNF     HDN
         SMI     10
-        LBNF    HD1
+        BNF     HD1
         GLO     RE
         ANI     0DFH
         SMI     'A'
-        LBNF    HDN
+        BNF     HDN
         SMI     6
-        LBDF    HDN
+        BDF     HDN
         ADI     16
         LSKP
 HD1:    ADI     10
@@ -826,11 +826,11 @@ LXCHR:  SEP     R4
         DW      NEXTCH
         LOAD    RD, CUR
         LDN     RD
-        LBZ     LCBAD
+        BZ      LCBAD
         XRI     27H
-        LBZ     LCBAD
+        BZ      LCBAD
         XRI     2DH             ; (27H ^ 0AH)
-        LBZ     LCBAD
+        BZ      LCBAD
         SEP     R4
         DW      ESCAPE
         PLO     R8
@@ -839,13 +839,13 @@ LXCHR:  SEP     R4
         LDI     27H
         SEP     R4
         DW      CURIS
-        LBNF    LC2
+        BNF     LC2
         SEP     R4
         DW      ERRT
         DB      'no closing ',27H,0
 LC2:    SEP     R4
         DW      NEXTCH
-        LBR     LNOK
+        BR      LNOK
 LCBAD:  SEP     R4
         DW      ERRT
         DB      'not a character',0
@@ -858,11 +858,11 @@ LXSTR:  SEP     R4
 LS1:    LOAD    RD, CUR
         LDN     RD
         XRI     22H
-        LBZ     LS9
+        BZ      LS9
         LDN     RD
-        LBZ     LSOPEN
+        BZ      LSOPEN
         XRI     0AH
-        LBZ     LSOPEN
+        BZ      LSOPEN
         SEP     R4
         DW      ESCAPE
         PLO     RE
@@ -870,13 +870,13 @@ LS1:    LOAD    RD, CUR
         LDN     RD
         PLO     RA
         ADI     1
-        LBZ     LSBIG
+        BZ      LSBIG
         STR     RD
         LDI     HIGH(SBUF)
         PHI     RA
         GLO     RE
         STR     RA
-        LBR     LS1
+        BR      LS1
 LS9:    SEP     R4
         DW      NEXTCH
         LDI     TSTR
@@ -895,7 +895,7 @@ ESCAPE: LOAD    RD, CUR
         DW      NEXTCH
         GLO     R9
         XRI     5CH
-        LBZ     ES1
+        BZ      ES1
         GLO     R9
         SEP     R5
 ES1:    LOAD    RD, CUR
@@ -905,13 +905,13 @@ ES1:    LOAD    RD, CUR
         DW      NEXTCH
         LOAD    RA, ESCT
 ES2:    LDA     RA
-        LBZ     ES9
+        BZ      ES9
         STR     R2
         GLO     R9
         XOR
-        LBZ     ES3
+        BZ      ES3
         INC     RA
-        LBR     ES2
+        BR      ES2
 ES3:    LDN     RA
         SEP     R5
 ES9:    SEP     R4
@@ -927,14 +927,14 @@ LI0:    LDI     0
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    LI0
+        BNZ     LI0
         LDI     0
         PLO     RB
 LI1:    LOAD    RD, CUR
         LDN     RD
         SEP     R4
         DW      ISLET
-        LBNF    LI2
+        BNF     LI2
         LDN     RD
         SMI     '0'
         LBNF    LI5
@@ -964,20 +964,20 @@ LI5:    LOAD    RD, KW          ; a keyword?
         LDI     1
         PLO     RB
 LI6:    LDN     RA
-        LBZ     LI9
+        BZ      LI9
         SEP     R4
         DW      NAMEQ           ; the 0-ended text at RA = NBUF? (RA past it)
-        LBDF    LI7
+        BDF     LI7
         LOAD    RD, KW
         GLO     RB
         STR     RD
-        LBR     LI9
+        BR      LI9
 LI7:    INC     RB
-        LBR     LI6
+        BR      LI6
 LI9:    LDI     TID
         LBR     SETK
 KWT:    DB      'u16',0,'void',0,'const',0,'if',0,'else',0,'while',0,'for',0,'break',0,'continue',0,'return',0
-        DB      'print',0,'printu',0,'putc',0,'getc',0,'halt',0,0
+        DB      'print',0,'printu',0,'putc',0,'getc',0,'halt',0,'q',0,'ef',0,'waitef',0,'rtc',0,0
 ; NAMEQ: the 0-ended text at RA = TBUF? DF = 0; RA ends past its 0 either way
 NAMEQ:  LOAD    RD, TBUF
         LDI     0
@@ -986,11 +986,11 @@ NQ1:    LDA     RA
         STR     R2
         LDA     RD
         XOR
-        LBZ     NQ2
+        BZ      NQ2
         LDI     1
         PLO     RE
 NQ2:    LDN     R2
-        LBNZ    NQ1
+        BNZ     NQ1
         GLO     RE
         SHR
         SEP     R5
@@ -1000,13 +1000,13 @@ ISOP:   PLO     RE              ; DF = 0 if the token is it
         LOAD    RD, TKIND
         LDN     RD
         XRI     TOP
-        LBNZ    NO
+        BNZ     NO
         LOAD    RD, TOPC
         LDN     RD
         STR     R2
         GLO     RE
         XOR
-        LBNZ    NO
+        BNZ     NO
 YES:    LDI     0
         SHR
         SEP     R5
@@ -1017,7 +1017,7 @@ ISKW:   PLO     RE
         LOAD    RD, TKIND
         LDN     RD
         XRI     TID
-        LBNZ    NO
+        BNZ     NO
         LOAD    RD, KW
         LDN     RD
         STR     R2
@@ -1034,11 +1034,11 @@ TK1:    SEP     R4
 TAKEKW: SEP     R4
         DW      ISKW
         LBDF    NO
-        LBR     TK1
+        BR      TK1
 NEEDOP: PLO     R9              ; "x expected"
         SEP     R4
         DW      TAKEOP
-        LBNF    NE9
+        BNF     NE9
         LOAD    RF, OPTXT
         GLO     R9
         SEP     R4
@@ -1048,14 +1048,14 @@ NEEDOP: PLO     R9              ; "x expected"
 NE9:    SEP     R5
 NEEDKW: SEP     R4              ; (only u16: a parameter)
         DW      TAKEKW
-        LBNF    NE9
+        BNF     NE9
         SEP     R4
         DW      ERRT
         DB      'u16 expected',0
 ; OPNAME: D = an operator's code -> "its text expected" at RF
 OPNAME: PLO     RE
         ANI     80H
-        LBZ     ON1
+        BZ      ON1
         GLO     RE              ; two characters: from OPS2
         ANI     1FH
         SHL
@@ -1068,7 +1068,7 @@ OPNAME: PLO     RE
         STR     RF
         INC     RF
         LDN     RA
-        LBR     ON2
+        BR      ON2
 ON1:    GLO     RE
 ON2:    STR     RF
         INC     RF
@@ -1079,12 +1079,12 @@ SEXP:   DB      ' expected',0
 NAME:   LOAD    RD, TKIND
         LDN     RD
         XRI     TID
-        LBNZ    NM9
+        BNZ     NM9
         LOAD    RD, KW
         LDN     RD
-        LBZ     NM1
+        BZ      NM1
         SMI     11
-        LBNF    NM9
+        BNF     NM9
 NM1:    LOAD    RD, KW
         LDN     RD
         PLO     RE
@@ -1107,7 +1107,7 @@ TB1:    LDA     RA
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    TB1
+        BNZ     TB1
         SEP     R5
 
 ; ==== code: EMIT D at PC (over DTOP: the program is over 4 KB)
@@ -1122,7 +1122,7 @@ EMIT:   PLO     RE
         STR     R2
         GHI     RF
         SM
-        LBNF    EM1
+        BNF     EM1
         LBNZ    BIG
         LDN     RD
         STR     R2
@@ -1156,7 +1156,7 @@ EN1:    LDA     R6
         DW      EMIT
         DEC     R9
         GLO     R9
-        LBNZ    EN1
+        BNZ     EN1
         SEP     R5
 ; WORD: RF -> 2 bytes out, high first.  EMITW: the word RC
 EMITW:  GHI     RC
@@ -1188,9 +1188,9 @@ PATCH:  GLO     RA
 PATCHPC: SEP    R4
         DW      HERE
 PP1:    GHI     RA
-        LBNZ    PP2
+        BNZ     PP2
         GLO     RA
-        LBZ     PP9
+        BZ      PP9
 PP2:    GLO     RA              ; the next first
         ADI     LOW(IMG)
         PLO     RD
@@ -1207,7 +1207,7 @@ PP2:    GLO     RA              ; the next first
         PHI     RA
         GLO     RB
         PLO     RA
-        LBR     PP1
+        BR      PP1
 PP9:    SEP     R5
 ; DATA: RC = bytes -> RC = their address (DTOP down by them; below PC: over 4 KB)
 DATA:   LOAD    RD, DTOP + 1
@@ -1222,7 +1222,7 @@ DATA:   LOAD    RD, DTOP + 1
         LDN     RD
         SMB
         STR     RD
-        LBNF    BIG
+        BNF     BIG
         LDA     RD
         PHI     RC
         LDN     RD
@@ -1232,13 +1232,13 @@ DATA:   LOAD    RD, DTOP + 1
         STR     R2
         GHI     RC
         SM
-        LBNF    BIG
-        LBNZ    DA9
+        BNF     BIG
+        BNZ     DA9
         LDN     RD
         STR     R2
         GLO     RC
         SM
-        LBNF    BIG
+        BNF     BIG
 DA9:    SEP     R5
 ; LDV: Rk (D) = the variable at RC: LOADXI RF addr; COPYMXY 02 Fk.  STV: the same, Rk -> it
 LDV:    PLO     R9
@@ -1275,7 +1275,7 @@ LDRF:   LDI     11H             ; LOADXI RF RC
         LDI     0FH
         SEP     R4
         DW      EMIT
-        LBR     EMITW
+        BR      EMITW
 ; LDXI: LOADXI Rk (D) RC
 LDXI:   PLO     R9
         LDI     11H
@@ -1284,7 +1284,7 @@ LDXI:   PLO     R9
         GLO     R9
         SEP     R4
         DW      EMIT
-        LBR     EMITW
+        BR      EMITW
 ; JMPW: D = an opcode (A0 A1 B0), then a place to fill: its chain link RC; -> RC = the place (PC before the word)
 JMPW:   SEP     R4
         DW      EMIT
@@ -1320,7 +1320,7 @@ FIND:   LOAD    RD, SYME
         PLO     RA
 FD1:    GHI     RA
         XRI     HIGH(SYMT)
-        LBNZ    FD2
+        BNZ     FD2
         GLO     RA
         XRI     LOW(SYMT)
         LBZ     NO
@@ -1332,7 +1332,7 @@ FD2:    GLO     RA
         PHI     RA
         SEP     R4
         DW      SYMEQ
-        LBDF    FD1
+        BDF     FD1
         SEP     R5
 ; SYMEQ: the entry at RA's name = NBUF? DF = 0 (RA kept)
 SYMEQ:  GHI     RA
@@ -1349,7 +1349,7 @@ SQ1:    LDA     RC
         LBNZ    NO
         DEC     RB
         GLO     RB
-        LBNZ    SQ1
+        BNZ     SQ1
         LBR     YES
 ; ADD: NBUF a new name, D its kind, RC its value -> RA its entry (defined twice in this function, or among the
 ;      globals: a mistake)
@@ -1360,11 +1360,11 @@ ADD:    PLO     R9
         PLO     R8
         LOAD    RD, FN          ; from NGLOB in a function, else from the start
         LDA     RD
-        LBZ     AD0
+        BZ      AD0
         LOAD    RD, NGLOB
-        LBR     AD0A
+        BR      AD0A
 AD0:    LOAD    RA, SYMT
-        LBR     AD1
+        BR      AD1
 AD0A:   LDA     RD
         PHI     RA
         LDN     RD
@@ -1374,15 +1374,15 @@ AD1:    LOAD    RD, SYME
         STR     R2
         GHI     RA
         XOR
-        LBNZ    AD2
+        BNZ     AD2
         LDN     RD
         STR     R2
         GLO     RA
         XOR
-        LBZ     AD3
+        BZ      AD3
 AD2:    SEP     R4
         DW      SYMEQ
-        LBDF    AD2A
+        BDF     AD2A
         SEP     R4
         DW      ERRN
         DB      ' defined twice',0
@@ -1392,17 +1392,17 @@ AD2A:   GLO     RA
         GHI     RA
         ADCI    0
         PHI     RA
-        LBR     AD1
+        BR      AD1
 AD3:    GLO     RA              ; room? (RA + 24 <= SYMTOP)
         SMI     LOW(SYMTOP - SYMSZ)
         GHI     RA
         SMBI    HIGH(SYMTOP - SYMSZ)
-        LBNF    AD4
-        LBZ     AD3A
-        LBR     AD3B
+        BNF     AD4
+        BZ      AD3A
+        BR      AD3B
 AD3A:   GLO     RA
         XRI     LOW(SYMTOP - SYMSZ)
-        LBZ     AD4
+        BZ      AD4
 AD3B:
         SEP     R4
         DW      ERRT
@@ -1415,7 +1415,7 @@ AD5:    LDA     RD
         INC     RA
         DEC     RB
         GLO     RB
-        LBNZ    AD5
+        BNZ     AD5
         GLO     R9              ; kind, value, 0s
         STR     RA
         INC     RA
@@ -1432,7 +1432,7 @@ AD6:    LDI     0
         INC     RA
         DEC     RB
         GLO     RB
-        LBNZ    AD6
+        BNZ     AD6
         LOAD    RD, SYME
         GHI     RA
         STR     RD
@@ -1451,7 +1451,7 @@ CEXPR:  LDI     '-'
         SEP     R4
         DW      TAKEOP
         LDI     0
-        LBDF    CX0
+        BDF     CX0
         LDI     1
 CX0:    PLO     R9
         GLO     R9
@@ -1459,16 +1459,16 @@ CX0:    PLO     R9
         LOAD    RD, TKIND
         LDN     RD
         XRI     TNUM
-        LBNZ    CX2
+        BNZ     CX2
         LOAD    RD, TVAL
         LDA     RD
         PHI     RC
         LDN     RD
         PLO     RC
-        LBR     CX5
+        BR      CX5
 CX2:    LDN     RD
         XRI     TID
-        LBNZ    CX9
+        BNZ     CX9
         LOAD    RA, NBUF        ; (NBUF kept: it may be the name being declared)
         LOAD    RD, CXBUF
         LDI     16
@@ -1478,12 +1478,12 @@ CX2A:   LDA     RA
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    CX2A
+        BNZ     CX2A
         SEP     R4
         DW      TBNAME
         SEP     R4
         DW      FIND
-        LBDF    CX3
+        BDF     CX3
         GLO     RA
         ADI     16
         PLO     RA
@@ -1492,7 +1492,7 @@ CX2A:   LDA     RA
         PHI     RA
         LDA     RA
         XRI     'c'
-        LBNZ    CX3
+        BNZ     CX3
         LDA     RA
         PHI     RC
         LDN     RA
@@ -1506,7 +1506,7 @@ CX4:    LDA     RA
         INC     RD
         DEC     RB
         GLO     RB
-        LBNZ    CX4
+        BNZ     CX4
 CX5:    GHI     RC
         STXD
         GLO     RC
@@ -1519,7 +1519,7 @@ CX5:    GHI     RC
         LDXA
         PHI     RC
         LDX
-        LBZ     CX6
+        BZ      CX6
         GLO     RC              ; - : 0 - it
         SDI     0
         PLO     RC
@@ -1538,7 +1538,7 @@ CX9:    SEP     R4
 PUSHK:  LOAD    RD, K
         LDN     RD
         XRI     NTEMP
-        LBNZ    PK1
+        BNZ     PK1
         SEP     R4
         DW      ERRT
         DB      'the expression is too deep',0
@@ -1564,7 +1564,7 @@ VALUE:  LOAD    RD, FLAG        ; (0FFH: the value is in Rk already)
         LOAD    RD, FLAG
         LDN     RD
         XRI     1
-        LBZ     VA1
+        BZ      VA1
         LDI     0A1H
         LSKP
 VA1:    LDI     0A0H
@@ -1619,7 +1619,7 @@ VA9:    SEP     R5
 TOJUMP: LOAD    RD, FLAG
         LDN     RD
         XRI     0FFH
-        LBNZ    TJ1
+        BNZ     TJ1
         SEP     R4              ; 8C 0k (TESTXZ: Test = it is 0), A0
         DW      GETK
         PLO     R9
@@ -1630,11 +1630,11 @@ TOJUMP: LOAD    RD, FLAG
         SEP     R4
         DW      EMIT
         LDI     0A0H
-        LBR     TJ3
+        BR      TJ3
 TJ1:    LDN     RD
-        LBZ     TJ2
+        BZ      TJ2
         LDI     0A1H
-        LBR     TJ3
+        BR      TJ3
 TJ2:    LDI     0A0H
 TJ3:    PLO     R9
         LOAD    RD, FLAG
@@ -1658,7 +1658,7 @@ CONDJ:  PLO     R8              ; R8.0 = when; R8.1 / RC kept
         LOAD    RD, FLAG
         LDN     RD
         XRI     0FFH
-        LBNZ    CJ1
+        BNZ     CJ1
         SEP     R4
         DW      GETK
         PLO     R9
@@ -1669,12 +1669,12 @@ CONDJ:  PLO     R8              ; R8.0 = when; R8.1 / RC kept
         SEP     R4
         DW      EMIT
         LDI     0
-        LBR     CJ2
+        BR      CJ2
 CJ1:    LDN     RD
 CJ2:    STR     R2              ; f == when: A0, else A1
         GLO     R8
         XOR
-        LBZ     CJ3
+        BZ      CJ3
         LDI     0A1H
         LSKP
 CJ3:    LDI     0A0H
@@ -1729,10 +1729,10 @@ EX1:    LOAD    RD, ELVL        ; an operator of this level?
         LOAD    RD, EOP
         LDN     RD
         XRI     O_SHL
-        LBZ     EXSHL
+        BZ      EXSHL
         LDN     RD
         XRI     O_SHR
-        LBZ     EXSHR
+        BZ      EXSHR
         LOAD    RD, ELVL        ; the right side: one level higher
         LDN     RD
         ADI     1
@@ -1788,7 +1788,7 @@ EXL1:   GLO     R9
         SEP     R4
         DW      EMIT
         DEC     R9
-        LBR     EXL1
+        BR      EXL1
 EXSHR:  SEP     R4              ; >> n: b = a new one; LOADXI b 2^n; DIVXY a b; COPYAX MA -> a
         DW      SHIFTN
         PLO     R9
@@ -1797,7 +1797,7 @@ EXSHR:  SEP     R4              ; >> n: b = a new one; LOADXI b 2^n; DIVXY a b; 
         LDI     0
         PHI     RC
 EXR1:   GLO     R9
-        LBZ     EXR2
+        BZ      EXR2
         GLO     RC
         SHL
         PLO     RC
@@ -1805,7 +1805,7 @@ EXR1:   GLO     R9
         SHLC
         PHI     RC
         DEC     R9
-        LBR     EXR1
+        BR      EXR1
 EXR2:   SEP     R4
         DW      PUSHK
         SEP     R4
@@ -1841,10 +1841,10 @@ EXR2:   SEP     R4
 SHIFTN: SEP     R4
         DW      CEXPR
         GHI     RC
-        LBNZ    SN9
+        BNZ     SN9
         GLO     RC
         SMI     16
-        LBDF    SN9
+        BDF     SN9
         GLO     RC
         SEP     R5
 SN9:    SEP     R4
@@ -1910,14 +1910,14 @@ BINOP:  PLO     R9
         PHI     RC
         LOAD    RA, BOPT
 BO1:    LDA     RA
-        LBZ     BO9
+        BZ      BO9
         STR     R2
         GLO     R9
         XOR
-        LBZ     BO2
+        BZ      BO2
         INC     RA
         INC     RA
-        LBR     BO1
+        BR      BO1
 BO2:    LOAD    RD, JMPV + 1
         LDA     RA
         STR     RD
@@ -1956,7 +1956,7 @@ BOPT:   DB      '+'
         DW      OP_LE
         DB      0
 OP_ADD: LDI     50H             ; 50 ab 0a
-        LBR     OPXYZ
+        BR      OPXYZ
 OP_SUB: LDI     51H
 OPXYZ:  SEP     R4
         DW      EMIT
@@ -1994,9 +1994,9 @@ OP_MOD: LDI     4DH             ; 4D ab 27 21 0a
         GHI     R8
         LBR     EMIT
 OP_AND: LDI     65H             ; 22 0b 6x 0a 21 1a
-        LBR     OPLOG
+        BR      OPLOG
 OP_OR:  LDI     63H
-        LBR     OPLOG
+        BR      OPLOG
 OP_XOR: LDI     64H
 OPLOG:  PLO     R9
         LDI     22H
@@ -2031,7 +2031,7 @@ OP_GE:  LDI     0
 OPTAB:  SEP     R4
         DW      EMIT
         GLO     RC
-        LBR     OPTF
+        BR      OPTF
 OP_GT:  LDI     1               ; TESTLXY b a
         LSKP
 OP_LE:  LDI     0
@@ -2073,12 +2073,12 @@ LOGIC:  PLO     RE
         DW      LOGOP
         SEP     R4
         DW      ISOP
-        LBDF    LG9
+        BDF     LG9
 LG1:    SEP     R4
         DW      LOGOP
         SEP     R4
         DW      TAKEOP
-        LBDF    LG2
+        BDF     LG2
         SEP     R4
         DW      LGJUMP
         LOAD    RD, LLVL
@@ -2086,7 +2086,7 @@ LG1:    SEP     R4
         ADI     1
         SEP     R4
         DW      EXPR
-        LBR     LG1
+        BR      LG1
 LG2:    SEP     R4
         DW      LGJUMP
         SEP     R4              ; the answer's register
@@ -2179,7 +2179,7 @@ LGJUMP: LOAD    RD, LCHAIN
 ; LOGOP: LLVL's operator -> D
 LOGOP:  LOAD    RD, LLVL
         LDN     RD
-        LBZ     LO1
+        BZ      LO1
         LDI     O_AND
         SEP     R5
 LO1:    LDI     O_OR
@@ -2189,7 +2189,7 @@ LO1:    LDI     O_OR
 UNARY:  LDI     '-'
         SEP     R4
         DW      TAKEOP
-        LBDF    UN2
+        BDF     UN2
         SEP     R4
         DW      UNARY
         SEP     R4
@@ -2209,7 +2209,7 @@ UNARY:  LDI     '-'
 UN2:    LDI     '~'
         SEP     R4
         DW      TAKEOP
-        LBDF    UN3
+        BDF     UN3
         SEP     R4
         DW      UNARY
         SEP     R4
@@ -2233,13 +2233,13 @@ UN2:    LDI     '~'
 UN3:    LDI     '!'
         SEP     R4
         DW      TAKEOP
-        LBDF    PRIMARY
+        BDF     PRIMARY
         SEP     R4
         DW      UNARY
         LOAD    RD, FLAG
         LDN     RD
         XRI     0FFH
-        LBZ     UN4
+        BZ      UN4
         LDN     RD
         XRI     1
         STR     RD
@@ -2262,7 +2262,7 @@ UN4:    SEP     R4              ; TESTXZ k: Test = 1 when it is 0
 PRIMARY: LDI    '('
         SEP     R4
         DW      TAKEOP
-        LBDF    PM1
+        BDF     PM1
         LDI     0
         SEP     R4
         DW      EXPR
@@ -2271,7 +2271,7 @@ PRIMARY: LDI    '('
 PM1:    LOAD    RD, TKIND
         LDN     RD
         XRI     TNUM
-        LBNZ    PM2
+        BNZ     PM2
         LOAD    RD, TVAL
         LDA     RD
         PHI     RC
@@ -2284,7 +2284,7 @@ PM1:    LOAD    RD, TKIND
         LBR     NEXT
 PM2:    LDN     RD
         XRI     TID
-        LBZ     PM3
+        BZ      PM3
         SEP     R4
         DW      ERRT
         DB      'a value expected',0
@@ -2293,7 +2293,7 @@ PM3:    SEP     R4
         LDI     '('
         SEP     R4
         DW      ISOP
-        LBDF    PM4
+        BDF     PM4
         LDI     1
         LBR     CALL
 PM4:    SEP     R4
@@ -2305,17 +2305,17 @@ PM4:    SEP     R4
 PM5:    SEP     R4
         DW      ENTKIND         ; D = the kind, RC = the value
         XRI     'c'
-        LBNZ    PM6
+        BNZ     PM6
         SEP     R4
         DW      PUSHK
         LBR     LDXI
 PM6:    XRI     15H             ; ('c' ^ 'v')
-        LBNZ    PM7
+        BNZ     PM7
         SEP     R4
         DW      PUSHK
         LBR     LDV
 PM7:    XRI     17H             ; ('v' ^ 'a')
-        LBZ     PM8
+        BZ      PM8
         SEP     R4
         DW      ERRN
         DB      ' is a function: ( expected',0
@@ -2401,7 +2401,7 @@ CL0:    LDA     RD
         STXD
         DEC     RC
         GLO     RC
-        LBNZ    CL0
+        BNZ     CL0
         LOAD    RD, CWANT
         GLO     RE
         STR     RD
@@ -2411,17 +2411,17 @@ CL0:    LDA     RD
         LOAD    RD, NKW         ; a builtin? (NAME set NKW; NEXT leaves it)
         LDN     RD
         SMI     11
-        LBNF    CL1
+        BNF     CL1
         SEP     R4
         DW      BUILTIN
         LBR     CL99
 CL1:    SEP     R4
         DW      FIND
-        LBDF    CANOF
+        BDF     CANOF
         SEP     R4
         DW      ENTKIND
         XRI     'f'
-        LBZ     CL2
+        BZ      CL2
 CANOF:  SEP     R4
         DW      ERRP
         DB      'no function ',0,'() (defined before this?)',0
@@ -2430,12 +2430,12 @@ CL2:    LOAD    RD, FN          ; itself?
         STR     R2
         GHI     RA
         XOR
-        LBNZ    CL3
+        BNZ     CL3
         LDN     RD
         STR     R2
         GLO     RA
         XOR
-        LBNZ    CL3
+        BNZ     CL3
         SEP     R4
         DW      ERRN
         DB      '() calls itself: no recursion',0
@@ -2453,11 +2453,11 @@ CL3:    LOAD    RD, CADDR       ; CADDR = its address
         PHI     RA
         LOAD    RD, CWANT
         LDN     RD
-        LBZ     CL4
+        BZ      CL4
         INC     RA
         LDN     RA
         DEC     RA
-        LBNZ    CL4
+        BNZ     CL4
         SEP     R4
         DW      ERRN
         DB      '() gives no value',0
@@ -2488,9 +2488,9 @@ CL5:    LOAD    RD, CN          ; the values (CJ of CN so far)
         LOAD    RD, CJ
         LDN     RD
         XOR
-        LBZ     CL7
+        BZ      CL7
         LDN     RD
-        LBZ     CL6
+        BZ      CL6
         LDI     ','
         SEP     R4
         DW      NEEDOP
@@ -2503,7 +2503,7 @@ CL6:    LDI     0
         LDN     RD
         ADI     1
         STR     RD
-        LBR     CL5
+        BR      CL5
 CL7:    LDI     ')'
         SEP     R4
         DW      NEEDOP
@@ -2553,7 +2553,7 @@ CL10:   GLO     R9
         STR     R2
         GLO     RE
         SM
-        LBNF    CL11
+        BNF     CL11
         LDI     72H
         SEP     R4
         DW      EMIT
@@ -2564,7 +2564,7 @@ CL10:   GLO     R9
         LOAD    RD, CK0
         LDN     RD
         PLO     RE
-        LBR     CL10
+        BR      CL10
 CL11:   LDI     0BDH            ; CALL its address
         SEP     R4
         DW      EMIT
@@ -2579,7 +2579,7 @@ CL11:   LDI     0BDH            ; CALL its address
         LDN     RD
         PLO     R9
 CL12:   GLO     R9
-        LBZ     CL13
+        BZ      CL13
         LDI     73H
         SEP     R4
         DW      EMIT
@@ -2587,10 +2587,10 @@ CL12:   GLO     R9
         SEP     R4
         DW      EMIT
         DEC     R9
-        LBR     CL12
+        BR      CL12
 CL13:   LOAD    RD, CWANT       ; its value: COPYXY RD -> Rk
         LDN     RD
-        LBZ     CL99
+        BZ      CL99
         SEP     R4
         DW      PUSHK
         PLO     R8
@@ -2610,7 +2610,7 @@ CL98:   IRX
         DEC     RD
         DEC     RC
         GLO     RC
-        LBNZ    CL98
+        BNZ     CL98
         SEP     R5
 ; BUILTIN: NKW = 11 print, 12 printu, 13 putc, 14 getc, 15 halt (the ( taken; CWANT)
 BUILTIN: LOAD   RD, NKW
@@ -2622,7 +2622,7 @@ BUILTIN: LOAD   RD, NKW
         LOAD    RD, TKIND       ; print("text")
         LDN     RD
         XRI     TSTR
-        LBZ     BI1
+        BZ      BI1
         SEP     R4
         DW      ERRT
         DB      'print("text") expected',0
@@ -2645,12 +2645,12 @@ BI1:    LOAD    RD, SLEN        ; its room, the text there
         PLO     RB
         LOAD    RD, SBUF
 BI1A:   GLO     RB
-        LBZ     BI1B
+        BZ      BI1B
         LDA     RD
         STR     RA
         INC     RA
         DEC     RB
-        LBR     BI1A
+        BR      BI1A
 BI1B:   GHI     RC              ; (RC kept on the stack)
         STXD
         GLO     RC
@@ -2674,7 +2674,7 @@ BI1B:   GHI     RC              ; (RC kept on the stack)
         LBR     EMIT
 BI2:    LDN     RD              ; printu, putc: a value
         SMI     14
-        LBDF    BI5
+        BDF     BI5
         SEP     R4
         DW      NOWANT
         LOAD    RD, NKW         ; (kept: a name in the value sets NKW)
@@ -2702,20 +2702,23 @@ BI2:    LDN     RD              ; printu, putc: a value
         IRX
         LDX
         XRI     13
-        LBNZ    BI4
+        BNZ     BI4
         LDI     0C9H            ; putc: SEROUT
         LBR     EMIT
 BI4:    SEP     R4              ; printu: 24 6B 00 6E
         DW      EMITN
         DB      4, 24H, 6BH, 00H, 6EH
         SEP     R5
-BI5:    LDI     ')'             ; getc, halt: ) first
+BI5:    LDN     RD              ; q, ef, waitef, rtc: BIQ
+        SMI     16
+        BDF     BIQ
+        LDI     ')'             ; getc, halt: ) first
         SEP     R4
         DW      NEEDOP
         LOAD    RD, NKW
         LDN     RD
         XRI     14
-        LBNZ    BI7
+        BNZ     BI7
         SEP     R4              ; getc: CB 21 0k
         DW      PUSHK
         PLO     R8
@@ -2730,7 +2733,7 @@ BI5:    LDI     ')'             ; getc, halt: ) first
         DW      EMIT
         LOAD    RD, CWANT
         LDN     RD
-        LBNZ    BI6
+        BNZ     BI6
         LOAD    RD, K
         LDN     RD
         SMI     1
@@ -2742,6 +2745,185 @@ BI7:    SEP     R4              ; halt: GAL 0004
         DW      EMITN
         DB      3, 0B0H, 00H, 04H
         SEP     R5
+; BIQ: D = 0 q(n), 1 ef(n), 2 waitef(n), 3 rtc(n) - n a constant (tsc's builtin, the Elf2K's hardware, 2026-11-24)
+BIQ:    STXD                    ; (the kind kept on the stack)
+        ANI     1
+        BNZ     BQ1
+        SEP     R4              ; q, waitef: no value
+        DW      NOWANT
+BQ1:    SEP     R4
+        DW      CEXPR
+        GHI     RC              ; (n kept over the ')')
+        STXD
+        GLO     RC
+        STXD
+        LDI     ')'
+        SEP     R4
+        DW      NEEDOP
+        IRX
+        LDXA
+        PLO     RC
+        LDXA
+        PHI     RC
+        LDX                     ; the kind
+        PLO     R7
+        SHL
+        SHL
+        ADI     LOW(BQT)        ; BQT: lo, hi, the opcode (q, waitef) - 4 bytes each
+        PLO     RA
+        LDI     HIGH(BQT)
+        ADCI    0
+        PHI     RA
+        GHI     RC
+        BNZ     BQE
+        LDA     RA
+        STR     R2
+        GLO     RC
+        SM
+        BNF     BQE             ; n < lo
+        LDA     RA
+        STR     R2
+        GLO     RC
+        SD
+        BNF     BQE             ; n > hi
+        GLO     R7
+        ANI     1
+        LBNZ    BQV
+        LDN     RA              ; q: 0A n (SETQ)  waitef: 0F n (WIP)
+        SEP     R4
+        DW      EMIT
+        GLO     RC
+        LBR     EMIT
+BQE:    SEP     R4
+        DW      ERRT
+        DB      'n out of range: q 0-3, ef 1-4, rtc 0-7',0
+BQT:    DB      0, 3, 0AH, 0, 1, 4, 0, 0, 1, 4, 0FH, 0, 0, 7, 0, 0
+BQV:    SEP     R4              ; ef, rtc: a value in Rk
+        DW      PUSHK
+        PLO     R8
+        GLO     R7
+        XRI     1
+        BNZ     BQR
+        SEP     R4              ; ef: 09 1A mask (GETEFA, TESTBITI): the Test flag
+        DW      EMITN
+        DB      2, 09H, 1AH
+        LDI     1
+        PLO     RB
+BQM:    DEC     RC              ; mask = 1 << (n - 1)
+        GLO     RC
+        BZ      BQM9
+        GLO     RB
+        SHL
+        PLO     RB
+        BR      BQM
+BQM9:   GLO     RB
+        SEP     R4
+        DW      EMIT
+        LDI     1
+        BR      BQF
+BQR:    GLO     RC              ; rtc(7): 07 2B 21 0k 86 0k 00 FF (RTCRD B; register B $FF: no clock)
+        XRI     7
+        BNZ     BQB
+        SEP     R4
+        DW      EMITN
+        DB      3, 07H, 2BH, 21H
+        GLO     R8
+        SEP     R4
+        DW      EMIT
+        LDI     86H
+        SEP     R4
+        DW      EMIT
+        GLO     R8
+        SEP     R4
+        DW      EMIT
+        SEP     R4
+        DW      EMITN
+        DB      2, 0, 0FFH
+        LDI     0
+        BR      BQF
+BQB:    GLO     RC              ; rtc(0-6): 11 0F buf 07 0F (RTCGET), then the field
+        PLO     R7
+        LOAD    RD, RTCB        ; the 8 bytes: made the first time
+        LDA     RD
+        BNZ     BQB1
+        LDN     RD
+        BNZ     BQB1
+        LOAD    RC, 8
+        SEP     R4
+        DW      DATA
+        LOAD    RD, RTCB
+        GHI     RC
+        STR     RD
+        INC     RD
+        GLO     RC
+        STR     RD
+BQB1:   SEP     R4
+        DW      EMITN
+        DB      2, 11H, 0FH
+        LDI     0
+        SEP     R4
+        DW      RTCAT
+        SEP     R4
+        DW      EMITN
+        DB      2, 07H, 0FH
+        GLO     R7
+        XRI     6
+        BNZ     BQB2
+        SEP     R4              ; the year: 11 0F buf+6 39 02 Fk
+        DW      EMITN
+        DB      2, 11H, 0FH
+        LDI     6
+        SEP     R4
+        DW      RTCAT
+        SEP     R4
+        DW      EMITN
+        DB      2, 39H, 02H
+        GLO     R8
+        ORI     0F0H
+        SEP     R4
+        DW      EMIT
+        LDI     0FFH
+        BR      BQF
+BQB2:   SEP     R4              ; the others: 11 0E 0000 2E 0E buf+n 21 0k (READIDX RE, COPYAX)
+        DW      EMITN
+        DB      6, 11H, 0EH, 0, 0, 2EH, 0EH
+        GLO     R7
+        SEP     R4
+        DW      RTCAT
+        LDI     21H
+        SEP     R4
+        DW      EMIT
+        GLO     R8
+        SEP     R4
+        DW      EMIT
+        LDI     0FFH
+BQF:    PLO     RB              ; D = FLAG (0FFH none); no value wanted: K - 1, no flag
+        LOAD    RD, CWANT
+        LDN     RD
+        BNZ     BQF1
+        LDI     0FFH
+        PLO     RB
+        LOAD    RD, K
+        LDN     RD
+        SMI     1
+        STR     RD
+BQF1:   LOAD    RD, FLAG
+        GLO     RB
+        STR     RD
+BQF9:   SEP     R5
+; RTCAT: the word RTCB + D out
+RTCAT:  PLO     RB
+        LOAD    RD, RTCB + 1
+        LDN     RD
+        STR     R2
+        GLO     RB
+        ADD
+        PLO     RC
+        DEC     RD
+        LDN     RD
+        ADCI    0
+        PHI     RC
+        LBR     EMITW
 NOWANT: LOAD    RD, CWANT       ; (print, printu, putc, halt give no value)
         LDN     RD
         LBZ     NW9
@@ -2759,7 +2941,7 @@ SM0:    LDA     RD
         STXD
         DEC     RC
         GLO     RC
-        LBNZ    SM0
+        BNZ     SM0
         SEP     R4
         DW      STMT1
         LOAD    RD, SVARS + 9
@@ -2771,42 +2953,42 @@ SM9:    IRX
         DEC     RD
         DEC     RC
         GLO     RC
-        LBNZ    SM9
+        BNZ     SM9
         SEP     R5
 STMT1:  SEP     R4              ; K = 0, no flag
         DW      CLEARK
         LDI     '{'
         SEP     R4
         DW      TAKEOP
-        LBDF    SB2
+        BDF     SB2
 SB1:    LDI     '}'
         SEP     R4
         DW      TAKEOP
-        LBNF    SB1Z
+        BNF     SB1Z
         LOAD    RD, TKIND
         LDN     RD
-        LBNZ    SB1A
+        BNZ     SB1A
         SEP     R4
         DW      ERRT
         DB      '} expected',0
 SB1A:   SEP     R4
         DW      STMT
-        LBR     SB1
+        BR      SB1
 SB1Z:   SEP     R5
 SB2:    LDI     ';'
         SEP     R4
         DW      TAKEOP
-        LBNF    SB1Z
+        BNF     SB1Z
         LDI     KU16
         SEP     R4
         DW      TAKEKW
-        LBDF    STIF
+        BDF     STIF
 STD1:   SEP     R4              ; u16 x [= e], ... ;
         DW      NAME
         LDI     '['
         SEP     R4
         DW      ISOP
-        LBDF    STD2
+        BDF     STD2
         SEP     R4
         DW      ERRT
         DB      'arrays are declared outside functions',0
@@ -2828,7 +3010,7 @@ STD2:   LDI     2
         LDI     '='
         SEP     R4
         DW      TAKEOP
-        LBDF    STD3
+        BDF     STD3
         SEP     R4
         DW      CLEARK
         LDI     0
@@ -2849,7 +3031,7 @@ STD2:   LDI     2
 STD3:   LDI     ','
         SEP     R4
         DW      TAKEOP
-        LBNF    STD1
+        BNF     STD1
         LDI     ';'
         LBR     NEEDOP
 STIF:   LDI     KIF             ; if ( e ) s [else s]
@@ -2871,7 +3053,7 @@ STIF:   LDI     KIF             ; if ( e ) s [else s]
         LDI     KELSE
         SEP     R4
         DW      TAKEKW
-        LBDF    SI2
+        BDF     SI2
         LDI     0               ; B0 end; at -> here; s; end -> here
         PLO     RC
         PHI     RC
@@ -2894,7 +3076,7 @@ SI2:    LBR     PATAT
 STWH:   LDI     KWHILE          ; while ( e ) s
         SEP     R4
         DW      TAKEKW
-        LBDF    STFOR
+        BDF     STFOR
         SEP     R4
         DW      HERE
         LOAD    RD, STOP
@@ -2926,7 +3108,7 @@ STFOR:  LDI     KFOR            ; for ( [simple] ; [e] ; [simple] ) s
         LDI     ';'
         SEP     R4
         DW      ISOP
-        LBNF    SF1
+        BNF     SF1
         SEP     R4
         DW      SIMPLE
 SF1:    LDI     ';'
@@ -2948,7 +3130,7 @@ SF1:    LDI     ';'
         LDI     ';'
         SEP     R4
         DW      ISOP
-        LBNF    SF2
+        BNF     SF2
         SEP     R4
         DW      CLEARK
         LDI     0
@@ -2988,7 +3170,7 @@ SF2:    LDI     ';'
         LDI     ')'
         SEP     R4
         DW      ISOP
-        LBNF    SF3
+        BNF     SF3
         SEP     R4
         DW      SIMPLE
 SF3:    LDI     ')'
@@ -3023,10 +3205,10 @@ SF3:    LDI     ')'
 STBRK:  LDI     KBREAK          ; break ;
         SEP     R4
         DW      TAKEKW
-        LBDF    STCONT
+        BDF     STCONT
         SEP     R4
         DW      LOOPAT          ; RA -> the loop (none: a mistake)
-        LBDF    SBNO
+        BDF     SBNO
         LDI     ';'
         SEP     R4
         DW      NEEDOP
@@ -3061,10 +3243,10 @@ SBNO:   SEP     R4
 STCONT: LDI     KCONT           ; continue ;
         SEP     R4
         DW      TAKEKW
-        LBDF    STRET
+        BDF     STRET
         SEP     R4
         DW      LOOPAT
-        LBDF    SCNO
+        BDF     SCNO
         LDI     ';'
         SEP     R4
         DW      NEEDOP
@@ -3090,7 +3272,7 @@ STRET:  LDI     KRET            ; return [e] ;
         LBNF    SR2
         SEP     R4
         DW      FNVAL
-        LBNZ    SR1
+        BNZ     SR1
         SEP     R4
         DW      ERRT
         DB      'a void function returns no value',0
@@ -3116,10 +3298,10 @@ SR1:    LDI     0
         ORI     0DH
         SEP     R4
         DW      EMIT
-        LBR     SR3
+        BR      SR3
 SR2:    SEP     R4
         DW      FNVAL
-        LBZ     SR3
+        BZ      SR3
         SEP     R4
         DW      ERRT
         DB      'return: a value expected',0
@@ -3191,7 +3373,7 @@ LOOPIN: LDA     RD
         LOAD    RD, LSP
         LDN     RD
         XRI     16
-        LBNZ    LI0X
+        BNZ     LI0X
         SEP     R4
         DW      ERRT
         DB      'loops 16 deep',0
@@ -3257,7 +3439,7 @@ SIMPLE: SEP     R4
         LBR     CALL
 SP1:    SEP     R4
         DW      FIND
-        LBDF    SPNOV
+        BDF     SPNOV
         SEP     R4
         DW      ENTKIND
         PLO     RE
@@ -3271,10 +3453,10 @@ SP1:    SEP     R4
         GLO     RE
         STR     RD
         XRI     'v'
-        LBZ     SP3
+        BZ      SP3
         LDN     RD
         XRI     'a'
-        LBZ     SP2
+        BZ      SP2
 SPNOV:  SEP     R4
         DW      ERRN
         DB      ' is not a variable',0
@@ -3302,7 +3484,7 @@ SP2:    LDI     '['             ; a[i]: R1 = the element's address (50 11 01 52 
 SP3:    LDI     '='
         SEP     R4
         DW      TAKEOP
-        LBDF    SP4
+        BDF     SP4
         LDI     0
         SEP     R4
         DW      EXPR
@@ -3312,13 +3494,13 @@ SP3:    LDI     '='
 SP4:    LOAD    RD, TKIND       ; ++ -- op=
         LDN     RD
         XRI     TOP
-        LBNZ    SPEQ
+        BNZ     SPEQ
         LOAD    RD, TOPC
         LDN     RD
         SMI     O_INC
-        LBNF    SPEQ
+        BNF     SPEQ
         SMI     10
-        LBDF    SPEQ
+        BDF     SPEQ
         LDN     RD
         PLO     RE
         LOAD    RD, SOP
@@ -3333,10 +3515,10 @@ SP4:    LOAD    RD, TKIND       ; ++ -- op=
         LOAD    RD, SOP
         LDN     RD
         XRI     O_INC
-        LBZ     SP5
+        BZ      SP5
         LDN     RD
         XRI     O_DEC
-        LBNZ    SP6
+        BNZ     SP6
         LDI     43H
         LSKP
 SP5:    LDI     42H
@@ -3378,7 +3560,7 @@ OPEQT:  DB      '+', '-', '*', '/', '%', '&', '|', '^'
 SLOAD:  LOAD    RD, SKIND
         LDN     RD
         XRI     'a'
-        LBNZ    SL1
+        BNZ     SL1
         SEP     R4
         DW      EMITN
         DB      3, 39H, 02H, 12H
@@ -3394,7 +3576,7 @@ SL1:    LOAD    RD, SADDR
 SSAVE:  LOAD    RD, SKIND
         LDN     RD
         XRI     'a'
-        LBNZ    SS1
+        BNZ     SS1
         SEP     R4
         DW      EMITN
         DB      3, 3AH, 02H, 21H
@@ -3417,7 +3599,7 @@ PG1:    LOAD    RD, TKIND
         LDI     KCONST
         SEP     R4
         DW      TAKEKW
-        LBDF    PG2
+        BDF     PG2
         SEP     R4              ; const NAME = constant ;
         DW      NAME
         LDI     '='
@@ -3431,21 +3613,21 @@ PG1:    LOAD    RD, TKIND
         LDI     ';'
         SEP     R4
         DW      NEEDOP
-        LBR     PG1
+        BR      PG1
 PG2:    LDI     KVOID
         SEP     R4
         DW      TAKEKW
-        LBDF    PG3
+        BDF     PG3
         SEP     R4
         DW      NAME
         LDI     0
         SEP     R4
         DW      FUNCTION
-        LBR     PG1
+        BR      PG1
 PG3:    LDI     KU16
         SEP     R4
         DW      TAKEKW
-        LBNF    PG4
+        BNF     PG4
         SEP     R4
         DW      ERRT
         DB      'u16, void or const expected',0
@@ -3454,11 +3636,11 @@ PG4:    SEP     R4
         LDI     '('
         SEP     R4
         DW      ISOP
-        LBDF    PG5
+        BDF     PG5
         LDI     1
         SEP     R4
         DW      FUNCTION
-        LBR     PG1
+        BR      PG1
 PG5:    LDI     '['             ; a global: an array, or a variable [= constant]
         SEP     R4
         DW      TAKEOP
@@ -3469,12 +3651,12 @@ PG5:    LDI     '['             ; a global: an array, or a variable [= constant]
         STR     R2
         GHI     RC
         OR
-        LBZ     PGBIG
+        BZ      PGBIG
         GLO     RC
         SMI     0D1H
         GHI     RC
         SMBI    07H
-        LBDF    PGBIG
+        BDF     PGBIG
         GLO     RC              ; x 2
         SHL
         PLO     RC
@@ -3518,7 +3700,7 @@ PG6:    LDI     2
         LDI     '='
         SEP     R4
         DW      TAKEOP
-        LBDF    PG7
+        BDF     PG7
         SEP     R4              ; = constant: into the block
         DW      CEXPR
         IRX
@@ -3528,13 +3710,13 @@ PG6:    LDI     2
         PHI     RA
         SEP     R4
         DW      PATCH
-        LBR     PG8
+        BR      PG8
 PG7:    IRX
         IRX
 PG8:    LDI     ','
         SEP     R4
         DW      TAKEOP
-        LBDF    PG8A
+        BDF     PG8A
         SEP     R4
         DW      NAME
         LBR     PG5
@@ -3551,14 +3733,14 @@ PG9A:   LDA     RA
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    PG9A
+        BNZ     PG9A
         SEP     R4
         DW      FIND
-        LBDF    PGNOM
+        BDF     PGNOM
         SEP     R4
         DW      ENTKIND
         XRI     'f'
-        LBZ     PG10
+        BZ      PG10
 PGNOM:  SEP     R4
         DW      ERRT
         DB      'no main()',0
@@ -3574,7 +3756,7 @@ PG11:   LDA     RA
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    PG11
+        BNZ     PG11
         SEP     R5
 STLHD:  DB      'STL1', 9, 40H, 0, 42H, 0, 44H, 0, 46H, 0, 48H, 0, 4AH, 0, 50H, 0, 60H, 0, 70H, 0
 SMAIN:  DB      'main', 0,0,0,0,0,0,0,0,0,0,0,0
@@ -3592,7 +3774,7 @@ FU0:    LDA     RA
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    FU0
+        BNZ     FU0
         LDI     '('
         SEP     R4
         DW      NEEDOP
@@ -3602,7 +3784,7 @@ FU0:    LDA     RA
         LDI     ')'
         SEP     R4
         DW      ISOP
-        LBNF    FU3
+        BNF     FU3
 FU1:    LDI     KU16
         SEP     R4
         DW      NEEDKW
@@ -3611,7 +3793,7 @@ FU1:    LDI     KU16
         LOAD    RD, PCNT        ; NBUF -> PNAMES[PCNT] (8 at most)
         LDN     RD
         XRI     8
-        LBNZ    FU1A
+        BNZ     FU1A
         SEP     R4
         DW      ERRT
         DB      'more than 8 parameters',0
@@ -3636,11 +3818,11 @@ FU2:    LDA     RA
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    FU2
+        BNZ     FU2
         LDI     ','
         SEP     R4
         DW      TAKEOP
-        LBNF    FU1
+        BNF     FU1
 FU3:    LDI     ')'
         SEP     R4
         DW      NEEDOP
@@ -3651,10 +3833,10 @@ FU3:    LDI     ')'
         LDI     0
         PHI     RC
         GLO     RC
-        LBZ     FU4
+        BZ      FU4
         SEP     R4
         DW      DATA
-        LBR     FU5
+        BR      FU5
 FU4:    LOAD    RD, DTOP
         LDA     RD
         PHI     RC
@@ -3675,7 +3857,7 @@ FU6:    LDA     RA
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    FU6
+        BNZ     FU6
         SEP     R4
         DW      HERE
         LDI     'f'
@@ -3717,7 +3899,7 @@ FU6:    LDA     RA
         LOAD    RA, SMAIN       ; main: CALL main's address (at 2)
         SEP     R4
         DW      NAMEQN
-        LBDF    FU7
+        BDF     FU7
         LOAD    RA, 2
         SEP     R4
         DW      HERE
@@ -3730,7 +3912,7 @@ FU8:    LOAD    RD, PCNT
         STR     R2
         GLO     R9
         XOR
-        LBZ     FU9
+        BZ      FU9
         GLO     R9
         SHL
         SHL
@@ -3749,7 +3931,7 @@ FU8A:   LDA     RA
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    FU8A
+        BNZ     FU8A
         GLO     R9
         SHL
         STR     R2
@@ -3774,7 +3956,7 @@ FU8A:   LDA     RA
 FU9:    LDI     '{'
         SEP     R4
         DW      ISOP
-        LBNF    FU10
+        BNF     FU10
         SEP     R4
         DW      ERRT
         DB      '{ expected',0
@@ -3807,7 +3989,7 @@ NQN1:   LDA     RA
         LBNZ    NO
         DEC     RB
         GLO     RB
-        LBNZ    NQN1
+        BNZ     NQN1
         LBR     YES
 
 SSC:    DB      '.SC',0
@@ -3832,6 +4014,7 @@ SLEN:   DS      1
 PC:     DS      2
 DTOP:   DS      2
 K:      DS      1
+RTCB:   DS      2               ; rtc(n)'s 8 bytes in the block (0: none yet)
 FLAG:   DS      1
 SYME:   DS      2
 NGLOB:  DS      2

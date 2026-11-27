@@ -173,9 +173,8 @@ W3:     SEP     R4
         DW      PIN
         DB      0DH,0AH,'LTOS 0.5 - LiteOS for the Elf2K.  Type HELP for the commands.',0DH,0AH,0
 
-        LOAD    RD, HIST        ; no last command yet
-        LDI     0
-        STR     RD
+        LOAD    RD, HIST        ; no last command yet (LCCHK: and LC's line, if it ran a STELLAR app)
+        LBR     LCCHK
                                 ; (then the prompt: no start-up script - Craig, 2026-11-08)
 ; ---- the command loop
 MAIN:   LOAD    R2, STACK       ; (a fresh stack for every command)
@@ -329,11 +328,8 @@ UKR:    LDI     0
         SEP     R4
         DW      FINDX
         LBNF    UKF
-UKB:    SEP     R4
-        DW      TOBIN
-        LBDF    UKS
-        SEP     R4
-        DW      FINDX
+UKB:    SEP     R4              ; /BIN, then its folders
+        DW      BINWALK
         LBDF    UKS
 UKF:    LOAD    RD, DATTR
         LDN     RD
@@ -347,7 +343,7 @@ UKF:    LOAD    RD, DATTR
         LBNZ    RUNIT
         LOAD    RD, SHNM        ; NAME.SH: SH.PRG (the root, then /BIN) with the whole line - SH NAME ...
         LBR     UKS2
-; UKS: no NAME.SH or NAME.PRG here, in the root or in /BIN - perhaps a STELLAR app: STELLAR.PRG (the root, then
+; UKS: no NAME.SH or NAME.PRG here, in the root, in /BIN or in a folder in /BIN - perhaps a STELLAR app: STELLAR.PRG (the root, then
 ;      /BIN) is run with the whole line, as if STELLAR had been typed in front ("LW2 DOC.TXT"). A path typed, or
 ;      STELLAR.PRG or SH.PRG itself not found: unknown.
 UKS:    LOAD    RD, UKM
@@ -1840,6 +1836,111 @@ DOTDOT: DB      '..         '
         INCL    "cons.asm"
         INCL    "nums.asm"
         INCL    "redir.asm"
+; LCCHK (from WARM): HIST emptied; LC ran a STELLAR app (LCMARK: 'L','C', its line after them): the mark
+;        used up, the line to LINE and run (as typed) - so LC comes back. Else the prompt.
+LCCHK:  LDI     0
+        STR     RD
+        LOAD    RD, LCMARK
+        LDA     RD
+        XRI     'L'
+        BNZ     LCC9
+        LDN     RD
+        XRI     'C'
+        BNZ     LCC9
+        STR     RD
+        PLO     RF
+        INC     RD
+        LDI     HIGH(LINE)
+        PHI     RF
+LCC1:   LDA     RD
+        STR     RF
+        INC     RF
+        BNZ     LCC1
+        LBR     KEXEC
+LCC9:   LBR     MAIN
+
+; ---- BINWALK: FINDX in /BIN, then in each folder in /BIN (one level down; in the order DIR /BIN lists them;
+;      hidden ones not). DF = 0: found - WDIR is its folder; DF = 1: nowhere, or no /BIN. Two of one name: the
+;      first found. One pass over /BIN keeps its folders' first clusters in BINL (24 at most; 0, 0 after the
+;      last), so neither the root nor /BIN is read again for each folder. BINP: where the list is filled / read.
+;      Programs: the 11-byte name in FNAME and UKM = 1, then BINWALK (as FINDN finds it).
+BINWALK: SEP    R4
+        DW      TOBIN
+        LBDF    BWR
+        SEP     R4              ; /BIN itself
+        DW      FINDX
+        LBNF    BWR
+        LOAD    RF, PAT         ; /BIN's entries, all of them ...
+        LDI     11
+        PLO     RB
+BW2:    LDI     '?'
+        STR     RF
+        INC     RF
+        DEC     RB
+        GLO     RB
+        BNZ     BW2
+        SEP     R4
+        DW      DOPEN
+        LOAD    RD, BINP
+        LDI     LOW(BINL)
+        STR     RD
+BW3:    SEP     R4
+        DW      DNEXT
+        LBDF    BW5
+        LOAD    RD, DATTR       ; ... the folders' first clusters, into BINL
+        LDN     RD
+        ANI     10H
+        LBZ     BW3
+        LOAD    RD, BINP
+        LDN     RD
+        PLO     RF
+        XRI     LOW(BINLE)      ; (full: the rest left out)
+        LBZ     BW3
+        LDI     HIGH(BINL)
+        PHI     RF
+        LOAD    RD, DCLUS
+        LDA     RD
+        STR     RF
+        INC     RF
+        LDN     RD
+        STR     RF
+        INC     RF
+        LOAD    RD, BINP
+        GLO     RF
+        STR     RD
+        LBR     BW3
+BW5:    LOAD    RD, BINP        ; 0, 0 after the last
+        LDN     RD
+        PLO     RF
+        LDI     HIGH(BINL)
+        PHI     RF
+        LDI     0
+        STR     RF
+        INC     RF
+        STR     RF
+        LOAD    RD, BINP        ; each folder in turn
+        LDI     LOW(BINL)
+        STR     RD
+BW6:    LOAD    RD, BINP
+        LDN     RD
+        PLO     RF
+        LDI     HIGH(BINL)
+        PHI     RF
+        LDA     RF
+        PHI     RC
+        STR     R2
+        LDA     RF
+        PLO     RC
+        OR
+        LBZ     FONO            ; no more: nowhere (DF = 1)
+        GLO     RF
+        STR     RD
+        SEP     R4              ; WDIR = it
+        DW      FOSET
+        SEP     R4
+        DW      FINDX
+        LBDF    BW6
+BWR:    SEP     R5
 
 DATEV:  DB      0, 0, 21H, 5CH  ; the time and date LTOS was built (build.py): files' dates with no clock
 
@@ -1956,5 +2057,8 @@ RLBA:   DS      4
 ROFF:   DS      2
 STT:    DS      2               ; STT, STD: in this order (little-endian, as a directory entry has them)
 STD:    DS      2
+BINP:   DS      1               ; BINWALK: the low byte of where BINL is filled / read
+BINL:   DS      48              ; BINWALK: /BIN's folders' first clusters (24 at most), then 0, 0
+BINLE:  DS      2
 KVEND:                          ; (build.py: the variables must end before PROGLO)
         END

@@ -129,7 +129,7 @@ def main():
                                         os.mkdir(os.path.join(m, 'Docs'))])
         P1.load_image(cf, img)
         shorts = P2.root_names(img)
-        l1 = [x for x in shorts if x.startswith('LONGN') and x.endswith('TXT')]
+        l1 = [x for x in shorts if x.startswith('LON') and '~' in x and x.endswith('TXT')]   # (LONGNA~1.TXT or LONG~1A2.TXT)
         keys = (b'REN TEST.BIN T2.BIN\r' b'MV T2.BIN PROG.PRG\r' b'REN NOPE.BIN N2.BIN\r' b'REN ' + l1[0].encode() + b' ONE.TXT\r'
                 b'RM BIG.BIN\r' b'RM *.TXT\rN' b'DEL ' + l1[1].encode() + b'\r' b'RM DOCS\r' b'RM NOPE.*\r' b'RM *.*\rY' b'DIR\r' b'MON\r')
         b, st, t = session(cf, keys, rtc=clock())
@@ -143,7 +143,7 @@ def main():
                      ('There is no file NOPE.BIN', 'REN NOPE.BIN N2.BIN\r'), ('Renamed.', 'REN ' + l1[0] + ' ONE.TXT\r'),
                      ('Deleted.', 'RM BIG.BIN\r'), ('3 files match - delete them all? (Y/N) N', 'RM *.TXT\r'),
                      ('Deleted.', 'DEL ' + l1[1] + '\r'), ('No file matches.', 'RM DOCS\r'), ('No file matches.', 'RM NOPE.*\r'),
-                     ('%d files match - delete them all? (Y/N) Y' % (len(build.samples()) + 4), 'RM *.*\r')):
+                     ('%d files match - delete them all? (Y/N) Y' % (len(build.system_files()) + 4), 'RM *.*\r')):
             if w not in out(t, c): e.append('%r: %r' % (c, out(t, c)[:150]))
         if '-v' in sys.argv and mb == 8: print(t)
         report('%d MB: REN / MV (taken name, missing file, a Mac long name), RM / DEL (one, wildcards asked Y / N, a '
@@ -154,7 +154,7 @@ def main():
     for mb in (8, 32):
         n = mb * 2048
         cf, e2k, st = P1.installed_full(mem, n)
-        files = dict((nm[:8].decode().strip() + '.' + nm[8:].decode().strip(), d) for nm, d in build.samples())
+        files = dict((nm[:8].decode().strip() + '.' + nm[8:].decode().strip(), d) for nm, d in build.system_files())
         text = ''.join('Line %02d sent from the terminal by RECV - the quick brown fox.\r\n' % i for i in range(30))
         hx = build.intel_hex({0x3000 + i: b for i, b in enumerate(files['HELLO.PRG'][6:])})
         hl = hx.split('\n'); hl[1] = hl[1][:-2] + '%02X' % ((int(hl[1][-2:], 16) + 1) & 0xFF); bad = '\n'.join(hl)  # a checksum wrong

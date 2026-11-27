@@ -10,9 +10,11 @@
   * ^W across the parts, and a text that is not there;
   * HUGE.TXT (59,000 bytes): an X at part 2's top moves 52 KB up the card;
   * NANO alone: the name asked for; ^X with a change: N leaves it as it was;
-  * a long line shown whole (wrapped), Down by screen rows, the mark: Shift + arrows, ^^ / Alt-A, ^K, Alt-6, ^U.
+  * a long line shown whole (wrapped), Down by screen rows, the mark: Shift + arrows, ^^ / Alt-A, ^K, Alt-6, ^U;
+  * curly quotes and dashes from the Mac (UTF-8 E2 80 xx): shown as ' " - (they were ???); ^X: the file as it was;
+    an edit and ^O: saved as plain ASCII, any other UTF-8 (an e-acute) kept as it was.
 
-    python3 LTOS/verify_enano.py [-v] [scenario numbers, 1-7]
+    python3 LTOS/verify_enano.py [-v] [scenario numbers, 1-8]
 """
 import os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -194,6 +196,22 @@ def main():
         report('^G: the key chart; a 200-character line shown whole (wrapped); Down Down: its second row (col 76); ^^ Shift-Right x3 ^K: '
                '"abc" cut, ^E ^U: pasted at the line\'s end; ^B Up Alt-A Right x3 Alt-6: "end" copied, ^B ^U, ^O: the '
                'Mac reads the model\'s text, fsck clean', e)
+
+    if chosen(8):
+        # ---- curly quotes and dashes (UTF-8 E2 80 xx): one ASCII character each
+        Q = ('It\u2019s \u2018one\u2019 and \u201ctwo\u201d \u2013 a dash \u2014 caf\u00e9.\nline two\n').encode()
+        A = b'It\'s \'one\' and "two" - a dash - caf\xc3\xa9.\nline two\n'
+        st, t, rc, fl = session({'Q.TXT': Q}, [('LTOS> ', b'NANO Q.TXT\r'), ('NANO 1.1', b'\x18')])
+        e = []
+        if st != 'stop' or rc: e.append('the end %s, fsck %d: %r' % (st, rc, t[-300:]))
+        if 'It\'s \'one\' and "two" - a dash - caf??.' not in t: e.append('the screen: %r' % t[t.find('It'):][:60])
+        if fl.get('Q.TXT') != Q: e.append('^X, no change: Q.TXT %r' % fl.get('Q.TXT'))
+        st, t, rc, fl = session({'Q.TXT': Q}, [('LTOS> ', b'NANO Q.TXT\r'), ('NANO 1.1', b'X\x0f'),
+                                               ('bytes to Q.TXT', b'\x18')])
+        if st != 'stop' or rc: e.append('the end %s, fsck %d: %r' % (st, rc, t[-300:]))
+        if fl.get('Q.TXT') != b'X' + A: e.append('X, ^O: Q.TXT %r' % fl.get('Q.TXT'))
+        report('curly quotes and dashes from the Mac shown as \' " - (not ???), the e-acute as before; ^X: the file as it '
+               'was; X, ^O: saved in plain ASCII (the e-acute kept), fsck clean', e)
 
     print('\nLTOS + NANO: %s' % ('ALL PASS' if ok else 'FAIL'))
     return ok

@@ -1,6 +1,7 @@
 ; Copyright (C) 2026 Craig Ledbetter
 ; SPDX-License-Identifier: GPL-3.0-or-later
-; ltcalc.asm - LTCALC.PRG: LTCALC [name] - a small spreadsheet in 1802 code: one page of 8 columns (A-H) by 20 rows.
+; ltcalc.asm - LTCALC.PRG: LTCALC [name] - a small spreadsheet in 1802 code: 8 columns (A-H) by 32 rows (256 cells),
+;   20 rows on the screen at a time: the view moves as the cursor goes past its top or bottom.
 ;   A cell holds a number, text, or a formula: =A1+B1*2  =(A1-B2)/3  =SUM(A1:A10)  =AVG MIN MAX COUNT over ranges
 ;   (a list too: =SUM(A1:A3,C1:C3)). Numbers have two decimals: a 32-bit whole number of hundredths, up to
 ;   21,474,836.47 either way. Going past that, dividing by 0, a bad formula or a cell that needs itself shows ERR.
@@ -8,13 +9,18 @@
 ; The sheet in memory IS the file: a pool of lines, "A1 =B1*2" LF, in cell order (a line someone else put out of
 ; order still works; a line that names no cell stays in the file, unused). Saving writes the pool as it is, opening
 ; reads it as it is, and TYPE, GREP, RAWK and NANO can all use the file. A name with no extension gets .CLC.
+; CSV (2026-11-24): opening NAME.CSV runs CSV2CLC -L NAME.CSV (csv2clc.asm: row n of the file is row n, its fields
+;   A-H; quotes as Excel writes them), which makes /_CSV.CLC and runs LTCALC -C: the sheet, with no name yet; ^A with a name ending .CSV writes the values (numbers with two decimals,
+;   formulas as what they give, ERR as ERR) - the sheet keeps its own name and its formulas.
 ;
 ; Memory, from the first page after the code, up to $6BFF:
-;   seven pages, each indexed by the cell's number (0-159: row * 8 + column), so a cell's byte is one PLO away:
-;   TYP  the kind (below) and its flags         tail: the variables
-;   PH PL  where its line is in the pool (0: empty)   tail of PH: the typed line, the cell's text; of PL: the math
-;   V0-V3  its value (V0 the top byte)          tail of V1: the value stack
-;   then a page for the key ring, and the pool, to PTOP. LTOS's own buffers ($6C00 up) stay LTOS's: saving and opening are the kernel's.
+;   seven pages, each indexed by the cell's number (0-255: row * 8 + column), so a cell's byte is one PLO away:
+;   TYP  the kind (below) and its flags
+;   PH PL  where its line is in the pool (0: empty)
+;   V0-V3  its value (V0 the top byte)
+;   a page for the variables, the math's work and (at its top) the value stack (2026-11-24: they were in the
+;   pages' tails, after cell 159, when the sheet had 160 cells); a page for the key ring (its first half) and the
+;   typed line and the cell's text (its top); then the pool, to PTOP. LTOS's own buffers ($6C00 up) stay LTOS's: saving and opening are the kernel's.
 ;
 ; Recalculating: first the formulas that name a changed cell are found (a look through their text, far quicker than
 ; working them out), and those that name them, and so on. Those are marked waiting, then passes over them: a formula
@@ -30,7 +36,8 @@
         INCL    "kapi.inc"
         INCL    "out/ksyms.inc"
 
-NCELL   EQU     160
+NROW    EQU     32              ; the sheet's rows (256 cells: a cell's number is a byte)
+SROWS   EQU     20              ; the rows on the screen at a time
 GROW    EQU     4               ; the screen row of the sheet's row 1
 GCOL    EQU     5               ; the screen column of column A
 INMAX   EQU     60              ; the most characters typed into a cell
@@ -69,24 +76,65 @@ START:  LOAD    RD, 032DH       ; built for this kernel? (it uses the kernel's r
         STR     RD
         INC     RD              ; NAMED
         STR     RD
+        LOAD    RD, VTOP        ; the view at row 1
+        LDI     0
+        STR     RD
         SEP     R4
         DW      K_SKIPSP
+        LOAD    RD, CSVM
+        LDI     0
+        STR     RD
+        LOAD    RD, SPON
+        LDI     0
+        STR     RD
         LDN     RF
         LBZ     ST5             ; no name
+        XRI     '-'             ; -C: the sheet CSV2CLC made of a CSV
+        BNZ     ST1
+        INC     RF
+        LDN     RF
+        ANI     0DFH
+        XRI     'C'
+        BNZ     ST5
+        LOAD    RD, CSVM
+        LDI     1
+        STR     RD
+        LOAD    RF, TMPCSV
+ST1:    GHI     RF              ; (the name as typed kept, for a CSV)
+        STXD
+        GLO     RF
+        STXD
         LOAD    RD, TMP11
         SEP     R4
         DW      KS_NAMEP
         SEP     R4
         DW      DEFEXT
+        IRX
+        LDXA
+        PLO     RF
+        LDX
+        PHI     RF
+        SEP     R4              ; NAME.CSV: CSV2CLC makes it a sheet
+        DW      ISCSV
+        BDF     ST2
+        SEP     R4
+        DW      XCSV
+        SEP     R4
+        DW      K_PIN
+        DB      'There is no such file.',0DH,0AH,0
+        LBR     K_MAIN
+ST2:    LOAD    RD, CSVM
+        LDN     RD
+        BNZ     ST3
         SEP     R4
         DW      KEEPNM
-        SEP     R4
+ST3:    SEP     R4
         DW      LOADFILE
         LOAD    RD, LRC
         LDN     RD
-        LBZ     ST6             ; opened
+        BZ      ST6             ; opened
         XRI     1
-        LBZ     ST5             ; not there yet: a new sheet of that name
+        BZ      ST5             ; not there yet: a new sheet of that name
         SEP     R4
         DW      K_PIN
         DB      'That file cannot be opened as a sheet.',0DH,0AH,0
@@ -95,6 +143,12 @@ ST5:    SEP     R4
         DW      CLEAR
 ST6:    SEP     R4
         DW      REDRAW
+        LOAD    RD, CSVM
+        LDN     RD
+        LBZ     MAINL
+        LOAD    R8, MCSVIN
+        SEP     R4
+        DW      MESSAGE
 ; ---- the main loop: the line above the sheet only when no key is waiting
 MAINL:  SEP     R4
         DW      RXPOLL
@@ -103,10 +157,10 @@ MAINL:  SEP     R4
         STR     R2
         LDN     RD
         XOR
-        LBNZ    ML1
+        BNZ     ML1
         LOAD    RD, SHOWP
         LDN     RD
-        LBZ     ML1
+        BZ      ML1
         SEP     R4
         DW      SHOWCUR
 ML1:    SEP     R4
@@ -155,6 +209,12 @@ ML1:    SEP     R4
         GLO     RC
         XRI     0FH             ; ^O
         LBZ     OPENK
+        GLO     RC
+        XRI     12H             ; ^R: insert or delete a row
+        LBZ     ROWK
+        GLO     RC
+        XRI     0CH             ; ^L: insert or delete a column
+        LBZ     COLK
         GLO     RC              ; a printable key starts an entry
         SMI     20H
         LBNF    MAINL
@@ -224,7 +284,7 @@ EDITC:  SEP     R4
         PHI     RF
         LDN     RF
         ANI     7
-        LBZ     EC9             ; empty: nothing to fetch
+        BZ      EC9             ; empty: nothing to fetch
         SEP     R4
         DW      SRCP
         LOAD    RD, INB
@@ -233,14 +293,14 @@ EDITC:  SEP     R4
 EC1:    LDA     R8
         PLO     RC
         SMI     20H
-        LBNF    EC9
+        BNF     EC9
         GLO     RC
         STR     RD
         INC     RD
         INC     RB
         GLO     RB
         XRI     INMAX
-        LBNZ    EC1
+        BNZ     EC1
 EC9:    LDI     0
         STR     RD
         LOAD    RD, INLEN
@@ -265,31 +325,28 @@ MVUP:   SEP     R4
         DW      CURR7
         GLO     R7
         SMI     8
-        LBNF    MVSTAY
-        LBR     MVTO
+        BNF     MVSTAY
+        BR      MVTO
 MVDOWN: SEP     R4
         DW      CURR7
         GLO     R7
         ADI     8
-        PLO     RC
-        SMI     NCELL
-        LBDF    MVSTAY
-        GLO     RC
-        LBR     MVTO
+        BDF     MVSTAY          ; (past row 32: the byte carried)
+        BR      MVTO
 MVRIGHT: SEP    R4
         DW      CURR7
         GLO     R7
         ANI     7
         XRI     7
-        LBZ     MVSTAY
+        BZ      MVSTAY
         GLO     R7
         ADI     1
-        LBR     MVTO
+        BR      MVTO
 MVLEFT: SEP     R4
         DW      CURR7
         GLO     R7
         ANI     7
-        LBZ     MVSTAY
+        BZ      MVSTAY
         GLO     R7
         SMI     1
 MVTO:   PLO     RC
@@ -300,7 +357,13 @@ MVTO:   PLO     RC
         DW      PUTCELL
         SEP     R4
         DW      CURR7
+        SEP     R4              ; off the screen: the view moves, all drawn again
+        DW      VIEW
+        BNF     MVT2
         SEP     R4
+        DW      REDRAW
+        BR      MVSTAY
+MVT2:   SEP     R4
         DW      PUTCELL
 MVSTAY: LOAD    RD, SHOWP
         LDI     1
@@ -309,11 +372,11 @@ MVSTAY: LOAD    RD, SHOWP
 ; ---- Esc: leave, asking first if there is something unsaved
 QUIT:   LOAD    RD, CHG
         LDN     RD
-        LBZ     QT5
+        BZ      QT5
         LOAD    R8, QQUIT
         SEP     R4
         DW      ASKYN
-        LBDF    QT5
+        BDF     QT5
         SEP     R4
         DW      SHOWCUR
         LBR     MAINL
@@ -335,8 +398,11 @@ SAVEAS: LOAD    R8, QSAVE
         LOAD    R8, QREPL
         SEP     R4
         DW      ASKYN
-        LBNF    KCANCEL
-SV3:    SEP     R4
+        BNF     KCANCEL
+SV3:    SEP     R4              ; NAME.CSV: the values, written (the sheet keeps its own name)
+        DW      ISCSV
+        BNF     SVCSV
+        SEP     R4
         DW      KEEPNM
 SV5:    LOAD    RD, MYDIR       ; WDIR = the sheet's folder
         LOAD    RF, KS_WDIR
@@ -360,7 +426,7 @@ SV5:    LOAD    RD, MYDIR       ; WDIR = the sheet's folder
         LOAD    RA, POOL
         SEP     R4
         DW      K_SAVER
-        LBDF    SV8
+        BDF     SV8
         LOAD    RD, CHG
         LDI     0
         STR     RD
@@ -373,9 +439,830 @@ SV8:    LOAD    R8, MNOSAVE
 KCANCEL: SEP    R4
         DW      SHOWCUR
         LBR     MAINL
+; SVCSV: the sheet's values as CSV in the pool's free room (TOPV up), saved as TMP11 in WDIR (ASKNAME's)
+SVCSV:  LOAD    RD, TOPV
+        LDA     RD
+        PHI     RC
+        LDN     RD
+        PLO     RC
+        LOAD    RD, OUTP
+        GHI     RC
+        STR     RD
+        INC     RD
+        GLO     RC
+        STR     RD
+        LOAD    RD, FSTART
+        GHI     RC
+        STR     RD
+        INC     RD
+        GLO     RC
+        STR     RD
+        LOAD    RD, CFULL
+        LDI     0
+        STR     RD
+        LOAD    RD, MAXR        ; the rows and columns in use
+        LDI     0
+        STR     RD
+        INC     RD
+        STR     RD
+        PLO     R7
+CX1:    GLO     R7
+        PLO     RD
+        LDI     HIGH(TYP)
+        PHI     RD
+        LDN     RD
+        ANI     7
+        BZ      CX2
+        GLO     R7
+        SHR
+        SHR
+        SHR
+        ADI     1
+        PLO     RC
+        LOAD    RD, MAXR
+        LDN     RD
+        STR     R2
+        GLO     RC
+        SD
+        BDF     CX1B
+        GLO     RC
+        STR     RD
+CX1B:   GLO     R7
+        ANI     7
+        ADI     1
+        PLO     RC
+        LOAD    RD, MAXC
+        LDN     RD
+        STR     R2
+        GLO     RC
+        SD
+        BDF     CX2
+        GLO     RC
+        STR     RD
+CX2:    INC     R7
+        GLO     R7
+        BNZ     CX1
+        LOAD    RD, CROW
+        LDI     0
+        STR     RD
+CX3:    LOAD    RD, MAXR        ; a row
+        LDN     RD
+        STR     R2
+        LOAD    RD, CROW
+        LDN     RD
+        XOR
+        LBZ     CXDONE
+        LOAD    RD, CCOL
+        LDI     0
+        STR     RD
+CX4:    LOAD    RD, MAXC        ; a column
+        LDN     RD
+        STR     R2
+        LOAD    RD, CCOL
+        LDN     RD
+        XOR
+        BZ      CX9
+        LDN     RD
+        BZ      CX5
+        LDI     ','
+        SEP     R4
+        DW      PUTO
+CX5:    LOAD    RD, CROW        ; R7.0 = the cell
+        LDN     RD
+        SHL
+        SHL
+        SHL
+        STR     R2
+        LOAD    RD, CCOL
+        LDN     RD
+        OR
+        PLO     R7
+        PLO     RD
+        LDI     HIGH(TYP)
+        PHI     RD
+        LDN     RD
+        ANI     7
+        BZ      CX8             ; empty: nothing between the commas
+        XRI     K_TEXT
+        BZ      CXT
+        LDN     RD
+        ANI     7
+        SMI     K_FERR
+        BDF     CXE
+        SEP     R4              ; a number, or a formula's: its value, two decimals
+        DW      GETV
+        SEP     R4
+        DW      FMT
+        LOAD    R8, FMTB
+CXV:    LDA     R8
+        BZ      CX8
+        SEP     R4
+        DW      PUTO
+        BR      CXV
+CXE:    LOAD    R8, SERR
+        BR      CXV
+CXT:    SEP     R4              ; text: in quotes if it holds a comma or a quote (a quote in it doubled)
+        DW      SRCP
+        GHI     R8
+        PHI     RB
+        GLO     R8
+        PLO     RB
+CXT1:   LDA     R8
+        XRI     0AH
+        BZ      CXT5
+        XRI     0AH XOR ','
+        BZ      CXT2
+        XRI     ',' XOR '"'
+        BZ      CXT2
+        BR      CXT1
+CXT2:   GHI     RB
+        PHI     R8
+        GLO     RB
+        PLO     R8
+        LDI     '"'
+        SEP     R4
+        DW      PUTO
+CXT3:   LDA     R8
+        XRI     0AH
+        BZ      CXT4
+        XRI     0AH XOR '"'
+        BNZ     CXT3A
+        LDI     '"'
+        SEP     R4
+        DW      PUTO
+CXT3A:  DEC     R8
+        LDA     R8
+        SEP     R4
+        DW      PUTO
+        BR      CXT3
+CXT4:   LDI     '"'
+        SEP     R4
+        DW      PUTO
+        BR      CX8
+CXT5:   GHI     RB
+        PHI     R8
+        GLO     RB
+        PLO     R8
+CXT6:   LDA     R8
+        XRI     0AH
+        BZ      CX8
+        DEC     R8
+        LDA     R8
+        SEP     R4
+        DW      PUTO
+        BR      CXT6
+CX8:    LOAD    RD, CCOL
+        LDN     RD
+        ADI     1
+        STR     RD
+        LBR     CX4
+CX9:    LDI     0DH             ; the row's end: CR LF
+        SEP     R4
+        DW      PUTO
+        LDI     0AH
+        SEP     R4
+        DW      PUTO
+        LOAD    RD, CROW
+        LDN     RD
+        ADI     1
+        STR     RD
+        LBR     CX3
+CXDONE: LOAD    RD, CFULL
+        LDN     RD
+        BZ      CXD1
+        LOAD    R8, MCSVBIG
+        LBR     KMSG
+CXD1:   LOAD    RD, FSTART      ; RA = its start, RC = its length
+        LDA     RD
+        PHI     RA
+        LDN     RD
+        PLO     RA
+        LOAD    RD, OUTP
+        LDA     RD
+        PHI     RC
+        LDN     RD
+        PLO     RC
+        GLO     RA
+        STR     R2
+        GLO     RC
+        SM
+        PLO     RC
+        GHI     RA
+        STR     R2
+        GHI     RC
+        SMB
+        PHI     RC
+        LOAD    RD, TMP11
+        SEP     R4
+        DW      K_SAVER
+        LBDF    SV8
+        LOAD    R8, MSAVCSV
+        BR      KMSG
+; PUTO: D at OUTP, OUTP + 1 - unless the pool is full (CFULL then 1). RD RF used.
+PUTO:   STXD
+        LOAD    RD, CFULL
+        LDN     RD
+        BNZ     PO9
+        LOAD    RD, OUTP
+        LDA     RD
+        PHI     RF
+        LDN     RD
+        PLO     RF
+        IRX
+        LDX
+        STR     RF
+        INC     RF
+        GLO     RF
+        STR     RD
+        DEC     RD
+        GHI     RF
+        STR     RD
+        GLO     RF
+        XRI     LOW(POOLE)
+        BNZ     PO8
+        GHI     RF
+        XRI     HIGH(POOLE)
+        BNZ     PO8
+        LOAD    RD, CFULL
+        LDI     1
+        STR     RD
+PO8:    SEP     R5
+PO9:    IRX
+        SEP     R5
 KMSG:   SEP     R4
         DW      MESSAGE
         LBR     MAINL
+; ---- ^R / ^L: a row inserted above the cursor's, or the cursor's deleted; a column to its left, or its own. Every
+;   cell's line is written again in the pool's free room under its new name, references in formulas moved as Excel
+;   moves them (a range grows or shrinks; a reference to a deleted cell becomes A0: ERR), then the sheet is read
+;   from those lines as a file is (Craig, 2026-11-24). Inserting is refused if row 32 / column H holds anything.
+ROWK:   LDI     0               ; RCOP: 0 insert a row, 1 delete it, 2 insert a column, 3 delete it
+        BR      RCK
+COLK:   LDI     2
+RCK:    STXD
+        BNZ     XR0
+        LOAD    R8, QROW
+        BR      XR1
+XR0:    LOAD    R8, QCOL
+XR1:    SEP     R4
+        DW      MESSAGE
+        SEP     R4
+        DW      RKEY
+        LOAD    RD, KEY
+        LDN     RD
+        ANI     0DFH
+        PLO     RC
+        IRX
+        LDX
+        PLO     RB              ; RB.0 = 0 rows, 2 columns
+        GLO     RC
+        XRI     'I'
+        BZ      XR2
+        GLO     RC
+        XRI     'D'
+        LBNZ    KCANCEL
+        INC     RB
+XR2:    LOAD    RD, RCOP
+        GLO     RB
+        STR     RD
+        SEP     R4              ; RCN = the cursor's row (1-32) or column (1-8)
+        DW      CURR7
+        GLO     RB
+        ANI     2
+        BNZ     XR3
+        GLO     R7
+        SHR
+        SHR
+        SHR
+        BR      XR4
+XR3:    GLO     R7
+        ANI     7
+XR4:    ADI     1
+        PLO     RC
+        LOAD    RD, RCN
+        GLO     RC
+        STR     RD
+        GLO     RB              ; inserting: row 32 / column H empty?
+        ANI     1
+        BNZ     XR8
+        LDI     0
+        PLO     R7
+XR5:    GLO     RB
+        BNZ     XR6
+        GLO     R7              ; a row: cells 248-255
+        SMI     248
+        BNF     XR7
+        BR      XR6A
+XR6:    GLO     R7              ; a column: cell & 7 = 7
+        ANI     7
+        XRI     7
+        BNZ     XR7
+XR6A:   GLO     R7
+        PLO     RD
+        LDI     HIGH(TYP)
+        PHI     RD
+        LDN     RD
+        ANI     7
+        BZ      XR7
+        GLO     RB
+        BNZ     XR6B
+        LOAD    R8, MR32
+        BR      KMSG
+XR6B:   LOAD    R8, MCH
+        BR      KMSG
+XR7:    INC     R7
+        GLO     R7
+        BNZ     XR5
+XR8:    LOAD    RD, SPON        ; (the spinner on: REPARSE's LOADFILE end turns it off)
+        LDI     1
+        STR     RD
+        LOAD    RD, TOPV        ; the new lines at the pool's top: OUTP = FSTART = TOPV
+        LDA     RD
+        PHI     RC
+        LDN     RD
+        PLO     RC
+        LOAD    RD, OUTP
+        GHI     RC
+        STR     RD
+        INC     RD
+        GLO     RC
+        STR     RD
+        LOAD    RD, FSTART
+        GHI     RC
+        STR     RD
+        INC     RD
+        GLO     RC
+        STR     RD
+        LOAD    RD, CFULL
+        LDI     0
+        STR     RD
+        PLO     R7
+XR9:    SEP     R4
+        DW      SPINT
+        GLO     R7              ; each cell with something in it
+        PLO     RD
+        LDI     HIGH(TYP)
+        PHI     RD
+        LDN     RD
+        ANI     7
+        LBZ     XR19
+        GLO     R7              ; RA.1 = its row (1-32), RA.0 its column (1-8)
+        SHR
+        SHR
+        SHR
+        ADI     1
+        PHI     RA
+        GLO     R7
+        ANI     7
+        ADI     1
+        PLO     RA
+        SEP     R4              ; where it goes (DF = 1: a deleted one's)
+        DW      RCMOVE
+        LBDF    XR19
+        SEP     R4
+        DW      PUTREF
+        LDI     ' '
+        SEP     R4
+        DW      PUTO
+        SEP     R4              ; what it holds: a formula's references moved too
+        DW      SRCP
+        LDN     R8
+        XRI     '='
+        BNZ     XR17
+        LOAD    RD, PREVC
+        LDI     '='
+        STR     RD
+        SEP     R4
+        DW      PUTO
+        INC     R8
+XR10:   LDN     R8              ; a formula, a character at a time
+        XRI     0AH
+        LBZ     XR18
+        LDN     R8
+        ANI     0DFH
+        SMI     'A'
+        BNF     XR15
+        SMI     8
+        BDF     XR15
+        LOAD    RD, PREVC       ; a letter A-H, after no letter or digit: a reference?
+        LDN     RD
+        ANI     0DFH
+        SMI     'A'
+        BNF     XR11
+        SMI     26
+        BNF     XR15
+XR11:   LDN     RD
+        SMI     '0'
+        BNF     XR12
+        SMI     10
+        BNF     XR15
+XR12:   GHI     R8              ; (R8 kept: PREF moves it even when it says no)
+        PHI     RB
+        GLO     R8
+        PLO     RB
+        SEP     R4
+        DW      PREF
+        BNF     XR13
+        GHI     RB
+        PHI     R8
+        GLO     RB
+        PLO     R8
+        BR      XR15
+XR13:   GHI     RA              ; RA: 1-based
+        ADI     1
+        PHI     RA
+        INC     RA
+        LDN     R8              ; a range: A1:B7
+        XRI     ':'
+        BNZ     XR14
+        GHI     RA
+        STXD
+        GLO     RA
+        STXD
+        GHI     R8
+        PHI     RB
+        GLO     R8
+        PLO     RB
+        INC     R8
+        SEP     R4
+        DW      PREF
+        BNF     XR13A
+        GHI     RB              ; not one after the colon: the first alone
+        PHI     R8
+        GLO     RB
+        PLO     R8
+        IRX
+        LDXA
+        PLO     RA
+        LDX
+        PHI     RA
+        BR      XR14
+XR13A:  GHI     RA              ; the pair: RA the first, RC the second
+        ADI     1
+        PHI     RC
+        GLO     RA
+        ADI     1
+        PLO     RC
+        IRX
+        LDXA
+        PLO     RA
+        LDX
+        PHI     RA
+        SEP     R4
+        DW      RCPAIR
+        SEP     R4
+        DW      PUTREF
+        LDI     ':'
+        SEP     R4
+        DW      PUTO
+        GHI     RC
+        PHI     RA
+        GLO     RC
+        PLO     RA
+        SEP     R4
+        DW      PUTREF
+        BR      XR14B
+XR14:   SEP     R4              ; one reference
+        DW      RCMOVE
+        BNF     XR14A
+        LOAD    RA, 0001H       ; it is gone: A0, ERR
+XR14A:  SEP     R4
+        DW      PUTREF
+XR14B:  LOAD    RD, PREVC
+        LDI     '1'
+        STR     RD
+        BR      XR10
+XR15:   LDA     R8              ; any other character, as it is
+        PLO     RC
+        LOAD    RD, PREVC
+        GLO     RC
+        STR     RD
+        SEP     R4
+        DW      PUTO
+        BR      XR10
+XR17:   LDA     R8              ; a number or text, as it is
+        XRI     0AH
+        LBZ     XR18
+        XRI     0AH
+        SEP     R4
+        DW      PUTO
+        LBR     XR17
+XR18:   LDI     0AH
+        SEP     R4
+        DW      PUTO
+XR19:   INC     R7
+        GLO     R7
+        LBNZ    XR9
+        LOAD    RD, CFULL       ; no room: nothing changed
+        LDN     RD
+        LBZ     XR20
+        SEP     R4
+        DW      SPINEND
+        LOAD    RD, SPON
+        LDI     0
+        STR     RD
+        LOAD    R8, MNORM
+        LBR     KMSG
+XR20:   LOAD    RD, CUR         ; the cursor and the view kept over CLEAR
+        LDN     RD
+        STXD
+        LOAD    RD, VTOP
+        LDN     RD
+        STXD
+        SEP     R4
+        DW      CLEAR
+        IRX
+        LDXA
+        PLO     RB
+        LDX
+        PHI     RB
+        LOAD    RD, VTOP
+        GLO     RB
+        STR     RD
+        LOAD    RD, CUR
+        GHI     RB
+        STR     RD
+        LOAD    RD, FSTART      ; the lines down to POOL
+        LDA     RD
+        PHI     RF
+        LDN     RD
+        PLO     RF
+        LOAD    RD, OUTP
+        LDA     RD
+        PHI     RC
+        LDN     RD
+        PLO     RC
+        LOAD    RA, POOL
+XR21:   GLO     RF
+        STR     R2
+        GLO     RC
+        XOR
+        BNZ     XR22
+        GHI     RF
+        STR     R2
+        GHI     RC
+        XOR
+        BZ      XR23
+XR22:   LDA     RF
+        STR     RA
+        INC     RA
+        BR      XR21
+XR23:   LOAD    RD, CSVM        ; then read as a file is (RA: their top), worked out, drawn again
+        LDI     0
+        STR     RD
+        SEP     R4
+        DW      REPARSE
+        LOAD    RD, CHG
+        LDI     1
+        STR     RD
+        SEP     R4
+        DW      REDRAW
+        LBR     MAINL
+REPARSE: LBR    LO5
+; RCMOVE: the cell RA (RA.1 row 1-32, RA.0 column 1-8) as RCOP moves it. DF = 1: it is deleted. RC kept.
+RCMOVE: SEP     R4
+        DW      RCWHICH         ; RF.0 = the part that moves (row or column), RF.1 = which (0 row, 1 col)
+        LOAD    RD, RCN
+        LDN     RD
+        STR     R2
+        LOAD    RD, RCOP
+        LDN     RD
+        ANI     1
+        BNZ     XV2
+        GLO     RF              ; inserting: n >= N: n + 1 (past the end: gone)
+        SM
+        BNF     XV8
+        GLO     RF
+        ADI     1
+        PLO     RF
+        SEP     R4
+        DW      RCMAX
+        BDF     XV9
+        BR      XV8
+XV2:    GLO     RF              ; deleting: n = N gone, n > N: n - 1
+        SM
+        BNF     XV8
+        BZ      XV9
+        GLO     RF
+        SMI     1
+        PLO     RF
+XV8:    SEP     R4
+        DW      RCPUT
+        LDI     0
+        SHR
+        SEP     R5
+XV9:    LDI     1
+        SHR
+        SEP     R5
+; RCPAIR: a range RA:RC moved - each end as RCMOVE, but a deleted end stays at the cut (the low end) or comes back
+;   one (the high end); a range all deleted: A0:A0
+RCPAIR: GHI     RA              ; RB = the moving parts: RB.1 the first's, RB.0 the second's
+        STXD
+        GLO     RA
+        STXD
+        SEP     R4
+        DW      RCWHICH
+        GLO     RF
+        PHI     RB
+        GHI     RC
+        PHI     RA
+        GLO     RC
+        PLO     RA
+        SEP     R4
+        DW      RCWHICH
+        GLO     RF
+        PLO     RB
+        IRX                     ; RA back to the first
+        LDXA
+        PLO     RA
+        LDX
+        PHI     RA
+        LOAD    RD, PAIRS       ; (the ends kept)
+        GHI     RA
+        STR     RD
+        INC     RD
+        GLO     RA
+        STR     RD
+        INC     RD
+        GHI     RC
+        STR     RD
+        INC     RD
+        GLO     RC
+        STR     RD
+        LOAD    RD, RCOP
+        LDN     RD
+        ANI     1
+        BNZ     XQ1
+        SEP     R4              ; inserting: both as RCMOVE, past the end: the end
+        DW      RCEND
+        LBR     XQ9
+XQ1:    LOAD    RD, RCN         ; deleting: a range all of it deleted?
+        LDN     RD
+        STR     R2
+        GHI     RB
+        XOR
+        LBNZ    XQ2
+        GLO     RB
+        XOR
+        LBNZ    XQ2
+        LOAD    RA, 0001H
+        LOAD    RC, 0001H
+        SEP     R5
+XQ2:    GHI     RB              ; the first: lo end (<= the second) at N stays; else as RCMOVE
+        STR     R2
+        GLO     RB
+        SM                      ; second - first
+        BNF     XQ3
+        LDI     0               ; the first is the low end
+        BR      XQ4
+XQ3:    LDI     1
+XQ4:    PLO     RE              ; RE.0 = 1: the first is the high end
+        GHI     RB
+        SEP     R4
+        DW      RCEND1
+        PHI     RB
+        GLO     RE
+        XRI     1
+        PLO     RE
+        GLO     RB
+        SEP     R4
+        DW      RCEND1
+        PLO     RB
+XQ9:    LOAD    RD, PAIRS       ; the ends back with their new parts: the first ...
+        LDA     RD
+        PHI     RA
+        LDN     RD
+        PLO     RA
+        GHI     RB
+        PLO     RF
+        SEP     R4
+        DW      RCPUT
+        GHI     RA              ; (kept)
+        STXD
+        GLO     RA
+        STXD
+        LOAD    RD, PAIRS + 2   ; ... the second, into RC
+        LDA     RD
+        PHI     RA
+        LDN     RD
+        PLO     RA
+        GLO     RB
+        PLO     RF
+        SEP     R4
+        DW      RCPUT
+        GHI     RA
+        PHI     RC
+        GLO     RA
+        PLO     RC
+        IRX
+        LDXA
+        PLO     RA
+        LDX
+        PHI     RA
+        SEP     R5
+; RCEND (inserting): RB.1 and RB.0, each n >= N: n + 1, past the end: the end
+RCEND:  GHI     RB
+        SEP     R4
+        DW      RCINS
+        PHI     RB
+        GLO     RB
+        SEP     R4
+        DW      RCINS
+        PLO     RB
+        SEP     R5
+RCINS:  PLO     RF
+        LOAD    RD, RCN
+        LDN     RD
+        STR     R2
+        GLO     RF
+        SM
+        BNF     XN9
+        GLO     RF
+        ADI     1
+        PLO     RF
+        SEP     R4
+        DW      RCMAX
+        BNF     XN9
+        DEC     RF
+XN9:    GLO     RF
+        SEP     R5
+; RCEND1 (deleting): D = an end, RE.0 = 1 if it is the high one: > N: - 1; = N: the high end - 1, the low stays
+RCEND1: PLO     RF
+        LOAD    RD, RCN
+        LDN     RD
+        STR     R2
+        GLO     RF
+        SM
+        BNF     XY9
+        BNZ     XY8
+        GLO     RE
+        BZ      XY9
+XY8:    DEC     RF
+XY9:    GLO     RF
+        SEP     R5
+; RCWHICH: RF.0 = RA's moving part (RA.1 the row for 0/1, RA.0 the column for 2/3)
+RCWHICH: LOAD   RD, RCOP
+        LDN     RD
+        ANI     2
+        BNZ     XW1
+        GHI     RA
+        PLO     RF
+        SEP     R5
+XW1:    GLO     RA
+        PLO     RF
+        SEP     R5
+; RCPUT: RA's moving part = RF.0
+RCPUT:  LOAD    RD, RCOP
+        LDN     RD
+        ANI     2
+        BNZ     XU1
+        GLO     RF
+        PHI     RA
+        SEP     R5
+XU1:    GLO     RF
+        PLO     RA
+        SEP     R5
+; RCMAX: DF = 1 if RF.0 is past the last row (32) or column (8)
+RCMAX:  LOAD    RD, RCOP
+        LDN     RD
+        ANI     2
+        BNZ     XX1
+        GLO     RF
+        SMI     NROW + 1
+        SEP     R5
+XX1:    GLO     RF
+        SMI     9
+        SEP     R5
+; PUTREF: RA (row 1-32 or 0, column 1-8) as a name: A0 .. H32
+PUTREF: GLO     RA
+        ADI     'A' - 1
+        SEP     R4
+        DW      PUTO
+        GHI     RA
+        PLO     RF
+        LDI     0
+        PHI     RF
+XF1:    GLO     RF
+        SMI     10
+        BNF     XF3
+        PLO     RF
+        GHI     RF
+        ADI     1
+        PHI     RF
+        BR      XF1
+XF3:    GHI     RF
+        LBZ     XF4
+        ADI     '0'
+        SEP     R4
+        DW      PUTO
+XF4:    GLO     RF
+        ADI     '0'
+        LBR     PUTO
+QROW:   DB      'Row: I insert one above this, D delete this one (Esc: nothing) ',0
+QCOL:   DB      'Column: I insert one left of this, D delete this one (Esc: nothing) ',0
+MR32:   DB      'Row 32 is not empty: nothing done.',0
+MCH:    DB      'Column H is not empty: nothing done.',0
+MNORM:  DB      'No room to do that.',0
 ; ---- ^O: another sheet (the one here is kept if that one cannot be opened)
 OPENK:  LOAD    RD, CHG
         LDN     RD
@@ -388,13 +1275,21 @@ OK2:    LOAD    R8, QOPEN
         SEP     R4
         DW      ASKNAME
         LBDF    KCANCEL
+        SEP     R4              ; a CSV: CSV2CLC makes it a sheet (and runs LTCALC -C)
+        DW      ISCSV
+        BDF     OK2B
+        LOAD    RF, INB
         SEP     R4
+        DW      XCSV
+        LOAD    R8, MNOFILE
+        LBR     KMSG
+OK2B:   SEP     R4
         DW      LOADFILE
         LOAD    RD, LRC
         LDN     RD
-        LBZ     OK5
+        BZ      OK5
         XRI     1
-        LBNZ    OK3
+        BNZ     OK3
         LOAD    R8, MNOFILE
         LBR     KMSG
 OK3:    LOAD    R8, MBAD
@@ -414,6 +1309,11 @@ QOPEN:  DB      'Open: ',0
 QREPL:  DB      'Replace that file? Y/N ',0
 QLOSE:  DB      'Lose your changes? Y/N ',0
 MSAVED: DB      'Saved.',0
+MSAVCSV: DB     'Saved the values as CSV.',0
+MCSVIN: DB      'From a CSV: ^A saves it as a sheet.',0
+TMPCSV: DB      '/_CSV.CLC',0
+MCSVBIG: DB     'Not saved: no room for that much CSV.',0
+SERR:   DB      'ERR',0
 MNOSAVE: DB     'Not saved: the card or the folder may be full.',0
 MNOFILE: DB     'There is no such file.',0
 MBAD:   DB      'That file cannot be opened as a sheet.',0
@@ -461,7 +1361,7 @@ RXPOLL: LDI     15H
         OUT     SELPORT
         DEC     R2
         INP     DATPORT
-        LBR     PUSHK
+        BR      PUSHK
 RXP9:   SEP     R5
 ; POLLS: RXPOLL with RD and RF kept
 POLLS:  GLO     RD
@@ -494,7 +1394,7 @@ PUSHK:  PHI     RF
         DEC     RD
         LDN     RD              ; = RHEAD: full
         XOR
-        LBZ     PK9
+        BZ      PK9
         INC     RD
         LDN     RD
         PLO     RD
@@ -512,7 +1412,7 @@ POPK:   LOAD    RD, RHEAD
         STR     R2
         LDN     RD
         XOR
-        LBZ     PP9
+        BZ      PP9
         LDN     R2
         PLO     RD
         LDI     HIGH(RING)
@@ -533,23 +1433,23 @@ PP9:    ADI     0               ; DF = 0
 ; GETK: D = the next key (waits)
 GETK:   SEP     R4
         DW      POPK
-        LBDF     GK9
+        BDF      GK9
         SEP     R4
         DW      RXPOLL
-        LBR     GETK
+        BR      GETK
 GK9:    SEP     R5
 ; ESCW: the next key if it comes soon (a sequence's next byte): DF = 1, D. DF = 0: none (~70 ms). R9 used.
 ESCW:   LOAD    R9, 150
 EW1:    SEP     R4
         DW      POPK
-        LBDF     EW9
+        BDF      EW9
         SEP     R4
         DW      RXPOLL
         DEC     R9
         GLO     R9
-        LBNZ     EW1
+        BNZ      EW1
         GHI     R9
-        LBNZ     EW1
+        BNZ      EW1
         LDI     0
         SHR
 EW9:    SEP     R5
@@ -564,16 +1464,16 @@ RKEY:   SEP     R4
         LBNF    RK8             ; alone: Esc
         PLO     RB
         XRI     '['
-        LBZ     RK2
+        BZ      RK2
         GLO     RB
         XRI     'O'
-        LBZ     RK2
+        BZ      RK2
 RK0:    LDI     0
         PLO     RC
         LBR     RK8
 RK2:    SEP     R4
         DW      ESCW
-        LBNF    RK0
+        BNF     RK0
         PLO     RB
         LDI     KUP
         PLO     RC
@@ -605,7 +1505,7 @@ RK5:    GLO     RB              ; to the end of the sequence
         LBDF    RK8
         SEP     R4
         DW      ESCW
-        LBNF    RK8
+        BNF     RK8
         PLO     RB
         LBR     RK5
 RK8:    LOAD    RD, KEY
@@ -614,16 +1514,16 @@ RK8:    LOAD    RD, KEY
         SEP     R5
 ; ---- printing. TPIN: the text after the call. TSTR: the text at R8. EOL: to the line's end. CLS: the whole screen
 TPIN:   LDA     R6
-        LBZ     TP9
+        BZ      TP9
         SEP     R4
         DW      TXB
-        LBR     TPIN
+        BR      TPIN
 TP9:    SEP     R5
 TSTR:   LDA     R8
-        LBZ     TP9
+        BZ      TP9
         SEP     R4
         DW      TXB
-        LBR     TSTR
+        BR      TSTR
 EOL:    SEP     R4
         DW      TPIN
         DB      1BH,'[K',0
@@ -656,14 +1556,14 @@ PNUM:   PLO     RB
         PHI     RB
 PN1:    GLO     RB
         SMI     10
-        LBNF    PN2
+        BNF     PN2
         PLO     RB
         GHI     RB
         ADI     1
         PHI     RB
-        LBR     PN1
+        BR      PN1
 PN2:    GHI     RB
-        LBZ     PN3
+        BZ      PN3
         ADI     '0'
         SEP     R4
         DW      TXB
@@ -686,7 +1586,7 @@ ASKYN:  SEP     R4
         LDN     RD
         ANI     0DFH
         XRI     'Y'
-        LBZ     AY1
+        BZ      AY1
         LDI     0
         SHR
         SEP     R5
@@ -772,7 +1672,7 @@ KN1:    LDA     RD
         INC     RF
         DEC     RC
         GLO     RC
-        LBNZ    KN1
+        BNZ     KN1
         LOAD    RD, KS_WDIR
         LOAD    RF, MYDIR
         LDA     RD
@@ -792,39 +1692,39 @@ EDLINE: SEP     R4
         LDN     RD
         PLO     RC
         XRI     0DH
-        LBZ     EDX
+        BZ      EDX
         GLO     RC
         XRI     0AH
-        LBZ     EDX
+        BZ      EDX
         GLO     RC
         XRI     1BH
-        LBZ     EDX
+        BZ      EDX
         GLO     RC
         XRI     08H
-        LBZ     EDB
+        BZ      EDB
         GLO     RC
         XRI     7FH
-        LBZ     EDB
+        BZ      EDB
         LOAD    RD, ARROK
         LDN     RD
-        LBZ     ED2
+        BZ      ED2
         GLO     RC
         XRI     09H
-        LBZ     EDX
+        BZ      EDX
         GLO     RC
         ANI     0FCH
         XRI     80H
-        LBZ     EDX
+        BZ      EDX
 ED2:    GLO     RC              ; a printable key
         SMI     20H
-        LBNF    EDLINE
+        BNF     EDLINE
         GLO     RC
         SHL
-        LBDF    EDLINE
+        BDF     EDLINE
         LOAD    RD, INLEN
         LDN     RD
         XRI     INMAX
-        LBZ     EDLINE
+        BZ      EDLINE
         LDN     RD
         ADI     LOW(INB)
         PLO     RF
@@ -838,16 +1738,16 @@ ED2:    GLO     RC              ; a printable key
         GLO     RC
         SEP     R4
         DW      TXB
-        LBR     EDLINE
+        BR      EDLINE
 EDB:    LOAD    RD, INLEN
         LDN     RD
-        LBZ     EDLINE
+        BZ      EDLINE
         SMI     1
         STR     RD
         SEP     R4
         DW      TPIN
         DB      8,' ',8,0
-        LBR     EDLINE
+        BR      EDLINE
 EDX:    LOAD    RD, INLEN       ; its end
         LDN     RD
         ADI     LOW(INB)
@@ -867,16 +1767,22 @@ REDRAW: SEP     R4
         SEP     R4
         DW      TPIN
         DB      '    A        B        C        D        E        F        G        H',0
-        LDI     1
+        LOAD    RD, VTOP        ; the row numbers: VTOP + 1 on
+        LDN     RD
+        ADI     1
         PLO     RA
-RD1:    GLO     RA              ; the row numbers
+RD1:    LOAD    RD, VTOP        ; (its screen row: RA - VTOP + GROW - 1)
+        LDN     RD
+        STR     R2
+        GLO     RA
+        SM
         ADI     GROW - 1
         PHI     RC
         LDI     1
         PLO     RC
         GLO     RA
         SMI     10
-        LBDF    RD2
+        BDF     RD2
         INC     RC              ; (one digit: under the other's units)
 RD2:    SEP     R4
         DW      GOTO
@@ -884,20 +1790,23 @@ RD2:    SEP     R4
         SEP     R4
         DW      PNUM
         INC     RA
+        LOAD    RD, VTOP
+        LDN     RD
+        STR     R2
         GLO     RA
-        XRI     21
-        LBNZ    RD1
+        SM
+        XRI     SROWS + 1
+        BNZ     RD1
         LOAD    RD, TYP         ; the cells with something in them
 RD3:    LDN     RD
         ANI     7
-        LBZ     RD4
+        BZ      RD4
         LDN     RD
         ORI     F_DIRTY
         STR     RD
 RD4:    INC     RD
         GLO     RD
-        XRI     NCELL
-        LBNZ    RD3
+        BNZ     RD3
         SEP     R4
         DW      CURR7           ; and the mark
         GLO     R7
@@ -921,7 +1830,7 @@ DW1:    GLO     R7
         PHI     RD
         LDN     RD
         ANI     F_DIRTY
-        LBZ     DW2
+        BZ      DW2
         LDN     RD
         ANI     0FFH - F_DIRTY
         STR     RD
@@ -929,8 +1838,30 @@ DW1:    GLO     R7
         DW      PUTCELL
 DW2:    INC     R7
         GLO     R7
-        XRI     NCELL
-        LBNZ    DW1
+        BNZ     DW1
+        SEP     R5
+; VIEW: the view moved so that row R7.0 / 8 is on the screen: DF = 1 if it had to move
+VIEW:   GLO     R7
+        SHR
+        SHR
+        SHR
+        PLO     RB
+        LOAD    RD, VTOP
+        LDN     RD
+        STR     R2
+        GLO     RB
+        SM                      ; row - VTOP
+        BNF     VW1             ; above it: the row at the top
+        SMI     SROWS
+        BNF     VW9             ; on the screen
+        GLO     RB              ; below it: the row at the bottom
+        SMI     SROWS - 1
+        SKP                     ; (past the GLO)
+VW1:    GLO     RB
+        STR     RD
+        SMI     0               ; DF = 1
+        SEP     R5
+VW9:    ADI     0               ; DF = 0
         SEP     R5
 ; CURR7: R7 = the current cell
 CURR7:  LOAD    RD, CUR
@@ -938,10 +1869,19 @@ CURR7:  LOAD    RD, CUR
         PLO     R7
         SEP     R5
 ; PUTCELL: cell R7.0 on the screen (the current one marked)
-PUTCELL: GLO    R7
+PUTCELL: LOAD   RD, VTOP        ; (a row off the screen: nothing)
+        LDN     RD
+        STR     R2
+        GLO     R7
         SHR
         SHR
         SHR
+        SM
+        LBNF    PC9
+        PHI     RC
+        SMI     SROWS
+        LBDF    PC9
+        GHI     RC
         ADI     GROW
         PHI     RC
         GLO     R7              ; the column: 9 * c + GCOL
@@ -959,7 +1899,7 @@ PUTCELL: GLO    R7
         DW      GOTO
         SEP     R4
         DW      ISCUR
-        LBNF    PC1
+        BNF     PC1
         SEP     R4
         DW      TPIN
         DB      1BH,'[7m',0
@@ -981,13 +1921,14 @@ ISCUR:  LOAD    RD, CUR
         STR     R2
         GLO     R7
         XOR
-        LBZ     IC1
+        BZ      IC1
         LDI     0
         SHR
         SEP     R5
 IC1:    SMI     0
         SEP     R5
-; CELLTXT: cell R7.0's nine characters -> CBUF (0-ended)
+; CELLTXT: cell R7.0's nine characters -> CBUF (0-ended): eight of its own and a space, so a long number never
+;   runs into the next column (Craig, 2026-11-24; it used all nine)
 CELLTXT: LOAD   RD, CBUF
         LDI     9
         PLO     RC
@@ -996,7 +1937,7 @@ CT1:    LDI     ' '
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    CT1
+        BNZ     CT1
         LDI     0
         STR     RD
         GLO     R7
@@ -1005,13 +1946,13 @@ CT1:    LDI     ' '
         PHI     RD
         LDN     RD
         ANI     7
-        LBZ     CT9             ; empty
+        BZ      CT9             ; empty
         PLO     RB
         XRI     K_TEXT
-        LBZ     CTT
+        BZ      CTT
         GLO     RB
         SMI     K_FERR
-        LBDF    CTE
+        BDF     CTE
         SEP     R4              ; a value
         DW      GETV
         SEP     R4
@@ -1019,29 +1960,29 @@ CT1:    LDI     ' '
         LOAD    RD, FMTL
         LDN     RD
         PLO     RC
-        SDI     9               ; 9 - its length: where it starts
-        LBNF    CTH             ; too long
+        SDI     8               ; 8 - its length: where it starts
+        BNF     CTH             ; too long
         ADI     LOW(CBUF)
         PLO     RD
         LDI     HIGH(CBUF)
         PHI     RD
         LOAD    RF, FMTB
 CT2:    LDA     RF
-        LBZ     CT9
+        BZ      CT9
         STR     RD
         INC     RD
-        LBR     CT2
+        BR      CT2
 CTH:    LOAD    RD, CBUF
-        LDI     9
+        LDI     8
         PLO     RC
 CT3:    LDI     '#'
         STR     RD
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    CT3
+        BNZ     CT3
 CT9:    SEP     R5
-CTE:    LOAD    RD, CBUF + 6
+CTE:    LOAD    RD, CBUF + 5
         LDI     'E'
         STR     RD
         INC     RD
@@ -1050,21 +1991,21 @@ CTE:    LOAD    RD, CBUF + 6
         INC     RD
         STR     RD
         SEP     R5
-CTT:    SEP     R4              ; text: its first nine characters
+CTT:    SEP     R4              ; text: its first eight characters
         DW      SRCP
         LOAD    RD, CBUF
-        LDI     9
+        LDI     8
         PLO     RC
 CT4:    LDA     R8
         PLO     RB
         SMI     20H
-        LBNF    CT9
+        BNF     CT9
         GLO     RB
         STR     RD
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    CT4
+        BNZ     CT4
         SEP     R5
 ; SHOWCUR: row 1: the current cell's name and what is in it. Row 2: its value
 SHOWCUR: LOAD   RD, SHOWP
@@ -1117,7 +2058,7 @@ SC3:    SEP     R4
         LOAD    R8, FMTB
         SEP     R4
         DW      TSTR
-        LBR     SC8
+        BR      SC8
 SC6:    SEP     R4
         DW      TPIN
         DB      'ERR',0
@@ -1136,27 +2077,27 @@ STATUS: LOAD    RC, 1801H
         DW      GOTO
         LOAD    RD, NAMED
         LDN     RD
-        LBNZ    SA1
+        BNZ     SA1
         SEP     R4
         DW      TPIN
         DB      '(no name)',0
-        LBR     SA5
+        BR      SA5
 SA1:    LOAD    R8, NAME11
         LDI     8
         PLO     RC
 SA2:    LDA     R8
         PLO     RB
         XRI     ' '
-        LBZ     SA3
+        BZ      SA3
         GLO     RB
         SEP     R4
         DW      TXB
 SA3:    DEC     RC
         GLO     RC
-        LBNZ    SA2
+        BNZ     SA2
         LDN     R8              ; the extension
         XRI     ' '
-        LBZ     SA5
+        BZ      SA5
         LDI     '.'
         SEP     R4
         DW      TXB
@@ -1165,16 +2106,16 @@ SA3:    DEC     RC
 SA4:    LDA     R8
         PLO     RB
         XRI     ' '
-        LBZ     SA41
+        BZ      SA41
         GLO     RB
         SEP     R4
         DW      TXB
 SA41:   DEC     RC
         GLO     RC
-        LBNZ    SA4
+        BNZ     SA4
 SA5:    LOAD    RD, CHG
         LDN     RD
-        LBZ     SA6
+        BZ      SA6
         LDI     '*'
         SEP     R4
         DW      TXB
@@ -1204,7 +2145,7 @@ NI1:    GLO     RC
         GHI     RC
         ADI     1
         PHI     RC
-        LBR     NI1
+        BR      NI1
 NI2:    GHI     RC
         XRI     '0'
         LBZ     NI3
@@ -1240,9 +2181,11 @@ CR1:    LDI     0
         INC     RF
         INC     RB
         GLO     RD
-        XRI     NCELL
-        LBNZ    CR1
+        BNZ     CR1
         LOAD    RD, CUR
+        LDI     0
+        STR     RD
+        LOAD    RD, VTOP
         LDI     0
         STR     RD
         LOAD    RD, CHG
@@ -1291,7 +2234,7 @@ SRCP:   GLO     R7
         PLO     R8
 SP1:    LDA     R8
         XRI     ' '
-        LBNZ    SP1
+        BNZ     SP1
         SEP     R5
 ; GETV: ACC = cell R7.0's value. STV: ACC to it; RB.0 <> 0 if that changed it.
 GETV:   LOAD    RF, ACC
@@ -1309,7 +2252,7 @@ GV1:    LDN     RD
         PHI     RD
         DEC     RC
         GLO     RC
-        LBNZ    GV1
+        BNZ     GV1
         SEP     R5
 STV:    LOAD    RF, ACC
         GLO     R7
@@ -1337,7 +2280,7 @@ SV1:    LDA     RF
         PHI     RD
         DEC     RC
         GLO     RC
-        LBNZ    SV1
+        BNZ     SV1
         SEP     R5
 ; SETCELL: cell CUR = INB (INLEN bytes; 0: emptied), all that follows from it worked out and shown.
 ; DF = 1: no room (it said so, nothing changed).
@@ -1378,7 +2321,7 @@ SETCELL: SEP    R4
 SE2:    SEP     R4
         DW      GETP
         GHI     RA
-        LBNZ    SE3
+        BNZ     SE3
         LOAD    RD, INLEN       ; nothing there, and nothing to put there
         LDN     RD
         LBZ     SE9
@@ -1394,14 +2337,14 @@ SE3:    SEP     R4
         STR     RD
         LOAD    RD, INLEN
         LDN     RD
-        LBZ     SE5
+        BZ      SE5
         SEP     R4
         DW      INSERT
         SEP     R4
         DW      CLASS
 SE5:    LOAD    RD, CHG         ; (the star, the first time)
         LDN     RD
-        LBNZ    SE6
+        BNZ     SE6
         LDI     1
         STR     RD
         SEP     R4
@@ -1417,14 +2360,14 @@ SE9:    LDI     0
 REMOVE: SEP     R4
         DW      GETP
         GHI     RA
-        LBZ     RM9
+        BZ      RM9
         GHI     RA              ; RB = its end, past the LF
         PHI     RB
         GLO     RA
         PLO     RB
 RM1:    LDA     RB
         XRI     0AH
-        LBNZ    RM1
+        BNZ     RM1
         GLO     RA              ; RC = minus its length
         STR     R2
         GLO     RB
@@ -1452,21 +2395,21 @@ RM2:    GHI     RB              ; the rest down over it
         STR     R2
         GHI     RF
         XOR
-        LBNZ    RM3
+        BNZ     RM3
         GLO     RB
         STR     R2
         GLO     RF
         XOR
-        LBZ     RM4
+        BZ      RM4
 RM3:    LDA     RB
         STR     RD
         INC     RD
         GLO     RD              ; (now and then, a key typed meanwhile is kept)
         ANI     3FH
-        LBNZ    RM2
+        BNZ     RM2
         SEP     R4
         DW      POLLS
-        LBR     RM2
+        BR      RM2
 RM4:    GHI     RD              ; (RD = the new top)
         PHI     RB
         GLO     RD
@@ -1490,10 +2433,10 @@ RM9:    SEP     R5
 ; ADJ: every line at RA or above moves by RC
 ADJ:    LOAD    RD, PH
         LOAD    RF, PL
-        LDI     NCELL
+        LDI     0               ; (256 cells: 0, counted down)
         PLO     RB
 AJ1:    LDN     RD              ; (empty)
-        LBZ     AJ2
+        BZ      AJ2
         LDN     RF              ; DF = 1: its address >= RA
         STR     R2
         GLO     RA
@@ -1502,7 +2445,7 @@ AJ1:    LDN     RD              ; (empty)
         STR     R2
         GHI     RA
         SDB
-        LBNF    AJ2
+        BNF     AJ2
         LDN     RF
         STR     R2
         GLO     RC
@@ -1536,7 +2479,6 @@ INSERT: SEP     R4
         PLO     RD
 RI1:    INC     RD
         GLO     RD
-        XRI     NCELL
         LBZ     RI3
         LDI     HIGH(PH)
         PHI     RD
@@ -1547,7 +2489,7 @@ RI1:    INC     RD
         PHI     RD
         LDN     RD
         PLO     RA
-        LBR     RI4
+        BR      RI4
 RI3:    LOAD    RD, TOPV
         LDA     RD
         PHI     RA
@@ -1576,22 +2518,22 @@ RI5:    GHI     RF              ; what is above it moves up, from the top down
         STR     R2
         GHI     RA
         XOR
-        LBNZ    RI6
+        BNZ     RI6
         GLO     RF
         STR     R2
         GLO     RA
         XOR
-        LBZ     RI7
+        BZ      RI7
 RI6:    DEC     RF
         DEC     RD
         LDN     RF
         STR     RD
         GLO     RD              ; (now and then, a key typed meanwhile is kept)
         ANI     3FH
-        LBNZ    RI5
+        BNZ     RI5
         SEP     R4
         DW      POLLS
-        LBR     RI5
+        BR      RI5
 RI7:    SEP     R4
         DW      ADJ
         SEP     R4
@@ -1602,16 +2544,16 @@ RI7:    SEP     R4
         GLO     RA
         PLO     RD
 RI8:    LDA     R8
-        LBZ     RI85
+        BZ      RI85
         STR     RD
         INC     RD
-        LBR     RI8
+        BR      RI8
 RI85:   LOAD    R8, INB
 RI9:    LDA     R8
-        LBZ     RI95
+        BZ      RI95
         STR     RD
         INC     RD
-        LBR     RI9
+        BR      RI9
 RI95:   LDI     0AH
         STR     RD
         SEP     R5
@@ -1620,49 +2562,49 @@ CLASS:  SEP     R4
         DW      SRCP
         LDN     R8
         XRI     '='
-        LBNZ    CL1
+        BNZ     CL1
         LDI     K_FORM + F_WAIT + F_DIRTY + F_CHG
-        LBR     CLK
+        BR      CLK
 CL1:    LOAD    RD, MSIGN       ; a number? [+-] digits [. digits], and nothing after
         LDI     0
         STR     RD
         LDN     R8
         XRI     '-'
-        LBNZ    CL2
+        BNZ     CL2
         LDI     80H
         STR     RD
         INC     R8
-        LBR     CL3
+        BR      CL3
 CL2:    LDN     R8
         XRI     '+'
-        LBNZ    CL3
+        BNZ     CL3
         INC     R8
 CL3:    LDN     R8              ; a digit, or a point and a digit
         XRI     '.'
-        LBNZ    CL4
+        BNZ     CL4
         INC     R8
         LDN     R8
         DEC     R8
-        LBR     CL5
+        BR      CL5
 CL4:    LDN     R8
 CL5:    SMI     '0'
-        LBNF    CLT
+        BNF     CLT
         SMI     10
-        LBDF    CLT
+        BDF     CLT
         SEP     R4
         DW      PNUMB
-        LBDF    CLO
+        BDF     CLO
         LDN     R8
         SMI     20H
-        LBDF    CLT
+        BDF     CLT
         SEP     R4
         DW      SGNF
         SEP     R4
         DW      STV
         LDI     K_NUM + F_DIRTY + F_CHG
-        LBR     CLK
+        BR      CLK
 CLO:    LDI     K_NERR + F_DIRTY + F_CHG
-        LBR     CLK
+        BR      CLK
 CLT:    LDI     K_TEXT + F_DIRTY + F_CHG
 CLK:    PLO     RC
         GLO     R7
@@ -1680,7 +2622,10 @@ LOADFILE: LOAD  RD, TMP11
         LBNF    LO1
         LDI     1
         LBR     LO9
-LO1:    LOAD    RD, KS_DATTR
+LO1:    LOAD    RD, SPON        ; the spinner on while a file is read and worked out
+        LDI     1
+        STR     RD
+        LOAD    RD, KS_DATTR
         LDN     RD
         ANI     10H
         LBNZ    LO8             ; a folder
@@ -1688,7 +2633,7 @@ LO1:    LOAD    RD, KS_DATTR
         LDA     RD
         LBNZ    LO8
         LDA     RD
-        LBNZ    LO8
+        BNZ     LO8
         LDA     RD
         PHI     RC
         LDN     RD
@@ -1699,16 +2644,21 @@ LO1:    LOAD    RD, KS_DATTR
         GHI     RC
         ADCI    HIGH(POOL)
         PHI     RC
-        LBDF    LO8
+        BDF     LO8
         GLO     RC
         SDI     LOW(POOLE)
         GHI     RC
         SDBI    HIGH(POOLE)
-        LBDF    LO2
+        BDF     LO2
 LO8:    LDI     2
 LO9:    PLO     RC
         LOAD    RD, LRC
         GLO     RC
+        STR     RD
+        SEP     R4              ; the spinner rubbed out, and off
+        DW      SPINEND
+        LOAD    RD, SPON
+        LDI     0
         STR     RD
         SEP     R5
 LO2:    SEP     R4
@@ -1724,7 +2674,7 @@ LO2:    SEP     R4
         STR     RD
         SEP     R4
         DW      KS_LOADF
-        LBNF    LO3
+        BNF     LO3
         LDI     3
         LBR     LO9
 LO3:    LOAD    RD, KS_LDEND    ; the top
@@ -1734,14 +2684,14 @@ LO3:    LOAD    RD, KS_LDEND    ; the top
         PLO     RA
         GLO     RA              ; empty?
         XRI     LOW(POOL)
-        LBNZ    LO4
+        BNZ     LO4
         GHI     RA
         XRI     HIGH(POOL)
-        LBZ     LO5
+        BZ      LO5
 LO4:    DEC     RA              ; a last line with no LF gets one
         LDA     RA
         XRI     0AH
-        LBZ     LO5
+        BZ      LO5
         LDI     0AH
         STR     RA
         INC     RA
@@ -1757,7 +2707,9 @@ LO5:    LOAD    RD, TOPV
         INC     RD
         LDI     LOW(POOL)
         STR     RD
-LO6:    LOAD    RD, LNP
+LO6:    SEP     R4
+        DW      SPINT
+        LOAD    RD, LNP
         LDA     RD
         PHI     R8
         LDN     RD
@@ -1767,7 +2719,7 @@ LO6:    LOAD    RD, LNP
         STR     R2
         GHI     R8
         XOR
-        LBNZ    LO61
+        BNZ     LO61
         LDN     RD
         STR     R2
         GLO     R8
@@ -1775,13 +2727,13 @@ LO6:    LOAD    RD, LNP
         LBZ     LO7
 LO61:   LDN     R8              ; (a line starting with a space is no cell's)
         XRI     ' '
-        LBZ     LO65
+        BZ      LO65
         SEP     R4
         DW      PREF
-        LBDF    LO65
+        BDF     LO65
         LDN     R8
         XRI     ' '
-        LBNZ    LO65
+        BNZ     LO65
         GHI     RA              ; R7.0 = the cell
         SHL
         SHL
@@ -1816,8 +2768,89 @@ LO66:   LDA     R8
         LBR     LO6
 LO7:    SEP     R4
         DW      RECALC
+        LOAD    RD, CSVM        ; LTCALC -C (a CSV CSV2CLC made into /_CSV.CLC): a sheet with no name yet, not saved
+        LDN     RD
+        LBZ     LO7A
+        LOAD    RD, CHG
+        LDI     1
+        STR     RD
+        INC     RD              ; NAMED
         LDI     0
+        STR     RD
+LO7A:   LDI     0
         LBR     LO9
+; XCSV: a CSV to open: the file named at RF (as typed) made a sheet by CSV2CLC -L, which then runs LTCALC -C. TMP11
+;   (in WDIR) is the CSV: not there - DF = 1, nothing done. (CSV reading is CSV2CLC's: room for the sheet here.)
+XCSV:   GHI     RF
+        STXD
+        GLO     RF
+        STXD
+        LOAD    RD, TMP11
+        SEP     R4
+        DW      KS_FINDN
+        IRX
+        LDXA
+        PLO     RF
+        LDX
+        PHI     RF
+        BNF     XC1
+        SEP     R5
+XC1:    LOAD    RD, INB         ; the name to INB first (it may be in LINE itself: LTCALC NAME.CSV)
+XC0:    LDA     RF
+        STR     RD
+        INC     RD
+        BZ      XC0A
+        XRI     ' '
+        BNZ     XC0
+        DEC     RD
+        LDI     0
+        STR     RD
+XC0A:   LOAD    RA, XCCMD       ; LINE = CSV2CLC -L name
+        LOAD    RD, KS_LINE
+XC2:    LDA     RA
+        BZ      XC3
+        STR     RD
+        INC     RD
+        BR      XC2
+XC3:    LOAD    RF, INB
+XC3A:   LDA     RF
+        STR     RD
+        INC     RD
+        BNZ     XC3A
+        SEP     R4
+        DW      CLS
+        LBR     K_EXEC
+XCCMD:  DB      'CSV2CLC -L ',0
+; SPINT: while SPON, the spinner (spin.inc) turned every 32nd call - a long read or recalculation is seen to work
+SPINT:  LOAD    RD, SPON
+        LDN     RD
+        LBZ     SPT9
+        LOAD    RD, SPK
+        LDN     RD
+        ADI     1
+        STR     RD
+        ANI     1FH
+        LBZ     SPIN
+SPT9:   SEP     R5
+SPK:    DB      0
+        INCL    "spin.inc"
+; ISCSV: DF = 0 if TMP11's extension is CSV (RD used)
+ISCSV:  LOAD    RD, TMP11 + 8
+        LDA     RD
+        XRI     'C'
+        LBNZ    IS9
+        LDA     RD
+        XRI     'S'
+        LBNZ    IS9
+        LDN     RD
+        XRI     'V'
+        BNZ     IS9
+        LDI     0
+        SHR
+        SEP     R5
+IS9:    LDI     1
+        SHR
+        SEP     R5
 ; ==== working it out
 ; RECALC: every formula, in the order they need each other. A cell whose kind or value changes is marked dirty.
 RECALC: LOAD    RD, PROG        ; a look: which formulas name a changed cell?
@@ -1831,14 +2864,14 @@ RP1:    GLO     R7
         LDN     RD              ; a formula, not known yet?
         ANI     F_CHG + 7
         XRI     K_FORM
-        LBZ     RP2
+        BZ      RP2
         XRI     K_FORM XOR K_FERR
-        LBNZ    RP4
+        BNZ     RP4
 RP2:    SEP     R4              ; (a key typed meanwhile is kept)
         DW      RXPOLL
         SEP     R4
         DW      DEPS
-        LBNF    RP4
+        BNF     RP4
         GLO     R7
         PLO     RD
         LDI     HIGH(TYP)
@@ -1851,7 +2884,6 @@ RP2:    SEP     R4              ; (a key typed meanwhile is kept)
         STR     RD
 RP4:    INC     R7
         GLO     R7
-        XRI     NCELL
         LBNZ    RP1
         LOAD    RD, PROG
         LDN     RD
@@ -1859,23 +2891,24 @@ RP4:    INC     R7
         LOAD    RD, TYP         ; those formulas wait
 RC1:    LDN     RD
         ANI     F_CHG
-        LBZ     RC3
+        BZ      RC3
         LDN     RD
         ANI     7
         XRI     K_FORM
-        LBZ     RC2
+        BZ      RC2
         LDN     RD
         ANI     7
         XRI     K_FERR
-        LBNZ    RC3
+        BNZ     RC3
 RC2:    LDN     RD
         ORI     F_WAIT
         STR     RD
 RC3:    INC     RD
         GLO     RD
-        XRI     NCELL
-        LBNZ    RC1
-RC4:    LOAD    RD, PROG        ; a pass
+        BNZ     RC1
+RC4:    SEP     R4              ; (a file read: the spinner turns, a pass at a time)
+        DW      SPINT
+        LOAD    RD, PROG        ; a pass
         LDI     0
         STR     RD
         PLO     R7
@@ -1885,7 +2918,7 @@ RC5:    GLO     R7
         PHI     RD
         LDN     RD
         SHL
-        LBNF    RC8             ; not waiting
+        BNF     RC8             ; not waiting
         SEP     R4              ; (a key typed meanwhile is kept)
         DW      RXPOLL
         SEP     R4
@@ -1893,17 +2926,17 @@ RC5:    GLO     R7
         LOAD    RD, ECODE
         LDN     RD
         XRI     2
-        LBZ     RC8             ; it needs one still waiting
+        BZ      RC8             ; it needs one still waiting
         LOAD    RD, PROG
         LDI     1
         STR     RD
         LOAD    RD, ECODE
         LDN     RD
-        LBNZ    RC6
+        BNZ     RC6
         SEP     R4              ; a value
         DW      STV
         LDI     K_FORM
-        LBR     RC7
+        BR      RC7
 RC6:    LDI     0
         PLO     RB
         LDI     K_FERR
@@ -1912,11 +2945,10 @@ RC7:    PLO     RC
         DW      SETK
 RC8:    INC     R7
         GLO     R7
-        XRI     NCELL
-        LBNZ    RC5
+        BNZ     RC5
         LOAD    RD, PROG
         LDN     RD
-        LBNZ    RC4
+        BNZ     RC4
         LDI     0               ; what still waits is a loop
         PLO     R7
 RC9:    GLO     R7
@@ -1927,7 +2959,7 @@ RC9:    GLO     R7
         ANI     0FFH - F_CHG
         STR     RD
         SHL
-        LBNF    RC95
+        BNF     RC95
         LDI     0
         PLO     RB
         LDI     K_FERR
@@ -1936,7 +2968,6 @@ RC9:    GLO     R7
         DW      SETK
 RC95:   INC     R7
         GLO     R7
-        XRI     NCELL
         LBNZ    RC9
         SEP     R5
 ; SETK: cell R7.0 is done: kind RC.0; dirty if that differs from before, or RB.0 <> 0 (STV's word)
@@ -1981,18 +3012,18 @@ EVAL:   LOAD    RD, EVR2
         SEP     R4
         DW      SRCP
         INC     R8              ; past the =
-        LOAD    R9, V1 + 0A0H
+        LOAD    R9, VPG + 0A0H  ; (the value stack: PUSHA stops at the page's end)
         SEP     R4
         DW      EXPR
         SEP     R4
         DW      PEEK
         GLO     RF
         SMI     20H
-        LBDF    EVERR           ; something left over
+        BDF     EVERR           ; something left over
         LDI     0
-        LBR     EVEND
+        BR      EVEND
 EVWAIT: LDI     2
-        LBR     EVEND
+        BR      EVEND
 EVERR:  LDI     1
 EVEND:  PLO     RC
         LOAD    RD, ECODE
@@ -2011,15 +3042,15 @@ EVEND:  PLO     RC
 ; PEEK: RF.0 = the next character past any spaces, a letter in capitals; R8 at it
 PEEK:   LDN     R8
         XRI     ' '
-        LBNZ    PE1
+        BNZ     PE1
         INC     R8
-        LBR     PEEK
+        BR      PEEK
 PE1:    LDN     R8
         PLO     RF
         SMI     'a'
-        LBNF    PE9
+        BNF     PE9
         SMI     26
-        LBDF    PE9
+        BDF     PE9
         GLO     RF
         ANI     0DFH
         PLO     RF
@@ -2031,10 +3062,10 @@ EX1:    SEP     R4
         DW      PEEK
         GLO     RF
         XRI     '+'
-        LBZ     EXA
+        BZ      EXA
         GLO     RF
         XRI     '-'
-        LBZ     EXS
+        BZ      EXS
         SEP     R5
 EXA:    INC     R8
         SEP     R4
@@ -2045,7 +3076,7 @@ EXA:    INC     R8
         DW      POPB
         SEP     R4
         DW      ADDBA
-        LBR     EX1
+        BR      EX1
 EXS:    INC     R8
         SEP     R4
         DW      PUSHA
@@ -2058,17 +3089,17 @@ EXS:    INC     R8
         DW      NEGP
         SEP     R4
         DW      ADDBA
-        LBR     EX1
+        BR      EX1
 TERM:   SEP     R4
         DW      UNARY
 TM1:    SEP     R4
         DW      PEEK
         GLO     RF
         XRI     '*'
-        LBZ     TMM
+        BZ      TMM
         GLO     RF
         XRI     '/'
-        LBZ     TMD
+        BZ      TMD
         SEP     R5
 TMM:    INC     R8
         SEP     R4
@@ -2079,7 +3110,7 @@ TMM:    INC     R8
         DW      POPB
         SEP     R4
         DW      MULBA
-        LBR     TM1
+        BR      TM1
 TMD:    INC     R8
         SEP     R4
         DW      PUSHA
@@ -2089,12 +3120,12 @@ TMD:    INC     R8
         DW      POPB
         SEP     R4
         DW      DIVBA
-        LBR     TM1
+        BR      TM1
 UNARY:  SEP     R4
         DW      PEEK
         GLO     RF
         XRI     '-'
-        LBNZ    UN1
+        BNZ     UN1
         INC     R8
         SEP     R4
         DW      UNARY
@@ -2102,7 +3133,7 @@ UNARY:  SEP     R4
         LBR     NEGP
 UN1:    GLO     RF
         XRI     '+'
-        LBNZ    UN2
+        BNZ     UN2
         INC     R8
         LBR     UNARY
 UN2:    GLO     RF              ; ( expression )
@@ -2123,9 +3154,9 @@ UN3:    GLO     RF              ; a number
         LBZ     UN4
         GLO     RF
         SMI     '0'
-        LBNF    UN5
+        BNF     UN5
         SMI     10
-        LBDF    UN5
+        BDF     UN5
 UN4:    SEP     R4
         DW      PNUMB
         LBDF    EVERR
@@ -2153,30 +3184,30 @@ UN5:    GLO     RF              ; a letter: a cell, or a function's name
         GLO     RA
         OR
         PLO     RC
-        LBR     CELLV
-; PREF: a cell's name at R8 -> RA.1 its row (0-19), RA.0 its column; R8 past it. DF = 1: not a cell.
+        BR      CELLV
+; PREF: a cell's name at R8 -> RA.1 its row (0-31), RA.0 its column; R8 past it. DF = 1: not a cell.
 PREF:   SEP     R4
         DW      PEEK
         GLO     RF
         SMI     'A'
-        LBNF    PRX
+        BNF     PRX
         PLO     RA
         SMI     8
-        LBDF    PRX
+        BDF     PRX
         INC     R8
         LDN     R8
         SMI     '0'
-        LBNF    PRX
+        BNF     PRX
         SMI     10
-        LBDF    PRX
+        BDF     PRX
         LDA     R8
         SMI     '0'
         PHI     RA
         LDN     R8
         SMI     '0'
-        LBNF    PR2
+        BNF     PR2
         SMI     10
-        LBDF    PR2
+        BDF     PR2
         LDA     R8
         SMI     '0'
         PLO     RB
@@ -2191,9 +3222,9 @@ PREF:   SEP     R4
         ADD
         PHI     RA
 PR2:    GHI     RA
-        LBZ     PRX
-        SMI     21
-        LBDF    PRX
+        BZ      PRX
+        SMI     NROW + 1
+        BDF     PRX
         GHI     RA
         SMI     1
         PHI     RA
@@ -2215,7 +3246,7 @@ CELLV:  GLO     RC
         ANI     7
         PLO     RB
         SMI     K_NUM
-        LBNF    CV0
+        BNF     CV0
         GLO     RB
         SMI     K_FERR
         LBDF    EVERR
@@ -2271,7 +3302,7 @@ FN2:    LDA     RF
         LBNZ    FN3
         DEC     RC
         GLO     RC
-        LBNZ    FN2
+        BNZ     FN2
         LDN     RB              ; found
         PLO     RC
         LOAD    RD, FK
@@ -2291,11 +3322,11 @@ FN2:    LDA     RF
         ANI     0DFH
         XRI     'T'
         LBNZ    EVERR
-        LBR     FN5
+        BR      FN5
 FN3:    INC     RB              ; the next one's name
         DEC     RC
         GLO     RC
-        LBNZ    FN3
+        BNZ     FN3
         LBR     FN1
 FN5:    SEP     R4
         DW      PEEK
@@ -2331,7 +3362,7 @@ FN6:    SEP     R4
         DW      PEEK
         GLO     RF
         XRI     ':'
-        LBNZ    FN7
+        BNZ     FN7
         INC     R8
         SEP     R4
         DW      PREF
@@ -2348,9 +3379,9 @@ FN7:    SEP     R4
         DW      PEEK
         GLO     RF
         XRI     ','
-        LBNZ    FN8
+        BNZ     FN8
         INC     R8
-        LBR     FN6
+        BR      FN6
 FN8:    GLO     RF
         XRI     ')'
         LBNZ    EVERR
@@ -2359,23 +3390,23 @@ FN8:    GLO     RF
         LDN     RD
         PLO     RC
         XRI     1
-        LBNZ    FN81
+        BNZ     FN81
         LOAD    RF, FSUM
-        LBR     FNCP
+        BR      FNCP
 FN81:   GLO     RC
         XRI     3
-        LBNZ    FN82
+        BNZ     FN82
         LOAD    RF, FMIN
-        LBR     FNCP
+        BR      FNCP
 FN82:   GLO     RC
         XRI     4
-        LBNZ    FN83
+        BNZ     FN83
         LOAD    RF, FMAX
 FNCP:   LOAD    RD, ACC
         LBR     COPY4
 FN83:   GLO     RC
         XRI     5
-        LBNZ    FN84
+        BNZ     FN84
         LOAD    RD, FCNT        ; COUNT: the number of them, as hundredths
         LDI     0
         PHI     RA
@@ -2465,7 +3496,7 @@ DP1:    LDN     R8
         LBDF    DPN
         SEP     R4
         DW      PREF
-        LBDF    DP1
+        BDF     DP1
         LOAD    RD, R1V
         GHI     RA
         STR     RD
@@ -2482,11 +3513,11 @@ DP1:    LDN     R8
         DW      PEEK
         GLO     RF
         XRI     ':'
-        LBNZ    DP3
+        BNZ     DP3
         INC     R8
         SEP     R4
         DW      PREF
-        LBDF    DP1
+        BDF     DP1
         LOAD    RD, R2V
         GHI     RA
         STR     RD
@@ -2516,9 +3547,9 @@ DP5:    GHI     RA
         STR     R2
         GLO     RA
         XOR
-        LBZ     DP6
+        BZ      DP6
         INC     RA
-        LBR     DP5
+        BR      DP5
 DP6:    LOAD    RD, R2V
         LDN     RD
         STR     R2
@@ -2555,7 +3586,7 @@ FRNORM: LOAD    RD, R1V
         STR     R2
         GHI     RA
         SM
-        LBNF    FG1
+        BNF     FG1
         GHI     RA
         PLO     RC
         GHI     RB
@@ -2599,7 +3630,7 @@ FG4:    GHI     RA
         PLO     RC
         SEP     R4
         DW      CELLV
-        LBNF    FG5
+        BNF     FG5
         SEP     R4
         DW      FACC
 FG5:    SEP     R4              ; (a long range: a key typed meanwhile is kept)
@@ -2609,19 +3640,19 @@ FG5:    SEP     R4              ; (a long range: a key typed meanwhile is kept)
         STR     R2
         GLO     RA
         XOR
-        LBZ     FG6
+        BZ      FG6
         INC     RA
-        LBR     FG4
+        BR      FG4
 FG6:    LOAD    RD, R2V
         LDN     RD
         STR     R2
         GHI     RA
         XOR
-        LBZ     FG9
+        BZ      FG9
         GHI     RA
         ADI     1
         PHI     RA
-        LBR     FG3
+        BR      FG3
 FG9:    SEP     R5
 ; FACC: ACC into the function's sum, count, least and most
 FACC:   LOAD    RD, FCNT
@@ -2629,12 +3660,12 @@ FACC:   LOAD    RD, FCNT
         STR     R2
         LDN     RD
         OR
-        LBZ     FA1             ; the first: least and most
+        BZ      FA1             ; the first: least and most
         LOAD    RF, ACC + 3
         LOAD    RD, FMIN + 3
         SEP     R4
         DW      CMPV
-        LBDF    FA2
+        BDF     FA2
         LOAD    RF, ACC
         LOAD    RD, FMIN
         SEP     R4
@@ -2724,7 +3755,7 @@ PA1:    LDA     RD
         INC     R9
         DEC     RC
         GLO     RC
-        LBNZ    PA1
+        BNZ     PA1
         SEP     R5
 POPB:   LOAD    RD, BV + 3
         LDI     4
@@ -2735,7 +3766,7 @@ PO1:    DEC     R9
         DEC     RD
         DEC     RC
         GLO     RC
-        LBNZ    PO1
+        BNZ     PO1
         SEP     R5
 ; NEGP: the value ending at RD negated (the one value with no opposite: EVERR). RB used.
 NEGP:   LDN     RD
@@ -2806,11 +3837,11 @@ ADDBA:  LOAD    RD, ACC
         LOAD    RD, ACC         ; the one value with no opposite is out of range too
         LDA     RD
         XRI     80H
-        LBNZ    AD9
+        BNZ     AD9
         LDA     RD
-        LBNZ    AD9
+        BNZ     AD9
         LDA     RD
-        LBNZ    AD9
+        BNZ     AD9
         LDN     RD
         LBZ     EVERR
 AD9:    SEP     R5
@@ -2844,7 +3875,7 @@ SG2:    SEP     R5
 SGNF:   LOAD    RD, MSIGN
         LDN     RD
         ANI     80H
-        LBZ     SG2
+        BZ      SG2
         LOAD    RD, ACC + 3
         LBR     NEGP
 ; MULBA: ACC = BV * ACC / 100. DIVBA: ACC = BV * 100 / ACC. Both to the nearest hundredth.
@@ -2864,7 +3895,7 @@ MULBA:  SEP     R4
         INC     RD
         LDI     100
         STR     RD
-        LBR     MD1
+        BR      MD1
 DIVBA:  LOAD    RD, ACC
         LDA     RD
         STR     R2
@@ -2920,7 +3951,7 @@ MC0:    LDI     0
         INC     RD
         DEC     RC
         GLO     RC
-        LBNZ    MC0
+        BNZ     MC0
 MC1:    LOAD    RD, MY          ; nothing left in MY: done
         LDA     RD
         STR     R2
@@ -3007,10 +4038,10 @@ DV3:    GLO     RB
         GLO     RA
         SHLC
         PLO     RA
-        LBDF     DV4             ; 9 bits: it goes
+        BDF      DV4             ; 9 bits: it goes
         SM
-        LBNF     DV6
-        LBR      DV5
+        BNF      DV6
+        BR       DV5
 DV4:    SM
 DV5:    PLO     RA
         GLO     RB
@@ -3018,7 +4049,7 @@ DV5:    PLO     RA
         PLO     RB
 DV6:    DEC     RC
         GLO     RC
-        LBNZ     DV3
+        BNZ      DV3
         GLO     RB
         STR     RD
 DV7:    INC     RD
@@ -3045,7 +4076,7 @@ DVL:    LOAD    RD, MR          ; the long way
         PLO     RC
 DL1:    LOAD    RD, MP          ; a top byte of 0: eight steps saved
         LDN     RD
-        LBNZ    DL3
+        BNZ     DL3
         LOAD    RF, MP + 1
         LDI     7
         PHI     RC
@@ -3055,13 +4086,13 @@ DL2:    LDA     RF
         GHI     RC
         SMI     1
         PHI     RC
-        LBNZ    DL2
+        BNZ     DL2
         LDI     0
         STR     RD
         GLO     RC
         SMI     8
         PLO     RC
-        LBNZ    DL1
+        BNZ     DL1
         LBR     DVF             ; it was 0
 DL3:    ADI     0
         LOAD    RD, MP + 7      ; MP's top bit into MR (unrolled: a counter would lose DF)
@@ -3196,8 +4227,8 @@ DL5:    DEC     RC
         SMB
         PHI     RB
         SEX     R2
-        LBDF    DVUP
-        LBR     DVF
+        BDF     DVUP
+        BR      DVF
 DVUP:   LOAD    RD, MP + 7
         LDI     8
         PLO     RC
@@ -3208,7 +4239,7 @@ DU1:    LDN     RD
         DEC     RD
         DEC     RC
         GLO     RC
-        LBNZ    DU1
+        BNZ     DU1
 DVF:    LOAD    RD, MP          ; it must fit in 31 bits
         LDA     RD
         LBNZ    EVERR
@@ -3247,19 +4278,19 @@ PNUMB:  LDI     0
         PLO     RB
 PB1:    LDN     R8
         SMI     '0'
-        LBNF    PB2
+        BNF     PB2
         SMI     10
-        LBDF    PB2
+        BDF     PB2
         LDA     R8
         SMI     '0'
         PLO     RF
         SEP     R4
         DW      M10
         LBDF    PB9
-        LBR     PB1
+        BR      PB1
 PB2:    LDN     R8
         XRI     '.'
-        LBNZ    PB3
+        BNZ     PB3
         INC     R8
 PB3:    SEP     R4              ; tenths
         DW      FDIG
@@ -3294,9 +4325,9 @@ PB5:    SEP     R4              ; the rest do not count
         DW      FDIG
         LDN     R8
         SMI     '0'
-        LBNF    PB6
+        BNF     PB6
         SMI     10
-        LBNF    PB5
+        BNF     PB5
 PB6:    SEP     R4
         DW      STACC
         LDI     0
@@ -3350,10 +4381,10 @@ M10:    GHI     RA
         ADC
         PHI     RA
         SHL
-        LBDF    M19
+        BDF     M19
         SEP     R4
         DW      SH1
-        LBDF    M19
+        BDF     M19
         GLO     RF
         STR     R2
         GLO     RB
@@ -3399,7 +4430,7 @@ FMT:    LOAD    RD, ACC
         GHI     RA
         ANI     80H
         STR     R8
-        LBZ     FM1
+        BZ      FM1
         GLO     RB
         SDI     0
         PLO     RB
@@ -3438,7 +4469,7 @@ FM3:    SEX     RF
         DEC     RF
         DEC     RF
         SEX     R2
-        LBNF    FM4
+        BNF     FM4
         GHI     RD
         PHI     RA
         GLO     RD
@@ -3450,7 +4481,7 @@ FM3:    SEX     RF
         GHI     R9
         ADI     1
         PHI     R9
-        LBR     FM3
+        BR      FM3
 FM4:    GHI     R9
         STR     R8
         INC     R8
@@ -3460,7 +4491,7 @@ FM4:    GHI     R9
         INC     RF
         DEC     R9
         GLO     R9
-        LBNZ    FM2
+        BNZ     FM2
         LOAD    RF, FMTB
         LOAD    R8, FNEG
         LDN     R8
@@ -3472,7 +4503,7 @@ FM5:    LOAD    R8, DIGB        ; no leading zeros, but always one digit before 
         LDI     7
         PLO     R9
 FM6:    LDN     R8
-        LBNZ    FM7
+        BNZ     FM7
         INC     R8
         DEC     R9
         GLO     R9
@@ -3484,7 +4515,7 @@ FM8:    LDA     R8
         INC     RF
         DEC     R9
         GLO     R9
-        LBNZ    FM8
+        BNZ     FM8
         LDI     '.'
         STR     RF
         INC     RF
@@ -3525,53 +4556,71 @@ V0      EQU     DATA + 300H
 V1      EQU     DATA + 400H
 V2      EQU     DATA + 500H
 V3      EQU     DATA + 600H
-RING    EQU     DATA + 700H     ; 128 keys
-POOL    EQU     DATA + 800H
+VPG     EQU     DATA + 700H     ; the variables, the math, the value stack ($A0 up)
+RING    EQU     DATA + 800H     ; 128 keys; the typed line and the cell's text at $A0 up
+POOL    EQU     DATA + 900H
 POOLE   EQU     PTOP - 2        ; (a last line with no LF gets one)
 ; the tail of TYP
-CUR     EQU     TYP + 0A0H
-TOPV    EQU     TYP + 0A1H      ; (2) the pool's top
-CHG     EQU     TYP + 0A3H      ; changed since it was saved
-NAMED   EQU     TYP + 0A4H      ; (follows CHG) it has a name
-MYDIR   EQU     TYP + 0A5H      ; (2) its folder
-RHEAD   EQU     TYP + 0A7H      ; the key ring (RTAIL follows RHEAD)
-RTAIL   EQU     TYP + 0A8H
-KEY     EQU     TYP + 0A9H
-INLEN   EQU     TYP + 0AAH
-ARROK   EQU     TYP + 0ABH
-SHOWP   EQU     TYP + 0ACH      ; rows 1 and 2 are out of date
-NLEN    EQU     TYP + 0ADH
-ECODE   EQU     TYP + 0AEH
-MSIGN   EQU     TYP + 0AFH
-FK      EQU     TYP + 0B0H
-R1V     EQU     TYP + 0B1H      ; a range: R1V C1V R2V C2V
-C1V     EQU     TYP + 0B2H
-R2V     EQU     TYP + 0B3H
-C2V     EQU     TYP + 0B4H
-FNEG    EQU     TYP + 0B5H
-PROG    EQU     TYP + 0B6H
-EVR2    EQU     TYP + 0B7H      ; (2) and EVR6 (2) after it
-LNP     EQU     TYP + 0BBH      ; (2)
-LRC     EQU     TYP + 0BDH
-FMTL    EQU     TYP + 0BEH
-NAME11  EQU     TYP + 0C0H      ; (11)
-TMP11   EQU     TYP + 0CBH      ; (11)
-ACC     EQU     TYP + 0D6H      ; (4)
-BV      EQU     TYP + 0DAH      ; (4)
-FSUM    EQU     TYP + 0DEH      ; (4) then FMIN FMAX FCNT, cleared together
-FMIN    EQU     TYP + 0E2H
-FMAX    EQU     TYP + 0E6H
-FCNT    EQU     TYP + 0EAH      ; (2)
-; the tail of PH
-INB     EQU     PH + 0A0H       ; (61)
-NBUF    EQU     PH + 0E0H       ; (5)
-CBUF    EQU     PH + 0F0H       ; (10)
-; the tail of PL
-MX      EQU     PL + 0A0H       ; (8)
-MP      EQU     PL + 0A8H       ; (8)
-MY      EQU     PL + 0B0H       ; (4)
-MD      EQU     PL + 0B4H       ; (4)
-MR      EQU     PL + 0B8H       ; (4)
-DIGB    EQU     PL + 0BCH       ; (10)
-FMTB    EQU     PL + 0C6H       ; (14)
+TV      EQU     VPG - 0A0H      ; (the variables keep the offsets they had in TYP's tail)
+CUR     EQU     TV + 0A0H
+TOPV    EQU     TV + 0A1H      ; (2) the pool's top
+CHG     EQU     TV + 0A3H      ; changed since it was saved
+NAMED   EQU     TV + 0A4H      ; (follows CHG) it has a name
+MYDIR   EQU     TV + 0A5H      ; (2) its folder
+RHEAD   EQU     TV + 0A7H      ; the key ring (RTAIL follows RHEAD)
+RTAIL   EQU     TV + 0A8H
+KEY     EQU     TV + 0A9H
+INLEN   EQU     TV + 0AAH
+ARROK   EQU     TV + 0ABH
+SHOWP   EQU     TV + 0ACH      ; rows 1 and 2 are out of date
+NLEN    EQU     TV + 0ADH
+ECODE   EQU     TV + 0AEH
+MSIGN   EQU     TV + 0AFH
+FK      EQU     TV + 0B0H
+R1V     EQU     TV + 0B1H      ; a range: R1V C1V R2V C2V
+C1V     EQU     TV + 0B2H
+R2V     EQU     TV + 0B3H
+C2V     EQU     TV + 0B4H
+FNEG    EQU     TV + 0B5H
+PROG    EQU     TV + 0B6H
+EVR2    EQU     TV + 0B7H      ; (2) and EVR6 (2) after it
+LNP     EQU     TV + 0BBH      ; (2)
+LRC     EQU     TV + 0BDH
+FMTL    EQU     TV + 0BEH
+NAME11  EQU     TV + 0C0H      ; (11)
+TMP11   EQU     TV + 0CBH      ; (11)
+ACC     EQU     TV + 0D6H      ; (4)
+BV      EQU     TV + 0DAH      ; (4)
+FSUM    EQU     TV + 0DEH      ; (4) then FMIN FMAX FCNT, cleared together
+FMIN    EQU     TV + 0E2H
+FMAX    EQU     TV + 0E6H
+FCNT    EQU     TV + 0EAH      ; (2)
+VTOP    EQU     TV + 0ECH      ; the first row on the screen (0-12)
+OUTP    EQU     TV + 0EDH      ; (2) CSV: where the next byte goes
+CROW    EQU     TV + 0EFH      ; CSV: the row (1 up reading, 0 up writing) and the column
+CCOL    EQU     TV + 0F0H
+FSTART  EQU     TV + 0F1H      ; (2) CSV: where this field's line starts (writing: the text's start)
+FLEN    EQU     TV + 0F3H      ; CSV: the field's characters
+MAXR    EQU     TV + 0F4H      ; CSV: the rows and columns in use (MAXC follows)
+MAXC    EQU     TV + 0F5H
+CFULL   EQU     TV + 0F6H      ; CSV: no room left for it
+CSVM    EQU     TV + 0F7H      ; 1: LTCALC -C - the sheet is a CSV's, read by CSV2CLC
+RCOP    EQU     VPG + 8DH      ; ^R / ^L: 0 insert a row, 1 delete it, 2 insert a column, 3 delete it
+RCN     EQU     VPG + 8EH      ; the row (1-32) or column (1-8) it is done at
+PREVC   EQU     VPG + 8FH      ; the character before, in a formula being copied
+PAIRS   EQU     VPG + 90H      ; (4) a range's two ends being moved
+SPON    EQU     VPG + 94H      ; 1: the spinner turns (a file read, ^R / ^L)
+; the typed line and the cell's text: the top of RING's page
+INB     EQU     RING + 0A0H       ; (61)
+NBUF    EQU     RING + 0E0H       ; (5)
+CBUF    EQU     RING + 0F0H       ; (10)
+; the math: after the variables in VPG
+PLV     EQU     VPG + 58H - 0A0H
+MX      EQU     PLV + 0A0H       ; (8)
+MP      EQU     PLV + 0A8H       ; (8)
+MY      EQU     PLV + 0B0H       ; (4)
+MD      EQU     PLV + 0B4H       ; (4)
+MR      EQU     PLV + 0B8H       ; (4)
+DIGB    EQU     PLV + 0BCH       ; (10)
+FMTB    EQU     PLV + 0C6H       ; (14)
         END

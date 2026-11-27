@@ -1003,7 +1003,8 @@ UP3:    SEP     R4
         DB      '  NOT SAVED (the card is full, or failed)',0DH,0AH,0
         LBR     UP1
 UP9:    SEP     R5
-; UPDIR: with /BIN (PKB = 1), the file at PKP goes in /BIN if it is a .PRG or .STL, else in the root
+; UPDIR: with /BIN (PKB = 1), the file at PKP goes in /BIN if it is a .PRG, .STL or .OVL (or in the folder in /BIN
+;        that has it already), else in the root
 UPDIR:  LOAD    RF, PKB
         LDN     RF
         LBZ     UD9
@@ -1026,14 +1027,50 @@ UPDIR:  LOAD    RF, PKB
         XRI     'G'
         LBR     UPX2
 UPX1:   XRI     'P' XOR 'S'
-        LBNZ    UPRT
+        LBNZ    UPX3
         LDA     RF
         XRI     'T'
         LBNZ    UPRT
         LDN     RF
         XRI     'L'
+        LBR     UPX2
+UPX3:   XRI     'S' XOR 'O'     ; .OVL (NANO.OVL): beside its program, as a .PRG
+        LBNZ    UPRT
+        LDA     RF
+        XRI     'V'
+        LBNZ    UPRT
+        LDN     RF
+        XRI     'L'
 UPX2:   LBNZ    UPRT
-        LOAD    RF, PBIN        ; a program: /BIN
+        LOAD    RD, 032DH       ; a program: if it is in a folder in /BIN already, replaced there (this kernel's
+        LDA     RD              ;  BINWALK - an older kernel: /BIN, as before)
+        XRI     HIGH(KS_STAMPV)
+        LBNZ    UPB
+        LDN     RD
+        XRI     LOW(KS_STAMPV)
+        LBNZ    UPB
+        LOAD    RF, PKP
+        LDA     RF
+        PHI     RD
+        LDN     RF
+        PLO     RD
+        LOAD    RC, KS_FNAME
+        LDI     11
+        PLO     RB
+UPC:    LDA     RD
+        STR     RC
+        INC     RC
+        DEC     RB
+        GLO     RB
+        LBNZ    UPC
+        LOAD    RD, KS_UKM
+        LDI     1
+        STR     RD
+        SEP     R4
+        DW      KS_BINWALK
+        LBDF    UPB
+        SEP     R5              ; (WDIR = its folder)
+UPB:    LOAD    RF, PBIN        ; else /BIN
         LBR     UPAT
 UPRT:   LOAD    RF, PROOT       ; the rest: the root
 UPAT:   LOAD    RD, NBUF        ; UPAT: K_PARSE of the path at RF - WDIR = its folder (the 11 bytes: NBUF)
@@ -1112,12 +1149,11 @@ TS1:    LDA     RD
         SEP     R4
         DW      KS_FINDN
         LBNF    TS2
-        SEP     R4              ; not there: /BIN (KS_ is safe here - the stamp was checked)
-        DW      KS_TOBIN
-        LBDF    TSNO
-        LOAD    RD, KS_FNAME
+        LOAD    RD, KS_UKM      ; not there: /BIN, then its folders (KS_ is safe here - the stamp was checked)
+        LDI     1
+        STR     RD
         SEP     R4
-        DW      KS_FINDN
+        DW      KS_BINWALK
         LBDF    TSNO
 TS2:    LBR     KS_RUNIT
 TSNO:   SEP     R4

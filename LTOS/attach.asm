@@ -261,7 +261,8 @@ SD7:    LDI     0
         INC     RD
         LDI     LOW(KS_DIRBUF)
         STR     RD
-; ---- 3: (after the folder has grown, if it had to - it takes a cluster) a FAT sector that is all free: S (from the end down), C1 = S x 256, K clusters for ROOMS sectors
+; ---- 3: (after the folder has grown, if it had to - it takes a cluster) a FAT sector that is all free: S (from the end down,
+;      the ones whose run would pass sector 65,535 skipped - a big card), C1 = S x 256, K clusters for ROOMS sectors
 SF2:    LDI     ROOMS           ; K = ROOMS / SPC rounded up: R9.1
         PLO     R9
         SEP     R4
@@ -299,7 +300,25 @@ SS1:    GLO     RA
         GLO     RA
         SDB                     ; (RC - (S x 256 + K - 1)): a borrow = it runs past the card's clusters
         LBNF    SSN
-        GLO     RA              ; that FAT sector (FATSEC: sector RC.1) - all 0?
+        GLO     RA              ; its K clusters end below sector 65,536 (the note's sectors are 16-bit)? A big
+        PHI     RC              ;  card's FAT runs far past that: the search from the end skips down to them
+        LOAD    RD, KCL         ;  (sector of cluster S x 256 + K: 65,536 at most)
+        LDN     RD
+        PLO     RC
+        SEP     R4
+        DW      KS_CL2LBA
+        GHI     R8
+        LBNZ    SSN
+        GLO     R8
+        LBZ     SS1F
+        GLO     R7              ; (exactly 65,536: the run's last sector is 65,535)
+        LBNZ    SSN
+        GHI     R7
+        LBNZ    SSN
+        GLO     R8
+        XRI     1
+        LBNZ    SSN
+SS1F:   GLO     RA              ; that FAT sector (FATSEC: sector RC.1) - all 0?
         PHI     RC
         LDI     0
         PLO     RC

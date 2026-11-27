@@ -2,7 +2,7 @@
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; help.asm - HELP.PRG: HELP (every command, a line each, by group) / HELP name (that command's page).
 ;   The text is help.txt, made into HELP.HLP by build.py (HELP.PRG loads it at TEXT: from this folder, else the
-;   root, else /BIN - where HELP.PRG itself is found): records of
+;   root, else /BIN or a folder in it - where HELP.PRG itself is found): records of
 ;     1, heading, 0                                   - a group's name (the list only)
 ;     2, NAME[,OTHER...], 0, summary, 0, body, 0      - a command (lines end with LF)
 ;     0                                               - the end
@@ -364,11 +364,15 @@ LDONE:  LOAD    RD, LPTR
         SEP     R4
         DW      DNFIND
         LBNF    LD2
-        SEP     R4              ; ... /BIN
-        DW      KS_TOBIN
-        LBDF    LD9
+        LOAD    RD, DNP         ; ... /BIN, then its folders
+        LDA     RD
+        PHI     RF
+        LDN     RD
+        PLO     RD
+        GHI     RF
+        PHI     RD
         SEP     R4
-        DW      DNFIND
+        DW      BINFN
         LBDF    LD9
 LD2:    SEP     R4
         DW      KS_FOPEN
@@ -429,6 +433,7 @@ DNFIND: LOAD    RD, DNP         ; FINDN of the name at DNP
         SEP     R4
         DW      KS_FINDN
         SEP     R5
+        INCL    "binfn.inc"
 OLD:    SEP     R4
         DW      K_PIN
         DB      'Not for this kernel - install LTOS again.',0DH,0AH,0

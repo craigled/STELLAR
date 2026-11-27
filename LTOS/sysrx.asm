@@ -3,14 +3,15 @@
 ; sysrx.asm - SYSRX.PRG: every LTOS program from the PC/Mac/Linux in one go (there: elfser.py system).
 ;   The one file out/LTOS-ALL.PAK comes in XFER's frames: block 0 says how many parts and how many blocks in each;
 ;   each part (an LPAK bundle, as RECV SYSTEM's) is gathered in memory, and its files saved before the ACK of its
-;   last block, so the sender waits for the card. Each .PRG and .STL goes in /BIN if there is one, the rest in the
-;   root. RECV SYSTEM stays for a plain terminal program, which has no way to wait.
-;   Only the fixed K_ calls and no kernel addresses: it still works right after U has put a new kernel on the card.
+;   last block, so the sender waits for the card. Each .PRG, .STL and .OVL goes in /BIN if there is one, each .MUS in
+;   /MUSIC if there is one, the rest in the root. RECV SYSTEM stays for a plain terminal program, which has no way to wait.
+;   Fixed K_ calls only, except BINWALK behind a stamp check (UPDIR): it still works right after U puts a new kernel on.
 ; The receive code is XFER's. Nothing is printed until the end: the sender is listening for ACKs.
 ; verify_sysrx.py runs it on the simulated Elf2K.
         CPU     1802
         INCL    "ltos.inc"
         INCL    "kapi.inc"
+        INCL    "out/ksyms.inc"
 THI     EQU     7700H           ; the CRC table: high bytes, low bytes (page-aligned; made at the start)
 TLO     EQU     7800H           ;  (above LTOS's buffers, so a part has all of memory up to PTOP)
 FRB     EQU     7900H           ; a frame, as it comes
@@ -513,11 +514,9 @@ UP3:    LOAD    RD, FAILS
         STR     RD
         LBR     UP1
 UP9:    SEP     R5
-; UPDIR: with /BIN, the file at PKP goes in /BIN if it is a .PRG or .STL, else in the root
-UPDIR:  LOAD    RF, PKB
-        LDN     RF
-        LBZ     UPRT
-        LOAD    RF, PKP         ; RF -> its extension
+; UPDIR: a .MUS goes in /MUSIC if the card has one, a .SC in /SRC; with /BIN, the file at PKP goes in /BIN if it is a .PRG, .STL or
+;        .OVL (or in the folder in /BIN that has it already); the rest in the root
+UPDIR:  LOAD    RF, PKP         ; RF -> its extension
         LDA     RF
         PHI     RD
         LDN     RF
@@ -526,6 +525,44 @@ UPDIR:  LOAD    RF, PKB
         GHI     RD
         ADCI    0
         PHI     RF
+        LDA     RF              ; a .MUS (PLAY's songs): in /MUSIC, if the card has one
+        XRI     'M'
+        LBNZ    UPS0
+        LDA     RF
+        XRI     'U'
+        LBNZ    UPD0
+        LDN     RF
+        XRI     'S'
+        LBNZ    UPD0
+        LOAD    RF, PMUS
+        LBR     UPGO
+UPS0:   XRI     'M' XOR 'S'     ; a .SC (the Stellar C examples): in /SRC, if the card has one
+        LBNZ    UPD1
+        LDA     RF
+        XRI     'C'
+        LBNZ    UPD0
+        LDN     RF
+        XRI     ' '
+        LBNZ    UPD0
+        LOAD    RF, PSRC
+UPGO:   SEP     R4
+        DW      UPAT
+        XRI     3
+        LBNZ    UPD0
+        SEP     R5              ; (WDIR = /MUSIC or /SRC)
+UPD0:   LOAD    RF, PKP         ; (RF back to its extension)
+        LDA     RF
+        PHI     RD
+        LDN     RF
+        ADI     9
+        PLO     RF
+        GHI     RD
+        ADCI    0
+        PHI     RF
+UPD1:   DEC     RF              ; with /BIN (PKB = 1): programs there
+        LOAD    RD, PKB
+        LDN     RD
+        LBZ     UPRT
         LDA     RF
         XRI     'P'
         LBNZ    UPX1
@@ -536,14 +573,50 @@ UPDIR:  LOAD    RF, PKB
         XRI     'G'
         LBR     UPX2
 UPX1:   XRI     'P' XOR 'S'
-        LBNZ    UPRT
+        LBNZ    UPX3
         LDA     RF
         XRI     'T'
         LBNZ    UPRT
         LDN     RF
         XRI     'L'
+        LBR     UPX2
+UPX3:   XRI     'S' XOR 'O'     ; .OVL (NANO.OVL): beside its program, as a .PRG
+        LBNZ    UPRT
+        LDA     RF
+        XRI     'V'
+        LBNZ    UPRT
+        LDN     RF
+        XRI     'L'
 UPX2:   LBNZ    UPRT
-        LOAD    RF, PBIN        ; a program: /BIN
+        LOAD    RD, 032DH       ; a program: if it is in a folder in /BIN already, replaced there (this kernel's
+        LDA     RD              ;  BINWALK - an older kernel: /BIN, as before)
+        XRI     HIGH(KS_STAMPV)
+        LBNZ    UPB
+        LDN     RD
+        XRI     LOW(KS_STAMPV)
+        LBNZ    UPB
+        LOAD    RF, PKP
+        LDA     RF
+        PHI     RD
+        LDN     RF
+        PLO     RD
+        LOAD    RC, KS_FNAME
+        LDI     11
+        PLO     RB
+UPC:    LDA     RD
+        STR     RC
+        INC     RC
+        DEC     RB
+        GLO     RB
+        LBNZ    UPC
+        LOAD    RD, KS_UKM
+        LDI     1
+        STR     RD
+        SEP     R4
+        DW      KS_BINWALK
+        LBDF    UPB
+        SEP     R5              ; (WDIR = its folder)
+UPB:    LOAD    RF, PBIN        ; else /BIN
         LBR     UPAT
 UPRT:   LOAD    RF, PROOT       ; the rest: the root
 UPAT:   LOAD    RD, NBUF        ; K_PARSE of the path at RF: WDIR = its folder
@@ -551,6 +624,8 @@ UPAT:   LOAD    RD, NBUF        ; K_PARSE of the path at RF: WDIR = its folder
         DW      K_PARSE
         SEP     R5
 PBIN:   DB      '/BIN/',0
+PMUS:   DB      '/MUSIC/',0
+PSRC:   DB      '/SRC/',0
 PROOT:  DB      '/',0
 PEND:
 VBEG:

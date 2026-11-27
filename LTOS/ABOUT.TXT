@@ -1,0 +1,158 @@
+ABOUT LTOS 0.5 - LiteOS for the COSMAC 1802
+===========================================
+
+LTOS turns an RCA COSMAC 1802 computer with a CompactFlash card into a
+small, complete disk computer. It was written for the Elf 2000 (the Elf2K)
+with its Disk/UART/RTC card, by Craig Ledbetter.
+
+    TYPE /ABOUT.TXT    this file        HELP    every command
+    LC                 the file manager VER     the version and the card
+
+
+WHAT IT MEANS FOR AN 1802 WITH A CARD
+-------------------------------------
+On its own an 1802 machine has a front panel, a monitor in ROM and a
+serial terminal. Programs are keyed in or sent as hex, and are gone when
+the power goes. LTOS changes that:
+
+  * The card is a real disk. It is FAT16, as a PC or Mac formats it, so
+    the same card can be read and written on your computer too.
+  * Folders, files and names (8.3, as NOTE.TXT), with paths such as
+    /BIN/GAMES/SNAKE.STL, wildcards (*.TXT), a trash can and a checker.
+  * Programs load by name: type SNAKE and it is found and run. Nothing to
+    key in, nothing to send, and it is still there tomorrow.
+  * A shell with scripts (.SH files): loops, functions, variables, and
+    the output of any command sent to a file with > and >>.
+  * The clock chip dates every file; CRON runs jobs at set times.
+  * STELLAR, the multitasking virtual machine in the Elf2K's ROM, runs
+    its apps (.STL files) straight from the card - up to four at once.
+
+LTOS starts from the card when the Elf2K boots. The kernel sits low in
+memory ($0300), programs load at $3000, and the STELLAR firmware is in
+ROM. Esc leaves every program and app and brings you back to LTOS>.
+
+
+WHERE THINGS ARE ON THE CARD
+----------------------------
+  /BIN          the commands (DIR, TYPE, COPY ...) and their helpers
+  /BIN/GAMES    the games, in 1802 code (.PRG) and for STELLAR (.STL)
+  /BIN/OFFICE   the spreadsheet, word processors, editor, address book
+  /BIN/SYSTEM   the file manager and the card's tools
+  /BIN/RAW      raw 1802 programs for the bare machine (1802 NAME)
+  /SRC          Tiny Stellar C examples, to compile on the 1802 itself
+  /MUSIC        tunes for PLAY
+  /BIBLE        the verses MEMVERSE picks from
+  /TRASH        what DELETE moved there (EMPTY empties it)
+
+A name typed alone is looked for in the folder you are in, then in /BIN
+and its folders, then in the root: you never need to type the folder.
+
+
+THE EVERYDAY COMMANDS
+---------------------
+  DIR CD PWD MKDIR RMDIR TREE FIND   folders and finding things
+  TYPE CAT HEAD TAIL HEX NL          looking at files
+  COPY MV REN DELETE EMPTY RM HIDE   copying, moving, deleting
+  WC GREP SORT UNIQ SED RAWK FILE    text tools, as Unix has them
+  FREE DISKINFO FSCK SQUEEZE         the card: room, details, checks
+  DATE TIME CAL                      the clock, and a calendar
+  ECHO SLEEP GETSTR FETCH POS CLS    for scripts and the screen
+
+To and from a PC or Mac over the serial line: RECV and SEND, XFER (any
+size), and SYSRX, which brings a whole new LTOS in one go. On the Mac the
+"Elf2K Card" tool formats a card, updates it, backs it up and checks it.
+
+
+OFFICE
+------
+  LTCALC     a spreadsheet in 1802 code: 8 columns by 32 rows, formulas
+             (SUM AVG MIN MAX COUNT), insert and delete rows and columns;
+             its files are plain text; reads and writes CSV
+  CSV2CLC    makes a CSV file from a PC or Mac spreadsheet into a sheet
+  LW2        Lite-Writer 2, a full-screen word processor (STELLAR)
+  LTWRITER   Lite-Writer 3, for documents longer than memory
+  NANO       a small full-screen editor in 1802 code
+  CONTACTS   an address book
+  CAL        a calendar, as Unix cal lays it out
+  CALC5 CALC8   pocket calculators (STELLAR)
+  EROFF      plain text made into pages (a small nroff); DEROFF undoes it
+
+
+THE SYSTEM
+----------
+  LC         LTOS Commander: two folders side by side - view, copy,
+             move, rename, delete, edit with NANO, and run files
+  FSCK       checks the card's folders and chains
+  DISKINFO   all about the card: model, format, space, files
+  CRON       runs the jobs in /CRON.TAB at the times they give
+  SQUEEZE    tidies the root folder (deleted entries taken out)
+  VER        the kernel's version and build date
+
+
+WRITING PROGRAMS ON THE 1802 ITSELF
+-----------------------------------
+  SC         Tiny Stellar C: a C-like language compiled on the Elf2K into a
+             STELLAR app. Examples in /SRC: CD /SRC, SC FIRST, then FIRST.
+             It reaches the hardware too: the clock, Q and the EF lines.
+  ASM        an 1802 assembler (a18's language): NAME.ASM -> NAME.PRG
+  MAKE       remakes what is out of date, by a MAKEFILE
+  SH         scripts: if, while, for, functions, case, $( ) and more
+  RAWK SAWK  awk: whole numbers in 1802 code, decimals on STELLAR
+  1802       runs a raw program on the bare machine (examples /BIN/RAW)
+  LOAD SAVE DUMP MON FW   memory, the monitor and the firmware
+
+HELP SCLANG, HELP ASMLANG and HELP SCRIPTS say what each language holds.
+
+
+SOUND AND THE HARDWARE
+----------------------
+  PLAY       tunes on Q - a speaker or buzzer on the Q line (/MUSIC)
+  MORSE      sends text as Morse code on Q, and reads Morse keyed on an
+             EF line (the INPUT switch, or a tone detector)
+  EARTEST    tests a sound detector on an EF line
+Most games make their sounds on Q as well (S or M turns them off).
+
+
+GAMES IN 1802 CODE (/BIN/GAMES, .PRG)
+-------------------------------------
+  COSMO      COSMO KID, a platform game: coins, Blorbs, two worlds
+  DESCEND    a dungeon crawl: find the Star Crystal ten levels down
+  AT-MAN     a maze: eat every dot, dodge the Glitches, power cells
+  RUNNING    a man on the move, drawn in 1802 code
+
+
+GAMES AND APPS ON STELLAR (/BIN/GAMES, .STL)
+--------------------------------------------
+  GALAXIA    a Galaxian-style shooter       INVADERS   march and shoot
+  BREAKOUT   knock out the wall             SNAKE      grow, don't crash
+  FREEFALL   falling pieces: clear rows     RACER      keep on the road
+  BOUNCE     paddle game vs the computer    LANDER     land on the moon
+  SEABATTL   sea battle vs the computer     MOONBASE   a text adventure
+  CANONBAL   cannon duel vs the computer    CANONSOL   target practice
+  TICTAC     tic-tac-toe vs the computer    WARMER     guess: warmer, colder
+  MAZE       a maze carved and solved by two VMs; MAZERACE: three racing
+  LIFELAB    the Game of Life, seeded by you; LIFERACE: two VMs racing
+  ORBIT      fly Apollo 7 to orbit and home, on three VMs
+  MANDEL     the Mandelbrot set; MANDEL4: drawn by all four VMs at once
+  BALL       bouncing balls                 STARFLD    a flight through stars
+  WALK       a man walking                  STARSHIP   the COSMAC ELF ship
+  PI PISTL   the digits of pi               PRIMES     prime numbers
+  SORTVIS    a sort you can watch           BANNER     big letters
+  BIGCLOCK   a big clock from the clock chip, timer and alarm
+  ELIZA      the 1966 chatbot therapist     DICE       two dice, in Stellar C
+
+Run any of them by name: GALAXIA, then Esc to come back to LTOS.
+
+
+WHERE TO GO NEXT
+----------------
+  HELP            every command, a line each; HELP NAME for more
+  HELP PATHS      how to name files in other folders
+  HELP SCRIPTS    what a script can do
+  LC              walk the card with the file manager
+  CD /SRC         the Stellar C examples
+  DIR /BIN/GAMES  the games
+
+LTOS is free software: GPL-3.0-or-later (HELP LICENSE). Its source, the
+STELLAR firmware, a version that runs in your web browser and one for the
+Emma 02 emulator are at github.com/craigled/STELLAR.

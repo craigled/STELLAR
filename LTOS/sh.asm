@@ -212,12 +212,9 @@ SM2:    LOAD    RD, SNM         ; here ...
         SEP     R4
         DW      KS_FINDN
         LBNF    SM4
-        SEP     R4              ; ... /BIN
-        DW      KS_TOBIN
-        LBDF    NOFILE
-        LOAD    RD, SNM
+        LOAD    RD, SNM         ; ... /BIN, then its folders
         SEP     R4
-        DW      KS_FINDN
+        DW      BINFN
         LBDF    NOFILE
 SM4:    LOAD    RD, KS_DATTR    ; (a folder: no)
         LDN     RD
@@ -2311,7 +2308,7 @@ BDBAD:  SEP     R4
         DW      K_PIN
         DB      '. NAME',0DH,0AH,0
         LBR     ST2X
-; FINDSH: RF -> a script's name (.SH if none): here, else the root, else /BIN (a name alone). DF = 0 found.
+; FINDSH: RF -> a script's name (.SH if none): here, else the root, else /BIN or a folder in it (a name alone). DF = 0 found.
 FINDSH: LOAD    RD, SNM
         SEP     R4
         DW      K_PARSE
@@ -2341,12 +2338,9 @@ FS1:    LOAD    RD, SNM
         SEP     R4
         DW      KS_FINDN
         LBNF    FS4
+        LOAD    RD, SNM         ; ... /BIN, then its folders
         SEP     R4
-        DW      KS_TOBIN
-        LBDF    FS9
-        LOAD    RD, SNM
-        SEP     R4
-        DW      KS_FINDN
+        DW      BINFN
         LBDF    FS9
 FS4:    LOAD    RD, KS_DATTR    ; (a folder: no)
         LDN     RD
@@ -2357,6 +2351,7 @@ FS4:    LOAD    RD, KS_DATTR    ; (a folder: no)
 FS9:    LDI     1
         SHR
         SEP     R5
+        INCL    "binfn.inc"
 ; OPENSH: the script FINDSH found, from its first line
 OPENSH: SEP     R4
         DW      KS_FOPEN

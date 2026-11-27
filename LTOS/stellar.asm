@@ -396,10 +396,7 @@ AP1B:   LOAD    RF, RECP
         LDN     RF
         PLO     R9
         SEP     R4
-        DW      INBIN
-        LBDF    NOAPP
-        SEP     R4
-        DW      FINDC
+        DW      INBINF
         LBDF    NOAPP
 AP1F:   LOAD    RD, BADF        ; (an argument it could not take, the app there: say so)
         LDN     RD
@@ -560,12 +557,9 @@ GO:     LOAD    RD, HASDOC      ; a document (or LW2 alone): the file attached
         LDN     RD
         LBZ     GO9
 ; ---- ATTACH.PRG puts the document in place on the card and writes its note at NOTEB ($7EA0 later)
-GA0:    SEP     R4              ; ATTACH.PRG: in /BIN (where RECV SYSTEM puts it: each folder searched
-        DW      TOBINC          ;  in vain reads all of it), else here, else in the root
-        LBDF    GA0H
-        LOAD    RD, ATTN
-        SEP     R4
-        DW      KS_FINDN
+GA0:    LOAD    RD, ATTN        ; ATTACH.PRG: in /BIN or a folder in it (where RECV SYSTEM puts it: each
+        SEP     R4              ;  folder searched in vain reads all of it), else here, else in the root
+        DW      BINFN
         LBNF    GA0A
 GA0H:   LOAD    R9, KS_CWD
         SEP     R4
@@ -931,10 +925,7 @@ FIND3:  STXD
         LBNF    F3Y
 F3B:    LOAD    R9, APREC
         SEP     R4
-        DW      INBIN
-        LBDF    F3N
-        SEP     R4
-        DW      FINDC
+        DW      INBINF
         LBDF    F3N
 F3Y:    LOAD    RD, KS_DATTR    ; (a folder of that name: no)
         LDN     RD
@@ -1076,15 +1067,7 @@ RECOF:  GLO     RC
         ADCI    0
         PHI     R9
         SEP     R5
-; TOBINC: KS_TOBIN, but /BIN's cluster kept in BINC the first time: after it, the root is not read again for it
-TOBINC: LOAD    R9, BINC
-        LDA     R9
-        STR     R2
-        LDN     R9
-        DEC     R9
-        OR
-        LBZ     TBC1            ; not known yet
-        ADI     0               ; DF = 0: WDIR = BINC (SETDIR)
+; SETDIR: WDIR = the 2 bytes at R9
 SETDIR: LOAD    RF, KS_WDIR
         LDA     R9
         STR     RF
@@ -1093,17 +1076,6 @@ SETDIR: LOAD    RF, KS_WDIR
         STR     RF
         DEC     R9
         SEP     R5
-TBC1:   SEP     R4
-        DW      KS_TOBIN
-        LBDF    TBC9
-        LOAD    R9, BINC        ; (R9 again: the kernel's card routines use it)
-        LOAD    RF, KS_WDIR
-        LDA     RF
-        STR     R9
-        INC     R9
-        LDN     RF
-        STR     R9
-TBC9:   SEP     R5
 TOROOT: INC     R9
         INC     R9
         LDN     R9              ; a path was given: no
@@ -1133,7 +1105,22 @@ INBIN:  INC     R9
         DEC     R9
         DEC     R9
         LBNZ    TR9
-        LBR     TOBINC
+        LBR     KS_TOBIN
+; INBINF: the record at R9: a name typed alone: CURN's name in /BIN, else in a folder in /BIN (BINFN) - DF = 0
+;         found. Else (a path, or nowhere) DF = 1.
+INBINF: INC     R9
+        INC     R9
+        LDN     R9
+        DEC     R9
+        DEC     R9
+        LBNZ    TR9
+        LOAD    RF, CURN
+        LDA     RF
+        PHI     RD
+        LDN     RF
+        PLO     RD
+        LBR     BINFN
+        INCL    "binfn.inc"
 ; FINDC: KS_FINDN for CURN's name
 FINDC:  LOAD    RF, CURN
         LDA     RF
@@ -1228,7 +1215,6 @@ HASDOC: DS      1               ; 1: a document, attached for the app (Lite-Writ
 DOCNM:  DS      11
 DOCREC: DS      3
 CURN:   DS      2
-BINC:   DS      2               ; /BIN's first cluster, once TOBINC has found it (0: not yet)
 JP:     DS      2
 KIDX:   DS      1               ; KIDX, SIDX: in this order
 SIDX:   DS      1

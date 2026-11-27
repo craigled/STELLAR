@@ -1,7 +1,9 @@
 # Copyright (C) 2026 Craig Ledbetter
 # SPDX-License-Identifier: GPL-3.0-or-later
 """SYSRX and elfser.py system on the simulated Elf2K: a card fresh from the installer (F and INSTALL2), MKDIR /BIN,
-then LTOS-ALL.PAK: every program in /BIN, the rest in the root, byte for byte; fsck clean; programs run. Over a card
+MKDIR /MUSIC /SRC, then LTOS-ALL.PAK: every program in /BIN, PLAY's songs in /MUSIC, the Stellar C examples in /SRC (in the
+root on a card without them),
+the rest in the root, byte for byte; fsck clean; programs run. Over a card
 that has them already. Damaged frames, a lost ACK, and a sender that stops.
 
     python3 LTOS/verify_sysrx.py
@@ -30,22 +32,26 @@ def main():
     fresh = V.image(cf, n)
     data = open(os.path.join(build.OUT, 'LTOS-ALL.PAK'), 'rb').read()
     want = {}
-    for name, d in build.samples():
+    for name, d in build.samples() + build.songs() + build.srcfiles():
         f = name[:8].decode().strip() + '.' + name[8:].decode().strip()
-        want[('BIN/' if name[8:] in (b'PRG', b'STL') else '') + f] = d
+        want[('BIN/' if name[8:] in (b'PRG', b'STL', b'OVL') else 'MUSIC/' if name[8:] == b'MUS' else
+              'SRC/' if name[8:] == b'SC ' else '') + f] = d
+    assert any(k.startswith('MUSIC/') for k in want), 'no songs in LTOS-ALL.PAK'
+    assert any(k.startswith('SRC/') for k in want), 'no Stellar C examples in LTOS-ALL.PAK'
     quiet = lambda *a: None
     E.xsys.t0 = 0
     E.time = type('T', (), {'time': staticmethod(lambda: 0), 'sleep': staticmethod(lambda x: None)})
 
-    def go(img, later_after=(), first=b'MKDIR /BIN\r', **kw):
+    def go(img, later_after=(), first=b'MKDIR /BIN\r', music=True, **kw):
         P1.load_image(cf, img)
-        later = [('LTOS> ', b'SYSRX\r')] + list(later_after) + [('LTOS> ', b'MON\r')]
+        later = [('LTOS> ', b'MKDIR /MUSIC\r'), ('LTOS> ', b'MKDIR /SRC\r')] * music + [('LTOS> ', b'SYSRX\r')] + list(later_after) + [('LTOS> ', b'MON\r')]
         u, st, t = X.run(cf, first, E.xsys(data, quiet), later=later, cap=3_000_000_000, **kw)
         return u, st, t, V.image(cf, n)
 
-    def check(img, e):
+    def check(img, e, music=True):
         got = X.files(img)
         for k, d in want.items():
+            if not music and k.startswith(('MUSIC/', 'SRC/')): k = k.split('/', 1)[1]
             if got.get(k) != d: e.append('%s: %s' % (k, 'not there' if k not in got else 'differs'))
         code = P2.fsck_free(img)
         if code[0]: e.append('fsck %r' % (code,))
@@ -71,10 +77,10 @@ def main():
     def recvf(k, b):
         if k == 30 and not lost[0]: lost[0] = True; return None
         return b
-    u, st, t, img3 = go(fresh, sendf=sendf, recvf=recvf)
+    u, st, t, img3 = go(fresh, sendf=sendf, recvf=recvf, music=False)
     if u.result is not True: e.append('%r %r' % (u.result, t[-200:]))
-    check(img3, e)
-    report('Damaged frames, one cut short, a lost ACK: sent again, every file right', e)
+    check(img3, e, music=False)
+    report('Damaged frames, one cut short, a lost ACK: sent again, every file right (no /MUSIC, /SRC: the songs and examples in the root)', e)
 
     e = []
     def stop():

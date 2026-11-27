@@ -470,6 +470,9 @@ PNAMES: DB      'all $00          ',0
         INCL    "ide.asm"
         INCL    "cons.asm"
         INCL    "nums.asm"
+PMBDEC  EQU     PDEC
+PMBPIN  EQU     PIN
+        INCL    "pmb.inc"
 
 DEFSEC: DS      4
 LSEC:   DS      4

@@ -9,11 +9,26 @@ Talk to the Elf2K over /dev/cu.usbserial-300005D8 at 19200 8N1 (no pyserial: ter
    python3 elf.py putstl LST [NAME] - a STELLAR app's .lst made into NAME.STL here (as RECV NAME.STL would),
                                      then put: for apps too big for RECV (over 15 KB, e.g. ORBIT's 31 blocks)
    python3 elf.py pull NAME [FILE] - XFER -S NAME on the Elf2K: the file from the card, any size
-   python3 elf.py system [FILE]   - every LTOS program, in one go (SYSRX on the Elf2K, out/LTOS-ALL.PAK here)
+   python3 elf.py system [FILE]   - every LTOS program and PLAY's songs (/MUSIC), in one go (its own SYSRX sent first,
+                                     then SYSRX on the Elf2K, out/LTOS-ALL.PAK here)
    options: --wait S (quiet time to stop reading, default 1.0), --max S (longest to read)"""
-import os, sys, termios, time, select, tty, binascii
+import os, sys, time, select, binascii
+try: import termios, tty                               # (not on Windows: cardsync.py drives the port with pyserial there)
+except ImportError: termios = tty = None
 DEV = '/dev/cu.usbserial-300005D8'
+def find_dev():
+    """DEV if it is there, else the one USB serial port there is (a Mac: cu.usbserial-*, cu.usbmodem*;
+    Linux: ttyUSB*, ttyACM*). None or more than one: say so and stop (--port names it)."""
+    if os.path.exists(DEV): return DEV
+    import glob
+    have = sorted(set(sum((glob.glob(g) for g in ('/dev/cu.usbserial*', '/dev/cu.usbmodem*', '/dev/cu.SLAB*',
+                                                  '/dev/cu.wchusbserial*', '/dev/ttyUSB*', '/dev/ttyACM*')), [])))
+    if len(have) == 1: return have[0]
+    raise SystemExit('Which serial port is the Elf2K on? Give --port /dev/...   (USB serial ports here: %s)'
+                     % (', '.join(have) or 'none - is the USB serial cable plugged in?'))
 def open_port():
+    global DEV
+    DEV = find_dev()
     fd = os.open(DEV, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
     a = termios.tcgetattr(fd)
     a[0] = 0; a[1] = 0
@@ -151,6 +166,15 @@ def xcommand(fd, cmd, yes=False):
             if a != 'Y': show(got + read_until_quiet(fd, 1.0, 5.0)); return False
             continue
         show(got); return False
+def pak_file(all_pak, name):
+    """One file's bytes out of LTOS-ALL.PAK (block 0 the plan: size 4, parts, blocks each; then each LPAK part)."""
+    at = 512
+    for k in range(all_pak[4]):
+        p = all_pak[at:at + all_pak[5 + k] * 512]; at += all_pak[5 + k] * 512
+        for i in range(p[4]):
+            e = p[5 + 15 * i: 20 + 15 * i]
+            if e[:11] == name: o = (e[11] << 8) | e[12]; return p[o:o + ((e[13] << 8) | e[14])]
+    return None
 def show(b): sys.stdout.write(b.decode('latin1').replace('\r\n', '\n').replace('\r', '\n')); sys.stdout.flush()
 def stl_of(lst):
     """What RECV NAME.STL makes of a STELLAR .lst (build.py's stl_of): only its 'D aaaa bb ...' lines; sector 0 =
@@ -192,8 +216,14 @@ def main():
                 os.write(fd, bytes([ch])); echo1(fd)
             return read_until_quiet(fd, 6.0, most, until=b'LTOS> ')
         os.write(fd, b'\r'); read_until_quiet(fd, 2.0, 6.0)
+        cmd('CD /')                                    # (the root: the SYSRX put there below is the one that runs)
         cmd('MKDIR /BIN')                              # (a fresh card has none; there already: it only says so)
+        cmd('MKDIR /MUSIC')                            # PLAY's songs (SYSRX puts each .MUS there)
+        cmd('MKDIR /SRC')                              # the Stellar C examples (SYSRX puts each .SC there)
         xsys.t0 = time.time()
+        rx = pak_file(data, b'SYSRX   PRG')            # this bundle's SYSRX first, as /SYSRX.PRG: a card's older SYSRX
+        if rx and xcommand(fd, 'XFER -R /SYSRX.PRG', yes=True):    #  would not know where newer kinds of file go
+            xrun(fd, xput(rx)); read_until_quiet(fd, 2.0, 10.0, until=b'LTOS> ')
         if not xcommand(fd, 'SYSRX'): os.close(fd); return
         okd = xrun(fd, xsys(data))
         show(read_until_quiet(fd, 6.0, 20.0, until=b'LTOS> '))
