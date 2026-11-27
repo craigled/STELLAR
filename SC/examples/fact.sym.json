@@ -1,0 +1,55 @@
+{
+ "vars": {
+  "main..h0": {
+   "reg": 0
+  },
+  "main.i": {
+   "reg": 1
+  },
+  "main.n": {
+   "reg": 2
+  },
+  "main.k": {
+   "reg": 3
+  },
+  "times.carry": {
+   "reg": 3
+  },
+  "len": {
+   "reg": 4
+  },
+  "times.i": {
+   "reg": 5
+  },
+  "show.i": {
+   "reg": 1
+  },
+  "small.n": {
+   "reg": 1
+  },
+  "times.d": {
+   "reg": 6
+  },
+  "small.f": {
+   "reg": 3
+  },
+  "times.m": {
+   "reg": 7
+  }
+ },
+ "arrays": {
+  "dig": 16977,
+  "line": 17137
+ },
+ "labels": {
+  "QUIT": 16414,
+  "F_small": 16415,
+  "R_small": 16440,
+  "F_times": 16442,
+  "R_times": 16513,
+  "F_show": 16515,
+  "R_show": 16541,
+  "F_main": 16543,
+  "R_main": 16869
+ }
+}

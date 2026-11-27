@@ -1,0 +1,32 @@
+{
+ "vars": {
+  "i": {
+   "reg": 0
+  },
+  "rattle.j": {
+   "reg": 1
+  },
+  "rattle.d": {
+   "reg": 2
+  },
+  "k": {
+   "reg": 3
+  },
+  "rattle.n": {
+   "reg": 4
+  },
+  "sound": {
+   "reg": 5
+  }
+ },
+ "arrays": {
+  "counts": 16909
+ },
+ "labels": {
+  "QUIT": 16399,
+  "F_rattle": 16400,
+  "R_rattle": 16463,
+  "F_main": 16465,
+  "R_main": 16777
+ }
+}

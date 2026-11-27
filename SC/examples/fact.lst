@@ -1,0 +1,397 @@
+; ==========================================================================
+; fact  -  compiled from fact.sc by scc (Stellar C, prototype)   loads at $4000
+; ==========================================================================
+; 180 STELLAR commands, 490 bytes of code, 97 bytes of data.
+; registers: main.i R1, show.i R1, small.n R1, main.n R2, main.k R3, times.carry R3, small.f R3, len R4, times.i R5, times.d R6, times.m R7
+; in memory: nothing
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 4000 CD             START                          Stellar C: fact
+; D 4001 11 0C 00 00    LOADXI R12 0000                // fact.sc - factorials. A u16 only holds up to 65535, so 8!   RC = 0: the index for a[k] and the u8 variables
+; D 4005 11 0E 02 51    LOADXI R14 0251                u8 dig[160];                // the answer, units digit first
+; D 4009 11 0F 02 F0    LOADXI R15 02F0
+; D 400D FB EF 00       FILLMEMXY RE..RF 00
+; D 4010 11 0E 02 F1    LOADXI R14 02F1                u8 line[8];                 // what you type
+; D 4014 11 0F 02 F8    LOADXI R15 02F8
+; D 4018 FB EF 00       FILLMEMXY RE..RF 00
+; D 401B BD 00 9F       CALL F_main                    run main()
+; QUIT:
+; D 401E 00             HALT
+; small():
+; D 401F 11 03 00 01    LOADXI R3 0001                 f = 1;
+; D 4023 B0 00 2C       GAL L2                         while (n > 1) { f = f * n; n--; }
+; D 4026 4A 31          MULTXY R3 * R1
+; D 4028 21 13          COPYAX MA -> R3
+; D 402A 43 01          DECX R1
+; D 402C 11 0F 00 01    LOADXI R15 0001
+; D 4030 89 F1          TESTLXY R15 < R1
+; D 4032 A0 00 26       IFTRUEI L1
+; D 4035 23 00 3D       COPYXY R3 -> R13               return f;
+; D 4038 BE 00          RETURN
+; times():
+; D 403A 11 03 00 00    LOADXI R3 0000                 carry = 0;
+; D 403E 11 05 00 00    LOADXI R5 0000                 for (i = 0; i < len; i++) {
+; D 4042 B0 00 63       GAL L6
+; D 4045 2E 05 02 51    READIDX R5 0251                d = dig[i] * m + carry;     // at most 9 * 100 + 99: fits ea
+; D 4049 21 0F          COPYAX Acc -> R15
+; D 404B 4A F7          MULTXY R15 * R7
+; D 404D 21 1F          COPYAX MA -> R15
+; D 404F 50 F3 06       ADDXYZ R15 + R3 -> R6
+; D 4052 11 0F 00 0A    LOADXI R15 000A                dig[i] = d % 10;            // keep the units...
+; D 4056 4D 6F          DIVXY R6 / R15
+; D 4058 27             COPYREMA
+; D 4059 2F 05 02 51    WRITEIDX R5 0251
+; D 405D 4D 6F          DIVXY R6 / R15                 carry = d / 10;             // ...and carry the rest
+; D 405F 21 13          COPYAX MA -> R3
+; D 4061 42 05          INCX R5                        for (i = 0; i < len; i++) {
+; D 4063 89 54          TESTLXY R5 < R4
+; D 4065 A0 00 45       IFTRUEI L5
+; D 4068 B0 00 7C       GAL L10                        while (carry > 0) {             // the carry makes the numbe
+; D 406B 11 0F 00 0A    LOADXI R15 000A                dig[len] = carry % 10;
+; D 406F 4D 3F          DIVXY R3 / R15
+; D 4071 27             COPYREMA
+; D 4072 2F 04 02 51    WRITEIDX R4 0251
+; D 4076 4D 3F          DIVXY R3 / R15                 carry = carry / 10;
+; D 4078 21 13          COPYAX MA -> R3
+; D 407A 42 04          INCX R4                        len++;
+; D 407C 89 C3          TESTLXY R12 < R3               while (carry > 0) {             // the carry makes the numbe
+; D 407E A0 00 6B       IFTRUEI L9
+; D 4081 BE 00          RETURN
+; show():
+; D 4083 23 00 41       COPYXY R4 -> R1                i = len;
+; D 4086 B0 00 98       GAL L14                        while (i > 0) { i--; putc('0' + dig[i]); }
+; D 4089 43 01          DECX R1
+; D 408B 2E 01 02 51    READIDX R1 0251
+; D 408F 21 0F          COPYAX Acc -> R15
+; D 4091 52 0F 00 30    ADDXI R15 0030
+; D 4095 22 0F          COPYXA R15 -> Acc
+; D 4097 C9             SEROUT
+; D 4098 89 C1          TESTLXY R12 < R1
+; D 409A A0 00 89       IFTRUEI L13
+; D 409D BE 00          RETURN
+; main():
+; D 409F 11 0F 01 F0    LOADXI R15 01F0                print("\r\nSmall ones, in a u16:\r\n");   "\r\nSmall ones, in a u16:\r\n"
+; D 40A3 C1 0F          PRINTSTR R15
+; D 40A5 11 02 00 00    LOADXI R2 0000                 for (n = 0; n <= 8; n++) {
+; D 40A9 B0 00 CF       GAL L18
+; D 40AC 22 02          COPYXA R2 -> Acc               printu(n); print("! = "); printu(small(n)); print("\r\n");
+; D 40AE 24             COPYAMA
+; D 40AF 6B 00          CVT2DEC Acc
+; D 40B1 6E             OUTDEC
+; D 40B2 11 0F 02 0A    LOADXI R15 020A                "! = "
+; D 40B6 C1 0F          PRINTSTR R15
+; D 40B8 23 00 21       COPYXY R2 -> R1
+; D 40BB BD 00 1F       CALL F_small
+; D 40BE 23 00 D0       COPYXY R13 -> R0
+; D 40C1 22 00          COPYXA R0 -> Acc
+; D 40C3 24             COPYAMA
+; D 40C4 6B 00          CVT2DEC Acc
+; D 40C6 6E             OUTDEC
+; D 40C7 11 0F 02 0F    LOADXI R15 020F                "\r\n"
+; D 40CB C1 0F          PRINTSTR R15
+; D 40CD 42 02          INCX R2                        for (n = 0; n <= 8; n++) {
+; D 40CF 11 0F 00 08    LOADXI R15 0008
+; D 40D3 88 F2          TESTGXY R15 >= R2
+; D 40D5 A0 00 AC       IFTRUEI L17
+; D 40D8 11 0F 02 12    LOADXI R15 0212                print("\r\nN (0-100, Enter to stop)? ");   "\r\nN (0-100, Enter to stop)? "
+; D 40DC C1 0F          PRINTSTR R15
+; D 40DE 11 0D 00 00    LOADXI R13 0000                k = getline(line);   getline(): at most 7 characters
+; D 40E2 CB             SERIN
+; D 40E3 21 0E          COPYAX Acc -> R14
+; D 40E5 86 0E 00 0D    TESTXI R14 000D
+; D 40E9 A0 01 28       IFTRUEI L27
+; D 40EC 86 0E 00 08    TESTXI R14 0008
+; D 40F0 A0 01 18       IFTRUEI L26
+; D 40F3 86 0E 00 7F    TESTXI R14 007F
+; D 40F7 A0 01 18       IFTRUEI L26
+; D 40FA 11 0F 00 20    LOADXI R15 0020
+; D 40FE 89 EF          TESTLXY R14 < R15
+; D 4100 A0 00 E2       IFTRUEI L25
+; D 4103 11 0F 00 07    LOADXI R15 0007
+; D 4107 89 DF          TESTLXY R13 < R15
+; D 4109 A1 00 E2       IFFALSEI L25                   full: ignored
+; D 410C 22 0E          COPYXA R14 -> Acc
+; D 410E 2F 0D 02 F1    WRITEIDX R13 02F1
+; D 4112 C9             SEROUT                         echo
+; D 4113 42 0D          INCX R13
+; D 4115 B0 00 E2       GAL L25
+; D 4118 8C 0D          TESTXZ R13
+; D 411A A0 00 E2       IFTRUEI L25
+; D 411D 43 0D          DECX R13
+; D 411F CA 08          SEROUTI 08
+; D 4121 CA 20          SEROUTI 20
+; D 4123 CA 08          SEROUTI 08
+; D 4125 B0 00 E2       GAL L25
+; D 4128 10 00 00       LOADAI 0000
+; D 412B 2F 0D 02 F1    WRITEIDX R13 02F1              NUL
+; D 412F CA 0D          SEROUTI 0D
+; D 4131 CA 0A          SEROUTI 0A
+; D 4133 23 00 D3       COPYXY R13 -> R3
+; D 4136 11 0F 02 0F    LOADXI R15 020F                print("\r\n");   "\r\n"
+; D 413A C1 0F          PRINTSTR R15
+; D 413C 8C 03          TESTXZ R3                      if (k == 0) return;
+; D 413E A0 01 E5       IFTRUEI R_main
+; D 4141 11 02 00 00    LOADXI R2 0000                 n = 0;                              // the typed digits -> a
+; D 4145 11 01 00 00    LOADXI R1 0000                 for (i = 0; i < k; i++) {
+; D 4149 B0 01 8B       GAL L29
+; D 414C 2E 01 02 F1    READIDX R1 02F1                if (line[i] < '0' || line[i] > '9') { n = 999; break; }
+; D 4150 21 0F          COPYAX Acc -> R15
+; D 4152 11 0E 00 30    LOADXI R14 0030
+; D 4156 89 FE          TESTLXY R15 < R14
+; D 4158 A0 01 6A       IFTRUEI L34
+; D 415B 2E 01 02 F1    READIDX R1 02F1
+; D 415F 21 0F          COPYAX Acc -> R15
+; D 4161 11 0E 00 39    LOADXI R14 0039
+; D 4165 89 EF          TESTLXY R14 < R15
+; D 4167 A1 01 71       IFFALSEI L33
+; D 416A 11 02 03 E7    LOADXI R2 03E7
+; D 416E B0 01 90       GAL L30
+; D 4171 11 0E 00 0A    LOADXI R14 000A                n = n * 10 + line[i] - '0';
+; D 4175 4A 2E          MULTXY R2 * R14
+; D 4177 21 1F          COPYAX MA -> R15
+; D 4179 2E 01 02 F1    READIDX R1 02F1
+; D 417D 21 0E          COPYAX Acc -> R14
+; D 417F 50 FE 0F       ADDXYZ R15 + R14 -> R15
+; D 4182 23 00 F2       COPYXY R15 -> R2
+; D 4185 53 02 00 30    SUBXI R2 0030
+; D 4189 42 01          INCX R1                        for (i = 0; i < k; i++) {
+; D 418B 89 13          TESTLXY R1 < R3
+; D 418D A0 01 4C       IFTRUEI L28
+; D 4190 11 0F 00 64    LOADXI R15 0064                if (n > 100) { print("0 to 100, please\r\n"); continue; }
+; D 4194 89 F2          TESTLXY R15 < R2
+; D 4196 A1 01 A2       IFFALSEI L36
+; D 4199 11 0F 02 2F    LOADXI R15 022F                "0 to 100, please\r\n"
+; D 419D C1 0F          PRINTSTR R15
+; D 419F B0 01 E2       GAL L24
+; D 41A2 10 00 01       LOADAI 0001                    dig[0] = 1; len = 1;                // start at 1
+; D 41A5 2F 0C 02 51    WRITEIDX R12 0251
+; D 41A9 11 04 00 01    LOADXI R4 0001
+; D 41AD 11 01 00 02    LOADXI R1 0002                 for (i = 2; i <= n; i++) times(i);  // then 1 x 2 x 3 x ...
+; D 41B1 B0 01 BC       GAL L38
+; D 41B4 23 00 17       COPYXY R1 -> R7
+; D 41B7 BD 00 3A       CALL F_times
+; D 41BA 42 01          INCX R1
+; D 41BC 88 21          TESTGXY R2 >= R1
+; D 41BE A0 01 B4       IFTRUEI L37
+; D 41C1 22 02          COPYXA R2 -> Acc               printu(n); print("! = "); show();
+; D 41C3 24             COPYAMA
+; D 41C4 6B 00          CVT2DEC Acc
+; D 41C6 6E             OUTDEC
+; D 41C7 11 0F 02 0A    LOADXI R15 020A                "! = "
+; D 41CB C1 0F          PRINTSTR R15
+; D 41CD BD 00 83       CALL F_show
+; D 41D0 11 0F 02 42    LOADXI R15 0242                print("\r\n("); printu(len); print(" digits)\r\n");   "\r\n("
+; D 41D4 C1 0F          PRINTSTR R15
+; D 41D6 22 04          COPYXA R4 -> Acc
+; D 41D8 24             COPYAMA
+; D 41D9 6B 00          CVT2DEC Acc
+; D 41DB 6E             OUTDEC
+; D 41DC 11 0F 02 46    LOADXI R15 0246                " digits)\r\n"
+; D 41E0 C1 0F          PRINTSTR R15
+; D 41E2 B0 00 D8       GAL L21                        while (1) {
+; D 41E5 BE 00          RETURN
+; D 41E7 F0 00 00       BREAK                          end marker: the pre-pass stops here
+
+; CODE  -  download this block
+
+D 4000 CD
+D 4001 11 0C 00 00
+D 4005 11 0E 02 51
+D 4009 11 0F 02 F0
+D 400D FB EF 00
+D 4010 11 0E 02 F1
+D 4014 11 0F 02 F8
+D 4018 FB EF 00
+D 401B BD 00 9F
+D 401E 00
+D 401F 11 03 00 01
+D 4023 B0 00 2C
+D 4026 4A 31
+D 4028 21 13
+D 402A 43 01
+D 402C 11 0F 00 01
+D 4030 89 F1
+D 4032 A0 00 26
+D 4035 23 00 3D
+D 4038 BE 00
+D 403A 11 03 00 00
+D 403E 11 05 00 00
+D 4042 B0 00 63
+D 4045 2E 05 02 51
+D 4049 21 0F
+D 404B 4A F7
+D 404D 21 1F
+D 404F 50 F3 06
+D 4052 11 0F 00 0A
+D 4056 4D 6F
+D 4058 27
+D 4059 2F 05 02 51
+D 405D 4D 6F
+D 405F 21 13
+D 4061 42 05
+D 4063 89 54
+D 4065 A0 00 45
+D 4068 B0 00 7C
+D 406B 11 0F 00 0A
+D 406F 4D 3F
+D 4071 27
+D 4072 2F 04 02 51
+D 4076 4D 3F
+D 4078 21 13
+D 407A 42 04
+D 407C 89 C3
+D 407E A0 00 6B
+D 4081 BE 00
+D 4083 23 00 41
+D 4086 B0 00 98
+D 4089 43 01
+D 408B 2E 01 02 51
+D 408F 21 0F
+D 4091 52 0F 00 30
+D 4095 22 0F
+D 4097 C9
+D 4098 89 C1
+D 409A A0 00 89
+D 409D BE 00
+D 409F 11 0F 01 F0
+D 40A3 C1 0F
+D 40A5 11 02 00 00
+D 40A9 B0 00 CF
+D 40AC 22 02
+D 40AE 24
+D 40AF 6B 00
+D 40B1 6E
+D 40B2 11 0F 02 0A
+D 40B6 C1 0F
+D 40B8 23 00 21
+D 40BB BD 00 1F
+D 40BE 23 00 D0
+D 40C1 22 00
+D 40C3 24
+D 40C4 6B 00
+D 40C6 6E
+D 40C7 11 0F 02 0F
+D 40CB C1 0F
+D 40CD 42 02
+D 40CF 11 0F 00 08
+D 40D3 88 F2
+D 40D5 A0 00 AC
+D 40D8 11 0F 02 12
+D 40DC C1 0F
+D 40DE 11 0D 00 00
+D 40E2 CB
+D 40E3 21 0E
+D 40E5 86 0E 00 0D
+D 40E9 A0 01 28
+D 40EC 86 0E 00 08
+D 40F0 A0 01 18
+D 40F3 86 0E 00 7F
+D 40F7 A0 01 18
+D 40FA 11 0F 00 20
+D 40FE 89 EF
+D 4100 A0 00 E2
+D 4103 11 0F 00 07
+D 4107 89 DF
+D 4109 A1 00 E2
+D 410C 22 0E
+D 410E 2F 0D 02 F1
+D 4112 C9
+D 4113 42 0D
+D 4115 B0 00 E2
+D 4118 8C 0D
+D 411A A0 00 E2
+D 411D 43 0D
+D 411F CA 08
+D 4121 CA 20
+D 4123 CA 08
+D 4125 B0 00 E2
+D 4128 10 00 00
+D 412B 2F 0D 02 F1
+D 412F CA 0D
+D 4131 CA 0A
+D 4133 23 00 D3
+D 4136 11 0F 02 0F
+D 413A C1 0F
+D 413C 8C 03
+D 413E A0 01 E5
+D 4141 11 02 00 00
+D 4145 11 01 00 00
+D 4149 B0 01 8B
+D 414C 2E 01 02 F1
+D 4150 21 0F
+D 4152 11 0E 00 30
+D 4156 89 FE
+D 4158 A0 01 6A
+D 415B 2E 01 02 F1
+D 415F 21 0F
+D 4161 11 0E 00 39
+D 4165 89 EF
+D 4167 A1 01 71
+D 416A 11 02 03 E7
+D 416E B0 01 90
+D 4171 11 0E 00 0A
+D 4175 4A 2E
+D 4177 21 1F
+D 4179 2E 01 02 F1
+D 417D 21 0E
+D 417F 50 FE 0F
+D 4182 23 00 F2
+D 4185 53 02 00 30
+D 4189 42 01
+D 418B 89 13
+D 418D A0 01 4C
+D 4190 11 0F 00 64
+D 4194 89 F2
+D 4196 A1 01 A2
+D 4199 11 0F 02 2F
+D 419D C1 0F
+D 419F B0 01 E2
+D 41A2 10 00 01
+D 41A5 2F 0C 02 51
+D 41A9 11 04 00 01
+D 41AD 11 01 00 02
+D 41B1 B0 01 BC
+D 41B4 23 00 17
+D 41B7 BD 00 3A
+D 41BA 42 01
+D 41BC 88 21
+D 41BE A0 01 B4
+D 41C1 22 02
+D 41C3 24
+D 41C4 6B 00
+D 41C6 6E
+D 41C7 11 0F 02 0A
+D 41CB C1 0F
+D 41CD BD 00 83
+D 41D0 11 0F 02 42
+D 41D4 C1 0F
+D 41D6 22 04
+D 41D8 24
+D 41D9 6B 00
+D 41DB 6E
+D 41DC 11 0F 02 46
+D 41E0 C1 0F
+D 41E2 B0 00 D8
+D 41E5 BE 00
+D 41E7 F0 00 00
+
+D 41F0 0D 0A 53 6D 61 6C 6C 20 6F 6E 65 73 2C 20 69 6E
+D 4200 20 61 20 75 31 36 3A 0D 0A 00
+
+D 420A 21 20 3D 20 00
+
+D 420F 0D 0A 00
+
+D 4212 0D 0A 4E 20 28 30 2D 31 30 30 2C 20 45 6E 74 65
+D 4222 72 20 74 6F 20 73 74 6F 70 29 3F 20 00
+
+D 422F 30 20 74 6F 20 31 30 30 2C 20 70 6C 65 61 73 65
+D 423F 0D 0A 00
+
+D 4242 0D 0A 28 00
+
+D 4246 20 64 69 67 69 74 73 29 0D 0A 00
+D 5000 00
+D 6000 00
+D 7000 00

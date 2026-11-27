@@ -1,0 +1,124 @@
+{
+ "vars": {
+  "space..h0": {
+   "reg": 0
+  },
+  "play.w": {
+   "reg": 0
+  },
+  "hi": {
+   "reg": 1
+  },
+  "play.i": {
+   "reg": 2
+  },
+  "ti": {
+   "reg": 3
+  },
+  "dir": {
+   "reg": 4
+  },
+  "hc": {
+   "reg": 5
+  },
+  "hl": {
+   "reg": 6
+  },
+  "tc": {
+   "reg": 7
+  },
+  "tl": {
+   "reg": 8
+  },
+  "grow": {
+   "reg": 9
+  },
+  "score": {
+   "reg": 10
+  },
+  "gameover.n": {
+   "reg": 0
+  },
+  "kwait.n": {
+   "reg": 2
+  },
+  "space.k": {
+   "reg": 2
+  },
+  "place.c": {
+   "reg": 0
+  },
+  "place.l": {
+   "reg": 2
+  },
+  "place.i": {
+   "reg": 11
+  },
+  "keys.k": {
+   "reg": 2
+  },
+  "keys.d": {
+   "reg": 11
+  },
+  "put3.v": {
+   "reg": 2
+  },
+  "put3.p": {
+   "reg": 11
+  },
+  "best": {
+   "mem": 20444
+  }
+ },
+ "arrays": {
+  "next": 17648,
+  "next2": 17649,
+  "lvl": 17650,
+  "grid": 17651,
+  "tens": 19331,
+  "ones": 19432,
+  "rev": 19533,
+  "waith": 19538,
+  "waitv": 19548,
+  "status": 19558,
+  "paused": 19641,
+  "init": 19696,
+  "walls": 19711,
+  "side": 19886,
+  "snake0": 19905,
+  "move": 19918,
+  "tail": 19937,
+  "foods": 19947,
+  "dead": 19957,
+  "over": 19967,
+  "newb": 20057,
+  "again": 20087,
+  "title": 20132,
+  "bye": 20391
+ },
+ "labels": {
+  "QUIT": 16403,
+  "F_quit": 16404,
+  "R_quit": 16413,
+  "F_kwait": 16415,
+  "R_kwait": 16442,
+  "F_space": 16444,
+  "R_space": 16486,
+  "F_put3": 16488,
+  "R_put3": 16526,
+  "F_showstatus": 16528,
+  "R_showstatus": 16558,
+  "F_place": 16560,
+  "R_place": 16661,
+  "F_pause": 16663,
+  "R_pause": 16680,
+  "F_keys": 16682,
+  "R_keys": 16901,
+  "F_play": 16903,
+  "R_play": 17506,
+  "F_gameover": 17508,
+  "R_gameover": 17607,
+  "F_main": 17609,
+  "R_main": 17641
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "vars": {
+  "i": {
+   "reg": 0
+  },
+  "n": {
+   "reg": 1
+  }
+ },
+ "arrays": {
+  "name": 17507,
+  "t": 17528
+ },
+ "labels": {
+  "QUIT": 16414,
+  "F_main": 16415,
+  "R_main": 16970,
+  "LIB_AT": 16972,
+  "LIB_HEX": 16994,
+  "LIB_HEX_L": 16994,
+  "LIB_PRW": 17023,
+  "LIB_PRW_L": 17029,
+  "LIB_PRW_D": 17059,
+  "LIB_PRW_N": 17069,
+  "LIB_PRZ": 17087,
+  "LIB_PRZ_L": 17093,
+  "LIB_PRZ_D": 17123,
+  "LIB_PRZ_N": 17133
+ }
+}

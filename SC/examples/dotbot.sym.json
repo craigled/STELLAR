@@ -1,0 +1,256 @@
+{
+ "vars": {
+  "anykey..h0": {
+   "reg": 0
+  },
+  "play..h0": {
+   "reg": 0
+  },
+  "play.k": {
+   "reg": 1
+  },
+  "px": {
+   "reg": 2
+  },
+  "py": {
+   "reg": 3
+  },
+  "dots": {
+   "reg": 4
+  },
+  "drawall.x": {
+   "reg": 1
+  },
+  "score": {
+   "reg": 5
+  },
+  "drawall.inrev": {
+   "reg": 6
+  },
+  "level": {
+   "reg": 7
+  },
+  "scaret": {
+   "reg": 8
+  },
+  "pd": {
+   "reg": 9
+  },
+  "nd": {
+   "reg": 10
+  },
+  "sx": {
+   "reg": 11
+  },
+  "sy": {
+   "mem": 21455
+  },
+  "lives": {
+   "mem": 21457
+  },
+  "drawall.c": {
+   "mem": 21459
+  },
+  "play.c": {
+   "reg": 6
+  },
+  "play.w": {
+   "mem": 21461
+  },
+  "tnum": {
+   "mem": 21463
+  },
+  "drawall.y": {
+   "mem": 21465
+  },
+  "starts.k": {
+   "reg": 1
+  },
+  "meet.k": {
+   "reg": 1
+  },
+  "opx": {
+   "mem": 21467
+  },
+  "opy": {
+   "mem": 21469
+  },
+  "scare.k": {
+   "reg": 1
+  },
+  "setup.i": {
+   "reg": 1
+  },
+  "setup.c": {
+   "reg": 6
+  },
+  "sweepf.k": {
+   "reg": 6
+  },
+  "meet.hit": {
+   "reg": 6
+  },
+  "sndwin.i": {
+   "reg": 1
+  },
+  "anykey.n": {
+   "reg": 1
+  },
+  "kwait.n": {
+   "reg": 1
+  },
+  "sweepf.steps": {
+   "mem": 21471
+  },
+  "twait.w": {
+   "reg": 6
+  },
+  "scare.t": {
+   "reg": 6
+  },
+  "anykey.k": {
+   "reg": 6
+  },
+  "sweepf.step": {
+   "mem": 21473
+  },
+  "keys.k": {
+   "reg": 1
+  },
+  "sweepf.n": {
+   "mem": 21475
+  },
+  "sweepf.up": {
+   "mem": 21477
+  },
+  "stepto.d": {
+   "reg": 1
+  },
+  "shle": {
+   "mem": 21479
+  },
+  "cellat.x": {
+   "reg": 0
+  },
+  "cellat.y": {
+   "reg": 1
+  },
+  "open.c": {
+   "reg": 1
+  },
+  "open.x": {
+   "reg": 6
+  },
+  "open.y": {
+   "mem": 21481
+  },
+  "stepto.x": {
+   "reg": 6
+  },
+  "stepto.y": {
+   "mem": 21483
+  },
+  "tone.k": {
+   "mem": 21485
+  },
+  "tone.n": {
+   "mem": 21487
+  },
+  "shli": {
+   "mem": 21489
+  },
+  "shsc": {
+   "mem": 21491
+  }
+ },
+ "arrays": {
+  "maze0": 18880,
+  "grid": 19658,
+  "rowt": 20435,
+  "gx": 20477,
+  "gy": 20481,
+  "gd": 20485,
+  "gm": 20489,
+  "gw": 20493,
+  "gox": 20497,
+  "goy": 20501,
+  "gs": 20505,
+  "gos": 20509,
+  "nv": 20513,
+  "ghome": 20529,
+  "gwait0": 20533,
+  "init": 20537,
+  "rev": 20552,
+  "norm": 20557,
+  "keysl": 20562,
+  "st1": 20654,
+  "st2": 20693,
+  "st3": 20708,
+  "st4": 20723,
+  "readys": 20745,
+  "unreadys": 20767,
+  "over": 20781,
+  "title": 20938,
+  "bye": 21424,
+  "fanf": 21442
+ },
+ "labels": {
+  "QUIT": 16515,
+  "F_quit": 16516,
+  "R_quit": 16546,
+  "F_tone": 16548,
+  "R_tone": 16579,
+  "F_sweepf": 16581,
+  "R_sweepf": 16671,
+  "F_snddot": 16673,
+  "R_snddot": 16698,
+  "F_sndpower": 16700,
+  "R_sndpower": 16802,
+  "F_sndeat": 16804,
+  "R_sndeat": 16855,
+  "F_snddie": 16857,
+  "R_snddie": 16904,
+  "F_sndwin": 16906,
+  "R_sndwin": 16962,
+  "F_kwait": 16964,
+  "R_kwait": 16991,
+  "F_keys": 16993,
+  "R_keys": 17180,
+  "F_twait": 17182,
+  "R_twait": 17201,
+  "F_cellat": 17203,
+  "R_cellat": 17225,
+  "F_stepto": 17227,
+  "R_stepto": 17327,
+  "F_open": 17329,
+  "R_open": 17379,
+  "F_setup": 17381,
+  "R_setup": 17447,
+  "F_starts": 17449,
+  "R_starts": 17555,
+  "F_status": 17557,
+  "R_status": 17677,
+  "F_drawall": 17679,
+  "R_drawall": 17915,
+  "F_drawmov": 17917,
+  "R_drawmov": 17962,
+  "F_gall": 17964,
+  "R_gall": 17967,
+  "F_scare": 17969,
+  "R_scare": 18064,
+  "F_meet": 18066,
+  "R_meet": 18251,
+  "F_play": 18253,
+  "R_play": 18762,
+  "F_anykey": 18764,
+  "R_anykey": 18820,
+  "F_main": 18822,
+  "R_main": 18840,
+  "LIB_AT": 18842
+ },
+ "natives": [
+  21504,
+  21553,
+  22351
+ ]
+}

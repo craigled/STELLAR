@@ -1,0 +1,60 @@
+{
+ "vars": {
+  "main.hits": {
+   "reg": 0
+  },
+  "main.hold": {
+   "reg": 1
+  },
+  "main.mask": {
+   "reg": 2
+  },
+  "main.peak": {
+   "reg": 3
+  },
+  "main.k": {
+   "reg": 4
+  },
+  "main.quiet": {
+   "reg": 5
+  },
+  "main.inv": {
+   "reg": 6
+  },
+  "main.cnt": {
+   "reg": 7
+  },
+  "main.on": {
+   "reg": 8
+  },
+  "main.seen": {
+   "reg": 9
+  },
+  "main.sounds": {
+   "reg": 10
+  },
+  "main.lvl": {
+   "reg": 11
+  },
+  "main.oldmask": {
+   "reg": 12
+  },
+  "main.shown": {
+   "mem": 17843
+  }
+ },
+ "arrays": {
+  "hashes": 17800,
+  "dots": 17821
+ },
+ "labels": {
+  "QUIT": 16388,
+  "F_screen": 16389,
+  "R_screen": 16467,
+  "F_main": 16469,
+  "R_main": 17004
+ },
+ "natives": [
+  17845
+ ]
+}

@@ -1,0 +1,31 @@
+{
+ "vars": {
+  "main.total": {
+   "reg": 0
+  },
+  "main.n": {
+   "reg": 1
+  },
+  "main.i": {
+   "reg": 2
+  },
+  "main.check": {
+   "reg": 3
+  }
+ },
+ "arrays": {
+  "data": 16556,
+  "hex": 16756,
+  "buf": 16761
+ },
+ "labels": {
+  "QUIT": 16399,
+  "F_main": 16400,
+  "R_main": 16530
+ },
+ "natives": [
+  16773,
+  16823,
+  16872
+ ]
+}

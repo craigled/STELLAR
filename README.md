@@ -214,7 +214,7 @@ LTOS, the STELLAR firmware, the Stellar C compiler and the programs here are fre
 
 **Programs you compile are yours.** The Stellar C compiler copies some of its library routines into your program, so an exception (`COPYING.EXCEPTION`) lets you use what it produces on any terms you like.
 
-The source of LTOS is in the `LTOS` folder, the Stellar C compiler in `web/sc`, and the programs in `APPLICATIONS` and `web/samples`.
+The source of LTOS is in the `LTOS` folder; the Stellar C compiler in `SC` (`scc.py`, with its tests and examples, and `tsc.py`, the Tiny Stellar C that LTOS's SC.PRG matches byte for byte; it uses `Firmware-Math/mini.py`, `Firmware-Math/stellar_ops.py` and `tools/stellar_disasm.py`), and the same compiler for the browser in `web/sc`; the Elf2K card tool in `tools` (see `tools/README.md`); and the programs in `APPLICATIONS` and `web/samples`.
 
 The documentation, including this README and the Stellar C guide, is under the Creative Commons Attribution-ShareAlike 4.0 licence (CC BY-SA 4.0).
 

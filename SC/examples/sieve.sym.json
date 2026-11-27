@@ -1,0 +1,52 @@
+{
+ "vars": {
+  "main..h0": {
+   "reg": 0
+  },
+  "main..h1": {
+   "reg": 1
+  },
+  "main..h2": {
+   "reg": 2
+  },
+  "main..h3": {
+   "reg": 3
+  },
+  "main.j": {
+   "reg": 4
+  },
+  "main.i": {
+   "reg": 5
+  },
+  "count": {
+   "reg": 6
+  },
+  "max.a": {
+   "reg": 4
+  },
+  "max.b": {
+   "reg": 5
+  },
+  "show.p": {
+   "reg": 4
+  },
+  "square.x": {
+   "reg": 4
+  }
+ },
+ "arrays": {
+  "composite": 16745,
+  "hello": 18745
+ },
+ "labels": {
+  "QUIT": 16403,
+  "F_max": 16404,
+  "R_max": 16417,
+  "F_square": 16419,
+  "R_square": 16423,
+  "F_show": 16425,
+  "R_show": 16454,
+  "F_main": 16456,
+  "R_main": 16676
+ }
+}

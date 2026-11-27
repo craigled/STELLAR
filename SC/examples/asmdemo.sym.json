@@ -1,0 +1,37 @@
+{
+ "vars": {
+  "main.i": {
+   "reg": 0
+  },
+  "main.n": {
+   "reg": 1
+  },
+  "countkeys.k": {
+   "reg": 0
+  },
+  "main.p": {
+   "reg": 2
+  },
+  "main..h0": {
+   "reg": 3
+  },
+  "twice.a": {
+   "reg": 0
+  }
+ },
+ "arrays": {
+  "msg": 16539
+ },
+ "labels": {
+  "QUIT": 16388,
+  "F_twice": 16389,
+  "R_twice": 16392,
+  "F_countkeys": 16394,
+  "A_countkeys_poll": 16398,
+  "A_countkeys_done": 16408,
+  "R_countkeys": 16411,
+  "F_main": 16413,
+  "A_main_good": 16478,
+  "R_main": 16512
+ }
+}

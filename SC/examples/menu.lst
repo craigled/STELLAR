@@ -1,0 +1,134 @@
+; ==========================================================================
+; menu  -  compiled from menu.sc by scc (Stellar C, prototype)   loads at $4000
+; ==========================================================================
+; 47 STELLAR commands, 135 bytes of code, 181 bytes of data.
+; registers: k R0
+; in memory: nothing
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 4000 CD             START                          Stellar C: menu
+; D 4001 BD 00 05       CALL F_main                    run main()
+; QUIT:
+; D 4004 00             HALT
+; main():
+; D 4005 11 0F 00 E9    LOADXI R15 00E9                print(menu);
+; D 4009 C1 0F          PRINTSTR R15
+; D 400B CB             SERIN                          k = getc();
+; D 400C 21 00          COPYAX Acc -> R0
+; D 400E 11 0F 00 61    LOADXI R15 0061                if (k >= 'a' && k <= 'z') k = k - 'a' + 'A';
+; D 4012 88 0F          TESTGXY R0 >= R15
+; D 4014 A1 00 2E       IFFALSEI L6
+; D 4017 11 0F 00 7A    LOADXI R15 007A
+; D 401B 88 F0          TESTGXY R15 >= R0
+; D 401D A1 00 2E       IFFALSEI L6
+; D 4020 23 00 0F       COPYXY R0 -> R15
+; D 4023 53 0F 00 61    SUBXI R15 0061
+; D 4027 23 00 F0       COPYXY R15 -> R0
+; D 402A 52 00 00 41    ADDXI R0 0041
+; D 402E 22 00          COPYXA R0 -> Acc               putc(k); print("\r\n");
+; D 4030 C9             SEROUT
+; D 4031 11 0F 00 90    LOADXI R15 0090                "\r\n"
+; D 4035 C1 0F          PRINTSTR R15
+; D 4037 86 00 00 31    TESTXI R0 0031                 case '1': print("-> would run: LW2\r\n"); break;
+; D 403B A0 00 56       IFTRUEI L8                     case 49
+; D 403E 86 00 00 32    TESTXI R0 0032                 case '2': print("-> would run: NANO\r\n"); break;
+; D 4042 A0 00 5F       IFTRUEI L9                     case 50
+; D 4045 86 00 00 33    TESTXI R0 0033                 case '3': print("-> would run: DIR\r\n"); break;
+; D 4049 A0 00 68       IFTRUEI L10                    case 51
+; D 404C 86 00 00 51    TESTXI R0 0051                 case 'Q': print("Bye.\r\n"); return;
+; D 4050 A0 00 71       IFTRUEI L11                    case 81
+; D 4053 B0 00 79       GAL L12                        default
+; D 4056 11 0F 00 93    LOADXI R15 0093                case '1': print("-> would run: LW2\r\n"); break;   "-> would run: LW2\r\n"
+; D 405A C1 0F          PRINTSTR R15
+; D 405C B0 00 7F       GAL L7
+; D 405F 11 0F 00 A7    LOADXI R15 00A7                case '2': print("-> would run: NANO\r\n"); break;   "-> would run: NANO\r\n"
+; D 4063 C1 0F          PRINTSTR R15
+; D 4065 B0 00 7F       GAL L7
+; D 4068 11 0F 00 BC    LOADXI R15 00BC                case '3': print("-> would run: DIR\r\n"); break;   "-> would run: DIR\r\n"
+; D 406C C1 0F          PRINTSTR R15
+; D 406E B0 00 7F       GAL L7
+; D 4071 11 0F 00 D0    LOADXI R15 00D0                case 'Q': print("Bye.\r\n"); return;   "Bye.\r\n"
+; D 4075 C1 0F          PRINTSTR R15
+; D 4077 BE 00          RETURN
+; D 4079 11 0F 00 D7    LOADXI R15 00D7                default:  print("No such choice.\r\n");   "No such choice.\r\n"
+; D 407D C1 0F          PRINTSTR R15
+; D 407F B0 00 05       GAL L1                         while (1) {
+; D 4082 BE 00          RETURN
+; D 4084 F0 00 00       BREAK                          end marker: the pre-pass stops here
+
+; CODE  -  download this block
+
+D 4000 CD
+D 4001 BD 00 05
+D 4004 00
+D 4005 11 0F 00 E9
+D 4009 C1 0F
+D 400B CB
+D 400C 21 00
+D 400E 11 0F 00 61
+D 4012 88 0F
+D 4014 A1 00 2E
+D 4017 11 0F 00 7A
+D 401B 88 F0
+D 401D A1 00 2E
+D 4020 23 00 0F
+D 4023 53 0F 00 61
+D 4027 23 00 F0
+D 402A 52 00 00 41
+D 402E 22 00
+D 4030 C9
+D 4031 11 0F 00 90
+D 4035 C1 0F
+D 4037 86 00 00 31
+D 403B A0 00 56
+D 403E 86 00 00 32
+D 4042 A0 00 5F
+D 4045 86 00 00 33
+D 4049 A0 00 68
+D 404C 86 00 00 51
+D 4050 A0 00 71
+D 4053 B0 00 79
+D 4056 11 0F 00 93
+D 405A C1 0F
+D 405C B0 00 7F
+D 405F 11 0F 00 A7
+D 4063 C1 0F
+D 4065 B0 00 7F
+D 4068 11 0F 00 BC
+D 406C C1 0F
+D 406E B0 00 7F
+D 4071 11 0F 00 D0
+D 4075 C1 0F
+D 4077 BE 00
+D 4079 11 0F 00 D7
+D 407D C1 0F
+D 407F B0 00 05
+D 4082 BE 00
+D 4084 F0 00 00
+
+D 4090 0D 0A 00
+
+D 4093 2D 3E 20 77 6F 75 6C 64 20 72 75 6E 3A 20 4C 57
+D 40A3 32 0D 0A 00
+
+D 40A7 2D 3E 20 77 6F 75 6C 64 20 72 75 6E 3A 20 4E 41
+D 40B7 4E 4F 0D 0A 00
+
+D 40BC 2D 3E 20 77 6F 75 6C 64 20 72 75 6E 3A 20 44 49
+D 40CC 52 0D 0A 00
+
+D 40D0 42 79 65 2E 0D 0A 00
+
+D 40D7 4E 6F 20 73 75 63 68 20 63 68 6F 69 63 65 2E 0D
+D 40E7 0A 00
+
+D 40E9 0D 0A 3D 3D 3D 20 45 4C 46 32 4B 20 4D 45 4E 55
+D 40F9 20 3D 3D 3D 0D 0A 20 31 20 20 4C 69 74 65 2D 57
+D 4109 72 69 74 65 72 0D 0A 20 32 20 20 4E 41 4E 4F 20
+D 4119 65 64 69 74 6F 72 0D 0A 20 33 20 20 44 69 72 65
+D 4129 63 74 6F 72 79 0D 0A 20 51 20 20 51 75 69 74 0D
+D 4139 0A 0D 0A 43 68 6F 69 63 65 3F 20 00
+D 5000 00
+D 6000 00
+D 7000 00

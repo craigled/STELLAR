@@ -1,0 +1,1238 @@
+// DOTBOT in Stellar C - the same game as LTOS/dotbot.asm (native 1802), here as STELLAR bytecode.
+// DOTBOT (@) eats the dots of the maze; four Glitches (X) hunt him: one at him, one 4 cells ahead of him,
+// one at random, one at him but slower. A power cell (o) scares them (x) for a while: one caught then is 200
+// and goes home to the pen; caught by one that is not scared, a life (3). The maze cleared: the next level,
+// faster. Arrows or W A S D steer (a turn asked early is taken where it can be); a lone Esc quits.
+// The maze is LTOS/dotbot_gen.py's (made into dotbot.sc by SC/mk_dotbot.py). The tones: a native 1802 loop.
+
+const MW = 37;  const MH = 21;  const NG = 4;
+const UP = 0;  const LEFT = 1;  const DOWN = 2;  const RIGHT = 3;
+const DOORX = 18;  const OUTY = 7;  const PENY = 9;  const STARTX = 18;  const STARTY = 19;
+
+u8 maze0[] = "######################################........#.................#........##o##.###.#.######.#.######.#.###.##o##...................................##.##.#.#######.##.#.##.#######.#.##.##....#....#....#.....#....#....#....#####.####.#.###.#####.###.#.####.####   #.#.........       .........#.#   ####.#.#####.#.###-###.#.#####.#.####    ...#.....#.#GGGGG#.#.....#...    ####.#.#####.#.#######.#.#####.#.####   #.#.........................#.#   ####.#.###.####.#####.####.###.#.#####........#.................#........##.##.###.#.#####.#.#.#####.#.###.##.##o.#...........#.....#...........#.o###.#.#.#######.#.###.#.#######.#.#.###....#....#....#.....#....#....#....##.#######.#.####.###.####.#.#######.##.................P.................######################################";
+u8 grid[777];
+u16 rowt[] = { 0, 37, 74, 111, 148, 185, 222, 259, 296, 333, 370, 407, 444, 481, 518, 555, 592, 629, 666, 703, 740 };
+u8 gx[4];  u8 gy[4];  u8 gd[4];  u8 gm[4];  u8 gw[4];  u8 gox[4];  u8 goy[4];  u8 gs[4];  u8 gos[4];
+u16 shsc, shli, shle;           // the status line as last shown (it is sent only when they change)
+// values the native blocks share, in one table (a register each would push the busy variables into memory)
+u16 nv[8];
+const N_TK = 0;  const N_TN = 1;  const N_TNUM = 2;  const N_PX = 3;  const N_PY = 4;  const N_PD = 5;  const N_OPX = 6;  const N_OPY = 7;
+u8 ghome[] = { 16, 17, 19, 20 };
+u8 gwait0[] = { 2, 30, 60, 90 };
+
+u16 px, py, pd, nd, opx, opy;
+u16 score, lives, level, dots, scaret, tnum;
+
+u8 init[]   = "\e[0m\e[2J\e[?25l";
+u8 rev[]    = "\e[7m";
+u8 norm[]   = "\e[0m";
+u8 keysl[]  = "\e[24;1H\e[0m   Arrows / W A S D steer     a power cell (o) scares the Glitches     Esc quits";
+u8 st1[]    = "\e[1;1H\e[7m DOTBOT (Stellar C)   SCORE ";
+u8 st2[]    = "        LIVES ";
+u8 st3[]    = "        LEVEL ";
+u8 st4[]    = "                 \e[0m";
+u8 readys[] = "\e[9;38H\e[7mREADY!\e[0m";
+u8 unreadys[] = "\e[9;38H      ";
+u8 over[]   = "\e[11;29H\e[7m                       \e[0m\e[12;29H\e[7m      GAME  OVER       \e[0m\e[13;29H\e[7m  a key: the title     \e[0m\e[14;29H\e[7m                       \e[0m";
+u8 title[]  = "\e[0m\e[2J\e[?25l\e[5;29H\e[7m                       \e[0m\e[6;29H\e[7m     D O T B O T       \e[0m\e[7;29H\e[7m      in Stellar C     \e[0m\e[9;20HA little robot in a maze, on the COSMAC 1802.\e[11;14HEat every dot (.) to clear the maze. Four Glitches (X) hunt you;\e[12;14Ha power cell (o) scares them (x) for a while - catch one then\e[13;14Hfor 200 points. The tunnel at the sides takes you across.\e[15;27H@    Arrows or W A S D   steer\e[16;32HEsc                 quit\e[19;29HPress any key to play";
+u8 bye[]    = "\e[0m\e[?25h\e[2J\e[H";
+
+void quit() { tone(0, 0); print(bye); halt(); }
+
+// ---- sound: Q toggled tn times, each half-period about 10 + 3 tk 1802 instructions (a native loop)
+void tone(u16 k, u16 n) {
+    nv[N_TK] = k; nv[N_TN] = n;
+    native {
+        LDI hi(nv+2*N_TN)
+        PHI R9
+        LDI lo(nv+2*N_TN)
+        PLO R9
+        LDA R9
+        PHI R7
+        LDN R9
+        PLO R7                  ; R7 = half-periods
+        LDI hi(nv+2*N_TK)
+        PHI R9
+        LDI lo(nv+2*N_TK)
+        PLO R9
+        INC R9
+        LDN R9
+        PLO R8                  ; R8.0 = K
+        GHI R7
+        BNZ hp
+        GLO R7
+        BZ done
+hp:     BQ  off
+        SEQ
+        BR  dly
+off:    REQ
+        BR  dly
+dly:    GLO R8
+        PLO RB
+d1:     DEC RB
+        GLO RB
+        BNZ d1
+        DEC R7
+        GLO R7
+        BNZ hp
+        GHI R7
+        BNZ hp
+done:   REQ
+    }
+}
+void sweepf(u16 k, u16 step, u16 up, u16 steps, u16 n) {   // from k, by step (up or down), steps tones of n
+    while (steps != 0) {
+        tone(k, n);
+        if (up) k -= step; else k += step;
+        steps--;
+    }
+}
+void snddot()   { tone(37, 6); }
+void sndpower() { sweepf(77, 8, 1, 5, 8); sweepf(37, 8, 0, 5, 8); }
+void sndeat()   { sweepf(57, 7, 1, 5, 12); }
+void snddie()   { sweepf(37, 15, 0, 12, 12); }
+u8 fanf[] = { 55, 40, 47, 48, 37, 64, 47, 48, 37, 64, 31, 160, 0 };
+void sndwin()   { u16 i = 0; while (fanf[i] != 0) { tone(fanf[i], fanf[i + 1] * 4); i += 2; } }
+
+// ---- keys: arrows (ESC [ x) or W A S D -> nd; a lone Esc quits
+u16 kwait() {
+    u16 n = 8;
+    while (n != 0) { if (keyready()) return getc(); n--; }
+    return 0;
+}
+void keys() {
+    u16 k = getc();
+    if (k == 27) {
+        k = kwait();
+        if (k == 0) quit();
+        if (k == '[') k = kwait();
+        if (k == 'A') nd = UP; else if (k == 'B') nd = DOWN; else if (k == 'C') nd = RIGHT; else if (k == 'D') nd = LEFT;
+        return;
+    }
+    // A B C D (capitals) are an arrow's last byte - its Esc may have been lost (the UART holds one byte):
+    // taken as the arrow. w a s d (and W S) steer as keys.
+    if (k == 'A' || k == 'w' || k == 'W') nd = UP;
+    else if (k == 'B' || k == 's' || k == 'S') nd = DOWN;
+    else if (k == 'C' || k == 'd') nd = RIGHT;
+    else if (k == 'D' || k == 'a') nd = LEFT;
+}
+void twait(u16 w) { while (w != 0) { if (keyready()) keys(); delay(1); w--; } }
+
+// ---- the maze
+u16 cellat(u16 x, u16 y) { return grid[rowt[y] + x]; }
+u16 sx, sy;                     // stepto's answer
+void stepto(u16 x, u16 y, u16 d) {
+    sx = x; sy = y;
+    if (d == UP) sy--;
+    else if (d == DOWN) sy++;
+    else if (d == LEFT) { if (sx == 0) sx = MW - 1; else sx--; }
+    else { sx++; if (sx == MW) sx = 0; }
+}
+u16 open(u16 x, u16 y) {        // not a wall, not the pen's door
+    u16 c = grid[rowt[y] + x];
+    if (c == '#' || c == '-') return 0;
+    return 1;
+}
+void setup() {                  // the maze afresh: G and P made corridors; the dots counted
+    u16 i, c;
+    dots = 0;
+    for (i = 0; i != 777; i++) {
+        c = maze0[i];
+        if (c == 'G' || c == 'P') c = ' ';
+        if (c == '.' || c == 'o') dots++;
+        grid[i] = c;
+    }
+}
+void starts() {
+    u16 k;
+    px = STARTX; py = STARTY; pd = 255; nd = 255; opx = 255; scaret = 0;
+    for (k = 0; k != NG; k++) {
+        gx[k] = ghome[k]; gy[k] = PENY; gd[k] = UP; gm[k] = 0; gw[k] = gwait0[k];
+        gox[k] = ghome[k]; goy[k] = PENY; gs[k] = 0;
+    }
+}
+
+// ---- the screen: a cell is two columns (row y + 2, col 2 x + 4)
+void status() {
+    if (shsc == score && shli == lives && shle == level) return;
+    shsc = score; shli = lives; shle = level;
+    print(st1); printu(score);
+    print(st2); printu(lives);
+    print(st3); printu(level);
+    print(st4);
+}
+void drawall() {
+    u16 x, y, c, inrev;
+    print(init);
+    for (y = 0; y != MH; y++) {
+        at(y + 2, 4);
+        inrev = 0;
+        for (x = 0; x != MW; x++) {
+            c = grid[rowt[y] + x];
+            if (c == '#') {
+                if (inrev == 0) { print(rev); inrev = 1; }
+                putc(' '); putc(' ');
+            } else {
+                if (inrev) { print(norm); inrev = 0; }
+                putc(c); putc(' ');
+            }
+        }
+        print(norm);
+    }
+    print(keysl);
+    shle = 999;                 // (the status line shown afresh)
+    status();
+    for (x = 0; x != NG; x++) gos[x] = 9;
+    drawmov();
+}
+void drawmov() {                // the cells left, then the Glitches (X, scared x), DOTBOT on top
+    nv[N_PX] = px; nv[N_PY] = py; nv[N_OPX] = opx; nv[N_OPY] = opy;
+    // in 1802 code: first a list of (x, y, character) to draw - the cell DOTBOT left, each Glitch that moved or
+    // changed (its old cell, then X or x), DOTBOT (@) - then the bytes for all of it in one buffer, sent at once.
+    // The cursor is followed: the next cell to the right costs one space, the cell above or below a backspace
+    // and ESC [ A / B, anything else ESC [ row ; col H (at 9600 baud a byte is ~180 1802 instructions).
+    native {
+        SEX R2
+        LDI hi(jb)
+        PHI RD
+        LDI lo(jb)
+        PLO RD
+        LDI hi(nv+2*N_OPX+1)
+        PHI RF
+        LDI lo(nv+2*N_OPX+1)
+        PLO RF
+        LDN RF
+        XRI 0xFF
+        LBZ a_g
+        LDI hi(nv+2*N_OPX+1)
+        PHI RF
+        LDI lo(nv+2*N_OPX+1)
+        PLO RF
+        LDN RF
+        STR R2
+        LDI hi(nv+2*N_PX+1)
+        PHI RF
+        LDI lo(nv+2*N_PX+1)
+        PLO RF
+        LDN RF
+        XOR
+        LBNZ a_o
+        LDI hi(nv+2*N_OPY+1)
+        PHI RF
+        LDI lo(nv+2*N_OPY+1)
+        PLO RF
+        LDN RF
+        STR R2
+        LDI hi(nv+2*N_PY+1)
+        PHI RF
+        LDI lo(nv+2*N_PY+1)
+        PLO RF
+        LDN RF
+        XOR
+        LBZ a_g
+a_o:    ; the cell DOTBOT left
+        LDI hi(nv+2*N_OPX+1)
+        PHI RF
+        LDI lo(nv+2*N_OPX+1)
+        PLO RF
+        LDN RF
+        PHI RB
+        LDI hi(nv+2*N_OPY+1)
+        PHI RF
+        LDI lo(nv+2*N_OPY+1)
+        PLO RF
+        LDN RF
+        PLO RB
+        GLO RB
+        SHL
+        ADI lo(&rowt)
+        PLO RF
+        LDI hi(&rowt)
+        ADCI 0
+        PHI RF
+        LDA RF
+        PHI R8
+        LDN RF
+        PLO R8
+        GHI RB
+        STR R2
+        GLO R8
+        ADD
+        PLO R8
+        GHI R8
+        ADCI 0
+        PHI R8
+        GLO R8
+        ADI lo(&grid)
+        PLO R8
+        GHI R8
+        ADCI hi(&grid)
+        PHI R8
+        LDN R8
+        PLO R9
+        GHI RB
+        STR RD
+        INC RD
+        GLO RB
+        STR RD
+        INC RD
+        GLO R9
+        STR RD
+        INC RD
+a_g:    
+        LDI 0
+        PLO R7                  ; R7.0 = k
+gl:     
+        GLO R7
+        ADI lo(&gx)
+        PLO RF
+        LDI hi(&gx)
+        ADCI 0
+        PHI RF
+        LDN RF
+        STR R2
+        GLO R7
+        ADI lo(&gox)
+        PLO RF
+        LDI hi(&gox)
+        ADCI 0
+        PHI RF
+        LDN RF
+        XOR
+        LBNZ chg
+        GLO R7
+        ADI lo(&gy)
+        PLO RF
+        LDI hi(&gy)
+        ADCI 0
+        PHI RF
+        LDN RF
+        STR R2
+        GLO R7
+        ADI lo(&goy)
+        PLO RF
+        LDI hi(&goy)
+        ADCI 0
+        PHI RF
+        LDN RF
+        XOR
+        LBNZ chg
+        GLO R7
+        ADI lo(&gs)
+        PLO RF
+        LDI hi(&gs)
+        ADCI 0
+        PHI RF
+        LDN RF
+        STR R2
+        GLO R7
+        ADI lo(&gos)
+        PLO RF
+        LDI hi(&gos)
+        ADCI 0
+        PHI RF
+        LDN RF
+        XOR
+        LBNZ chg
+        LBR gnx
+chg:    ; its old cell
+        GLO R7
+        ADI lo(&gox)
+        PLO RF
+        LDI hi(&gox)
+        ADCI 0
+        PHI RF
+        LDN RF
+        PHI RB
+        GLO R7
+        ADI lo(&goy)
+        PLO RF
+        LDI hi(&goy)
+        ADCI 0
+        PHI RF
+        LDN RF
+        PLO RB
+        GLO RB
+        SHL
+        ADI lo(&rowt)
+        PLO RF
+        LDI hi(&rowt)
+        ADCI 0
+        PHI RF
+        LDA RF
+        PHI R8
+        LDN RF
+        PLO R8
+        GHI RB
+        STR R2
+        GLO R8
+        ADD
+        PLO R8
+        GHI R8
+        ADCI 0
+        PHI R8
+        GLO R8
+        ADI lo(&grid)
+        PLO R8
+        GHI R8
+        ADCI hi(&grid)
+        PHI R8
+        LDN R8
+        PLO R9
+        GHI RB
+        STR RD
+        INC RD
+        GLO RB
+        STR RD
+        INC RD
+        GLO R9
+        STR RD
+        INC RD
+        GLO R7
+        ADI lo(&gx)
+        PLO RF
+        LDI hi(&gx)
+        ADCI 0
+        PHI RF
+        LDN RF
+        PHI RB
+        GLO R7
+        ADI lo(&gox)
+        PLO RF
+        LDI hi(&gox)
+        ADCI 0
+        PHI RF
+        GHI RB
+        STR RF
+        GLO R7
+        ADI lo(&gy)
+        PLO RF
+        LDI hi(&gy)
+        ADCI 0
+        PHI RF
+        LDN RF
+        PLO RB
+        GLO R7
+        ADI lo(&goy)
+        PLO RF
+        LDI hi(&goy)
+        ADCI 0
+        PHI RF
+        GLO RB
+        STR RF
+        GLO R7
+        ADI lo(&gs)
+        PLO RF
+        LDI hi(&gs)
+        ADCI 0
+        PHI RF
+        LDN RF
+        PLO R9
+        GLO R7
+        ADI lo(&gos)
+        PLO RF
+        LDI hi(&gos)
+        ADCI 0
+        PHI RF
+        GLO R9
+        STR RF
+        LBZ bigx
+        LDI 0x78
+        LBR pushg
+bigx:   
+        LDI 0x58
+pushg:  
+        PLO R9
+        GHI RB
+        STR RD
+        INC RD
+        GLO RB
+        STR RD
+        INC RD
+        GLO R9
+        STR RD
+        INC RD
+gnx:    
+        INC R7
+        GLO R7
+        XRI 4
+        LBNZ gl
+        LDI hi(nv+2*N_PX+1)
+        PHI RF
+        LDI lo(nv+2*N_PX+1)
+        PLO RF
+        LDN RF
+        PHI RB
+        LDI hi(nv+2*N_PY+1)
+        PHI RF
+        LDI lo(nv+2*N_PY+1)
+        PLO RF
+        LDN RF
+        PLO RB
+        LDI 0x40
+        PLO R9
+        GHI RB
+        STR RD
+        INC RD
+        GLO RB
+        STR RD
+        INC RD
+        GLO R9
+        STR RD
+        INC RD
+        LDI 0xFF
+        STR RD
+        LDI hi(jb)              ; the bytes: RD reads the list, RF writes ob, R9 = the cursor (row.1, col.0)
+        PHI RD
+        LDI lo(jb)
+        PLO RD
+        LDI hi(ob)
+        PHI RF
+        LDI lo(ob)
+        PLO RF
+        LDI 0xFF
+        PHI R9
+        PLO R9
+bl:     
+        LDN RD
+        XRI 0xFF
+        LBZ bdone
+        LDA RD
+        SHL
+        ADI 4
+        PLO R7
+        LDA RD
+        ADI 2
+        PHI R7
+        LDA RD
+        PLO R8
+        GHI R7
+        STR R2
+        GHI R9
+        XOR
+        LBNZ nrow
+        GLO R7
+        STR R2
+        GLO R9
+        XOR
+        LBZ emit
+        GLO R9
+        ADI 1
+        STR R2
+        GLO R7
+        XOR
+        LBNZ full
+        LDI 0x20
+        STR RF
+        INC RF
+        LBR emit
+nrow:   
+        GLO R9
+        SMI 1
+        STR R2
+        GLO R7
+        XOR
+        LBNZ full
+        GHI R9
+        ADI 1
+        STR R2
+        GHI R7
+        XOR
+        LBZ down
+        GHI R9
+        SMI 1
+        STR R2
+        GHI R7
+        XOR
+        LBNZ full
+        LDI 0x08
+        STR RF
+        INC RF
+        LDI 0x1B
+        STR RF
+        INC RF
+        LDI 0x5B
+        STR RF
+        INC RF
+        LDI 0x41
+        STR RF
+        INC RF
+        LBR emit
+down:   
+        LDI 0x08
+        STR RF
+        INC RF
+        LDI 0x1B
+        STR RF
+        INC RF
+        LDI 0x5B
+        STR RF
+        INC RF
+        LDI 0x42
+        STR RF
+        INC RF
+        LBR emit
+full:   
+        LDI 0x1B
+        STR RF
+        INC RF
+        LDI 0x5B
+        STR RF
+        INC RF
+        GHI R7
+        PLO RB
+        LDI 0x30
+        PHI RB
+n1r:    
+        GLO RB
+        SMI 10
+        LBNF n2r
+        PLO RB
+        GHI RB
+        ADI 1
+        PHI RB
+        LBR n1r
+n2r:    
+        GHI RB
+        XRI 0x30
+        LBZ n3r
+        GHI RB
+        STR RF
+        INC RF
+n3r:    
+        GLO RB
+        ADI 0x30
+        STR RF
+        INC RF
+        LDI 0x3B
+        STR RF
+        INC RF
+        GLO R7
+        PLO RB
+        LDI 0x30
+        PHI RB
+n1c:    
+        GLO RB
+        SMI 10
+        LBNF n2c
+        PLO RB
+        GHI RB
+        ADI 1
+        PHI RB
+        LBR n1c
+n2c:    
+        GHI RB
+        XRI 0x30
+        LBZ n3c
+        GHI RB
+        STR RF
+        INC RF
+n3c:    
+        GLO RB
+        ADI 0x30
+        STR RF
+        INC RF
+        LDI 0x48
+        STR RF
+        INC RF
+emit:   
+        GLO R8
+        STR RF
+        INC RF
+        GHI R7
+        PHI R9
+        GLO R7
+        ADI 1
+        PLO R9
+        LBR bl
+bdone:  
+        LDI 0
+        STR RF
+        LDI hi(ob)
+        PHI RD
+        LDI lo(ob)
+        PLO RD
+send:   LDN RD
+        LBZ exit
+w1:     LDI 0x15                ; the UART's line status: room to send?
+        STR R2
+        OUT 2
+        DEC R2
+        INP 3
+        ANI 0x20
+        LBZ w1
+        LDI 0x10
+        STR R2
+        OUT 2
+        DEC R2
+        LDA RD
+        STR R2
+        OUT 3
+        DEC R2
+        LBR send
+jb:     DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+ob:     DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    }
+}
+
+// ---- the Glitches, all four a tick, in 1802 code (in Stellar C this was most of a tick): in the pen, its wait,
+// then out above the door; out, scared ones move every other tick and Glitch 3 skips one tick in four. Its
+// target: DOTBOT (Glitch 1: four cells ahead of him), or, scared or Glitch 2, at random. Each way but back
+// whose cell is open (not # or -): the nearest to the target by |dx| + |dy|, or a random one; none: back.
+void gall() {
+    native {
+        SEX R2
+        LDI hi(kk)
+        PHI RF
+        LDI lo(kk)
+        PLO RF
+        LDI 0
+        STR RF
+gloop:  ; one Glitch: k in kk
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gm)
+        PLO RD
+        LDI hi(&gm)
+        ADCI 0
+        PHI RD
+        LDN RD
+        LBNZ gout
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gw)
+        PLO RD
+        LDI hi(&gw)
+        ADCI 0
+        PHI RD
+        LDN RD
+        LBZ gleave
+        SMI 1
+        STR RD
+        LBR gnext
+gleave: 
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gm)
+        PLO RD
+        LDI hi(&gm)
+        ADCI 0
+        PHI RD
+        LDI 2
+        STR RD
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gx)
+        PLO RD
+        LDI hi(&gx)
+        ADCI 0
+        PHI RD
+        LDI 18
+        STR RD
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gy)
+        PLO RD
+        LDI hi(&gy)
+        ADCI 0
+        PHI RD
+        LDI 7
+        STR RD
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gd)
+        PLO RD
+        LDI hi(&gd)
+        ADCI 0
+        PHI RD
+        LDI 1
+        STR RD
+        LBR gnext
+gout:   
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gs)
+        PLO RD
+        LDI hi(&gs)
+        ADCI 0
+        PHI RD
+        LDN RD
+        LBZ gns
+        LDI hi(nv+2*N_TNUM+1)
+        PHI RF
+        LDI lo(nv+2*N_TNUM+1)
+        PLO RF
+        LDN RF
+        ANI 1
+        LBNZ gnext
+gns:    
+        LDI hi(kk)
+        PHI RF
+        LDI lo(kk)
+        PLO RF
+        LDN RF
+        XRI 3
+        LBNZ g3
+        LDI hi(nv+2*N_TNUM+1)
+        PHI RF
+        LDI lo(nv+2*N_TNUM+1)
+        PLO RF
+        LDN RF
+        ANI 3
+        LBZ gnext
+g3:     
+        LDI 1
+        PLO RE
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gs)
+        PLO RD
+        LDI hi(&gs)
+        ADCI 0
+        PHI RD
+        LDN RD
+        LBNZ grand
+        LDI hi(kk)
+        PHI RF
+        LDI lo(kk)
+        PLO RF
+        LDN RF
+        XRI 2
+        LBZ grand
+        LDI 0
+        PLO RE
+        LDI hi(nv+2*N_PX+1)
+        PHI RF
+        LDI lo(nv+2*N_PX+1)
+        PLO RF
+        LDN RF
+        PHI RB
+        LDI hi(nv+2*N_PY+1)
+        PHI RF
+        LDI lo(nv+2*N_PY+1)
+        PLO RF
+        LDN RF
+        PLO RB
+        LDI hi(kk)
+        PHI RF
+        LDI lo(kk)
+        PLO RF
+        LDN RF
+        XRI 1
+        LBNZ gtset
+        LDI hi(nv+2*N_PD+1)
+        PHI RF
+        LDI lo(nv+2*N_PD+1)
+        PLO RF
+        LDN RF
+        PHI R7
+        XRI 0xFF
+        LBZ gtset
+        LDI 4
+        PLO R7
+gt4:    
+        GHI R7
+        LBZ tup
+        SMI 1
+        LBZ tleft
+        SMI 1
+        LBZ tdown
+        GHI RB
+        ADI 1
+        XRI 37
+        LBZ trw
+        XRI 37
+trw:    
+        PHI RB
+        LBR tnext
+tleft:  
+        GHI RB
+        LBNZ tl1
+        LDI 37
+tl1:    
+        SMI 1
+        PHI RB
+        LBR tnext
+tup:    
+        GLO RB
+        LBZ tnext
+        DEC RB
+        LBR tnext
+tdown:  
+        INC RB
+tnext:  
+        DEC R7
+        GLO R7
+        LBNZ gt4
+gtset:  ; the target: tx ty
+        LDI hi(tx)
+        PHI RF
+        LDI lo(tx)
+        PLO RF
+        GHI RB
+        STR RF
+        INC RF
+        GLO RB
+        STR RF
+grand:  
+        LDI hi(randf)
+        PHI RF
+        LDI lo(randf)
+        PLO RF
+        GLO RE
+        STR RF
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gx)
+        PLO RD
+        LDI hi(&gx)
+        ADCI 0
+        PHI RD
+        LDN RD
+        PHI R8                  ; R8.1 = x
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gy)
+        PLO RD
+        LDI hi(&gy)
+        ADCI 0
+        PHI RD
+        LDN RD
+        PLO R8                  ; R8.0 = y
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gd)
+        PLO RD
+        LDI hi(&gd)
+        ADCI 0
+        PHI RD
+        LDN RD
+        XRI 2
+        PHI R7                  ; R7.1 = back
+        LDI 0xFF
+        PLO R9                  ; R9.0 = the best distance, R9.1 = its way
+        PHI R9
+        LDI 0
+        PLO R7                  ; R7.0 = the way tried
+dloop:  GLO R7
+        STR R2
+        GHI R7
+        XOR
+        LBZ next
+        GHI R8                  ; RB = the cell that way (x RB.1, y RB.0; the tunnel wraps)
+        PHI RB
+        GLO R8
+        PLO RB
+        GLO R7
+        LBZ dup
+        SMI 1
+        LBZ dleft
+        SMI 1
+        LBZ ddown
+        GHI RB
+        ADI 1
+        XRI 37
+        LBZ rwrap
+        XRI 37
+rwrap:  PHI RB
+        LBR got
+dleft:  GHI RB
+        LBNZ dl1
+        LDI 37
+dl1:    SMI 1
+        PHI RB
+        LBR got
+dup:    DEC RB
+        LBR got
+ddown:  INC RB
+got:    GLO RB                  ; RD -> grid[rowt[y] + x]
+        SHL
+        ADI lo(&rowt)
+        PLO RF
+        LDI hi(&rowt)
+        ADCI 0
+        PHI RF
+        LDA RF
+        PHI RD
+        LDN RF
+        PLO RD
+        GHI RB
+        STR R2
+        GLO RD
+        ADD
+        PLO RD
+        GHI RD
+        ADCI 0
+        PHI RD
+        GLO RD
+        ADI lo(&grid)
+        PLO RD
+        GHI RD
+        ADCI hi(&grid)
+        PHI RD
+        LDN RD                  ; open? (not # or -)
+        XRI 0x23
+        LBZ next
+        XRI 0xE
+        LBZ next
+        LDI hi(randf)           ; its distance: random, or |dx| + |dy|
+        PHI RF
+        LDI lo(randf)
+        PLO RF
+        LDN RF
+        LBZ manh
+        LDI hi(seed)
+        PHI RF
+        LDI lo(seed)
+        PLO RF
+        LDN RF
+        SHL
+        LBNF rs1
+        XRI 0x1D
+rs1:    STR RF
+        ANI 0x7F
+        LBR cmp
+manh:   LDI hi(tx)
+        PHI RF
+        LDI lo(tx)
+        PLO RF
+        SEX RF
+        GHI RB
+        SM
+        SEX R2
+        LBDF a1
+        SDI 0
+a1:     PLO RE
+        LDI hi(ty)
+        PHI RF
+        LDI lo(ty)
+        PLO RF
+        SEX RF
+        GLO RB
+        SM
+        SEX R2
+        LBDF a2
+        SDI 0
+a2:     STR R2
+        GLO RE
+        ADD
+cmp:    STR R2                  ; nearer than the best so far?
+        GLO R9
+        SM
+        LBNF next
+        LBZ next
+        LDN R2
+        PLO R9
+        GLO R7
+        PHI R9
+next:   INC R7
+        GLO R7
+        XRI 4
+        LBNZ dloop
+        GHI R9                  ; none: back the way it came
+        XRI 0xFF
+        LBNZ store
+        GHI R7
+        PHI R9
+store:  GHI R9                  ; the new cell that way: into cx cy (the tunnel wraps)
+        LBZ s_up
+        SMI 1
+        LBZ s_left
+        SMI 1
+        LBZ s_down
+        GHI R8
+        ADI 1
+        XRI 37
+        LBZ s_rw
+        XRI 37
+s_rw:   PHI R8
+        LBR s_put
+s_left: GHI R8
+        LBNZ s_l1
+        LDI 37
+s_l1:   SMI 1
+        PHI R8
+        LBR s_put
+s_up:   DEC R8
+        LBR s_put
+s_down: INC R8
+s_put:  ; gx gy gd
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gx)
+        PLO RD
+        LDI hi(&gx)
+        ADCI 0
+        PHI RD
+        GHI R8
+        STR RD
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gy)
+        PLO RD
+        LDI hi(&gy)
+        ADCI 0
+        PHI RD
+        GLO R8
+        STR RD
+        LDI hi(kk)
+        PHI RD
+        LDI lo(kk)
+        PLO RD
+        LDN RD
+        ADI lo(&gd)
+        PLO RD
+        LDI hi(&gd)
+        ADCI 0
+        PHI RD
+        GHI R9
+        STR RD
+gnext:  
+        LDI hi(kk)
+        PHI RF
+        LDI lo(kk)
+        PLO RF
+        LDN RF
+        ADI 1
+        STR RF
+        XRI 4
+        LBNZ gloop
+        LBR exit
+kk:     DB 0
+tx:     DB 0
+ty:     DB 0
+randf:  DB 0
+seed:   DB 0xAC
+    }
+}
+void scare() {
+    u16 k, t;
+    if (level * 4 >= 44) t = 16; else t = 60 - level * 4;
+    scaret = t;
+    for (k = 0; k != NG; k++) {
+        if (gm[k] == 2) { t = gd[k] ^ 2; gd[k] = t; gs[k] = 1; }
+    }
+}
+u16 meet() {                    // 1: DOTBOT caught; a scared one met is caught (200, home)
+    u16 k, hit;
+    for (k = 0; k != NG; k++) {
+        if (gm[k] != 2) continue;
+        hit = 0;
+        if (gx[k] == px && gy[k] == py) hit = 1;
+        if (gox[k] == px && goy[k] == py && gx[k] == opx && gy[k] == opy) hit = 1;
+        if (hit) {
+            if (gs[k] == 0) return 1;
+            gs[k] = 0; gm[k] = 0; gw[k] = 25; gx[k] = DOORX; gy[k] = PENY;
+            score += 200;
+            sndeat();
+        }
+    }
+    return 0;
+}
+
+// ---- a game
+u16 play() {                    // 0: game over, 1: quit
+    u16 k, c, w;
+    lives = 3; score = 0; level = 1;
+    setup();
+    while (1) {
+        starts();
+        drawall();
+        print(readys);
+        twait(180);
+        print(unreadys);
+        while (1) {                              // a tick
+            tnum++;
+            opx = px; opy = py;
+            if (nd != 255) {                     // the turn asked for, if open that way
+                stepto(px, py, nd);
+                if (open(sx, sy)) pd = nd;
+            }
+            if (pd != 255) {
+                stepto(px, py, pd);
+                if (open(sx, sy)) {
+                    px = sx; py = sy;
+                    c = grid[rowt[py] + px];
+                    if (c == '.') { grid[rowt[py] + px] = ' '; score += 10; dots--; snddot(); }
+                    else if (c == 'o') { grid[rowt[py] + px] = ' '; score += 50; dots--; scare(); sndpower(); }
+                }
+            }
+            if (scaret != 0) {
+                scaret--;
+                if (scaret == 0) { for (k = 0; k != NG; k++) gs[k] = 0; }
+            }
+            nv[N_TNUM] = tnum; nv[N_PX] = px; nv[N_PY] = py; nv[N_PD] = pd;
+            gall();
+            if (meet()) {
+                drawmov(); snddie();
+                lives--;
+                if (lives == 0) { status(); print(over); return 0; }
+                break;                           // again from the starts
+            }
+            drawmov();
+            status();
+            if (dots == 0) { sndwin(); level++; setup(); break; }
+            if (level >= 10) w = 2; else w = 12 - level;
+            twait(w);
+        }
+    }
+}
+
+void anykey() {
+    u16 n, k;
+    for (n = 40; n != 0; n--) { if (keyready()) getc(); delay(12); }
+    while (1) {
+        while (!keyready()) rand();
+        k = getc();
+        if (k != 27) return;
+        if (kwait() == 0) quit();
+    }
+}
+
+void main() {
+    while (1) {
+        print(title);
+        anykey();
+        play();
+        anykey();
+    }
+}

@@ -1,0 +1,254 @@
+; ==========================================================================
+; nativedemo  -  compiled from nativedemo.sc by scc (Stellar C, prototype)   loads at $4000
+; ==========================================================================
+; 55 STELLAR commands, 151 bytes of code, 142 bytes of data.
+; registers: main.total R0, main.n R1, main.i R2, main.check R3
+; in memory: nothing
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 4000 CD             START                          Stellar C: nativedemo
+; D 4001 11 0E 00 AC    LOADXI R14 00AC                u8 data[N];
+; D 4005 11 0F 01 73    LOADXI R15 0173
+; D 4009 FB EF 00       FILLMEMXY RE..RF 00
+; D 400C BD 00 10       CALL F_main                    run main()
+; QUIT:
+; D 400F 00             HALT
+; main():
+; D 4010 11 02 00 00    LOADXI R2 0000                 for (i = 0; i < N; i++) data[i] = i;
+; D 4014 B0 00 1F       GAL L2
+; D 4017 22 02          COPYXA R2 -> Acc
+; D 4019 2F 02 00 AC    WRITEIDX R2 00AC
+; D 401D 42 02          INCX R2
+; D 401F 11 0F 00 C8    LOADXI R15 00C8
+; D 4023 89 2F          TESTLXY R2 < R15
+; D 4025 A0 00 17       IFTRUEI L1
+; D 4028 11 01 00 C8    LOADXI R1 00C8                 n = N;
+; D 402C F1 41 85       RUNMC 4185                     LDI hi(&data)   native block, 50 bytes
+; D 402F 11 03 00 00    LOADXI R3 0000                 check = 0;
+; D 4033 11 02 00 00    LOADXI R2 0000                 for (i = 0; i < N; i++) check += data[i];
+; D 4037 B0 00 45       GAL L6
+; D 403A 2E 02 00 AC    READIDX R2 00AC
+; D 403E 21 0F          COPYAX Acc -> R15
+; D 4040 50 3F 03       ADDXYZ R3 + R15 -> R3
+; D 4043 42 02          INCX R2
+; D 4045 11 0F 00 C8    LOADXI R15 00C8
+; D 4049 89 2F          TESTLXY R2 < R15
+; D 404B A0 00 3A       IFTRUEI L5
+; D 404E 22 00          COPYXA R0 -> Acc               printu(total);
+; D 4050 24             COPYAMA
+; D 4051 6B 00          CVT2DEC Acc
+; D 4053 6E             OUTDEC
+; D 4054 87 03          TESTXY R0 = R3                 if (total == check) print(" = "); else print(" != ");
+; D 4056 A1 00 62       IFFALSEI L9
+; D 4059 11 0F 00 A0    LOADXI R15 00A0                " = "
+; D 405D C1 0F          PRINTSTR R15
+; D 405F B0 00 68       GAL L10
+; D 4062 11 0F 00 A4    LOADXI R15 00A4                " != "
+; D 4066 C1 0F          PRINTSTR R15
+; D 4068 22 03          COPYXA R3 -> Acc               printu(check);
+; D 406A 24             COPYAMA
+; D 406B 6B 00          CVT2DEC Acc
+; D 406D 6E             OUTDEC
+; D 406E 11 0F 00 A9    LOADXI R15 00A9                print("\r\n");   "\r\n"
+; D 4072 C1 0F          PRINTSTR R15
+; D 4074 F1 41 B7       RUNMC 41B7                     LDI hi(&hex)   native block, 49 bytes
+; D 4077 11 0F 01 74    LOADXI R15 0174                print(hex);
+; D 407B C1 0F          PRINTSTR R15
+; D 407D 11 0F 00 A9    LOADXI R15 00A9                print("\r\n");   "\r\n"
+; D 4081 C1 0F          PRINTSTR R15
+; D 4083 F1 41 E8       RUNMC 41E8                     LBR copy   native block, 31 bytes
+; D 4086 11 0F 01 79    LOADXI R15 0179                print(buf);
+; D 408A C1 0F          PRINTSTR R15
+; D 408C 11 0F 00 A9    LOADXI R15 00A9                print("\r\n");   "\r\n"
+; D 4090 C1 0F          PRINTSTR R15
+; D 4092 BE 00          RETURN
+; D 4094 F0 00 00       BREAK                          end marker: the pre-pass stops here
+;
+; NATIVE 1802  -  50 bytes at $4185, run by RUNMC
+;
+; N 4185 F8 40      LDI hi(&data)
+; N 4187 B7         PHI R7
+; N 4188 F8 AC      LDI lo(&data)
+; N 418A A7         PLO R7                     R7 -> data
+; N 418B F8 30      LDI hi({n})
+; N 418D B9         PHI R9
+; N 418E F8 02      LDI lo({n})
+; N 4190 A9         PLO R9                     R9 -> n's VM register (high byte first)
+; N 4191 49         LDA R9
+; N 4192 B8         PHI R8
+; N 4193 09         LDN R9
+; N 4194 A8         PLO R8                     R8 = n
+; N 4195 F8 00      LDI 0
+; N 4197 BD         PHI RD
+; N 4198 AD         PLO RD                     RD = the sum
+; N 4199 E2         SEX R2
+; loop:
+; N 419A 47         LDA R7
+; N 419B 52         STR R2                     the next byte, where ADD can see it
+; N 419C 8D         GLO RD
+; N 419D F4         ADD
+; N 419E AD         PLO RD
+; N 419F 9D         GHI RD
+; N 41A0 7C 00      ADCI 0
+; N 41A2 BD         PHI RD
+; N 41A3 28         DEC R8
+; N 41A4 88         GLO R8
+; N 41A5 3A 9A      BNZ loop
+; N 41A7 98         GHI R8
+; N 41A8 3A 9A      BNZ loop
+; N 41AA F8 30      LDI hi({total})
+; N 41AC B9         PHI R9
+; N 41AD F8 00      LDI lo({total})
+; N 41AF A9         PLO R9
+; N 41B0 9D         GHI RD
+; N 41B1 59         STR R9
+; N 41B2 19         INC R9
+; N 41B3 8D         GLO RD
+; N 41B4 59         STR R9                     total = RD
+; N 41B5 E2         exit:  SEX R2
+; N 41B6 D5         RETN
+;
+; NATIVE 1802  -  49 bytes at $41B7, run by RUNMC
+;
+; N 41B7 F8 41      LDI hi(&hex)
+; N 41B9 B7         PHI R7
+; N 41BA F8 74      LDI lo(&hex)
+; N 41BC A7         PLO R7
+; N 41BD F8 30      LDI hi({total})
+; N 41BF B8         PHI R8
+; N 41C0 F8 00      LDI lo({total})
+; N 41C2 A8         PLO R8
+; N 41C3 F8 04      LDI 4
+; N 41C5 A9         PLO R9
+; digit:
+; N 41C6 89         GLO R9
+; N 41C7 FA 01      ANI 1
+; N 41C9 3A D2      BNZ low
+; N 41CB 08         LDN R8                     digits 4 and 2: the high nibble
+; N 41CC F6         SHR
+; N 41CD F6         SHR
+; N 41CE F6         SHR
+; N 41CF F6         SHR
+; N 41D0 30 D5      BR conv
+; low:
+; N 41D2 48         LDA R8                     digits 3 and 1: the low nibble, then the nex
+; N 41D3 FA 0F      ANI $0F
+; conv:
+; N 41D5 AE         PLO RE
+; N 41D6 FF 0A      SMI 10                     DF = 1 when the nibble is 10 or more
+; N 41D8 8E         GLO RE
+; N 41D9 3B DD      BNF num
+; N 41DB FC 07      ADI 'A'-'0'-10
+; num:
+; N 41DD FC 30      ADI '0'
+; N 41DF 57         STR R7
+; N 41E0 17         INC R7
+; N 41E1 29         DEC R9
+; N 41E2 89         GLO R9
+; N 41E3 3A C6      BNZ digit
+; N 41E5 57         STR R7                     D = 0 here: the terminator
+; N 41E6 E2         exit:  SEX R2
+; N 41E7 D5         RETN
+;
+; NATIVE 1802  -  31 bytes at $41E8, run by RUNMC
+;
+; N 41E8 C0 41 F3   LBR copy
+; text:
+; N 41EB 6E 61 74 69 76 65 21 00 DB "native!", 0
+; copy:
+; N 41F3 F8 41      LDI hi(text)
+; N 41F5 B7         PHI R7
+; N 41F6 F8 EB      LDI lo(text)
+; N 41F8 A7         PLO R7
+; N 41F9 F8 41      LDI hi(&buf)
+; N 41FB B8         PHI R8
+; N 41FC F8 79      LDI lo(&buf)
+; N 41FE A8         PLO R8
+; more:
+; N 41FF 47         LDA R7
+; N 4200 58         STR R8
+; N 4201 18         INC R8
+; N 4202 CA 41 FF   LBNZ more
+; N 4205 E2         exit:  SEX R2
+; N 4206 D5         RETN
+
+; CODE  -  download this block
+
+D 4000 CD
+D 4001 11 0E 00 AC
+D 4005 11 0F 01 73
+D 4009 FB EF 00
+D 400C BD 00 10
+D 400F 00
+D 4010 11 02 00 00
+D 4014 B0 00 1F
+D 4017 22 02
+D 4019 2F 02 00 AC
+D 401D 42 02
+D 401F 11 0F 00 C8
+D 4023 89 2F
+D 4025 A0 00 17
+D 4028 11 01 00 C8
+D 402C F1 41 85
+D 402F 11 03 00 00
+D 4033 11 02 00 00
+D 4037 B0 00 45
+D 403A 2E 02 00 AC
+D 403E 21 0F
+D 4040 50 3F 03
+D 4043 42 02
+D 4045 11 0F 00 C8
+D 4049 89 2F
+D 404B A0 00 3A
+D 404E 22 00
+D 4050 24
+D 4051 6B 00
+D 4053 6E
+D 4054 87 03
+D 4056 A1 00 62
+D 4059 11 0F 00 A0
+D 405D C1 0F
+D 405F B0 00 68
+D 4062 11 0F 00 A4
+D 4066 C1 0F
+D 4068 22 03
+D 406A 24
+D 406B 6B 00
+D 406D 6E
+D 406E 11 0F 00 A9
+D 4072 C1 0F
+D 4074 F1 41 B7
+D 4077 11 0F 01 74
+D 407B C1 0F
+D 407D 11 0F 00 A9
+D 4081 C1 0F
+D 4083 F1 41 E8
+D 4086 11 0F 01 79
+D 408A C1 0F
+D 408C 11 0F 00 A9
+D 4090 C1 0F
+D 4092 BE 00
+D 4094 F0 00 00
+
+D 40A0 20 3D 20 00
+
+D 40A4 20 21 3D 20 00
+
+D 40A9 0D 0A 00
+
+D 4185 F8 40 B7 F8 AC A7 F8 30 B9 F8 02 A9 49 B8 09 A8
+D 4195 F8 00 BD AD E2 47 52 8D F4 AD 9D 7C 00 BD 28 88
+D 41A5 3A 9A 98 3A 9A F8 30 B9 F8 00 A9 9D 59 19 8D 59
+D 41B5 E2 D5
+
+D 41B7 F8 41 B7 F8 74 A7 F8 30 B8 F8 00 A8 F8 04 A9 89
+D 41C7 FA 01 3A D2 08 F6 F6 F6 F6 30 D5 48 FA 0F AE FF
+D 41D7 0A 8E 3B DD FC 07 FC 30 57 17 29 89 3A C6 57 E2
+D 41E7 D5
+
+D 41E8 C0 41 F3 6E 61 74 69 76 65 21 00 F8 41 B7 F8 EB
+D 41F8 A7 F8 41 B8 F8 79 A8 47 58 18 CA 41 FF E2 D5
+D 5000 00
+D 6000 00
+D 7000 00

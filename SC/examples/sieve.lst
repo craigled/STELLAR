@@ -1,0 +1,249 @@
+; ==========================================================================
+; sieve  -  compiled from sieve.sc by scc (Stellar C, prototype)   loads at $4000
+; ==========================================================================
+; 108 STELLAR commands, 297 bytes of code, 94 bytes of data.
+; registers: main.j R4, max.a R4, show.p R4, square.x R4, main.i R5, max.b R5, count R6
+; in memory: nothing
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 4000 CD             START                          Stellar C: sieve
+; D 4001 11 0E 01 69    LOADXI R14 0169                u8 composite[N];                     // written -> zeroed in
+; D 4005 11 0F 09 38    LOADXI R15 0938
+; D 4009 FB EF 00       FILLMEMXY RE..RF 00
+; D 400C 11 06 00 00    LOADXI R6 0000                 u16 count = 0;
+; D 4010 BD 00 48       CALL F_main                    run main()
+; QUIT:
+; D 4013 00             HALT
+; max():
+; D 4014 89 54          TESTLXY R5 < R4                u16 max(u16 a, u16 b) { if (a > b) return a; return b; }
+; D 4016 A1 00 1E       IFFALSEI L2
+; D 4019 23 00 4D       COPYXY R4 -> R13
+; D 401C BE 00          RETURN
+; D 401E 23 00 5D       COPYXY R5 -> R13
+; D 4021 BE 00          RETURN
+; square():
+; D 4023 4A 44          MULTXY R4 * R4                 u16 square(u16 x) { return x * x; }
+; D 4025 21 1D          COPYAX MA -> R13
+; D 4027 BE 00          RETURN
+; show():
+; D 4029 22 04          COPYXA R4 -> Acc               printu(p);
+; D 402B 24             COPYAMA
+; D 402C 6B 00          CVT2DEC Acc
+; D 402E 6E             OUTDEC
+; D 402F 42 06          INCX R6                        count++;
+; D 4031 11 0F 00 0A    LOADXI R15 000A                if (count % 10 == 0) print("\r\n"); else putc(' ');
+; D 4035 4D 6F          DIVXY R6 / R15
+; D 4037 8E             TESTREMZ
+; D 4038 A1 00 44       IFFALSEI L3
+; D 403B 11 0F 01 30    LOADXI R15 0130                "\r\n"
+; D 403F C1 0F          PRINTSTR R15
+; D 4041 B0 00 46       GAL L4
+; D 4044 CA 20          SEROUTI 20
+; D 4046 BE 00          RETURN
+; main():
+; D 4048 11 0F 09 39    LOADXI R15 0939                print(hello);
+; D 404C C1 0F          PRINTSTR R15
+; D 404E 10 07 D0       LOADAI 07D0                    printu(N);
+; D 4051 24             COPYAMA
+; D 4052 6B 00          CVT2DEC Acc
+; D 4054 6E             OUTDEC
+; D 4055 11 0F 01 33    LOADXI R15 0133                print(":\r\n");   ":\r\n"
+; D 4059 C1 0F          PRINTSTR R15
+; D 405B 11 05 00 02    LOADXI R5 0002                 for (i = 2; square(i) < N; i++) {
+; D 405F B0 00 8D       GAL L6
+; D 4062 2E 05 01 69    READIDX R5 0169                if (composite[i] == 0) {
+; D 4066 81 00 00       TESTAI 0000
+; D 4069 A1 00 8B       IFFALSEI L10
+; D 406C 23 00 54       COPYXY R5 -> R4                for (j = square(i); j < N; j += i) composite[j] = 1;
+; D 406F BD 00 23       CALL F_square
+; D 4072 23 00 D4       COPYXY R13 -> R4
+; D 4075 B0 00 82       GAL L12
+; D 4078 10 00 01       LOADAI 0001
+; D 407B 2F 04 01 69    WRITEIDX R4 0169
+; D 407F 50 45 04       ADDXYZ R4 + R5 -> R4
+; D 4082 11 0F 07 D0    LOADXI R15 07D0
+; D 4086 89 4F          TESTLXY R4 < R15
+; D 4088 A0 00 78       IFTRUEI L11
+; D 408B 42 05          INCX R5                        for (i = 2; square(i) < N; i++) {
+; D 408D 23 00 54       COPYXY R5 -> R4
+; D 4090 BD 00 23       CALL F_square
+; D 4093 23 00 D0       COPYXY R13 -> R0
+; D 4096 11 0F 07 D0    LOADXI R15 07D0
+; D 409A 89 0F          TESTLXY R0 < R15
+; D 409C A0 00 62       IFTRUEI L5
+; D 409F 11 05 00 02    LOADXI R5 0002                 for (i = 2; i < N; i++) if (!composite[i] && i != 0 || i ==
+; D 40A3 B0 00 CE       GAL L16
+; D 40A6 2E 05 01 69    READIDX R5 0169
+; D 40AA 81 00 00       TESTAI 0000
+; D 40AD A1 00 B5       IFFALSEI L22
+; D 40B0 8C 05          TESTXZ R5
+; D 40B2 A1 00 C6       IFFALSEI L21
+; D 40B5 86 05 00 02    TESTXI R5 0002
+; D 40B9 A1 00 CC       IFFALSEI L20
+; D 40BC 2E 05 01 69    READIDX R5 0169
+; D 40C0 81 00 00       TESTAI 0000
+; D 40C3 A1 00 CC       IFFALSEI L20
+; D 40C6 23 00 54       COPYXY R5 -> R4
+; D 40C9 BD 00 29       CALL F_show
+; D 40CC 42 05          INCX R5
+; D 40CE 11 0F 07 D0    LOADXI R15 07D0
+; D 40D2 89 5F          TESTLXY R5 < R15
+; D 40D4 A0 00 A6       IFTRUEI L15
+; D 40D7 11 0F 01 30    LOADXI R15 0130                print("\r\n");   "\r\n"
+; D 40DB C1 0F          PRINTSTR R15
+; D 40DD 22 06          COPYXA R6 -> Acc               printu(count);
+; D 40DF 24             COPYAMA
+; D 40E0 6B 00          CVT2DEC Acc
+; D 40E2 6E             OUTDEC
+; D 40E3 11 0F 01 37    LOADXI R15 0137                print(" primes. max(7, 9) + max(max(1, 2), square(3)) = ");   " primes. max(7, 9) + max(max(1, 2), squa"
+; D 40E7 C1 0F          PRINTSTR R15
+; D 40E9 11 04 00 07    LOADXI R4 0007                 printu(max(7, 9) + max(max(1, 2), square(3)));
+; D 40ED 11 05 00 09    LOADXI R5 0009
+; D 40F1 BD 00 14       CALL F_max
+; D 40F4 23 00 D0       COPYXY R13 -> R0
+; D 40F7 11 04 00 01    LOADXI R4 0001
+; D 40FB 11 05 00 02    LOADXI R5 0002
+; D 40FF BD 00 14       CALL F_max
+; D 4102 23 00 D4       COPYXY R13 -> R4
+; D 4105 11 04 00 03    LOADXI R4 0003
+; D 4109 BD 00 23       CALL F_square
+; D 410C 23 00 D5       COPYXY R13 -> R5
+; D 410F BD 00 14       CALL F_max
+; D 4112 23 00 D1       COPYXY R13 -> R1
+; D 4115 50 01 0F       ADDXYZ R0 + R1 -> R15
+; D 4118 22 0F          COPYXA R15 -> Acc
+; D 411A 24             COPYAMA
+; D 411B 6B 00          CVT2DEC Acc
+; D 411D 6E             OUTDEC
+; D 411E 11 0F 01 30    LOADXI R15 0130                print("\r\n");   "\r\n"
+; D 4122 C1 0F          PRINTSTR R15
+; D 4124 BE 00          RETURN
+; D 4126 F0 00 00       BREAK                          end marker: the pre-pass stops here
+
+; CODE  -  download this block
+
+D 4000 CD
+D 4001 11 0E 01 69
+D 4005 11 0F 09 38
+D 4009 FB EF 00
+D 400C 11 06 00 00
+D 4010 BD 00 48
+D 4013 00
+D 4014 89 54
+D 4016 A1 00 1E
+D 4019 23 00 4D
+D 401C BE 00
+D 401E 23 00 5D
+D 4021 BE 00
+D 4023 4A 44
+D 4025 21 1D
+D 4027 BE 00
+D 4029 22 04
+D 402B 24
+D 402C 6B 00
+D 402E 6E
+D 402F 42 06
+D 4031 11 0F 00 0A
+D 4035 4D 6F
+D 4037 8E
+D 4038 A1 00 44
+D 403B 11 0F 01 30
+D 403F C1 0F
+D 4041 B0 00 46
+D 4044 CA 20
+D 4046 BE 00
+D 4048 11 0F 09 39
+D 404C C1 0F
+D 404E 10 07 D0
+D 4051 24
+D 4052 6B 00
+D 4054 6E
+D 4055 11 0F 01 33
+D 4059 C1 0F
+D 405B 11 05 00 02
+D 405F B0 00 8D
+D 4062 2E 05 01 69
+D 4066 81 00 00
+D 4069 A1 00 8B
+D 406C 23 00 54
+D 406F BD 00 23
+D 4072 23 00 D4
+D 4075 B0 00 82
+D 4078 10 00 01
+D 407B 2F 04 01 69
+D 407F 50 45 04
+D 4082 11 0F 07 D0
+D 4086 89 4F
+D 4088 A0 00 78
+D 408B 42 05
+D 408D 23 00 54
+D 4090 BD 00 23
+D 4093 23 00 D0
+D 4096 11 0F 07 D0
+D 409A 89 0F
+D 409C A0 00 62
+D 409F 11 05 00 02
+D 40A3 B0 00 CE
+D 40A6 2E 05 01 69
+D 40AA 81 00 00
+D 40AD A1 00 B5
+D 40B0 8C 05
+D 40B2 A1 00 C6
+D 40B5 86 05 00 02
+D 40B9 A1 00 CC
+D 40BC 2E 05 01 69
+D 40C0 81 00 00
+D 40C3 A1 00 CC
+D 40C6 23 00 54
+D 40C9 BD 00 29
+D 40CC 42 05
+D 40CE 11 0F 07 D0
+D 40D2 89 5F
+D 40D4 A0 00 A6
+D 40D7 11 0F 01 30
+D 40DB C1 0F
+D 40DD 22 06
+D 40DF 24
+D 40E0 6B 00
+D 40E2 6E
+D 40E3 11 0F 01 37
+D 40E7 C1 0F
+D 40E9 11 04 00 07
+D 40ED 11 05 00 09
+D 40F1 BD 00 14
+D 40F4 23 00 D0
+D 40F7 11 04 00 01
+D 40FB 11 05 00 02
+D 40FF BD 00 14
+D 4102 23 00 D4
+D 4105 11 04 00 03
+D 4109 BD 00 23
+D 410C 23 00 D5
+D 410F BD 00 14
+D 4112 23 00 D1
+D 4115 50 01 0F
+D 4118 22 0F
+D 411A 24
+D 411B 6B 00
+D 411D 6E
+D 411E 11 0F 01 30
+D 4122 C1 0F
+D 4124 BE 00
+D 4126 F0 00 00
+
+D 4130 0D 0A 00
+
+D 4133 3A 0D 0A 00
+
+D 4137 20 70 72 69 6D 65 73 2E 20 6D 61 78 28 37 2C 20
+D 4147 39 29 20 2B 20 6D 61 78 28 6D 61 78 28 31 2C 20
+D 4157 32 29 2C 20 73 71 75 61 72 65 28 33 29 29 20 3D
+D 4167 20 00
+
+D 4939 53 69 65 76 65 20 6F 66 20 45 72 61 74 6F 73 74
+D 4949 68 65 6E 65 73 2C 20 70 72 69 6D 65 73 20 62 65
+D 4959 6C 6F 77 20 00
+D 5000 00
+D 6000 00
+D 7000 00

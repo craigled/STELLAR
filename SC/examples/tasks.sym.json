@@ -1,0 +1,86 @@
+{
+ "shared": {
+  "keys": 16689,
+  "keys__h": 16697,
+  "keys__t": 16698,
+  "keys__n": 16699,
+  "total": 16700,
+  "adds": 16702
+ },
+ "vms": {
+  "1": {
+   "vars": {
+    "main.k": {
+     "reg": 0
+    },
+    "total": {
+     "mem": 16700
+    },
+    "adds": {
+     "mem": 16702
+    }
+   },
+   "arrays": {
+    "keys": 16689,
+    "keys__h": 16697,
+    "keys__t": 16698,
+    "keys__n": 16699
+   },
+   "labels": {
+    "QUIT": 16474,
+    "F_main": 16493,
+    "R_main": 16647
+   },
+   "part": "main"
+  },
+  "2": {
+   "vars": {
+    "keyboard.k": {
+     "reg": 0
+    },
+    "adds": {
+     "mem": 82238
+    },
+    "total": {
+     "mem": 82236
+    }
+   },
+   "arrays": {
+    "keys": 82225,
+    "keys__h": 82233,
+    "keys__t": 82234,
+    "keys__n": 82235
+   },
+   "labels": {
+    "QUIT": 20488,
+    "PARK": 20494,
+    "F_keyboard": 20500,
+    "R_keyboard": 20618
+   },
+   "part": "keyboard"
+  },
+  "3": {
+   "vars": {
+    "adds": {
+     "mem": 82238
+    },
+    "total": {
+     "mem": 82236
+    }
+   },
+   "arrays": {
+    "keys": 82225,
+    "keys__h": 82233,
+    "keys__t": 82234,
+    "keys__n": 82235
+   },
+   "labels": {
+    "QUIT": 24584,
+    "PARK": 24590,
+    "F_counter": 24596,
+    "R_counter": 24639
+   },
+   "part": "counter"
+  }
+ }
+}

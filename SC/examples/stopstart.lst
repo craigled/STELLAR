@@ -1,0 +1,423 @@
+; ==========================================================================
+; stopstart  -  a MULTITASKING program compiled from stopstart.sc by scc (Stellar C): 4 VMs, ONE file
+; ==========================================================================
+; 170 STELLAR commands in all.
+;   VM1 $4000-$4FFF  main()          111 commands,   338 bytes of code,   419 in all
+;   VM2 $5000-$5FFF  counter()        17 commands,    48 bytes of code,    48 in all
+;   VM3 $6000-$6FFF  sleeper()        25 commands,    73 bytes of code,    87 in all
+;   VM4 $7000-$7EFF  self()           17 commands,    50 bytes of code,    72 in all
+; shared (absolute): go $41A0, adds $41A1
+; Load this one file, then cold boot: every VM starts at once, and main() holds the tasks
+; until the shared data is set up. When main() ends, the whole program ends.
+;
+; ==========================================================================
+; stopstart  -  compiled from stopstart.sc by scc (Stellar C, prototype)   loads at $4000
+; ==========================================================================
+; 111 STELLAR commands, 338 bytes of code, 64 bytes of data.
+; registers: spin.i R0, main.a R1
+; in memory: adds
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 4000 CD             START                          Stellar C: stopstart
+; D 4001 C7 00          SETMULTI 00                    no other VM runs until the shared data is set up
+; D 4003 11 0F EF 15    LOADXI R15 EF15                VM2 state
+; D 4007 31 0F 04       COPYMXI R15 04                 VM2 waits
+; D 400A 11 0F EF 25    LOADXI R15 EF25                VM3 state
+; D 400E 31 0F 04       COPYMXI R15 04                 VM3 waits
+; D 4011 11 0F EF 35    LOADXI R15 EF35                VM4 state
+; D 4015 31 0F 04       COPYMXI R15 04                 VM4 waits
+; D 4018 11 0C 00 00    LOADXI R12 0000                RC = 0: the index for a[k] and the u8 variables
+; D 401C 10 00 00       LOADAI 0000                    shared u8 go;
+; D 401F 2F 0C 01 A0    WRITEIDX R12 01A0              shared: 0 at the start
+; D 4023 11 0F 00 00    LOADXI R15 0000                shared u16 adds;
+; D 4027 11 0E 01 A1    LOADXI R14 01A1                adds
+; D 402B 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 402E 11 0F EF 15    LOADXI R15 EF15                VM2 state
+; D 4032 31 0F 01       COPYMXI R15 01                 start VM2
+; D 4035 11 0F EF 25    LOADXI R15 EF25                VM3 state
+; D 4039 31 0F 01       COPYMXI R15 01                 start VM3
+; D 403C 11 0F EF 35    LOADXI R15 EF35                VM4 state
+; D 4040 31 0F 01       COPYMXI R15 01                 start VM4
+; D 4043 C7 01          SETMULTI 01                    the tasks run from here
+; D 4045 BD 00 76       CALL F_main                    run main()
+; QUIT:
+; D 4048 C7 00          SETMULTI 00
+; D 404A 11 0F EF 15    LOADXI R15 EF15                VM2 state
+; D 404E 31 0F 04       COPYMXI R15 04                 stop VM2
+; D 4051 11 0F EF 25    LOADXI R15 EF25                VM3 state
+; D 4055 31 0F 04       COPYMXI R15 04                 stop VM3
+; D 4058 11 0F EF 35    LOADXI R15 EF35                VM4 state
+; D 405C 31 0F 04       COPYMXI R15 04                 stop VM4
+; D 405F C7 01          SETMULTI 01
+; D 4061 00             HALT                           no VM is left running: the program ends
+; spin():
+; D 4062 11 00 00 00    LOADXI R0 0000                 void spin() { u16 i; i = 0; while (i < 300) i++; }
+; D 4066 B0 00 6B       GAL L2
+; D 4069 42 00          INCX R0
+; D 406B 11 0F 01 2C    LOADXI R15 012C
+; D 406F 89 0F          TESTLXY R0 < R15
+; D 4071 A0 00 69       IFTRUEI L1
+; D 4074 BE 00          RETURN
+; main():
+; D 4076 BD 00 62       CALL F_spin                    spin();
+; D 4079 11 01 01 A1    LOADXI R1 01A1                 a = adds; spin(); if (adds != a) print("runs\r\n");   adds
+; D 407D 39 02 11       COPYMXY M(R1) -> R1
+; D 4080 BD 00 62       CALL F_spin
+; D 4083 11 0F 01 A1    LOADXI R15 01A1                adds
+; D 4087 39 02 FF       COPYMXY M(R15) -> R15
+; D 408A 87 F1          TESTXY R15 = R1
+; D 408C A0 00 95       IFTRUEI L6
+; D 408F 11 0F 01 60    LOADXI R15 0160                "runs\r\n"
+; D 4093 C1 0F          PRINTSTR R15
+; D 4095 11 0F EF 15    LOADXI R15 EF15                stop(counter); spin();   VM2 state
+; D 4099 31 0F 03       COPYMXI R15 03                 stop(counter): no more turns
+; D 409C BD 00 62       CALL F_spin
+; D 409F 11 01 01 A1    LOADXI R1 01A1                 a = adds; spin(); if (adds == a) print("stopped\r\n");   adds
+; D 40A3 39 02 11       COPYMXY M(R1) -> R1
+; D 40A6 BD 00 62       CALL F_spin
+; D 40A9 11 0F 01 A1    LOADXI R15 01A1                adds
+; D 40AD 39 02 FF       COPYMXY M(R15) -> R15
+; D 40B0 87 F1          TESTXY R15 = R1
+; D 40B2 A1 00 BB       IFFALSEI L8
+; D 40B5 11 0F 01 67    LOADXI R15 0167                "stopped\r\n"
+; D 40B9 C1 0F          PRINTSTR R15
+; D 40BB C7 00          SETMULTI 00                    start(counter); spin();   start(counter): look and start with no other task running
+; D 40BD 11 0F EF 15    LOADXI R15 EF15                VM2 state
+; D 40C1 9D 1F 03       TESTMXI R15 03                 stopped?
+; D 40C4 A1 00 CA       IFFALSEI L9
+; D 40C7 31 0F 01       COPYMXI R15 01                 start(counter): it runs again
+; D 40CA C7 01          SETMULTI 01
+; D 40CC BD 00 62       CALL F_spin
+; D 40CF 11 0F 01 A1    LOADXI R15 01A1                if (adds != a) print("runs again\r\n");   adds
+; D 40D3 39 02 FF       COPYMXY M(R15) -> R15
+; D 40D6 87 F1          TESTXY R15 = R1
+; D 40D8 A0 00 E1       IFTRUEI L11
+; D 40DB 11 0F 01 71    LOADXI R15 0171                "runs again\r\n"
+; D 40DF C1 0F          PRINTSTR R15
+; D 40E1 11 0F EF 25    LOADXI R15 EF25                stop(sleeper); go = 1; spin(); spin();   VM3 state
+; D 40E5 31 0F 03       COPYMXI R15 03                 stop(sleeper): no more turns
+; D 40E8 10 00 01       LOADAI 0001
+; D 40EB 2F 0C 01 A0    WRITEIDX R12 01A0
+; D 40EF C7 00          SETMULTI 00                    wake with no other task running: a stop() cannot cut in
+; D 40F1 9D 1F 04       TESTMXI R15 04                 is VM3 asleep in wait()?
+; D 40F4 A1 00 FA       IFFALSEI L12
+; D 40F7 31 0F 01       COPYMXI R15 01                 wake VM3
+; D 40FA C7 01          SETMULTI 01
+; D 40FC BD 00 62       CALL F_spin
+; D 40FF BD 00 62       CALL F_spin
+; D 4102 2E 0C 01 A0    READIDX R12 01A0               if (go == 1) print("no wake while stopped\r\n");
+; D 4106 81 00 01       TESTAI 0001
+; D 4109 A1 01 12       IFFALSEI L14
+; D 410C 11 0F 01 7E    LOADXI R15 017E                "no wake while stopped\r\n"
+; D 4110 C1 0F          PRINTSTR R15
+; D 4112 C7 00          SETMULTI 00                    start(sleeper); spin(); spin();   start(sleeper): look and start with no other task running
+; D 4114 11 0F EF 25    LOADXI R15 EF25                VM3 state
+; D 4118 9D 1F 03       TESTMXI R15 03                 stopped?
+; D 411B A1 01 21       IFFALSEI L15
+; D 411E 31 0F 01       COPYMXI R15 01                 start(sleeper): it runs again
+; D 4121 C7 01          SETMULTI 01
+; D 4123 BD 00 62       CALL F_spin
+; D 4126 BD 00 62       CALL F_spin
+; D 4129 2E 0C 01 A0    READIDX R12 01A0               if (go == 0) print("started\r\n");
+; D 412D 81 00 00       TESTAI 0000
+; D 4130 A1 01 39       IFFALSEI L17
+; D 4133 11 0F 01 96    LOADXI R15 0196                "started\r\n"
+; D 4137 C1 0F          PRINTSTR R15
+; D 4139 C7 00          SETMULTI 00                    start(self); spin();   start(self): look and start with no other task running
+; D 413B 11 0F EF 35    LOADXI R15 EF35                VM4 state
+; D 413F 9D 1F 03       TESTMXI R15 03                 stopped?
+; D 4142 A1 01 48       IFFALSEI L18
+; D 4145 31 0F 01       COPYMXI R15 01                 start(self): it runs again
+; D 4148 C7 01          SETMULTI 01
+; D 414A BD 00 62       CALL F_spin
+; D 414D BE 00          RETURN
+; D 414F F0 00 00       BREAK                          end marker: the pre-pass stops here
+; ==========================================================================
+; stopstart  -  compiled from stopstart.sc by scc (Stellar C, prototype)   loads at $5000
+; ==========================================================================
+; 17 STELLAR commands, 48 bytes of code, 0 bytes of data.
+; registers: 
+; in memory: adds
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 5000 CD             START                          Stellar C: stopstart
+; D 5001 11 0C 00 00    LOADXI R12 0000                RC = 0: the index for a[k] and the u8 variables
+; D 5005 BD 00 14       CALL F_counter                 run counter()
+; QUIT:
+; D 5008 C7 01          SETMULTI 01                    in case it stopped inside atomic { }
+; D 500A 11 0F DF 15    LOADXI R15 DF15                my VM state
+; PARK:
+; D 500E 31 0F 04       COPYMXI R15 04                 paused - a stray wake-up only brings us back here
+; D 5011 B0 00 0E       GAL PARK
+; counter():
+; D 5014 C7 00          SETMULTI 00                    task counter() { while (1) adds++; }   a shared update: no other task cuts in
+; D 5016 11 0F F1 A1    LOADXI R15 F1A1                adds
+; D 501A 39 02 FF       COPYMXY M(R15) -> R15
+; D 501D 42 0F          INCX R15
+; D 501F 11 0E F1 A1    LOADXI R14 F1A1                adds
+; D 5023 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 5026 C7 01          SETMULTI 01
+; D 5028 B0 00 14       GAL L1
+; D 502B BE 00          RETURN
+; D 502D F0 00 00       BREAK                          end marker: the pre-pass stops here
+; ==========================================================================
+; stopstart  -  compiled from stopstart.sc by scc (Stellar C, prototype)   loads at $6000
+; ==========================================================================
+; 25 STELLAR commands, 73 bytes of code, 7 bytes of data.
+; registers: 
+; in memory: adds
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 6000 CD             START                          Stellar C: stopstart
+; D 6001 11 0C 00 00    LOADXI R12 0000                RC = 0: the index for a[k] and the u8 variables
+; D 6005 BD 00 14       CALL F_sleeper                 run sleeper()
+; QUIT:
+; D 6008 C7 01          SETMULTI 01                    in case it stopped inside atomic { }
+; D 600A 11 0F CF 25    LOADXI R15 CF25                my VM state
+; PARK:
+; D 600E 31 0F 04       COPYMXI R15 04                 paused - a stray wake-up only brings us back here
+; D 6011 B0 00 0E       GAL PARK
+; sleeper():
+; D 6014 C7 00          SETMULTI 00                    task sleeper() { while (1) { wait(go != 0); go = 0; print("w   wait(): look with no other task running
+; D 6016 2E 0C E1 A0    READIDX R12 E1A0
+; D 601A 81 00 00       TESTAI 0000
+; D 601D A1 00 32       IFFALSEI L7
+; D 6020 11 0F CF 25    LOADXI R15 CF25                my VM state
+; D 6024 31 0F 04       COPYMXI R15 04                 asleep: no more turns until a wake-up
+; D 6027 C7 01          SETMULTI 01
+; D 6029 9D 1F 04       TESTMXI R15 04                 still asleep?
+; D 602C A0 00 29       IFTRUEI L6
+; D 602F B0 00 14       GAL L5                         woken: look again
+; D 6032 C7 01          SETMULTI 01
+; D 6034 10 00 00       LOADAI 0000
+; D 6037 2F 0C E1 A0    WRITEIDX R12 E1A0
+; D 603B 11 0F 00 50    LOADXI R15 0050                "woke\r\n"
+; D 603F C1 0F          PRINTSTR R15
+; D 6041 B0 00 14       GAL L1
+; D 6044 BE 00          RETURN
+; D 6046 F0 00 00       BREAK                          end marker: the pre-pass stops here
+; ==========================================================================
+; stopstart  -  compiled from stopstart.sc by scc (Stellar C, prototype)   loads at $7000
+; ==========================================================================
+; 17 STELLAR commands, 50 bytes of code, 8 bytes of data.
+; registers: 
+; in memory: adds
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 7000 CD             START                          Stellar C: stopstart
+; D 7001 11 0C 00 00    LOADXI R12 0000                RC = 0: the index for a[k] and the u8 variables
+; D 7005 BD 00 14       CALL F_self                    run self()
+; QUIT:
+; D 7008 C7 01          SETMULTI 01                    in case it stopped inside atomic { }
+; D 700A 11 0F BF 35    LOADXI R15 BF35                my VM state
+; PARK:
+; D 700E 31 0F 04       COPYMXI R15 04                 paused - a stray wake-up only brings us back here
+; D 7011 B0 00 0E       GAL PARK
+; self():
+; D 7014 11 0F 00 40    LOADXI R15 0040                task self() { print("A\r\n"); stop(self); print("B\r\n"); }   "A\r\n"
+; D 7018 C1 0F          PRINTSTR R15
+; D 701A 11 0F BF 35    LOADXI R15 BF35                my VM state
+; D 701E 31 0F 03       COPYMXI R15 03                 stop(self): no more turns
+; D 7021 9D 1F 03       TESTMXI R15 03                 still stopped?
+; D 7024 A0 00 21       IFTRUEI L1
+; D 7027 11 0F 00 44    LOADXI R15 0044                "B\r\n"
+; D 702B C1 0F          PRINTSTR R15
+; D 702D BE 00          RETURN
+; D 702F F0 00 00       BREAK                          end marker: the pre-pass stops here
+
+; CODE  -  download this block
+
+D 4000 CD
+D 4001 C7 00
+D 4003 11 0F EF 15
+D 4007 31 0F 04
+D 400A 11 0F EF 25
+D 400E 31 0F 04
+D 4011 11 0F EF 35
+D 4015 31 0F 04
+D 4018 11 0C 00 00
+D 401C 10 00 00
+D 401F 2F 0C 01 A0
+D 4023 11 0F 00 00
+D 4027 11 0E 01 A1
+D 402B 3A 02 FE
+D 402E 11 0F EF 15
+D 4032 31 0F 01
+D 4035 11 0F EF 25
+D 4039 31 0F 01
+D 403C 11 0F EF 35
+D 4040 31 0F 01
+D 4043 C7 01
+D 4045 BD 00 76
+D 4048 C7 00
+D 404A 11 0F EF 15
+D 404E 31 0F 04
+D 4051 11 0F EF 25
+D 4055 31 0F 04
+D 4058 11 0F EF 35
+D 405C 31 0F 04
+D 405F C7 01
+D 4061 00
+D 4062 11 00 00 00
+D 4066 B0 00 6B
+D 4069 42 00
+D 406B 11 0F 01 2C
+D 406F 89 0F
+D 4071 A0 00 69
+D 4074 BE 00
+D 4076 BD 00 62
+D 4079 11 01 01 A1
+D 407D 39 02 11
+D 4080 BD 00 62
+D 4083 11 0F 01 A1
+D 4087 39 02 FF
+D 408A 87 F1
+D 408C A0 00 95
+D 408F 11 0F 01 60
+D 4093 C1 0F
+D 4095 11 0F EF 15
+D 4099 31 0F 03
+D 409C BD 00 62
+D 409F 11 01 01 A1
+D 40A3 39 02 11
+D 40A6 BD 00 62
+D 40A9 11 0F 01 A1
+D 40AD 39 02 FF
+D 40B0 87 F1
+D 40B2 A1 00 BB
+D 40B5 11 0F 01 67
+D 40B9 C1 0F
+D 40BB C7 00
+D 40BD 11 0F EF 15
+D 40C1 9D 1F 03
+D 40C4 A1 00 CA
+D 40C7 31 0F 01
+D 40CA C7 01
+D 40CC BD 00 62
+D 40CF 11 0F 01 A1
+D 40D3 39 02 FF
+D 40D6 87 F1
+D 40D8 A0 00 E1
+D 40DB 11 0F 01 71
+D 40DF C1 0F
+D 40E1 11 0F EF 25
+D 40E5 31 0F 03
+D 40E8 10 00 01
+D 40EB 2F 0C 01 A0
+D 40EF C7 00
+D 40F1 9D 1F 04
+D 40F4 A1 00 FA
+D 40F7 31 0F 01
+D 40FA C7 01
+D 40FC BD 00 62
+D 40FF BD 00 62
+D 4102 2E 0C 01 A0
+D 4106 81 00 01
+D 4109 A1 01 12
+D 410C 11 0F 01 7E
+D 4110 C1 0F
+D 4112 C7 00
+D 4114 11 0F EF 25
+D 4118 9D 1F 03
+D 411B A1 01 21
+D 411E 31 0F 01
+D 4121 C7 01
+D 4123 BD 00 62
+D 4126 BD 00 62
+D 4129 2E 0C 01 A0
+D 412D 81 00 00
+D 4130 A1 01 39
+D 4133 11 0F 01 96
+D 4137 C1 0F
+D 4139 C7 00
+D 413B 11 0F EF 35
+D 413F 9D 1F 03
+D 4142 A1 01 48
+D 4145 31 0F 01
+D 4148 C7 01
+D 414A BD 00 62
+D 414D BE 00
+D 414F F0 00 00
+
+D 4160 72 75 6E 73 0D 0A 00
+
+D 4167 73 74 6F 70 70 65 64 0D 0A 00
+
+D 4171 72 75 6E 73 20 61 67 61 69 6E 0D 0A 00
+
+D 417E 6E 6F 20 77 61 6B 65 20 77 68 69 6C 65 20 73 74
+D 418E 6F 70 70 65 64 0D 0A 00
+
+D 4196 73 74 61 72 74 65 64 0D 0A 00
+
+D 5000 CD
+D 5001 11 0C 00 00
+D 5005 BD 00 14
+D 5008 C7 01
+D 500A 11 0F DF 15
+D 500E 31 0F 04
+D 5011 B0 00 0E
+D 5014 C7 00
+D 5016 11 0F F1 A1
+D 501A 39 02 FF
+D 501D 42 0F
+D 501F 11 0E F1 A1
+D 5023 3A 02 FE
+D 5026 C7 01
+D 5028 B0 00 14
+D 502B BE 00
+D 502D F0 00 00
+
+D 6000 CD
+D 6001 11 0C 00 00
+D 6005 BD 00 14
+D 6008 C7 01
+D 600A 11 0F CF 25
+D 600E 31 0F 04
+D 6011 B0 00 0E
+D 6014 C7 00
+D 6016 2E 0C E1 A0
+D 601A 81 00 00
+D 601D A1 00 32
+D 6020 11 0F CF 25
+D 6024 31 0F 04
+D 6027 C7 01
+D 6029 9D 1F 04
+D 602C A0 00 29
+D 602F B0 00 14
+D 6032 C7 01
+D 6034 10 00 00
+D 6037 2F 0C E1 A0
+D 603B 11 0F 00 50
+D 603F C1 0F
+D 6041 B0 00 14
+D 6044 BE 00
+D 6046 F0 00 00
+
+D 6050 77 6F 6B 65 0D 0A 00
+
+D 7000 CD
+D 7001 11 0C 00 00
+D 7005 BD 00 14
+D 7008 C7 01
+D 700A 11 0F BF 35
+D 700E 31 0F 04
+D 7011 B0 00 0E
+D 7014 11 0F 00 40
+D 7018 C1 0F
+D 701A 11 0F BF 35
+D 701E 31 0F 03
+D 7021 9D 1F 03
+D 7024 A0 00 21
+D 7027 11 0F 00 44
+D 702B C1 0F
+D 702D BE 00
+D 702F F0 00 00
+
+D 7040 41 0D 0A 00
+
+D 7044 42 0D 0A 00

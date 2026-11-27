@@ -1,0 +1,36 @@
+{
+ "vars": {
+  "main.d": {
+   "reg": 0
+  },
+  "main.n": {
+   "reg": 1
+  },
+  "main.q": {
+   "reg": 2
+  },
+  "readnum.c": {
+   "reg": 0
+  },
+  "readnum.len": {
+   "reg": 1
+  },
+  "readnum.v": {
+   "reg": 2
+  },
+  "main.high": {
+   "reg": 3
+  },
+  "main.low": {
+   "reg": 4
+  }
+ },
+ "arrays": {},
+ "labels": {
+  "QUIT": 16388,
+  "F_readnum": 16389,
+  "R_readnum": 16498,
+  "F_main": 16500,
+  "R_main": 16633
+ }
+}

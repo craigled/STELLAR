@@ -1,0 +1,569 @@
+; ==========================================================================
+; vmtalk  -  a MULTITASKING program compiled from vmtalk.sc by scc (Stellar C): 3 VMs, ONE file
+; ==========================================================================
+; 246 STELLAR commands in all.
+;   VM1 $4000-$4FFF  main()          172 commands,   514 bytes of code,   722 in all
+;   VM2 $5000-$5FFF  worker()         57 commands,   176 bytes of code,   176 in all
+;   VM3 $6000-$6FFF  ticker()         17 commands,    48 bytes of code,    48 in all
+; shared (absolute): job $42C5, done $42CC, paused $42CD, answer $42CE, ticks $42D0
+; Load this one file, then cold boot: every VM starts at once, and main() holds the tasks
+; until the shared data is set up. When main() ends, the whole program ends.
+;
+; ==========================================================================
+; vmtalk  -  compiled from vmtalk.sc by scc (Stellar C, prototype)   loads at $4000
+; ==========================================================================
+; 172 STELLAR commands, 514 bytes of code, 181 bytes of data.
+; registers: main.k R0, main.n R1
+; in memory: answer, ticks
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 4000 CD             START                          Stellar C: vmtalk
+; D 4001 C7 00          SETMULTI 00                    no other VM runs until the shared data is set up
+; D 4003 11 0F EF 15    LOADXI R15 EF15                VM2 state
+; D 4007 31 0F 04       COPYMXI R15 04                 VM2 waits
+; D 400A 11 0F EF 25    LOADXI R15 EF25                VM3 state
+; D 400E 31 0F 04       COPYMXI R15 04                 VM3 waits
+; D 4011 11 0C 00 00    LOADXI R12 0000                RC = 0: the index for a[k] and the u8 variables
+; D 4015 11 0E 02 C5    LOADXI R14 02C5                chan job[4];                // main -> worker: a number to w
+; D 4019 11 0F 02 C8    LOADXI R15 02C8
+; D 401D FB EF 00       FILLMEMXY RE..RF 00
+; D 4020 10 00 00       LOADAI 0000                    chan job[4];                // main -> worker: a number to w
+; D 4023 2F 0C 02 C9    WRITEIDX R12 02C9              shared: 0 at the start
+; D 4027 10 00 00       LOADAI 0000                    chan job[4];                // main -> worker: a number to w
+; D 402A 2F 0C 02 CA    WRITEIDX R12 02CA              shared: 0 at the start
+; D 402E 10 00 00       LOADAI 0000                    chan job[4];                // main -> worker: a number to w
+; D 4031 2F 0C 02 CB    WRITEIDX R12 02CB              shared: 0 at the start
+; D 4035 10 00 00       LOADAI 0000                    shared u8 done;             //  and a flag saying it is ther
+; D 4038 2F 0C 02 CC    WRITEIDX R12 02CC              shared: 0 at the start
+; D 403C 10 00 00       LOADAI 0000                    shared u8 paused;           // main's note of whether ticker
+; D 403F 2F 0C 02 CD    WRITEIDX R12 02CD              shared: 0 at the start
+; D 4043 11 0F 00 00    LOADXI R15 0000                shared u16 answer;          // worker -> main: the result
+; D 4047 11 0E 02 CE    LOADXI R14 02CE                answer
+; D 404B 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 404E 11 0E 02 D0    LOADXI R14 02D0                shared u16 ticks;           // ticker -> anyone: how far it    ticks
+; D 4052 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 4055 11 0F EF 15    LOADXI R15 EF15                VM2 state
+; D 4059 31 0F 01       COPYMXI R15 01                 start VM2
+; D 405C 11 0F EF 25    LOADXI R15 EF25                VM3 state
+; D 4060 31 0F 01       COPYMXI R15 01                 start VM3
+; D 4063 C7 01          SETMULTI 01                    the tasks run from here
+; D 4065 BD 00 7B       CALL F_main                    run main()
+; QUIT:
+; D 4068 C7 00          SETMULTI 00
+; D 406A 11 0F EF 15    LOADXI R15 EF15                VM2 state
+; D 406E 31 0F 04       COPYMXI R15 04                 stop VM2
+; D 4071 11 0F EF 25    LOADXI R15 EF25                VM3 state
+; D 4075 31 0F 04       COPYMXI R15 04                 stop VM3
+; D 4078 C7 01          SETMULTI 01
+; D 407A 00             HALT                           no VM is left running: the program ends
+; main():
+; D 407B 11 0F 02 10    LOADXI R15 0210                print("\r\n 1  add up 1..N (worker)\r\n 2  how far has ticke   "\r\n 1  add up 1..N (worker)\r\n 2  how "
+; D 407F C1 0F          PRINTSTR R15
+; D 4081 11 0F 02 4A    LOADXI R15 024A                print(" 3  pause / resume ticker\r\n Q  quit\r\nChoice? ");   " 3  pause / resume ticker\r\n Q  quit\r\"
+; D 4085 C1 0F          PRINTSTR R15
+; D 4087 CB             SERIN                          k = getc();
+; D 4088 21 00          COPYAX Acc -> R0
+; D 408A 11 0F 00 61    LOADXI R15 0061                if (k >= 'a' && k <= 'z') k = k - 'a' + 'A';
+; D 408E 88 0F          TESTGXY R0 >= R15
+; D 4090 A1 00 AA       IFFALSEI L6
+; D 4093 11 0F 00 7A    LOADXI R15 007A
+; D 4097 88 F0          TESTGXY R15 >= R0
+; D 4099 A1 00 AA       IFFALSEI L6
+; D 409C 23 00 0F       COPYXY R0 -> R15
+; D 409F 53 0F 00 61    SUBXI R15 0061
+; D 40A3 23 00 F0       COPYXY R15 -> R0
+; D 40A6 52 00 00 41    ADDXI R0 0041
+; D 40AA 22 00          COPYXA R0 -> Acc               putc(k); print("\r\n");
+; D 40AC C9             SEROUT
+; D 40AD 11 0F 02 78    LOADXI R15 0278                "\r\n"
+; D 40B1 C1 0F          PRINTSTR R15
+; D 40B3 86 00 00 31    TESTXI R0 0031                 case '1':
+; D 40B7 A0 00 D2       IFTRUEI L8                     case 49
+; D 40BA 86 00 00 32    TESTXI R0 0032                 case '2':
+; D 40BE A0 01 94       IFTRUEI L9                     case 50
+; D 40C1 86 00 00 33    TESTXI R0 0033                 case '3':
+; D 40C5 A0 01 B0       IFTRUEI L10                    case 51
+; D 40C8 86 00 00 51    TESTXI R0 0051                 case 'Q':
+; D 40CC A0 01 F2       IFTRUEI L11                    case 81
+; D 40CF B0 01 FA       GAL L7                         no case: past the switch
+; D 40D2 11 0F 02 7B    LOADXI R15 027B                print("N (0-9)? ");   "N (0-9)? "
+; D 40D6 C1 0F          PRINTSTR R15
+; D 40D8 CB             SERIN                          n = getc(); putc(n); print("\r\n"); n = n - '0';
+; D 40D9 21 01          COPYAX Acc -> R1
+; D 40DB 22 01          COPYXA R1 -> Acc
+; D 40DD C9             SEROUT
+; D 40DE 11 0F 02 78    LOADXI R15 0278                "\r\n"
+; D 40E2 C1 0F          PRINTSTR R15
+; D 40E4 53 01 00 30    SUBXI R1 0030
+; D 40E8 10 00 00       LOADAI 0000                    done = 0;
+; D 40EB 2F 0C 02 CC    WRITEIDX R12 02CC
+; D 40EF C7 00          SETMULTI 00                    send(job, n);       // hand the job over...   wait(): look with no other task running
+; D 40F1 2E 0C 02 CB    READIDX R12 02CB
+; D 40F5 21 0F          COPYAX Acc -> R15
+; D 40F7 11 0E 00 04    LOADXI R14 0004
+; D 40FB 89 FE          TESTLXY R15 < R14
+; D 40FD A0 01 12       IFTRUEI L14
+; D 4100 11 0F EF 05    LOADXI R15 EF05                my VM state
+; D 4104 31 0F 04       COPYMXI R15 04                 asleep: no more turns until a wake-up
+; D 4107 C7 01          SETMULTI 01
+; D 4109 9D 1F 04       TESTMXI R15 04                 still asleep?
+; D 410C A0 01 09       IFTRUEI L13
+; D 410F B0 00 EF       GAL L12                        woken: look again
+; D 4112 C7 01          SETMULTI 01
+; D 4114 C7 00          SETMULTI 00                    atomic {: no other task runs
+; D 4116 2E 0C 02 C9    READIDX R12 02C9
+; D 411A 21 0F          COPYAX Acc -> R15
+; D 411C 22 01          COPYXA R1 -> Acc
+; D 411E 2F 0F 02 C5    WRITEIDX R15 02C5
+; D 4122 2E 0C 02 C9    READIDX R12 02C9
+; D 4126 4E 00 01       ADDAI 0001
+; D 4129 2F 0C 02 C9    WRITEIDX R12 02C9
+; D 412D 2E 0C 02 C9    READIDX R12 02C9
+; D 4131 81 00 04       TESTAI 0004
+; D 4134 A1 01 3E       IFFALSEI L16
+; D 4137 10 00 00       LOADAI 0000
+; D 413A 2F 0C 02 C9    WRITEIDX R12 02C9
+; D 413E 2E 0C 02 CB    READIDX R12 02CB
+; D 4142 4E 00 01       ADDAI 0001
+; D 4145 2F 0C 02 CB    WRITEIDX R12 02CB
+; D 4149 11 0F EF 15    LOADXI R15 EF15                VM2 state
+; D 414D 9D 1F 04       TESTMXI R15 04                 is VM2 asleep in wait()?
+; D 4150 A1 01 56       IFFALSEI L17
+; D 4153 31 0F 01       COPYMXI R15 01                 wake VM2
+; D 4156 C7 01          SETMULTI 01                    } atomic
+; D 4158 C7 00          SETMULTI 00                    wait(done == 1);    // ...and sleep until worker says it is    wait(): look with no other task running
+; D 415A 2E 0C 02 CC    READIDX R12 02CC
+; D 415E 81 00 01       TESTAI 0001
+; D 4161 A0 01 76       IFTRUEI L20
+; D 4164 11 0F EF 05    LOADXI R15 EF05                my VM state
+; D 4168 31 0F 04       COPYMXI R15 04                 asleep: no more turns until a wake-up
+; D 416B C7 01          SETMULTI 01
+; D 416D 9D 1F 04       TESTMXI R15 04                 still asleep?
+; D 4170 A0 01 6D       IFTRUEI L19
+; D 4173 B0 01 58       GAL L18                        woken: look again
+; D 4176 C7 01          SETMULTI 01
+; D 4178 11 0F 02 85    LOADXI R15 0285                print("  sum = "); printu(answer); print("\r\n");   "  sum = "
+; D 417C C1 0F          PRINTSTR R15
+; D 417E 11 0F 02 CE    LOADXI R15 02CE                answer
+; D 4182 39 02 FF       COPYMXY M(R15) -> R15
+; D 4185 22 0F          COPYXA R15 -> Acc
+; D 4187 24             COPYAMA
+; D 4188 6B 00          CVT2DEC Acc
+; D 418A 6E             OUTDEC
+; D 418B 11 0F 02 78    LOADXI R15 0278                "\r\n"
+; D 418F C1 0F          PRINTSTR R15
+; D 4191 B0 01 FA       GAL L7                         break;
+; D 4194 11 0F 02 8E    LOADXI R15 028E                print("  ticks = "); printu(ticks); print("\r\n");   "  ticks = "
+; D 4198 C1 0F          PRINTSTR R15
+; D 419A 11 0F 02 D0    LOADXI R15 02D0                ticks
+; D 419E 39 02 FF       COPYMXY M(R15) -> R15
+; D 41A1 22 0F          COPYXA R15 -> Acc
+; D 41A3 24             COPYAMA
+; D 41A4 6B 00          CVT2DEC Acc
+; D 41A6 6E             OUTDEC
+; D 41A7 11 0F 02 78    LOADXI R15 0278                "\r\n"
+; D 41AB C1 0F          PRINTSTR R15
+; D 41AD B0 01 FA       GAL L7                         break;
+; D 41B0 2E 0C 02 CD    READIDX R12 02CD               if (paused) { start(ticker); paused = 0; print("  ticker run
+; D 41B4 81 00 00       TESTAI 0000
+; D 41B7 A0 01 DB       IFTRUEI L21
+; D 41BA C7 00          SETMULTI 00                    start(ticker): look and start with no other task running
+; D 41BC 11 0F EF 25    LOADXI R15 EF25                VM3 state
+; D 41C0 9D 1F 03       TESTMXI R15 03                 stopped?
+; D 41C3 A1 01 C9       IFFALSEI L23
+; D 41C6 31 0F 01       COPYMXI R15 01                 start(ticker): it runs again
+; D 41C9 C7 01          SETMULTI 01
+; D 41CB 10 00 00       LOADAI 0000
+; D 41CE 2F 0C 02 CD    WRITEIDX R12 02CD
+; D 41D2 11 0F 02 99    LOADXI R15 0299                "  ticker running\r\n"
+; D 41D6 C1 0F          PRINTSTR R15
+; D 41D8 B0 01 EF       GAL L22
+; D 41DB 11 0F EF 25    LOADXI R15 EF25                else        { stop(ticker);  paused = 1; print("  ticker pau   VM3 state
+; D 41DF 31 0F 03       COPYMXI R15 03                 stop(ticker): no more turns
+; D 41E2 10 00 01       LOADAI 0001
+; D 41E5 2F 0C 02 CD    WRITEIDX R12 02CD
+; D 41E9 11 0F 02 AC    LOADXI R15 02AC                "  ticker paused\r\n"
+; D 41ED C1 0F          PRINTSTR R15
+; D 41EF B0 01 FA       GAL L7                         break;
+; D 41F2 11 0F 02 BE    LOADXI R15 02BE                print("Bye.\r\n");   "Bye.\r\n"
+; D 41F6 C1 0F          PRINTSTR R15
+; D 41F8 BE 00          RETURN                         return;             // main ending ends every task
+; D 41FA B0 00 7B       GAL L1                         while (1) {
+; D 41FD BE 00          RETURN
+; D 41FF F0 00 00       BREAK                          end marker: the pre-pass stops here
+; ==========================================================================
+; vmtalk  -  compiled from vmtalk.sc by scc (Stellar C, prototype)   loads at $5000
+; ==========================================================================
+; 57 STELLAR commands, 176 bytes of code, 0 bytes of data.
+; registers: worker.i R0, worker.sum R1, worker.n R2
+; in memory: answer, ticks
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 5000 CD             START                          Stellar C: vmtalk
+; D 5001 11 0C 00 00    LOADXI R12 0000                RC = 0: the index for a[k] and the u8 variables
+; D 5005 BD 00 14       CALL F_worker                  run worker()
+; QUIT:
+; D 5008 C7 01          SETMULTI 01                    in case it stopped inside atomic { }
+; D 500A 11 0F DF 15    LOADXI R15 DF15                my VM state
+; PARK:
+; D 500E 31 0F 04       COPYMXI R15 04                 paused - a stray wake-up only brings us back here
+; D 5011 B0 00 0E       GAL PARK
+; worker():
+; D 5014 C7 00          SETMULTI 00                    n = recv(job);      // sleeps here until main sends somethin   wait(): look with no other task running
+; D 5016 2E 0C F2 CB    READIDX R12 F2CB
+; D 501A 81 00 00       TESTAI 0000
+; D 501D A1 00 32       IFFALSEI L7
+; D 5020 11 0F DF 15    LOADXI R15 DF15                my VM state
+; D 5024 31 0F 04       COPYMXI R15 04                 asleep: no more turns until a wake-up
+; D 5027 C7 01          SETMULTI 01
+; D 5029 9D 1F 04       TESTMXI R15 04                 still asleep?
+; D 502C A0 00 29       IFTRUEI L6
+; D 502F B0 00 14       GAL L5                         woken: look again
+; D 5032 C7 01          SETMULTI 01
+; D 5034 C7 00          SETMULTI 00                    atomic {: no other task runs
+; D 5036 2E 0C F2 CA    READIDX R12 F2CA
+; D 503A 21 0F          COPYAX Acc -> R15
+; D 503C 2E 0F F2 C5    READIDX R15 F2C5
+; D 5040 21 02          COPYAX Acc -> R2
+; D 5042 2E 0C F2 CA    READIDX R12 F2CA
+; D 5046 4E 00 01       ADDAI 0001
+; D 5049 2F 0C F2 CA    WRITEIDX R12 F2CA
+; D 504D 2E 0C F2 CA    READIDX R12 F2CA
+; D 5051 81 00 04       TESTAI 0004
+; D 5054 A1 00 5E       IFFALSEI L9
+; D 5057 10 00 00       LOADAI 0000
+; D 505A 2F 0C F2 CA    WRITEIDX R12 F2CA
+; D 505E 2E 0C F2 CB    READIDX R12 F2CB
+; D 5062 4E FF FF       ADDAI FFFF
+; D 5065 2F 0C F2 CB    WRITEIDX R12 F2CB
+; D 5069 11 0F DF 05    LOADXI R15 DF05                VM1 state
+; D 506D 9D 1F 04       TESTMXI R15 04                 is VM1 asleep in wait()?
+; D 5070 A1 00 76       IFFALSEI L10
+; D 5073 31 0F 01       COPYMXI R15 01                 wake VM1
+; D 5076 C7 01          SETMULTI 01                    } atomic
+; D 5078 11 01 00 00    LOADXI R1 0000                 sum = 0;
+; D 507C 11 00 00 01    LOADXI R0 0001                 for (i = 1; i <= n; i++) sum += i;
+; D 5080 B0 00 88       GAL L12
+; D 5083 50 10 01       ADDXYZ R1 + R0 -> R1
+; D 5086 42 00          INCX R0
+; D 5088 88 20          TESTGXY R2 >= R0
+; D 508A A0 00 83       IFTRUEI L11
+; D 508D 11 0F F2 CE    LOADXI R15 F2CE                answer = sum;   answer
+; D 5091 3A 02 1F       COPYXMY R1 -> M(R15)
+; D 5094 10 00 01       LOADAI 0001                    done = 1;           // main's wait() wakes up on this
+; D 5097 2F 0C F2 CC    WRITEIDX R12 F2CC
+; D 509B 11 0F DF 05    LOADXI R15 DF05                VM1 state
+; D 509F 9D 1F 04       TESTMXI R15 04                 is VM1 asleep in wait()?
+; D 50A2 A1 00 A8       IFFALSEI L15
+; D 50A5 31 0F 01       COPYMXI R15 01                 wake VM1
+; D 50A8 B0 00 14       GAL L1                         while (1) {
+; D 50AB BE 00          RETURN
+; D 50AD F0 00 00       BREAK                          end marker: the pre-pass stops here
+; ==========================================================================
+; vmtalk  -  compiled from vmtalk.sc by scc (Stellar C, prototype)   loads at $6000
+; ==========================================================================
+; 17 STELLAR commands, 48 bytes of code, 0 bytes of data.
+; registers: 
+; in memory: ticks, answer
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 6000 CD             START                          Stellar C: vmtalk
+; D 6001 11 0C 00 00    LOADXI R12 0000                RC = 0: the index for a[k] and the u8 variables
+; D 6005 BD 00 14       CALL F_ticker                  run ticker()
+; QUIT:
+; D 6008 C7 01          SETMULTI 01                    in case it stopped inside atomic { }
+; D 600A 11 0F CF 25    LOADXI R15 CF25                my VM state
+; PARK:
+; D 600E 31 0F 04       COPYMXI R15 04                 paused - a stray wake-up only brings us back here
+; D 6011 B0 00 0E       GAL PARK
+; ticker():
+; D 6014 C7 00          SETMULTI 00                    while (1) ticks++;   a shared update: no other task cuts in
+; D 6016 11 0F E2 D0    LOADXI R15 E2D0                ticks
+; D 601A 39 02 FF       COPYMXY M(R15) -> R15
+; D 601D 42 0F          INCX R15
+; D 601F 11 0E E2 D0    LOADXI R14 E2D0                ticks
+; D 6023 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 6026 C7 01          SETMULTI 01
+; D 6028 B0 00 14       GAL L1
+; D 602B BE 00          RETURN
+; D 602D F0 00 00       BREAK                          end marker: the pre-pass stops here
+
+; CODE  -  download this block
+
+D 4000 CD
+D 4001 C7 00
+D 4003 11 0F EF 15
+D 4007 31 0F 04
+D 400A 11 0F EF 25
+D 400E 31 0F 04
+D 4011 11 0C 00 00
+D 4015 11 0E 02 C5
+D 4019 11 0F 02 C8
+D 401D FB EF 00
+D 4020 10 00 00
+D 4023 2F 0C 02 C9
+D 4027 10 00 00
+D 402A 2F 0C 02 CA
+D 402E 10 00 00
+D 4031 2F 0C 02 CB
+D 4035 10 00 00
+D 4038 2F 0C 02 CC
+D 403C 10 00 00
+D 403F 2F 0C 02 CD
+D 4043 11 0F 00 00
+D 4047 11 0E 02 CE
+D 404B 3A 02 FE
+D 404E 11 0E 02 D0
+D 4052 3A 02 FE
+D 4055 11 0F EF 15
+D 4059 31 0F 01
+D 405C 11 0F EF 25
+D 4060 31 0F 01
+D 4063 C7 01
+D 4065 BD 00 7B
+D 4068 C7 00
+D 406A 11 0F EF 15
+D 406E 31 0F 04
+D 4071 11 0F EF 25
+D 4075 31 0F 04
+D 4078 C7 01
+D 407A 00
+D 407B 11 0F 02 10
+D 407F C1 0F
+D 4081 11 0F 02 4A
+D 4085 C1 0F
+D 4087 CB
+D 4088 21 00
+D 408A 11 0F 00 61
+D 408E 88 0F
+D 4090 A1 00 AA
+D 4093 11 0F 00 7A
+D 4097 88 F0
+D 4099 A1 00 AA
+D 409C 23 00 0F
+D 409F 53 0F 00 61
+D 40A3 23 00 F0
+D 40A6 52 00 00 41
+D 40AA 22 00
+D 40AC C9
+D 40AD 11 0F 02 78
+D 40B1 C1 0F
+D 40B3 86 00 00 31
+D 40B7 A0 00 D2
+D 40BA 86 00 00 32
+D 40BE A0 01 94
+D 40C1 86 00 00 33
+D 40C5 A0 01 B0
+D 40C8 86 00 00 51
+D 40CC A0 01 F2
+D 40CF B0 01 FA
+D 40D2 11 0F 02 7B
+D 40D6 C1 0F
+D 40D8 CB
+D 40D9 21 01
+D 40DB 22 01
+D 40DD C9
+D 40DE 11 0F 02 78
+D 40E2 C1 0F
+D 40E4 53 01 00 30
+D 40E8 10 00 00
+D 40EB 2F 0C 02 CC
+D 40EF C7 00
+D 40F1 2E 0C 02 CB
+D 40F5 21 0F
+D 40F7 11 0E 00 04
+D 40FB 89 FE
+D 40FD A0 01 12
+D 4100 11 0F EF 05
+D 4104 31 0F 04
+D 4107 C7 01
+D 4109 9D 1F 04
+D 410C A0 01 09
+D 410F B0 00 EF
+D 4112 C7 01
+D 4114 C7 00
+D 4116 2E 0C 02 C9
+D 411A 21 0F
+D 411C 22 01
+D 411E 2F 0F 02 C5
+D 4122 2E 0C 02 C9
+D 4126 4E 00 01
+D 4129 2F 0C 02 C9
+D 412D 2E 0C 02 C9
+D 4131 81 00 04
+D 4134 A1 01 3E
+D 4137 10 00 00
+D 413A 2F 0C 02 C9
+D 413E 2E 0C 02 CB
+D 4142 4E 00 01
+D 4145 2F 0C 02 CB
+D 4149 11 0F EF 15
+D 414D 9D 1F 04
+D 4150 A1 01 56
+D 4153 31 0F 01
+D 4156 C7 01
+D 4158 C7 00
+D 415A 2E 0C 02 CC
+D 415E 81 00 01
+D 4161 A0 01 76
+D 4164 11 0F EF 05
+D 4168 31 0F 04
+D 416B C7 01
+D 416D 9D 1F 04
+D 4170 A0 01 6D
+D 4173 B0 01 58
+D 4176 C7 01
+D 4178 11 0F 02 85
+D 417C C1 0F
+D 417E 11 0F 02 CE
+D 4182 39 02 FF
+D 4185 22 0F
+D 4187 24
+D 4188 6B 00
+D 418A 6E
+D 418B 11 0F 02 78
+D 418F C1 0F
+D 4191 B0 01 FA
+D 4194 11 0F 02 8E
+D 4198 C1 0F
+D 419A 11 0F 02 D0
+D 419E 39 02 FF
+D 41A1 22 0F
+D 41A3 24
+D 41A4 6B 00
+D 41A6 6E
+D 41A7 11 0F 02 78
+D 41AB C1 0F
+D 41AD B0 01 FA
+D 41B0 2E 0C 02 CD
+D 41B4 81 00 00
+D 41B7 A0 01 DB
+D 41BA C7 00
+D 41BC 11 0F EF 25
+D 41C0 9D 1F 03
+D 41C3 A1 01 C9
+D 41C6 31 0F 01
+D 41C9 C7 01
+D 41CB 10 00 00
+D 41CE 2F 0C 02 CD
+D 41D2 11 0F 02 99
+D 41D6 C1 0F
+D 41D8 B0 01 EF
+D 41DB 11 0F EF 25
+D 41DF 31 0F 03
+D 41E2 10 00 01
+D 41E5 2F 0C 02 CD
+D 41E9 11 0F 02 AC
+D 41ED C1 0F
+D 41EF B0 01 FA
+D 41F2 11 0F 02 BE
+D 41F6 C1 0F
+D 41F8 BE 00
+D 41FA B0 00 7B
+D 41FD BE 00
+D 41FF F0 00 00
+
+D 4210 0D 0A 20 31 20 20 61 64 64 20 75 70 20 31 2E 2E
+D 4220 4E 20 28 77 6F 72 6B 65 72 29 0D 0A 20 32 20 20
+D 4230 68 6F 77 20 66 61 72 20 68 61 73 20 74 69 63 6B
+D 4240 65 72 20 67 6F 74 3F 0D 0A 00
+
+D 424A 20 33 20 20 70 61 75 73 65 20 2F 20 72 65 73 75
+D 425A 6D 65 20 74 69 63 6B 65 72 0D 0A 20 51 20 20 71
+D 426A 75 69 74 0D 0A 43 68 6F 69 63 65 3F 20 00
+
+D 4278 0D 0A 00
+
+D 427B 4E 20 28 30 2D 39 29 3F 20 00
+
+D 4285 20 20 73 75 6D 20 3D 20 00
+
+D 428E 20 20 74 69 63 6B 73 20 3D 20 00
+
+D 4299 20 20 74 69 63 6B 65 72 20 72 75 6E 6E 69 6E 67
+D 42A9 0D 0A 00
+
+D 42AC 20 20 74 69 63 6B 65 72 20 70 61 75 73 65 64 0D
+D 42BC 0A 00
+
+D 42BE 42 79 65 2E 0D 0A 00
+
+D 5000 CD
+D 5001 11 0C 00 00
+D 5005 BD 00 14
+D 5008 C7 01
+D 500A 11 0F DF 15
+D 500E 31 0F 04
+D 5011 B0 00 0E
+D 5014 C7 00
+D 5016 2E 0C F2 CB
+D 501A 81 00 00
+D 501D A1 00 32
+D 5020 11 0F DF 15
+D 5024 31 0F 04
+D 5027 C7 01
+D 5029 9D 1F 04
+D 502C A0 00 29
+D 502F B0 00 14
+D 5032 C7 01
+D 5034 C7 00
+D 5036 2E 0C F2 CA
+D 503A 21 0F
+D 503C 2E 0F F2 C5
+D 5040 21 02
+D 5042 2E 0C F2 CA
+D 5046 4E 00 01
+D 5049 2F 0C F2 CA
+D 504D 2E 0C F2 CA
+D 5051 81 00 04
+D 5054 A1 00 5E
+D 5057 10 00 00
+D 505A 2F 0C F2 CA
+D 505E 2E 0C F2 CB
+D 5062 4E FF FF
+D 5065 2F 0C F2 CB
+D 5069 11 0F DF 05
+D 506D 9D 1F 04
+D 5070 A1 00 76
+D 5073 31 0F 01
+D 5076 C7 01
+D 5078 11 01 00 00
+D 507C 11 00 00 01
+D 5080 B0 00 88
+D 5083 50 10 01
+D 5086 42 00
+D 5088 88 20
+D 508A A0 00 83
+D 508D 11 0F F2 CE
+D 5091 3A 02 1F
+D 5094 10 00 01
+D 5097 2F 0C F2 CC
+D 509B 11 0F DF 05
+D 509F 9D 1F 04
+D 50A2 A1 00 A8
+D 50A5 31 0F 01
+D 50A8 B0 00 14
+D 50AB BE 00
+D 50AD F0 00 00
+
+D 6000 CD
+D 6001 11 0C 00 00
+D 6005 BD 00 14
+D 6008 C7 01
+D 600A 11 0F CF 25
+D 600E 31 0F 04
+D 6011 B0 00 0E
+D 6014 C7 00
+D 6016 11 0F E2 D0
+D 601A 39 02 FF
+D 601D 42 0F
+D 601F 11 0E E2 D0
+D 6023 3A 02 FE
+D 6026 C7 01
+D 6028 B0 00 14
+D 602B BE 00
+D 602D F0 00 00
+D 7000 00

@@ -1,0 +1,83 @@
+{
+ "shared": {
+  "go": 16800,
+  "adds": 16801
+ },
+ "vms": {
+  "1": {
+   "vars": {
+    "spin.i": {
+     "reg": 0
+    },
+    "main.a": {
+     "reg": 1
+    },
+    "adds": {
+     "mem": 16801
+    }
+   },
+   "arrays": {
+    "go": 16800
+   },
+   "labels": {
+    "QUIT": 16456,
+    "F_spin": 16482,
+    "R_spin": 16500,
+    "F_main": 16502,
+    "R_main": 16717
+   },
+   "part": "main"
+  },
+  "2": {
+   "vars": {
+    "adds": {
+     "mem": 82337
+    }
+   },
+   "arrays": {
+    "go": 82336
+   },
+   "labels": {
+    "QUIT": 20488,
+    "PARK": 20494,
+    "F_counter": 20500,
+    "R_counter": 20523
+   },
+   "part": "counter"
+  },
+  "3": {
+   "vars": {
+    "adds": {
+     "mem": 82337
+    }
+   },
+   "arrays": {
+    "go": 82336
+   },
+   "labels": {
+    "QUIT": 24584,
+    "PARK": 24590,
+    "F_sleeper": 24596,
+    "R_sleeper": 24644
+   },
+   "part": "sleeper"
+  },
+  "4": {
+   "vars": {
+    "adds": {
+     "mem": 82337
+    }
+   },
+   "arrays": {
+    "go": 82336
+   },
+   "labels": {
+    "QUIT": 28680,
+    "PARK": 28686,
+    "F_self": 28692,
+    "R_self": 28717
+   },
+   "part": "self"
+  }
+ }
+}

@@ -1,0 +1,586 @@
+; ==========================================================================
+; eartest  -  compiled from eartest.sc by scc (Stellar C, prototype)   loads at $4000
+; ==========================================================================
+; 221 STELLAR commands, 625 bytes of code, 852 bytes of data.
+; registers: main.hits R0, main.hold R1, main.sounds R10, main.lvl R11, main.oldmask R12, main.mask R2, main.peak R3, main.k R4, main.quiet R5, main.inv R6, main.cnt R7, main.on R8, main.seen R9
+; in memory: main.shown
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 4000 CD             START                          Stellar C: eartest
+; D 4001 BD 00 55       CALL F_main                    run main()
+; QUIT:
+; D 4004 00             HALT
+; screen():
+; D 4005 11 0F 02 80    LOADXI R15 0280                cls(); cursor(0);   cls()
+; D 4009 C1 0F          PRINTSTR R15
+; D 400B 11 0F 02 8C    LOADXI R15 028C                cursor(0)
+; D 400F C1 0F          PRINTSTR R15
+; D 4011 11 0F 02 93    LOADXI R15 0293                print("STELLAR EAR TEST - listening on EF3\r\n\r\n");   "STELLAR EAR TEST - listening on EF3\r\n\"
+; D 4015 C1 0F          PRINTSTR R15
+; D 4017 11 0F 02 BB    LOADXI R15 02BB                print("EF lines   1 .  2 .  3 .  4 .     (* = the line is pu   "EF lines   1 .  2 .  3 .  4 .     (* = t"
+; D 401B C1 0F          PRINTSTR R15
+; D 401D 11 0F 03 02    LOADXI R15 0302                print("EF3         quiet\r\n\r\n");   "EF3         quiet\r\n\r\n"
+; D 4021 C1 0F          PRINTSTR R15
+; D 4023 11 0F 03 18    LOADXI R15 0318                print("Level      [....................]\r\n\r\n");   "Level      [....................]\r\n\r\"
+; D 4027 C1 0F          PRINTSTR R15
+; D 4029 11 0F 03 3E    LOADXI R15 033E                print("Sounds     0\r\nHold\r\nPolarity\r\n\r\n");   "Sounds     0\r\nHold\r\nPolarity\r\n\r\n"
+; D 402D C1 0F          PRINTSTR R15
+; D 402F 11 0F 03 5F    LOADXI R15 035F                print("Nothing plugged in: every line shows '.', EF4 '*' onl   "Nothing plugged in: every line shows '.'"
+; D 4033 C1 0F          PRINTSTR R15
+; D 4035 11 0F 03 AD    LOADXI R15 03AD                print("EF3 '*' with nothing plugged in: JP6 is still fitted    "EF3 '*' with nothing plugged in: JP6 is "
+; D 4039 C1 0F          PRINTSTR R15
+; D 403B 11 0F 03 FD    LOADXI R15 03FD                print("A clap or knock: Sounds goes up by one. A steady tone   "A clap or knock: Sounds goes up by one. "
+; D 403F C1 0F          PRINTSTR R15
+; D 4041 11 0F 04 47    LOADXI R15 0447                print("SOUND lit when it is quiet: the ear's output is the o   "SOUND lit when it is quiet: the ear's ou"
+; D 4045 C1 0F          PRINTSTR R15
+; D 4047 11 0F 04 95    LOADXI R15 0495                print("A raw sound module counting one clap as several: pres   "A raw sound module counting one clap as "
+; D 404B C1 0F          PRINTSTR R15
+; D 404D 11 0F 04 DF    LOADXI R15 04DF                print("q quit   c clear   i invert   + - hold");   "q quit   c clear   i invert   + - hold"
+; D 4051 C1 0F          PRINTSTR R15
+; D 4053 BE 00          RETURN
+; main():
+; D 4055 11 01 00 02    LOADXI R1 0002                 hold = 2; inv = 0;
+; D 4059 11 06 00 00    LOADXI R6 0000
+; D 405D BD 00 05       CALL F_screen                  screen();
+; D 4060 11 08 00 00    LOADXI R8 0000                 on = 0; quiet = 0; sounds = 0; shown = 0; oldmask = 99; cnt
+; D 4064 11 05 00 00    LOADXI R5 0000
+; D 4068 11 0A 00 00    LOADXI R10 0000
+; D 406C 11 0F 00 00    LOADXI R15 0000
+; D 4070 11 0E 05 B3    LOADXI R14 05B3                shown
+; D 4074 3A 02 FE       COPYXMY R15 -> M(R14)
+; D 4077 11 0C 00 63    LOADXI R12 0063
+; D 407B 11 07 00 00    LOADXI R7 0000
+; D 407F 11 03 00 00    LOADXI R3 0000
+; D 4083 11 09 00 00    LOADXI R9 0000
+; D 4087 11 0F 05 06    LOADXI R15 0506                at(10, 12); printu(hold);   at(10, 12)
+; D 408B C1 0F          PRINTSTR R15
+; D 408D 22 01          COPYXA R1 -> Acc
+; D 408F 24             COPYAMA
+; D 4090 6B 00          CVT2DEC Acc
+; D 4092 6E             OUTDEC
+; D 4093 11 0F 05 0F    LOADXI R15 050F                at(11, 12); if (inv) print("inverted"); else print("normal")   at(11, 12)
+; D 4097 C1 0F          PRINTSTR R15
+; D 4099 8C 06          TESTXZ R6
+; D 409B A0 00 A7       IFTRUEI L5
+; D 409E 11 0F 05 18    LOADXI R15 0518                "inverted"
+; D 40A2 C1 0F          PRINTSTR R15
+; D 40A4 B0 00 AD       GAL L6
+; D 40A7 11 0F 05 21    LOADXI R15 0521                "normal"
+; D 40AB C1 0F          PRINTSTR R15
+; D 40AD F1 45 B5       RUNMC 45B5                     LDI 0   native block, 33 bytes
+; D 40B0 8C 00          TESTXZ R0                      if (hits) seen = 1;                // the line itself (befor
+; D 40B2 A0 00 B9       IFTRUEI L12
+; D 40B5 11 09 00 01    LOADXI R9 0001
+; D 40B9 8C 06          TESTXZ R6                      if (inv) hits = SAMPLES - hits;
+; D 40BB A0 00 C5       IFTRUEI L14
+; D 40BE 11 0F 03 E8    LOADXI R15 03E8
+; D 40C2 51 F0 00       SUBXYZ R15 - R0 -> R0
+; D 40C5 11 0F 00 32    LOADXI R15 0032                lvl = hits / 50;                   // 0-1000 -> 0-20
+; D 40C9 4D 0F          DIVXY R0 / R15
+; D 40CB 21 1B          COPYAX MA -> R11
+; D 40CD 89 3B          TESTLXY R3 < R11               if (lvl > peak) peak = lvl;
+; D 40CF A1 00 D5       IFFALSEI L16
+; D 40D2 23 00 B3       COPYXY R11 -> R3
+; D 40D5 8C 08          TESTXZ R8                      if (on) {
+; D 40D7 A0 00 FA       IFTRUEI L17
+; D 40DA 8C 00          TESTXZ R0                      if (hits) quiet = 0;
+; D 40DC A0 00 E6       IFTRUEI L19
+; D 40DF 11 05 00 00    LOADXI R5 0000
+; D 40E3 B0 00 F7       GAL L20
+; D 40E6 42 05          INCX R5                        quiet++;
+; D 40E8 89 15          TESTLXY R1 < R5                if (quiet > hold) { on = 0; print("\e[5;12H quiet "); }
+; D 40EA A1 00 F7       IFFALSEI L22
+; D 40ED 11 08 00 00    LOADXI R8 0000
+; D 40F1 11 0F 05 28    LOADXI R15 0528                "\x1b[5;12H quiet "
+; D 40F5 C1 0F          PRINTSTR R15
+; D 40F7 B0 01 15       GAL L18
+; D 40FA 8C 00          TESTXZ R0                      } else if (hits) {
+; D 40FC A0 01 15       IFTRUEI L24
+; D 40FF 11 08 00 01    LOADXI R8 0001                 on = 1; quiet = 0; sounds++;
+; D 4103 11 05 00 00    LOADXI R5 0000
+; D 4107 42 0A          INCX R10
+; D 4109 11 0F 05 37    LOADXI R15 0537                print("\e[5;12H\e[7m SOUND \e[0m\e[9;12H"); printu(sounds);   "\x1b[5;12H\x1b[7m SOUND \x1b[0m\x1b[9;12"
+; D 410D C1 0F          PRINTSTR R15
+; D 410F 22 0A          COPYXA R10 -> Acc
+; D 4111 24             COPYAMA
+; D 4112 6B 00          CVT2DEC Acc
+; D 4114 6E             OUTDEC
+; D 4115 42 07          INCX R7                        cnt++;
+; D 4117 65 17 00 03    AND R7 0003                    if ((cnt & 3) == 0) {              // every fourth check: th
+; D 411B 21 1F          COPYAX MA -> R15
+; D 411D 8C 0F          TESTXZ R15
+; D 411F A1 01 D5       IFFALSEI L26
+; D 4122 11 0F 05 B3    LOADXI R15 05B3                if (peak != shown) {   shown
+; D 4126 39 02 FF       COPYMXY M(R15) -> R15
+; D 4129 87 3F          TESTXY R3 = R15
+; D 412B A0 01 51       IFTRUEI L28
+; D 412E 11 0F 05 55    LOADXI R15 0555                at(7, 13); print(&hashes[BAR - peak]); print(&dots[peak]);   at(7, 13)
+; D 4132 C1 0F          PRINTSTR R15
+; D 4134 11 0E 00 14    LOADXI R14 0014
+; D 4138 51 E3 0F       SUBXYZ R14 - R3 -> R15
+; D 413B 52 0F 05 88    ADDXI R15 0588
+; D 413F C1 0F          PRINTSTR R15
+; D 4141 23 00 3F       COPYXY R3 -> R15
+; D 4144 52 0F 05 9D    ADDXI R15 059D
+; D 4148 C1 0F          PRINTSTR R15
+; D 414A 11 0F 05 B3    LOADXI R15 05B3                shown = peak;   shown
+; D 414E 3A 02 3F       COPYXMY R3 -> M(R15)
+; D 4151 11 03 00 00    LOADXI R3 0000                 peak = 0;
+; D 4155 09             GETEFA                         mask = ef() & 11;   EF1-4 as a mask
+; D 4156 21 0F          COPYAX Acc -> R15
+; D 4158 65 1F 00 0B    AND R15 000B
+; D 415C 21 12          COPYAX MA -> R2
+; D 415E 8C 09          TESTXZ R9                      if (seen) mask = mask | 4;
+; D 4160 A0 01 69       IFTRUEI L30
+; D 4163 63 12 00 04    OR R2 0004
+; D 4167 21 12          COPYAX MA -> R2
+; D 4169 11 09 00 00    LOADXI R9 0000                 seen = 0;
+; D 416D 87 2C          TESTXY R2 = R12                if (mask != oldmask) {
+; D 416F A0 01 D5       IFTRUEI L32
+; D 4172 23 00 2C       COPYXY R2 -> R12               oldmask = mask;
+; D 4175 11 0F 05 5D    LOADXI R15 055D                at(3, 14); if (mask & 1) putc('*'); else putc('.');   at(3, 14)
+; D 4179 C1 0F          PRINTSTR R15
+; D 417B 65 12 00 01    AND R2 0001
+; D 417F 21 1F          COPYAX MA -> R15
+; D 4181 8C 0F          TESTXZ R15
+; D 4183 A0 01 8B       IFTRUEI L33
+; D 4186 CA 2A          SEROUTI 2A '*'
+; D 4188 B0 01 8D       GAL L34
+; D 418B CA 2E          SEROUTI 2E '.'
+; D 418D 11 0F 05 65    LOADXI R15 0565                at(3, 19); if (mask & 2) putc('*'); else putc('.');   at(3, 19)
+; D 4191 C1 0F          PRINTSTR R15
+; D 4193 65 12 00 02    AND R2 0002
+; D 4197 21 1F          COPYAX MA -> R15
+; D 4199 8C 0F          TESTXZ R15
+; D 419B A0 01 A3       IFTRUEI L35
+; D 419E CA 2A          SEROUTI 2A '*'
+; D 41A0 B0 01 A5       GAL L36
+; D 41A3 CA 2E          SEROUTI 2E '.'
+; D 41A5 11 0F 05 6D    LOADXI R15 056D                at(3, 24); if (mask & 4) putc('*'); else putc('.');   at(3, 24)
+; D 41A9 C1 0F          PRINTSTR R15
+; D 41AB 65 12 00 04    AND R2 0004
+; D 41AF 21 1F          COPYAX MA -> R15
+; D 41B1 8C 0F          TESTXZ R15
+; D 41B3 A0 01 BB       IFTRUEI L37
+; D 41B6 CA 2A          SEROUTI 2A '*'
+; D 41B8 B0 01 BD       GAL L38
+; D 41BB CA 2E          SEROUTI 2E '.'
+; D 41BD 11 0F 05 75    LOADXI R15 0575                at(3, 29); if (mask & 8) putc('*'); else putc('.');   at(3, 29)
+; D 41C1 C1 0F          PRINTSTR R15
+; D 41C3 65 12 00 08    AND R2 0008
+; D 41C7 21 1F          COPYAX MA -> R15
+; D 41C9 8C 0F          TESTXZ R15
+; D 41CB A0 01 D3       IFTRUEI L39
+; D 41CE CA 2A          SEROUTI 2A '*'
+; D 41D0 B0 01 D5       GAL L40
+; D 41D3 CA 2E          SEROUTI 2E '.'
+; D 41D5 CC             SERST                          if (keyready()) {
+; D 41D6 A1 02 66       IFFALSEI L42
+; D 41D9 CB             SERIN                          k = getc();
+; D 41DA 21 04          COPYAX Acc -> R4
+; D 41DC 86 04 00 71    TESTXI R4 0071                 if (k == 'q' || k == 'Q') { cls(); cursor(1); halt(); }
+; D 41E0 A0 01 EA       IFTRUEI L45
+; D 41E3 86 04 00 51    TESTXI R4 0051
+; D 41E7 A1 01 F9       IFFALSEI L44
+; D 41EA 11 0F 02 80    LOADXI R15 0280                cls()
+; D 41EE C1 0F          PRINTSTR R15
+; D 41F0 11 0F 05 7D    LOADXI R15 057D                cursor(1)
+; D 41F4 C1 0F          PRINTSTR R15
+; D 41F6 B0 00 04       GAL QUIT
+; D 41F9 86 04 00 63    TESTXI R4 0063                 if (k == 'c' || k == 'C') break;
+; D 41FD A0 02 69       IFTRUEI L9
+; D 4200 86 04 00 43    TESTXI R4 0043
+; D 4204 A0 02 69       IFTRUEI L9
+; D 4207 86 04 00 69    TESTXI R4 0069                 if (k == 'i' || k == 'I') { inv = inv ^ 1; break; }
+; D 420B A0 02 15       IFTRUEI L48
+; D 420E 86 04 00 49    TESTXI R4 0049
+; D 4212 A1 02 1E       IFFALSEI L47
+; D 4215 64 16 00 01    XOR R6 0001
+; D 4219 21 16          COPYAX MA -> R6
+; D 421B B0 02 69       GAL L9
+; D 421E 86 04 00 2B    TESTXI R4 002B                 if (k == '+' && hold < 20) { hold++; at(10, 12); printu(hold
+; D 4222 A1 02 42       IFFALSEI L50
+; D 4225 11 0F 00 14    LOADXI R15 0014
+; D 4229 89 1F          TESTLXY R1 < R15
+; D 422B A1 02 42       IFFALSEI L50
+; D 422E 42 01          INCX R1
+; D 4230 11 0F 05 06    LOADXI R15 0506                at(10, 12)
+; D 4234 C1 0F          PRINTSTR R15
+; D 4236 22 01          COPYXA R1 -> Acc
+; D 4238 24             COPYAMA
+; D 4239 6B 00          CVT2DEC Acc
+; D 423B 6E             OUTDEC
+; D 423C 11 0F 05 84    LOADXI R15 0584                eol()
+; D 4240 C1 0F          PRINTSTR R15
+; D 4242 86 04 00 2D    TESTXI R4 002D                 if (k == '-' && hold > 0) { hold--; at(10, 12); printu(hold)
+; D 4246 A1 02 66       IFFALSEI L52
+; D 4249 11 0F 00 00    LOADXI R15 0000
+; D 424D 89 F1          TESTLXY R15 < R1
+; D 424F A1 02 66       IFFALSEI L52
+; D 4252 43 01          DECX R1
+; D 4254 11 0F 05 06    LOADXI R15 0506                at(10, 12)
+; D 4258 C1 0F          PRINTSTR R15
+; D 425A 22 01          COPYXA R1 -> Acc
+; D 425C 24             COPYAMA
+; D 425D 6B 00          CVT2DEC Acc
+; D 425F 6E             OUTDEC
+; D 4260 11 0F 05 84    LOADXI R15 0584                eol()
+; D 4264 C1 0F          PRINTSTR R15
+; D 4266 B0 00 AD       GAL L7                         while (1) {
+; D 4269 B0 00 5D       GAL L1                         while (1) {
+; D 426C BE 00          RETURN
+; D 426E F0 00 00       BREAK                          end marker: the pre-pass stops here
+;
+; NATIVE 1802  -  33 bytes at $45B5, run by RUNMC
+;
+; N 45B5 F8 00      LDI 0
+; N 45B7 BD         PHI RD
+; N 45B8 AD         PLO RD
+; N 45B9 F8 03      LDI hi(SAMPLES)
+; N 45BB B8         PHI R8
+; N 45BC F8 E8      LDI lo(SAMPLES)
+; N 45BE A8         PLO R8
+; loop:
+; N 45BF 3E C2      BN3 off
+; N 45C1 1D         INC RD
+; off:
+; N 45C2 28         DEC R8
+; N 45C3 88         GLO R8
+; N 45C4 3A BF      BNZ loop
+; N 45C6 98         GHI R8
+; N 45C7 3A BF      BNZ loop
+; N 45C9 F8 30      LDI hi({hits})
+; N 45CB B9         PHI R9
+; N 45CC F8 00      LDI lo({hits})
+; N 45CE A9         PLO R9
+; N 45CF 9D         GHI RD
+; N 45D0 59         STR R9
+; N 45D1 19         INC R9
+; N 45D2 8D         GLO RD
+; N 45D3 59         STR R9
+; N 45D4 E2         exit:  SEX R2
+; N 45D5 D5         RETN
+
+; CODE  -  download this block
+
+D 4000 CD
+D 4001 BD 00 55
+D 4004 00
+D 4005 11 0F 02 80
+D 4009 C1 0F
+D 400B 11 0F 02 8C
+D 400F C1 0F
+D 4011 11 0F 02 93
+D 4015 C1 0F
+D 4017 11 0F 02 BB
+D 401B C1 0F
+D 401D 11 0F 03 02
+D 4021 C1 0F
+D 4023 11 0F 03 18
+D 4027 C1 0F
+D 4029 11 0F 03 3E
+D 402D C1 0F
+D 402F 11 0F 03 5F
+D 4033 C1 0F
+D 4035 11 0F 03 AD
+D 4039 C1 0F
+D 403B 11 0F 03 FD
+D 403F C1 0F
+D 4041 11 0F 04 47
+D 4045 C1 0F
+D 4047 11 0F 04 95
+D 404B C1 0F
+D 404D 11 0F 04 DF
+D 4051 C1 0F
+D 4053 BE 00
+D 4055 11 01 00 02
+D 4059 11 06 00 00
+D 405D BD 00 05
+D 4060 11 08 00 00
+D 4064 11 05 00 00
+D 4068 11 0A 00 00
+D 406C 11 0F 00 00
+D 4070 11 0E 05 B3
+D 4074 3A 02 FE
+D 4077 11 0C 00 63
+D 407B 11 07 00 00
+D 407F 11 03 00 00
+D 4083 11 09 00 00
+D 4087 11 0F 05 06
+D 408B C1 0F
+D 408D 22 01
+D 408F 24
+D 4090 6B 00
+D 4092 6E
+D 4093 11 0F 05 0F
+D 4097 C1 0F
+D 4099 8C 06
+D 409B A0 00 A7
+D 409E 11 0F 05 18
+D 40A2 C1 0F
+D 40A4 B0 00 AD
+D 40A7 11 0F 05 21
+D 40AB C1 0F
+D 40AD F1 45 B5
+D 40B0 8C 00
+D 40B2 A0 00 B9
+D 40B5 11 09 00 01
+D 40B9 8C 06
+D 40BB A0 00 C5
+D 40BE 11 0F 03 E8
+D 40C2 51 F0 00
+D 40C5 11 0F 00 32
+D 40C9 4D 0F
+D 40CB 21 1B
+D 40CD 89 3B
+D 40CF A1 00 D5
+D 40D2 23 00 B3
+D 40D5 8C 08
+D 40D7 A0 00 FA
+D 40DA 8C 00
+D 40DC A0 00 E6
+D 40DF 11 05 00 00
+D 40E3 B0 00 F7
+D 40E6 42 05
+D 40E8 89 15
+D 40EA A1 00 F7
+D 40ED 11 08 00 00
+D 40F1 11 0F 05 28
+D 40F5 C1 0F
+D 40F7 B0 01 15
+D 40FA 8C 00
+D 40FC A0 01 15
+D 40FF 11 08 00 01
+D 4103 11 05 00 00
+D 4107 42 0A
+D 4109 11 0F 05 37
+D 410D C1 0F
+D 410F 22 0A
+D 4111 24
+D 4112 6B 00
+D 4114 6E
+D 4115 42 07
+D 4117 65 17 00 03
+D 411B 21 1F
+D 411D 8C 0F
+D 411F A1 01 D5
+D 4122 11 0F 05 B3
+D 4126 39 02 FF
+D 4129 87 3F
+D 412B A0 01 51
+D 412E 11 0F 05 55
+D 4132 C1 0F
+D 4134 11 0E 00 14
+D 4138 51 E3 0F
+D 413B 52 0F 05 88
+D 413F C1 0F
+D 4141 23 00 3F
+D 4144 52 0F 05 9D
+D 4148 C1 0F
+D 414A 11 0F 05 B3
+D 414E 3A 02 3F
+D 4151 11 03 00 00
+D 4155 09
+D 4156 21 0F
+D 4158 65 1F 00 0B
+D 415C 21 12
+D 415E 8C 09
+D 4160 A0 01 69
+D 4163 63 12 00 04
+D 4167 21 12
+D 4169 11 09 00 00
+D 416D 87 2C
+D 416F A0 01 D5
+D 4172 23 00 2C
+D 4175 11 0F 05 5D
+D 4179 C1 0F
+D 417B 65 12 00 01
+D 417F 21 1F
+D 4181 8C 0F
+D 4183 A0 01 8B
+D 4186 CA 2A
+D 4188 B0 01 8D
+D 418B CA 2E
+D 418D 11 0F 05 65
+D 4191 C1 0F
+D 4193 65 12 00 02
+D 4197 21 1F
+D 4199 8C 0F
+D 419B A0 01 A3
+D 419E CA 2A
+D 41A0 B0 01 A5
+D 41A3 CA 2E
+D 41A5 11 0F 05 6D
+D 41A9 C1 0F
+D 41AB 65 12 00 04
+D 41AF 21 1F
+D 41B1 8C 0F
+D 41B3 A0 01 BB
+D 41B6 CA 2A
+D 41B8 B0 01 BD
+D 41BB CA 2E
+D 41BD 11 0F 05 75
+D 41C1 C1 0F
+D 41C3 65 12 00 08
+D 41C7 21 1F
+D 41C9 8C 0F
+D 41CB A0 01 D3
+D 41CE CA 2A
+D 41D0 B0 01 D5
+D 41D3 CA 2E
+D 41D5 CC
+D 41D6 A1 02 66
+D 41D9 CB
+D 41DA 21 04
+D 41DC 86 04 00 71
+D 41E0 A0 01 EA
+D 41E3 86 04 00 51
+D 41E7 A1 01 F9
+D 41EA 11 0F 02 80
+D 41EE C1 0F
+D 41F0 11 0F 05 7D
+D 41F4 C1 0F
+D 41F6 B0 00 04
+D 41F9 86 04 00 63
+D 41FD A0 02 69
+D 4200 86 04 00 43
+D 4204 A0 02 69
+D 4207 86 04 00 69
+D 420B A0 02 15
+D 420E 86 04 00 49
+D 4212 A1 02 1E
+D 4215 64 16 00 01
+D 4219 21 16
+D 421B B0 02 69
+D 421E 86 04 00 2B
+D 4222 A1 02 42
+D 4225 11 0F 00 14
+D 4229 89 1F
+D 422B A1 02 42
+D 422E 42 01
+D 4230 11 0F 05 06
+D 4234 C1 0F
+D 4236 22 01
+D 4238 24
+D 4239 6B 00
+D 423B 6E
+D 423C 11 0F 05 84
+D 4240 C1 0F
+D 4242 86 04 00 2D
+D 4246 A1 02 66
+D 4249 11 0F 00 00
+D 424D 89 F1
+D 424F A1 02 66
+D 4252 43 01
+D 4254 11 0F 05 06
+D 4258 C1 0F
+D 425A 22 01
+D 425C 24
+D 425D 6B 00
+D 425F 6E
+D 4260 11 0F 05 84
+D 4264 C1 0F
+D 4266 B0 00 AD
+D 4269 B0 00 5D
+D 426C BE 00
+D 426E F0 00 00
+
+D 4280 1B 5B 30 6D 1B 5B 32 4A 1B 5B 48 00
+
+D 428C 1B 5B 3F 32 35 6C 00
+
+D 4293 53 54 45 4C 4C 41 52 20 45 41 52 20 54 45 53 54
+D 42A3 20 2D 20 6C 69 73 74 65 6E 69 6E 67 20 6F 6E 20
+D 42B3 45 46 33 0D 0A 0D 0A 00
+
+D 42BB 45 46 20 6C 69 6E 65 73 20 20 20 31 20 2E 20 20
+D 42CB 32 20 2E 20 20 33 20 2E 20 20 34 20 2E 20 20 20
+D 42DB 20 20 28 2A 20 3D 20 74 68 65 20 6C 69 6E 65 20
+D 42EB 69 73 20 70 75 6C 6C 65 64 20 6C 6F 77 3A 20 6F
+D 42FB 6E 29 0D 0A 0D 0A 00
+
+D 4302 45 46 33 20 20 20 20 20 20 20 20 20 71 75 69 65
+D 4312 74 0D 0A 0D 0A 00
+
+D 4318 4C 65 76 65 6C 20 20 20 20 20 20 5B 2E 2E 2E 2E
+D 4328 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 4338 5D 0D 0A 0D 0A 00
+
+D 433E 53 6F 75 6E 64 73 20 20 20 20 20 30 0D 0A 48 6F
+D 434E 6C 64 0D 0A 50 6F 6C 61 72 69 74 79 0D 0A 0D 0A
+D 435E 00
+
+D 435F 4E 6F 74 68 69 6E 67 20 70 6C 75 67 67 65 64 20
+D 436F 69 6E 3A 20 65 76 65 72 79 20 6C 69 6E 65 20 73
+D 437F 68 6F 77 73 20 27 2E 27 2C 20 45 46 34 20 27 2A
+D 438F 27 20 6F 6E 6C 79 20 77 68 69 6C 65 20 49 4E 50
+D 439F 55 54 20 69 73 20 68 65 6C 64 2E 0D 0A 00
+
+D 43AD 45 46 33 20 27 2A 27 20 77 69 74 68 20 6E 6F 74
+D 43BD 68 69 6E 67 20 70 6C 75 67 67 65 64 20 69 6E 3A
+D 43CD 20 4A 50 36 20 69 73 20 73 74 69 6C 6C 20 66 69
+D 43DD 74 74 65 64 20 28 52 53 2D 32 33 32 20 69 6E 70
+D 43ED 75 74 20 6F 77 6E 73 20 45 46 33 29 2E 0D 0A 00
+
+D 43FD 41 20 63 6C 61 70 20 6F 72 20 6B 6E 6F 63 6B 3A
+D 440D 20 53 6F 75 6E 64 73 20 67 6F 65 73 20 75 70 20
+D 441D 62 79 20 6F 6E 65 2E 20 41 20 73 74 65 61 64 79
+D 442D 20 74 6F 6E 65 3A 20 53 4F 55 4E 44 20 73 74 61
+D 443D 79 73 20 6C 69 74 2E 0D 0A 00
+
+D 4447 53 4F 55 4E 44 20 6C 69 74 20 77 68 65 6E 20 69
+D 4457 74 20 69 73 20 71 75 69 65 74 3A 20 74 68 65 20
+D 4467 65 61 72 27 73 20 6F 75 74 70 75 74 20 69 73 20
+D 4477 74 68 65 20 6F 74 68 65 72 20 77 61 79 20 75 70
+D 4487 20 2D 20 70 72 65 73 73 20 69 2E 0D 0A 00
+
+D 4495 41 20 72 61 77 20 73 6F 75 6E 64 20 6D 6F 64 75
+D 44A5 6C 65 20 63 6F 75 6E 74 69 6E 67 20 6F 6E 65 20
+D 44B5 63 6C 61 70 20 61 73 20 73 65 76 65 72 61 6C 3A
+D 44C5 20 70 72 65 73 73 20 2B 20 28 6D 6F 72 65 20 68
+D 44D5 6F 6C 64 29 2E 0D 0A 0D 0A 00
+
+D 44DF 71 20 71 75 69 74 20 20 20 63 20 63 6C 65 61 72
+D 44EF 20 20 20 69 20 69 6E 76 65 72 74 20 20 20 2B 20
+D 44FF 2D 20 68 6F 6C 64 00
+
+D 4506 1B 5B 31 30 3B 31 32 48 00
+
+D 450F 1B 5B 31 31 3B 31 32 48 00
+
+D 4518 69 6E 76 65 72 74 65 64 00
+
+D 4521 6E 6F 72 6D 61 6C 00
+
+D 4528 1B 5B 35 3B 31 32 48 20 71 75 69 65 74 20 00
+
+D 4537 1B 5B 35 3B 31 32 48 1B 5B 37 6D 20 53 4F 55 4E
+D 4547 44 20 1B 5B 30 6D 1B 5B 39 3B 31 32 48 00
+
+D 4555 1B 5B 37 3B 31 33 48 00
+
+D 455D 1B 5B 33 3B 31 34 48 00
+
+D 4565 1B 5B 33 3B 31 39 48 00
+
+D 456D 1B 5B 33 3B 32 34 48 00
+
+D 4575 1B 5B 33 3B 32 39 48 00
+
+D 457D 1B 5B 3F 32 35 68 00
+
+D 4584 1B 5B 4B 00
+
+D 4588 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23 23
+D 4598 23 23 23 23 00
+
+D 459D 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E 2E
+D 45AD 2E 2E 2E 2E 5D 00
+
+D 45B5 F8 00 BD AD F8 03 B8 F8 E8 A8 3E C2 1D 28 88 3A
+D 45C5 BF 98 3A BF F8 30 B9 F8 00 A9 9D 59 19 8D 59 E2
+D 45D5 D5
+D 5000 00
+D 6000 00
+D 7000 00

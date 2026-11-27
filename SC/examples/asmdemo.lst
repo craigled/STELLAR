@@ -1,0 +1,140 @@
+; ==========================================================================
+; asmdemo  -  compiled from asmdemo.sc by scc (Stellar C, prototype)   loads at $4000
+; ==========================================================================
+; 56 STELLAR commands, 133 bytes of code, 21 bytes of data.
+; registers: main.i R0, countkeys.k R0, twice.a R0, main.n R1, main.p R2
+; in memory: nothing
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 4000 CD             START                          Stellar C: asmdemo
+; D 4001 BD 00 1D       CALL F_main                    run main()
+; QUIT:
+; D 4004 00             HALT
+; twice():
+; D 4005 50 00 0D       ADDXYZ R0 + R0 -> R13          u16 twice(u16 a) { return a + a; }
+; D 4008 BE 00          RETURN
+; countkeys():
+; D 400A 11 00 00 00    LOADXI R0 0000                 u16 k = 0;
+; A_countkeys_poll:
+; D 400E CC             SERST                          SERST                      // a key waiting?
+; D 400F A1 00 18       IFFALSEI done                  IFFALSEI @done
+; D 4012 CB             SERIN                          SERIN                      // take it
+; D 4013 42 00          INCX 00                        INCX 0{k}
+; D 4015 B0 00 0E       GAL poll                       GAL @poll
+; A_countkeys_done:
+; D 4018 23 00 0D       COPYXY R0 -> R13               return k;
+; D 401B BE 00          RETURN
+; main():
+; D 401D 11 01 00 07    LOADXI R1 0007                 n = 7; i = 6;
+; D 4021 11 00 00 06    LOADXI R0 0006
+; D 4025 4A 10          MULTXY 10                      MULTXY {n}{i}              // MA = n * i
+; D 4027 21 11          COPYAX 11                      COPYAX 1{n}                // n = MA
+; D 4029 22 01          COPYXA R1 -> Acc               printu(n);
+; D 402B 24             COPYAMA
+; D 402C 6B 00          CVT2DEC Acc
+; D 402E 6E             OUTDEC
+; D 402F 11 02 00 9B    LOADXI 02 00 9B                LOADXI 0{p} #&msg          // an array's address
+; D 4033 C1 02          PRINTSTR 02                    PRINTSTR 0{p}
+; D 4035 11 00 00 00    LOADXI R0 0000                 i = 0;
+; D 4039 42 00          INCX R0                        i++;
+; D 403B 86 00 00 05    TESTXI 00 00 05                TESTXI 0{i} #5
+; D 403F A0 00 45       IFTRUEI break                  IFTRUEI @break         // leaves the while loop
+; D 4042 B0 00 39       GAL L1                         while (1) {
+; D 4045 22 00          COPYXA R0 -> Acc               printu(i);
+; D 4047 24             COPYAMA
+; D 4048 6B 00          CVT2DEC Acc
+; D 404A 6E             OUTDEC
+; D 404B 11 00 00 15    LOADXI 00 00 15                LOADXI 0{twice.a} #21      // twice()'s parameter, set by ha
+; D 404F BD 00 05       CALL twice                     CALL @twice
+; D 4052 23 00 D1       COPYXY 00 D1                   COPYXY 00 D{n}             // the return value comes back in
+; D 4055 86 01 00 2A    TESTXI 01 00 2A                TESTXI 0{n} #42
+; D 4059 A0 00 5E       IFTRUEI good                   IFTRUEI @good
+; D 405C CA 58          SEROUTI 58                     SEROUTI %'X'
+; A_main_good:
+; D 405E CA 20          SEROUTI 20                     SEROUTI ' '
+; D 4060 CA 21          SEROUTI 21                     SEROUTI %0x21              // '!'
+; D 4062 22 01          COPYXA R1 -> Acc               printu(n);
+; D 4064 24             COPYAMA
+; D 4065 6B 00          CVT2DEC Acc
+; D 4067 6E             OUTDEC
+; D 4068 11 0F 00 90    LOADXI R15 0090                print("\r\n");   "\r\n"
+; D 406C C1 0F          PRINTSTR R15
+; D 406E BD 00 0A       CALL F_countkeys               printu(countkeys());
+; D 4071 23 00 D3       COPYXY R13 -> R3
+; D 4074 22 03          COPYXA R3 -> Acc
+; D 4076 24             COPYAMA
+; D 4077 6B 00          CVT2DEC Acc
+; D 4079 6E             OUTDEC
+; D 407A 11 0F 00 93    LOADXI R15 0093                print(" keys\r\n");   " keys\r\n"
+; D 407E C1 0F          PRINTSTR R15
+; D 4080 BE 00          RETURN
+; D 4082 F0 00 00       BREAK                          end marker: the pre-pass stops here
+
+; CODE  -  download this block
+
+D 4000 CD
+D 4001 BD 00 1D
+D 4004 00
+D 4005 50 00 0D
+D 4008 BE 00
+D 400A 11 00 00 00
+D 400E CC
+D 400F A1 00 18
+D 4012 CB
+D 4013 42 00
+D 4015 B0 00 0E
+D 4018 23 00 0D
+D 401B BE 00
+D 401D 11 01 00 07
+D 4021 11 00 00 06
+D 4025 4A 10
+D 4027 21 11
+D 4029 22 01
+D 402B 24
+D 402C 6B 00
+D 402E 6E
+D 402F 11 02 00 9B
+D 4033 C1 02
+D 4035 11 00 00 00
+D 4039 42 00
+D 403B 86 00 00 05
+D 403F A0 00 45
+D 4042 B0 00 39
+D 4045 22 00
+D 4047 24
+D 4048 6B 00
+D 404A 6E
+D 404B 11 00 00 15
+D 404F BD 00 05
+D 4052 23 00 D1
+D 4055 86 01 00 2A
+D 4059 A0 00 5E
+D 405C CA 58
+D 405E CA 20
+D 4060 CA 21
+D 4062 22 01
+D 4064 24
+D 4065 6B 00
+D 4067 6E
+D 4068 11 0F 00 90
+D 406C C1 0F
+D 406E BD 00 0A
+D 4071 23 00 D3
+D 4074 22 03
+D 4076 24
+D 4077 6B 00
+D 4079 6E
+D 407A 11 0F 00 93
+D 407E C1 0F
+D 4080 BE 00
+D 4082 F0 00 00
+
+D 4090 0D 0A 00
+
+D 4093 20 6B 65 79 73 0D 0A 00
+
+D 409B 20 61 73 6D 20 6F 6B 0D 0A 00
+D 5000 00
+D 6000 00
+D 7000 00

@@ -1,0 +1,103 @@
+{
+ "shared": {
+  "job": 17093,
+  "job__h": 17097,
+  "job__t": 17098,
+  "job__n": 17099,
+  "done": 17100,
+  "paused": 17101,
+  "answer": 17102,
+  "ticks": 17104
+ },
+ "vms": {
+  "1": {
+   "vars": {
+    "main.k": {
+     "reg": 0
+    },
+    "main.n": {
+     "reg": 1
+    },
+    "answer": {
+     "mem": 17102
+    },
+    "ticks": {
+     "mem": 17104
+    }
+   },
+   "arrays": {
+    "job": 17093,
+    "job__h": 17097,
+    "job__t": 17098,
+    "job__n": 17099,
+    "done": 17100,
+    "paused": 17101
+   },
+   "labels": {
+    "QUIT": 16488,
+    "F_main": 16507,
+    "R_main": 16893
+   },
+   "part": "main"
+  },
+  "2": {
+   "vars": {
+    "worker.i": {
+     "reg": 0
+    },
+    "worker.sum": {
+     "reg": 1
+    },
+    "worker.n": {
+     "reg": 2
+    },
+    "answer": {
+     "mem": 82638
+    },
+    "ticks": {
+     "mem": 82640
+    }
+   },
+   "arrays": {
+    "job": 82629,
+    "job__h": 82633,
+    "job__t": 82634,
+    "job__n": 82635,
+    "done": 82636,
+    "paused": 82637
+   },
+   "labels": {
+    "QUIT": 20488,
+    "PARK": 20494,
+    "F_worker": 20500,
+    "R_worker": 20651
+   },
+   "part": "worker"
+  },
+  "3": {
+   "vars": {
+    "ticks": {
+     "mem": 82640
+    },
+    "answer": {
+     "mem": 82638
+    }
+   },
+   "arrays": {
+    "job": 82629,
+    "job__h": 82633,
+    "job__t": 82634,
+    "job__n": 82635,
+    "done": 82636,
+    "paused": 82637
+   },
+   "labels": {
+    "QUIT": 24584,
+    "PARK": 24590,
+    "F_ticker": 24596,
+    "R_ticker": 24619
+   },
+   "part": "ticker"
+  }
+ }
+}

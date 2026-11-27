@@ -1,0 +1,74 @@
+; ==========================================================================
+; frontpanel  -  compiled from frontpanel.sc by scc (Stellar C, prototype)   loads at $4000
+; ==========================================================================
+; 25 STELLAR commands, 64 bytes of code, 70 bytes of data.
+; registers: main.n R0
+; in memory: nothing
+;
+; DISASSEMBLY  -  commented out; the loader skips it
+;
+; D 4000 CD             START                          Stellar C: frontpanel
+; D 4001 BD 00 05       CALL F_main                    run main()
+; QUIT:
+; D 4004 00             HALT
+; main():
+; D 4005 11 0F 00 40    LOADXI R15 0040                print("Counting $00 to $3F on the front panel's display; Q b   "Counting $00 to $3F on the front panel's"
+; D 4009 C1 0F          PRINTSTR R15
+; D 400B 11 00 00 00    LOADXI R0 0000                 for (n = 0; n < 64; n++) {
+; D 400F B0 00 2A       GAL L2
+; D 4012 06 00          OUTX R0                        out(n);   its low byte
+; D 4014 65 10 00 01    AND R0 0001                    q(n & 1);
+; D 4018 21 1F          COPYAX MA -> R15
+; D 401A 8C 0F          TESTXZ R15
+; D 401C A0 00 24       IFTRUEI L5
+; D 401F 0A 01          SETQ 1
+; D 4021 B0 00 26       GAL L6
+; D 4024 0A 00          SETQ 0
+; D 4026 C0 40          DLYI 40                        delay(64);                 // about 8 counts a second at Elf
+; D 4028 42 00          INCX R0                        for (n = 0; n < 64; n++) {
+; D 402A 11 0F 00 40    LOADXI R15 0040
+; D 402E 89 0F          TESTLXY R0 < R15
+; D 4030 A0 00 12       IFTRUEI L1
+; D 4033 0A 00          SETQ 0                         q(0);
+; D 4035 11 0F 00 7E    LOADXI R15 007E                print("Done.\r\n");   "Done.\r\n"
+; D 4039 C1 0F          PRINTSTR R15
+; D 403B BE 00          RETURN
+; D 403D F0 00 00       BREAK                          end marker: the pre-pass stops here
+
+; CODE  -  download this block
+
+D 4000 CD
+D 4001 BD 00 05
+D 4004 00
+D 4005 11 0F 00 40
+D 4009 C1 0F
+D 400B 11 00 00 00
+D 400F B0 00 2A
+D 4012 06 00
+D 4014 65 10 00 01
+D 4018 21 1F
+D 401A 8C 0F
+D 401C A0 00 24
+D 401F 0A 01
+D 4021 B0 00 26
+D 4024 0A 00
+D 4026 C0 40
+D 4028 42 00
+D 402A 11 0F 00 40
+D 402E 89 0F
+D 4030 A0 00 12
+D 4033 0A 00
+D 4035 11 0F 00 7E
+D 4039 C1 0F
+D 403B BE 00
+D 403D F0 00 00
+
+D 4040 43 6F 75 6E 74 69 6E 67 20 24 30 30 20 74 6F 20
+D 4050 24 33 46 20 6F 6E 20 74 68 65 20 66 72 6F 6E 74
+D 4060 20 70 61 6E 65 6C 27 73 20 64 69 73 70 6C 61 79
+D 4070 3B 20 51 20 62 6C 69 6E 6B 73 2E 0D 0A 00
+
+D 407E 44 6F 6E 65 2E 0D 0A 00
+D 5000 00
+D 6000 00
+D 7000 00

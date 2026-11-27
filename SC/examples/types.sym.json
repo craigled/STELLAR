@@ -1,0 +1,56 @@
+{
+ "vars": {
+  "main..h0": {
+   "reg": 0
+  },
+  "r": {
+   "reg": 1
+  },
+  "j": {
+   "reg": 2
+  },
+  "a": {
+   "reg": 3
+  },
+  "b": {
+   "reg": 4
+  },
+  "i": {
+   "reg": 5
+  },
+  "x": {
+   "reg": 6
+  },
+  "total": {
+   "reg": 7
+  },
+  "kind.r": {
+   "reg": 8
+  },
+  "kind.k": {
+   "reg": 9
+  }
+ },
+ "arrays": {
+  "v": 17683,
+  "big": 17697,
+  "sq": 17707,
+  "neg": 17727,
+  "dv": 17735,
+  "txt": 17743
+ },
+ "labels": {
+  "QUIT": 16414,
+  "F_kind": 16415,
+  "R_kind": 16524,
+  "F_main": 16526,
+  "R_main": 17577,
+  "LIB_SDIV": 17579,
+  "LIB_SDIV_A1": 17603,
+  "LIB_SDIV_A2": 17623,
+  "LIB_SDIV_Q": 17644,
+  "LIB_SDIV_R": 17651,
+  "LIB_SDIV_RM": 17665,
+  "LIB_SDIV_D": 17672
+ }
+}
