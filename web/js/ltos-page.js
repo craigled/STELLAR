@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var V = '201';                                    // the ?v= the card is fetched with
+  var V = '202';                                    // the ?v= the card is fetched with
   var KEY = null;                                   // what saved changes are kept under: this card's fingerprint
   var ELF2K = 170000;                               // 1802 instructions a second on Craig's 3 MHz Elf2K
   var CPS = 375000;                                 // its machine cycles a second (3 MHz / 8)
@@ -58,7 +58,7 @@
   var statusEl = document.getElementById('status');
   var vt = window.VT100(termEl);
   var bios = Uint8Array.from(atob(window.LTOS_WEBBIOS), function (c) { return c.charCodeAt(0); });
-  var base = null, m = null, speed = SPEEDS[2], halted = false, lastSave = 0, out = [];
+  var base = null, m = null, speed = SPEEDS[0], halted = false, lastSave = 0, out = [];
 
   function status(t) { statusEl.textContent = t; }
 
@@ -145,19 +145,21 @@
     var b = document.createElement('button');
     b.type = 'button'; b.className = 'clock-btn'; b.textContent = s.label; b.title = s.title || ('×' + (s.ips / ELF2K) + ' the Elf2K');
     b.setAttribute('role', 'radio');
-    b.addEventListener('click', function () { pick(s); });
+    b.addEventListener('click', function () { pick(s, true); });
     s.btn = b; sp.appendChild(b);
   });
-  function pick(s) {
+  function pick(s, chosen) {
     speed = s;
     SPEEDS.forEach(function (x) { x.btn.classList.toggle('active', x === s); x.btn.setAttribute('aria-checked', x === s); });
     document.getElementById('speedLabel').textContent = s.ips ? '≈ ' + Math.round(s.ips / 1000) + 'k 1802 instructions a second' : 'no pacing';
-    try { localStorage.setItem('ltos-speed', s.label); } catch (e) {}
+    if (chosen) try { localStorage.setItem('ltos-clock', s.label); } catch (e) {}   // only a clock the visitor picked
     if (qAudio && qAudio.enabled && s.ips !== ELF2K) status('Sound is muted at ' + s.label + ': it plays at the Elf2K clock only.');
     else if (/^Running LTOS|^Sound is/.test(statusEl.textContent)) status('Running LTOS 0.5 at ' + s.label + '.');
   }
-  var want = null; try { want = localStorage.getItem('ltos-speed'); } catch (e) {}
-  pick(SPEEDS.filter(function (s) { return s.label === want; })[0] || SPEEDS[2]);
+  // Real time to start with, so the games play as on the Elf2K (2026-11-27; was 10×, kept as 'ltos-speed' for
+  // everyone - a new key, so earlier visitors start at Elf2K too)
+  var want = null; try { want = localStorage.getItem('ltos-clock'); localStorage.removeItem('ltos-speed'); } catch (e) {}
+  pick(SPEEDS.filter(function (s) { return s.label === want; })[0] || SPEEDS[0]);
 
   document.getElementById('boot').addEventListener('click', function () {
     if (!base) return status('The card image is still loading…');
